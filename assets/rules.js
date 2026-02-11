@@ -37,6 +37,12 @@ const RULES_BY_KEY = {
     tag: "PHONE",
     mode: "phone" // special handling: if group1 exists keep prefix
   },
+   
+  money: {
+  // currency amounts: EUR/€/$/¥/RMB/CNY + common separators
+  pattern: /\b(?:EUR|RMB|CNY|USD|HKD|GBP|CHF)\s*[\d][\d\s.,]*\d\b|[€$¥]\s*[\d][\d\s.,]*\d\b|[\d][\d\s.,]*\d\s*(?:元|人民币|欧元|美元|英镑|瑞郎)\b/gi,
+  tag: "MONEY"
+},
 
   // German street + house number: mask street+house, keep city/country separately
   // Matches: "...str. 13", "...straße 13a", "...weg 10", "...platz 1"
