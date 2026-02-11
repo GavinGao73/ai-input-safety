@@ -3,21 +3,19 @@ const DETECTION_ITEMS = {
     { key: "email", defaultOn: true },
     { key: "phone", defaultOn: true },
     { key: "bank", defaultOn: true },
-    { key: "address", defaultOn: true },
-    { key: "id", defaultOn: true },
-    { key: "cred", defaultOn: true }
+    { key: "account", defaultOn: true },
+    { key: "address_de_street", defaultOn: true }
   ],
   l2: [
     { key: "url", defaultOn: true },
     { key: "handle", defaultOn: true },
-    { key: "ref", defaultOn: true }
+    { key: "ref", defaultOn: true },
+    { key: "title", defaultOn: true }
   ],
   l3: [
-    { key: "person", defaultOn: false },
-    { key: "org", defaultOn: false },
-    { key: "title", defaultOn: false }
+    // Optional fallback: long numbers (OFF by default)
+    { key: "number", defaultOn: false }
   ]
 };
 
 window.DETECTION_ITEMS = DETECTION_ITEMS;
-
