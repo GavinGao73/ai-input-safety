@@ -7,13 +7,13 @@ const DETECTION_ITEMS = {
     { key: "address_de_street", defaultOn: true }
   ],
   l2: [
-    { key: "url", defaultOn: true },
     { key: "handle", defaultOn: true },
     { key: "ref", defaultOn: true },
     { key: "title", defaultOn: true }
   ],
   l3: [
-    // Optional fallback: long numbers (OFF by default)
+    // Money protection is controlled by UI (M1/M2), but keep as a key for consistency
+    { key: "money", defaultOn: false },
     { key: "number", defaultOn: false }
   ]
 };
