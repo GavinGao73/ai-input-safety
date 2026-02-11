@@ -59,18 +59,30 @@ function setText() {
   }
 }
 
-function applyRules(text) {
+function applyRules(text){
   let out = text;
   let hits = 0;
 
-  for (const k of enabled) {
+  // ✅ fixed priority: protect whole tokens first
+  const PRIORITY = ["email", "bank", "account", "phone", "address_de_street", "address_de_city", "url", "handle", "ref", "title"];
+
+  for (const k of PRIORITY) {
+    if (!enabled.has(k)) continue;
     const r = RULES_BY_KEY[k];
     if (!r) continue;
 
-    out = out.replace(r.pattern, () => {
+    out = out.replace(r.pattern, (...args) => {
       hits++;
+      // if replace string uses $1 etc, default replace works via String.replace,
+      // but here we are in function form; easiest: use direct replace when needed
       return r.replace;
     });
+
+    // For rules with capture groups (account), we need native string replace
+    // so we re-apply using string replace once, without counting extra hits.
+    if (k === "account") {
+      out = out.replace(RULES_BY_KEY.account.pattern, RULES_BY_KEY.account.replace);
+    }
   }
 
   $("hitCount").textContent = hits;
