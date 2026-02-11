@@ -30,11 +30,23 @@
         <div class="sub" id="ui-in-sub"></div>
 
         <div class="outbox">
-         <div class="filebar">
-  <input id="pdfFile" type="file" accept="application/pdf" />
-  <div class="filehint" id="pdfHint">PDF（文字型）可拖拽到这里，或点击选择文件</div>
-</div> 
+          <div class="filebar">
+            <input id="pdfFile" type="file" accept="application/pdf" />
+            <div class="filehint" id="pdfHint">PDF（文字型）可拖拽到这里，或点击选择文件</div>
+          </div>
+
           <textarea id="inputText" spellcheck="false"></textarea>
+        </div>
+
+        <!-- ✅ Money protection (M1/M2) -->
+        <div class="moneybar">
+          <label id="ui-money-label" for="moneyMode">金额保护：</label>
+          <select id="moneyMode">
+            <option value="off">关闭</option>
+            <option value="m1">M1 精确遮盖</option>
+            <option value="m2">M2 区间遮盖</option>
+          </select>
+          <span class="moneyhint" id="ui-money-hint">报价/合同建议开启</span>
         </div>
 
         <details id="panel">
@@ -42,6 +54,7 @@
             <span id="ui-panel-title"></span>
             <span class="pill"><span id="ui-panel-pill"></span> <strong id="ui-enabled-count">0</strong></span>
           </summary>
+
           <div class="hint" id="ui-panel-hint"></div>
 
           <div class="opt-group">
