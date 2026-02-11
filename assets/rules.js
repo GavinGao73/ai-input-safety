@@ -1,71 +1,80 @@
-// v1.2 — tightened rules to reduce false positives
-// Key principles:
-// 1) Remove dangerous generic ID pattern
-// 2) Add context-aware account rule
-// 3) Strengthen email/phone/bank/DE-address stability
+// v1.2.2 — tightened & multilingual placeholder-ready rules
+// Design goals:
+// - No generic "ID" pattern (avoid contaminating normal text)
+// - Phone: only "+..." OR phone-context (Tel/电话/WhatsApp etc.) — avoids house numbers
+// - Address (DE street + house no.): mask street+house, keep city/country
+// - Account: context-aware (银行账号/Account No./Kontonummer...)
+// - Email: tolerate spaces around @ and dots (PDF extraction artifacts)
+// - NUMBER: optional fallback (default OFF in catalog)
 
 const RULES_BY_KEY = {
-  // 1) Email — keep whole token
+  // EMAIL (tolerate spaces caused by PDF extraction)
   email: {
-    pattern: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
-    replace: "[EMAIL]"
+    pattern: /\b[A-Z0-9._%+-]+\s*@\s*[A-Z0-9.-]+\s*\.\s*[A-Z]{2,}\b/gi,
+    tag: "EMAIL"
   },
 
-  // 2) IBAN (EU) — strict
+  // IBAN (EU)
   bank: {
     pattern: /\b[A-Z]{2}\d{2}(?:\s?\d{4}){3,7}\b/g,
-    replace: "[BANK]"
+    tag: "ACCOUNT"
   },
 
-  // 3) Account number (context-aware) — "银行账号/账号/Account" + 12–25 digits
-  // Avoid matching prices or random long digits in other contexts.
+  // Account number (context-aware): 12–25 digits (allow spaces/hyphens)
   account: {
-    pattern: /((?:银行账号|銀行賬號|账号|賬號|收款账号|账户|帳戶|Kontonummer|Account(?:\s*No\.)?)\s*[:：]?\s*)(\d[\d\s-]{10,30}\d)/gi,
-    replace: "$1[ACCOUNT]"
+    pattern:
+      /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|Kontonummer|Account(?:\s*No\.)?)\s*[:：]?\s*)(\d[\d\s-]{10,30}\d)/gi,
+    tag: "ACCOUNT",
+    mode: "prefix" // keep the label prefix
   },
 
-  // 4) Phone — more conservative; requires +country or clear separators, length >= 8 digits
+  // PHONE: only matches if
+  //  A) has +country prefix (international-like), OR
+  //  B) appears after phone-context words (Tel/Telefon/电话/联系方式/WhatsApp...)
   phone: {
-    pattern: /(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d[\d\s-]{6,}\d/g,
-    replace: "[PHONE]"
+    pattern:
+      /((?:tel|telefon|phone|mobile|handy|kontakt|whatsapp|联系方式|联系电话|电话|手機|手机|联系人|聯繫方式)\s*[:：]?\s*)(\+?\d[\d\s().-]{3,}\d)|(\+\d[\d\s().-]{3,}\d)/gi,
+    tag: "PHONE",
+    mode: "phone" // special handling: if group1 exists keep prefix
   },
 
-  // 5) German address (street + house no.) — conservative
-  // Examples: "Albrecht-Dürer-Str 13", "Musterstraße 5", "Hauptweg 10a"
+  // German street + house number: mask street+house, keep city/country separately
+  // Matches: "...str. 13", "...straße 13a", "...weg 10", "...platz 1"
   address_de_street: {
-    pattern: /\b[\p{L}ÄÖÜäöüß.\- ]{2,40}\b(?:str\.?|straße|weg|platz|allee|gasse)\s*\d{1,4}\w?\b/giu,
-    replace: "[ADDRESS_STREET]"
+    pattern:
+      /\b[\p{L}ÄÖÜäöüß.\- ]{2,60}\b(?:str\.?|straße|weg|platz|allee|gasse)\s*\d{1,4}\w?\b/giu,
+    tag: "ADDRESS"
   },
 
-  // 6) German postal code + city — 5 digits + City (optional country)
-  address_de_city: {
-    pattern: /\b\d{5}\s+[\p{L}ÄÖÜäöüß.\- ]{2,40}\b/giu,
-    replace: "[ADDRESS_CITY]"
-  },
-
-  // 7) URL
+  // URL
   url: {
     pattern: /\bhttps?:\/\/\S+/gi,
-    replace: "[URL]"
+    tag: "URL"
   },
 
-  // 8) Social handle
+  // Social handle
   handle: {
     pattern: /@[A-Za-z0-9_]{2,32}\b/g,
-    replace: "[HANDLE]"
+    tag: "HANDLE"
   },
 
-  // 9) Reference-like codes — keep, but stricter than old generic ID
-  // e.g. "AB-20240123", "INV-123456", "CN20250101"
+  // Reference-like codes (stricter than generic ID)
   ref: {
     pattern: /\b[A-Z]{2,6}-?\d{5,14}\b/g,
-    replace: "[REF]"
+    tag: "REF"
   },
 
-  // 10) Title
+  // Titles
   title: {
     pattern: /\b(Mr|Ms|Mrs|Herr|Frau|Fr\.|Hr\.)\b/gi,
-    replace: "[TITLE]"
+    tag: "TITLE"
+  },
+
+  // NUMBER (optional fallback): long digit sequences (8–30), allow spaces/hyphens
+  // Default OFF in catalog
+  number: {
+    pattern: /\b\d[\d\s-]{6,28}\d\b/g,
+    tag: "NUMBER"
   }
 };
 
