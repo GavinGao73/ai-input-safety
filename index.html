@@ -102,6 +102,51 @@
           </div>
         </div>
 
+        <!-- ✅ Share -->
+        <div class="sharebar">
+          <div class="shareleft">
+            <div class="sharetitle" id="ui-share-title">分享安全卡片</div>
+            <div class="sharesub" id="ui-share-sub">不包含你的原文，仅分享安全处理成果</div>
+          </div>
+
+          <div class="shareright">
+            <select id="shareSize">
+              <option value="story">1080×1350（通用/小红书/公众号）</option>
+              <option value="square">1080×1080（朋友圈/头像风格）</option>
+              <option value="wide">1200×628（Twitter/LinkedIn）</option>
+            </select>
+            <button class="btn secondary" id="btnSharePreview">预览</button>
+            <button class="btn primary" id="btnShareDownload">下载卡片</button>
+          </div>
+        </div>
+
+        <!-- Share modal -->
+        <div class="modal" id="shareModal" aria-hidden="true">
+          <div class="modalMask" id="shareMask"></div>
+          <div class="modalCard">
+            <div class="modalHead">
+              <div class="modalTitle" id="ui-share-modal-title">分享预览</div>
+              <button class="iconbtn close" id="btnShareClose">✕</button>
+            </div>
+
+            <div class="modalBody">
+              <div class="previewWrap">
+                <img id="sharePreviewImg" alt="Share preview" />
+              </div>
+
+              <div class="modalActions">
+                <button class="btn secondary" id="btnShareCopyText">复制分享文案</button>
+                <button class="btn secondary" id="btnShareSystem">系统分享</button>
+                <button class="btn primary" id="btnShareDownload2">下载图片</button>
+              </div>
+
+              <div class="tiny muted" id="ui-share-note">
+                注意：卡片不包含你的原文内容，只显示处理统计与隐私承诺。
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="risk" id="riskBox"></div>
 
         <div class="links">
@@ -136,5 +181,6 @@
   <script src="./assets/rules.js" defer></script>
   <script src="./assets/pdf.js" defer></script>
   <script src="./assets/app.js" defer></script>
+  <script src="./assets/share.js" defer></script>
 </body>
 </html>
