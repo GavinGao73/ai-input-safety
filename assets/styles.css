@@ -215,3 +215,27 @@ footer{
   cursor:pointer;
 }
 
+.filebar{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin:8px 0 10px;
+  padding:10px;
+  border:1px dashed rgba(255,255,255,.18);
+  border-radius:12px;
+  background:rgba(255,255,255,.02);
+}
+.filebar.dragover{
+  border-color: rgba(43,144,255,.55);
+  background: rgba(43,144,255,.08);
+}
+.filebar input[type="file"]{
+  max-width: 220px;
+  color: var(--muted);
+}
+.filehint{
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
