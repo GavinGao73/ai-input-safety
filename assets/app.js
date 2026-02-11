@@ -47,11 +47,10 @@ function placeholder(key) {
 function normalizeAmountToNumber(raw) {
   // tolerate "2 000. 00", "2.000,00", "15000.00"
   let s = String(raw || "").replace(/\s+/g, "");
-  // If both '.' and ',' exist, assume one is thousand sep. Keep last separator as decimal.
   const hasDot = s.includes(".");
   const hasComma = s.includes(",");
+
   if (hasDot && hasComma) {
-    // decide decimal separator by last occurrence
     const lastDot = s.lastIndexOf(".");
     const lastComma = s.lastIndexOf(",");
     const decSep = lastDot > lastComma ? "." : ",";
@@ -59,13 +58,11 @@ function normalizeAmountToNumber(raw) {
     s = s.replaceAll(thouSep, "");
     s = s.replace(decSep, ".");
   } else if (hasComma && !hasDot) {
-    // could be decimal or thousands. If comma appears once and is near end => decimal
     const idx = s.lastIndexOf(",");
     const decimals = s.length - idx - 1;
     if (decimals === 2) s = s.replace(",", ".");
     else s = s.replaceAll(",", "");
   } else {
-    // only dot or none: treat dot as decimal if 2 digits, else remove dots
     if (hasDot) {
       const idx = s.lastIndexOf(".");
       const decimals = s.length - idx - 1;
@@ -78,14 +75,12 @@ function normalizeAmountToNumber(raw) {
 }
 
 function moneyRangeLabel(currency, amount) {
-  // Currency families: EUR-like vs CNY-like
   const cur = String(currency || "").toUpperCase();
   const isCNY = (cur === "CNY" || cur === "RMB" || cur === "¥" || cur === "元");
 
   const a = amount;
   if (!Number.isFinite(a) || a <= 0) return placeholder("MONEY");
 
-  // thresholds
   const bands = isCNY
     ? [
         [0, 500, "<500"],
@@ -114,7 +109,6 @@ function moneyRangeLabel(currency, amount) {
 function formatCurrencyForM2(currency) {
   const c = String(currency || "").trim();
   if (!c) return "";
-  // unify symbols/words
   if (c === "€" || c.toUpperCase() === "EUR") return "EUR";
   if (c === "$" || c.toUpperCase() === "USD") return "USD";
   if (c === "¥" || c.toUpperCase() === "CNY" || c.toUpperCase() === "RMB") return "CNY";
@@ -199,6 +193,30 @@ function setText() {
           ? "Text-PDF hierher ziehen oder Datei auswählen"
           : "Drag a text-based PDF here or choose a file";
   }
+
+  // Share UI (if present)
+  const st = $("ui-share-title");
+  const ss = $("ui-share-sub");
+  const smt = $("ui-share-modal-title");
+  const sn = $("ui-share-note");
+  if (st && ss && smt && sn) {
+    if (currentLang === "zh") {
+      st.textContent = "分享安全卡片";
+      ss.textContent = "不包含你的原文，仅分享安全处理成果";
+      smt.textContent = "分享预览";
+      sn.textContent = "注意：卡片不包含你的原文内容，只显示处理统计与隐私承诺。";
+    } else if (currentLang === "de") {
+      st.textContent = "Share-Sicherheitskarte";
+      ss.textContent = "Kein Originaltext – nur Ergebnis & Versprechen";
+      smt.textContent = "Vorschau";
+      sn.textContent = "Hinweis: Die Karte enthält keinen Originaltext, nur Statistik & Datenschutzversprechen.";
+    } else {
+      st.textContent = "Share Safety Card";
+      ss.textContent = "No original text — only outcome & promise";
+      smt.textContent = "Preview";
+      sn.textContent = "Note: the card contains no original text, only stats & privacy promise.";
+    }
+  }
 }
 
 // ---- rule application ----
@@ -220,7 +238,6 @@ function applyRules(text) {
   ];
 
   for (const key of PRIORITY) {
-    // money is controlled by moneyMode, not by enabled toggle alone
     if (key !== "money" && !enabled.has(key)) continue;
 
     const r = RULES_BY_KEY[key];
@@ -243,11 +260,9 @@ function applyRules(text) {
         const num = normalizeAmountToNumber(amountRaw);
         const range = moneyRangeLabel(currencyRaw, num);
 
-        // Output style: "EUR【1k–3k】" / "CNY【10k–50k】"
         if (currentLang === "zh") {
           return (currency ? currency : "") + "【" + range + "】";
         }
-        // de/en: keep bracket style already in labels
         return (currency ? currency : "") + "[" + range + "]";
       });
 
@@ -280,10 +295,15 @@ function applyRules(text) {
   }
 
   $("hitCount").textContent = String(hits);
+
+  // ✅ Share metrics (must be BEFORE return)
+  window.__safe_hits = hits;
+  window.__safe_moneyMode = moneyMode;
+
   return out;
 }
 
-/* ============ PDF helpers (keep your existing) ============ */
+/* ============ PDF helpers ============ */
 async function handlePdf(file) {
   const pdfHint = $("pdfHint");
   const inputEl = $("inputText");
@@ -332,7 +352,6 @@ async function handlePdf(file) {
 
     inputEl.value = text;
 
-    // auto-generate once
     const btn = $("btnGenerate");
     if (btn) btn.click();
 
@@ -393,11 +412,15 @@ function bind() {
   if (mm) {
     mm.addEventListener("change", () => {
       moneyMode = mm.value || "off";
+      // just regenerate; applyRules will update __safe_* globals
       if (($("inputText").value || "").trim()) {
         $("outputText").textContent = applyRules($("inputText").value || "");
       }
     });
+
     moneyMode = mm.value || "off";
+    // keep global in sync even before first generate
+    window.__safe_moneyMode = moneyMode;
   }
 
   $("btnGenerate").onclick = () => {
@@ -408,6 +431,7 @@ function bind() {
     $("inputText").value = "";
     $("outputText").textContent = "";
     $("hitCount").textContent = "0";
+    window.__safe_hits = 0;
   };
 
   $("btnCopy").onclick = () => {
