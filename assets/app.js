@@ -84,6 +84,9 @@ async function handlePdf(file) {
   const pdfHint = $("pdfHint");
   const inputEl = $("inputText");
 
+const btn = document.getElementById("btnGenerate");
+if (btn) btn.click();
+  
   if (!file) return;
 
   if (file.type !== "application/pdf") {
