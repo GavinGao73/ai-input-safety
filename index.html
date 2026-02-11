@@ -377,20 +377,23 @@
 ];
 
     function applyRules(text){
-      let redacted = text;
-      const hits = [];
+  let redacted = text;
+  const hits = [];
 
-      for (const r of RULES){
-        redacted = redacted.replace(r.pattern, (match) => {
-          if (r.guard && !r.guard(match)) return match;
-          hits.push({ key: r.key, label: r.label, value: match });
-          return r.replace;
-        });
-      }
+  for (const r of RULES){
+    redacted = redacted.replace(r.pattern, (match) => {
+      // v1.1: protect placeholders or bracketed tokens from re-processing
+      if (match.includes("[") || match.includes("]")) return match;
 
-      // Additional: downgrade precise year references? (v1: do nothing)
-      return { redacted, hits };
-    }
+      if (r.guard && !r.guard(match)) return match;
+
+      hits.push({ key: r.key, label: r.label, value: match });
+      return r.replace;
+    });
+  }
+
+  return { redacted, hits };
+}
 
     function dedupeHits(hits){
       // Dedupe by label + value
