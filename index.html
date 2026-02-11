@@ -287,61 +287,94 @@
     // Simple redaction rules (v1):
     // Note: We deliberately avoid "name detection" in v1 (too error-prone) and focus on high-signal identifiers.
     const RULES = [
-      {
-        key: "email",
-        label: "邮箱地址",
-        pattern: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
-        replace: "[EMAIL]"
-      },
-      {
-        key: "phone",
-        label: "手机号/电话",
-        // Rough: +49 170 1234567 / 0170-1234567 / (030) 123456
-        pattern: /(\+?\d{1,3}[\s-]?)?(\(?\d{2,4}\)?[\s-]?)?\d{3,4}[\s-]?\d{4,}/g,
-        replace: "[PHONE]",
-        // Guard: avoid replacing small numbers in normal text
-        guard: (m) => m.replace(/\D/g,"").length >= 8
-      },
-      {
-        key: "iban",
-        label: "银行卡/IBAN（可能）",
-        pattern: /\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}\b/gi,
-        replace: "[BANK]"
-      },
-      {
-        key: "idlong",
-        label: "长编号（护照/身份证/客户号等）",
-        // 8-20 mixed alnum
-        pattern: /\b[A-Z0-9]{8,20}\b/gi,
-        replace: "[ID]",
-        guard: (m) => /[A-Z]/i.test(m) && /\d/.test(m)
-      },
-      {
-        key: "dateISO",
-        label: "精确日期（YYYY-MM-DD）",
-        pattern: /\b(19|20)\d{2}[-\/.](0?[1-9]|1[0-2])[-\/.](0?[1-9]|[12]\d|3[01])\b/g,
-        replace: "[DATE]"
-      },
-      {
-        key: "dateEU",
-        label: "精确日期（DD.MM.YYYY）",
-        pattern: /\b(0?[1-9]|[12]\d|3[01])[.\/-](0?[1-9]|1[0-2])[.\/-]((19|20)\d{2})\b/g,
-        replace: "[DATE]"
-      },
-      {
-        key: "postcodeDE",
-        label: "邮编（德国 5 位）",
-        pattern: /\b\d{5}\b/g,
-        replace: "[ADDRESS]"
-      },
-      {
-        key: "streetNo",
-        label: "街道门牌（可能）",
-        // Rough German/English street with number, e.g. "Musterstraße 12", "Main St 10"
-        pattern: /\b([A-Za-zÀ-ž\u4e00-\u9fff]{2,}\s?(straße|str\.|strasse|street|st\.|allee|weg|gasse|platz|ring|road|rd\.|lane|ln\.|avenue|ave\.))\s+\d+[a-zA-Z]?\b/gi,
-        replace: "[ADDRESS]"
-      }
-    ];
+  // 1) 高确定性：先做，避免被 phone 吃掉
+  {
+    key: "email",
+    label: "邮箱地址",
+    pattern: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
+    replace: "[EMAIL]"
+  },
+
+  {
+    key: "iban",
+    label: "IBAN（银行账户）",
+    // Allow spaces; strict enough to avoid random numbers
+    pattern: /\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}\b/gi,
+    replace: "[BANK]"
+  },
+
+  {
+    key: "card",
+    label: "银行卡号（可能）",
+    // 13–19 digits with optional spaces/hyphens
+    pattern: /\b(?:\d[ -]?){13,19}\b/g,
+    replace: "[BANK]",
+    guard: (m) => m.replace(/\D/g, "").length >= 13
+  },
+
+  {
+    key: "dateISO",
+    label: "精确日期（YYYY-MM-DD）",
+    pattern: /\b(19|20)\d{2}[-\/.](0?[1-9]|1[0-2])[-\/.](0?[1-9]|[12]\d|3[01])\b/g,
+    replace: "[DATE]"
+  },
+
+  {
+    key: "dateEU",
+    label: "精确日期（DD.MM.YYYY）",
+    pattern: /\b(0?[1-9]|[12]\d|3[01])[.\/-](0?[1-9]|1[0-2])[.\/-]((19|20)\d{2})\b/g,
+    replace: "[DATE]"
+  },
+
+  {
+    key: "idlong",
+    label: "长编号（护照/身份证/客户号等）",
+    // 8-24 alnum; require both letter and digit to reduce false positives
+    pattern: /\b[A-Z0-9]{8,24}\b/gi,
+    replace: "[ID]",
+    guard: (m) => /[A-Z]/i.test(m) && /\d/.test(m)
+  },
+
+  // 2) 地址：德英 + 邮编 + 中文“路/街/号”等模式
+  {
+    key: "postcodeDE",
+    label: "邮编（德国 5 位）",
+    pattern: /\b\d{5}\b/g,
+    replace: "[ADDRESS]"
+  },
+
+  {
+    key: "streetNo",
+    label: "街道门牌（德/英，可能）",
+    pattern: /\b([A-Za-zÀ-ž]{2,}\s?(straße|str\.|strasse|street|st\.|allee|weg|gasse|platz|ring|road|rd\.|lane|ln\.|avenue|ave\.))\s+\d+[a-zA-Z]?\b/gi,
+    replace: "[ADDRESS]"
+  },
+
+  {
+    key: "cnAddress",
+    label: "中文地址（可能）",
+    // e.g. 上海市黄浦区打浦桥路100号 / XX街12号 / XX大道88号 / XX巷3号
+    pattern: /[\u4e00-\u9fff]{2,}(?:省|市|自治区|区|县|镇|乡|街道)?[\u4e00-\u9fff]{2,}(?:路|街|巷|弄|大道|大街|胡同|里|段)\d{1,5}号?/g,
+    replace: "[ADDRESS]"
+  },
+
+  // 3) 最危险的：phone 放最后
+  {
+    key: "phone",
+    label: "手机号/电话",
+    // Safer: long digit sequences with separators; avoid matching placeholders like [BANK]
+    pattern: /\b(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,5}\)?[\s-]?)?(?:\d[\s-]?){7,}\d\b/g,
+    replace: "[PHONE]",
+    guard: (m) => {
+      const digits = m.replace(/\D/g, "");
+      // avoid very short/ambiguous matches
+      if (digits.length < 9) return false;
+      // avoid matching IBAN-like "DE89..." (letters present)
+      if (/[A-Z]/i.test(m)) return false;
+      return true;
+    }
+  }
+];
 
     function applyRules(text){
       let redacted = text;
