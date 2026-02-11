@@ -10,4 +10,4 @@ Purpose:
 This repository contains:
 - Product principles
 - Design decisions
-- Implementation notes
+- Implementation notes.
