@@ -3,274 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Safe Before Send · v2</title>
+  <title>Safe Before Send</title>
   <meta name="robots" content="noindex" />
-  <style>
-    :root{
-      --bg:#0b0f14;
-      --card:#121925;
-      --muted:#8fa0b6;
-      --text:#e8eef7;
-      --line:#223044;
-      --btn:#2b90ff;
-      --btn2:#1b2636;
-      --ok:#36d399;
-      --warn:#fbbf24;
-      --bad:#fb7185;
-      --shadow: 0 10px 30px rgba(0,0,0,.35);
-      --radius: 14px;
-      --max: 980px;
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family:var(--sans);
-      background: radial-gradient(1200px 600px at 30% -20%, rgba(43,144,255,.22), transparent 55%),
-                  radial-gradient(1000px 500px at 110% 10%, rgba(54,211,153,.16), transparent 55%),
-                  var(--bg);
-      color:var(--text);
-    }
-    a{color:#9ac7ff; text-decoration:none}
-    a:hover{text-decoration:underline}
-    .wrap{max-width:var(--max); margin:0 auto; padding:20px 16px 40px}
-    header{
-      display:flex; align-items:flex-start; justify-content:space-between;
-      gap:12px; margin-bottom:16px;
-    }
-    .brand{display:flex; flex-direction:column; gap:6px}
-    .logo{
-      display:flex; align-items:center; gap:10px;
-      font-weight:800; letter-spacing:.3px;
-      font-size:18px;
-    }
-    .dot{
-      width:12px; height:12px; border-radius:50%;
-      background:linear-gradient(135deg, var(--btn), var(--ok));
-      box-shadow:0 0 0 5px rgba(43,144,255,.12);
-    }
-    .slogan{color:var(--muted); font-size:13px; line-height:1.35; max-width:560px}
-    .lang{
-      display:flex; gap:6px; padding:6px; background:rgba(255,255,255,.04);
-      border:1px solid rgba(255,255,255,.06);
-      border-radius:999px;
-    }
-    .lang button{
-      border:0; background:transparent; color:var(--muted);
-      padding:8px 10px; border-radius:999px; cursor:pointer;
-      font-weight:650; font-size:12px;
-    }
-    .lang button.active{background:rgba(43,144,255,.18); color:var(--text)}
-    .grid{
-      display:grid;
-      grid-template-columns: 1.1fr .9fr;
-      gap:14px;
-    }
-    @media (max-width: 900px){
-      .grid{grid-template-columns:1fr}
-      header{align-items:flex-start}
-    }
-    .card{
-      background:rgba(255,255,255,.04);
-      border:1px solid rgba(255,255,255,.07);
-      border-radius:var(--radius);
-      box-shadow:var(--shadow);
-      overflow:hidden;
-    }
-    .card h3{
-      margin:0;
-      padding:14px 14px 0;
-      font-size:14px;
-      letter-spacing:.2px;
-    }
-    .sub{
-      padding:6px 14px 12px;
-      color:var(--muted);
-      font-size:12.5px;
-      line-height:1.35;
-    }
-    textarea{
-      width:100%;
-      min-height:260px;
-      resize:vertical;
-      padding:12px 12px 10px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(10,14,20,.55);
-      color:var(--text);
-      outline:none;
-      font-size:13px;
-      line-height:1.5;
-    }
-    textarea::placeholder{color:rgba(143,160,182,.75)}
-    .actions{
-      display:flex; flex-wrap:wrap; gap:10px;
-      padding:12px 14px 14px;
-      align-items:center; justify-content:space-between;
-      border-top:1px solid rgba(255,255,255,.06);
-    }
-    .btn{
-      border:0; cursor:pointer;
-      padding:11px 14px;
-      border-radius:12px;
-      font-weight:750;
-      letter-spacing:.2px;
-      display:inline-flex; align-items:center; gap:8px;
-      user-select:none;
-    }
-    .btn.primary{background:linear-gradient(135deg, var(--btn), #66b6ff); color:#07111b}
-    .btn.secondary{background:rgba(255,255,255,.06); color:var(--text); border:1px solid rgba(255,255,255,.10)}
-    .btn:disabled{opacity:.55; cursor:not-allowed}
-    .mini{
-      display:flex; gap:10px; flex-wrap:wrap; align-items:center;
-      color:var(--muted); font-size:12px;
-    }
-    .pill{
-      display:inline-flex; gap:6px; align-items:center;
-      padding:6px 10px; border-radius:999px;
-      border:1px solid rgba(255,255,255,.08);
-      background:rgba(255,255,255,.04);
-    }
-    .pill strong{color:var(--text)}
-    details{
-      border-top:1px solid rgba(255,255,255,.06);
-      padding:10px 14px 14px;
-    }
-    summary{
-      cursor:pointer;
-      color:var(--text);
-      font-weight:750;
-      font-size:13px;
-      list-style:none;
-      display:flex; align-items:center; justify-content:space-between;
-      gap:10px;
-    }
-    summary::-webkit-details-marker{display:none}
-    .hint{color:var(--muted); font-size:12px; margin-top:6px; line-height:1.35}
-    .opt-group{margin-top:12px; padding-top:10px; border-top:1px dashed rgba(255,255,255,.10)}
-    .opt-title{font-weight:800; font-size:12.5px; letter-spacing:.2px}
-    .opt-note{color:var(--muted); font-size:12px; margin-top:4px; line-height:1.35}
-    .checks{display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; margin-top:10px}
-    @media (max-width: 520px){ .checks{grid-template-columns:1fr} }
-    label.chk{
-      display:flex; gap:10px; align-items:flex-start;
-      padding:10px 10px;
-      border:1px solid rgba(255,255,255,.08);
-      border-radius:12px;
-      background:rgba(255,255,255,.03);
-      cursor:pointer;
-    }
-    label.chk:hover{border-color:rgba(154,199,255,.35)}
-    label.chk input{margin-top:2px}
-    .chk .t{font-weight:750; font-size:12.5px}
-    .chk .d{color:var(--muted); font-size:11.8px; margin-top:2px; line-height:1.3}
-    .right .card{height:100%}
-    .outbox{
-      padding:12px 14px 10px;
-    }
-    .output{
-      width:100%;
-      min-height:260px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(10,14,20,.55);
-      padding:12px 12px 10px;
-      color:var(--text);
-      font-size:13px;
-      line-height:1.5;
-      white-space:pre-wrap;
-      word-break:break-word;
-      font-family:var(--mono);
-    }
-    .row{
-      display:flex; gap:10px; flex-wrap:wrap; justify-content:space-between; align-items:center;
-      padding:12px 14px 14px;
-      border-top:1px solid rgba(255,255,255,.06);
-    }
-    .status{color:var(--muted); font-size:12px; display:flex; gap:8px; align-items:center}
-    .status .dot2{width:8px; height:8px; border-radius:50%; background:rgba(143,160,182,.65)}
-    .status.ok .dot2{background:var(--ok)}
-    .status.warn .dot2{background:var(--warn)}
-    .status.bad .dot2{background:var(--bad)}
-    .risk{
-      padding:10px 14px 0;
-      display:flex; flex-direction:column; gap:8px;
-    }
-    .riskline{
-      display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
-      padding:10px 10px;
-      border:1px solid rgba(255,255,255,.08);
-      background:rgba(255,255,255,.03);
-      border-radius:12px;
-    }
-    .riskline .lefty{display:flex; flex-direction:column; gap:2px}
-    .riskline .k{font-weight:800; font-size:12.5px}
-    .riskline .v{color:var(--muted); font-size:11.8px; line-height:1.3}
-    .riskline .c{font-weight:900; font-size:13px}
-    .links{
-      padding:10px 14px 14px;
-      color:var(--muted);
-      font-size:12px;
-      display:flex; gap:14px; flex-wrap:wrap;
-    }
-    footer{
-      margin-top:14px;
-      display:flex; flex-direction:column; gap:10px;
-    }
-    .trust{
-      display:flex; flex-wrap:wrap; gap:10px;
-      align-items:center; justify-content:space-between;
-      padding:12px 14px;
-      background:rgba(255,255,255,.03);
-      border:1px solid rgba(255,255,255,.07);
-      border-radius:var(--radius);
-    }
-    .trust .msg{display:flex; flex-direction:column; gap:3px}
-    .trust .msg .a{font-weight:850; font-size:12.8px}
-    .trust .msg .b{color:var(--muted); font-size:12px; line-height:1.3}
-    .feedback{
-      display:flex; align-items:center; gap:10px;
-    }
-    .fbq{color:var(--muted); font-size:12px}
-    .iconbtn{
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(255,255,255,.04);
-      color:var(--text);
-      border-radius:12px;
-      padding:10px 12px;
-      cursor:pointer;
-      font-weight:850;
-      display:inline-flex; align-items:center; gap:8px;
-    }
-    .iconbtn.active{border-color:rgba(54,211,153,.45); background:rgba(54,211,153,.12)}
-    .tiny{color:var(--muted); font-size:11.5px; line-height:1.3}
-  </style>
+
+  <link rel="stylesheet" href="./assets/styles.css" />
 </head>
 
 <body>
   <div class="wrap">
     <header>
       <div class="brand">
-        <div class="logo"><span class="dot"></span><span id="ui-title">Safe Before Send</span></div>
+        <div class="logo"><span class="dot"></span><span>Safe Before Send</span></div>
         <div class="slogan" id="ui-slogan"></div>
       </div>
 
-      <div class="lang" aria-label="Language Switch">
-        <button type="button" data-lang="de">DE</button>
-        <button type="button" data-lang="en">EN</button>
-        <button type="button" data-lang="zh" class="active">中文</button>
+      <div class="lang">
+        <button data-lang="de">DE</button>
+        <button data-lang="en">EN</button>
+        <button data-lang="zh" class="active">中文</button>
       </div>
     </header>
 
     <div class="grid">
-      <!-- LEFT -->
       <section class="card">
         <h3 id="ui-in-title"></h3>
         <div class="sub" id="ui-in-sub"></div>
 
         <div class="outbox">
-          <textarea id="inputText" placeholder="" spellcheck="false"></textarea>
+          <textarea id="inputText" spellcheck="false"></textarea>
         </div>
 
         <details id="panel">
@@ -280,21 +40,18 @@
           </summary>
           <div class="hint" id="ui-panel-hint"></div>
 
-          <!-- Level 1 -->
           <div class="opt-group">
             <div class="opt-title" id="ui-l1-title"></div>
             <div class="opt-note" id="ui-l1-note"></div>
             <div class="checks" id="group-l1"></div>
           </div>
 
-          <!-- Level 2 -->
           <div class="opt-group">
             <div class="opt-title" id="ui-l2-title"></div>
             <div class="opt-note" id="ui-l2-note"></div>
             <div class="checks" id="group-l2"></div>
           </div>
 
-          <!-- Level 3 -->
           <div class="opt-group">
             <div class="opt-title" id="ui-l3-title"></div>
             <div class="opt-note" id="ui-l3-note"></div>
@@ -303,16 +60,15 @@
         </details>
 
         <div class="actions">
-          <button class="btn primary" id="btnGenerate" type="button">生成安全版本</button>
+          <button class="btn primary" id="btnGenerate"></button>
           <div class="mini">
             <span class="pill"><span id="ui-hit-pill"></span> <strong id="hitCount">0</strong></span>
-            <button class="btn secondary" id="btnExample" type="button"></button>
-            <button class="btn secondary" id="btnClear" type="button"></button>
+            <button class="btn secondary" id="btnExample"></button>
+            <button class="btn secondary" id="btnClear"></button>
           </div>
         </div>
       </section>
 
-      <!-- RIGHT -->
       <section class="card right">
         <h3 id="ui-out-title"></h3>
         <div class="sub" id="ui-out-sub"></div>
@@ -322,7 +78,7 @@
         </div>
 
         <div class="row">
-          <button class="btn primary" id="btnCopy" type="button"></button>
+          <button class="btn primary" id="btnCopy"></button>
           <div class="status" id="status">
             <span class="dot2"></span>
             <span id="statusText"></span>
@@ -332,9 +88,9 @@
         <div class="risk" id="riskBox"></div>
 
         <div class="links">
-          <a id="linkLearn" href="./docs.html" target="_blank" rel="noopener"></a>
-          <a id="linkPrivacy" href="./privacy.html" target="_blank" rel="noopener"></a>
-          <a id="linkScope" href="./mvp.html" target="_blank" rel="noopener"></a>
+          <a id="linkLearn" href="./docs.html" target="_blank"></a>
+          <a id="linkPrivacy" href="./privacy.html" target="_blank"></a>
+          <a id="linkScope" href="./mvp.html" target="_blank"></a>
         </div>
       </section>
     </div>
@@ -348,8 +104,8 @@
 
         <div class="feedback">
           <div class="fbq" id="ui-fb-q"></div>
-          <button class="iconbtn" id="btnUp" type="button" title="Like">👍 <span id="upCount">0</span></button>
-          <button class="iconbtn" id="btnDown" type="button" title="Dislike">👎 <span id="downCount">0</span></button>
+          <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
+          <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
         </div>
       </div>
 
@@ -357,552 +113,10 @@
     </footer>
   </div>
 
-  <script>
-    /* =========================
-       i18n strings
-    ========================== */
-    const I18N = {
-      zh: {
-        slogan: "在你上传之前，先生成更安全的版本。",
-        inTitle: "输入",
-        inSub: "粘贴准备上传 / 分享 / 提交给 AI 的内容。",
-        placeholder: "例如：简历片段、邮件内容、咨询材料、报告摘要……",
-        panelTitle: "⚙ 识别选项",
-        panelPill: "已启用",
-        panelHint: "默认设置已足够。需要更精细控制时再展开调整。",
-        l1Title: "🟢 高风险信息（建议开启）",
-        l1Note: "结构化信息，误判概率低。",
-        l2Title: "🟡 扩展识别（可选）",
-        l2Note: "用于补充常见场景。",
-        l3Title: "🔵 实验性识别（默认关闭）",
-        l3Note: "可能存在误判，建议人工确认。",
-        btnGenerate: "生成安全版本",
-        btnCopy: "复制安全版本",
-        btnCopied: "✔ 已复制",
-        btnExample: "加载示例",
-        btnClear: "清空",
-        outTitle: "安全版本（可复制）",
-        outSub: "你可以把这里的内容粘贴到 AI / 表单 / 邮件中。",
-        hitPill: "命中",
-        statusIdle: "等待生成",
-        statusOk: "已生成（请检查后复制）",
-        statusWarn: "命中较多（建议仔细检查）",
-        statusBad: "高风险内容较多（建议强烈检查）",
-        riskOne: "许多文本包含可识别个人信息。",
-        riskTwo: "处理仅在本地浏览器完成，不会被保存。",
-        learn: "了解更多",
-        privacy: "隐私原则",
-        scope: "MVP 范围",
-        fbQ: "有帮助吗？",
-        foot: "提示：本工具提供风险提示与可复制的“安全版本”，不构成法律建议。"
-      },
-      de: {
-        slogan: "Vor dem Hochladen eine sicherere Version erzeugen.",
-        inTitle: "Eingabe",
-        inSub: "Füge Text ein, bevor du ihn hochlädst / teilst / an KI sendest.",
-        placeholder: "z.B. Lebenslauf, E-Mail-Text, Beratung, Berichtsauszug …",
-        panelTitle: "⚙ Erkennungsoptionen",
-        panelPill: "Aktiv",
-        panelHint: "Standard reicht meist. Öffne nur bei Bedarf.",
-        l1Title: "🟢 Hoher Schutz (empfohlen)",
-        l1Note: "Strukturiert, geringe Fehlalarme.",
-        l2Title: "🟡 Erweiterte Erkennung (optional)",
-        l2Note: "Für häufige Zusatzfälle.",
-        l3Title: "🔵 Experimentell (standardmäßig aus)",
-        l3Note: "Kann Fehlalarme enthalten, bitte prüfen.",
-        btnGenerate: "Sichere Version erzeugen",
-        btnCopy: "Sichere Version kopieren",
-        btnCopied: "✔ Kopiert",
-        btnExample: "Beispiel laden",
-        btnClear: "Leeren",
-        outTitle: "Sichere Version (kopierbar)",
-        outSub: "Du kannst diesen Text in KI / Formulare / E-Mails einfügen.",
-        hitPill: "Treffer",
-        statusIdle: "Bereit",
-        statusOk: "Erzeugt (bitte prüfen & kopieren)",
-        statusWarn: "Viele Treffer (bitte genau prüfen)",
-        statusBad: "Sehr viele Treffer (dringend prüfen)",
-        riskOne: "Viele Texte enthalten identifizierbare Daten.",
-        riskTwo: "Verarbeitung nur lokal im Browser, keine Speicherung.",
-        learn: "Mehr erfahren",
-        privacy: "Datenschutz",
-        scope: "MVP-Umfang",
-        fbQ: "Hilfreich?",
-        foot: "Hinweis: Dieses Tool liefert Hinweise und eine kopierbare sichere Version – keine Rechtsberatung."
-      },
-      en: {
-        slogan: "Create a safer version before you upload.",
-        inTitle: "Input",
-        inSub: "Paste what you plan to upload / share / send to AI.",
-        placeholder: "e.g. resume snippet, email text, consultation notes, report summary…",
-        panelTitle: "⚙ Detection Options",
-        panelPill: "Enabled",
-        panelHint: "Defaults are enough for most users. Expand only if needed.",
-        l1Title: "🟢 High Risk (recommended)",
-        l1Note: "Structured patterns, low false positives.",
-        l2Title: "🟡 Extended (optional)",
-        l2Note: "Extra coverage for common cases.",
-        l3Title: "🔵 Experimental (off by default)",
-        l3Note: "May contain false detections. Review manually.",
-        btnGenerate: "Generate Safe Copy",
-        btnCopy: "Copy Safe Copy",
-        btnCopied: "✔ Copied",
-        btnExample: "Load Example",
-        btnClear: "Clear",
-        outTitle: "Safe Copy (ready to use)",
-        outSub: "Paste this into AI / forms / emails.",
-        hitPill: "Hits",
-        statusIdle: "Ready",
-        statusOk: "Generated (review & copy)",
-        statusWarn: "Many hits (review carefully)",
-        statusBad: "High exposure (review strongly)",
-        riskOne: "Many texts contain identifiable personal data.",
-        riskTwo: "Processed locally in your browser. Nothing stored.",
-        learn: "Learn More",
-        privacy: "Privacy Principles",
-        scope: "MVP Scope",
-        fbQ: "Helpful?",
-        foot: "Note: This tool provides risk hints and a copyable safe version. Not legal advice."
-      }
-    };
-
-    /* =========================
-       Detection catalog (UI only for now)
-       key -> will map to rules later
-    ========================== */
-    const DETECTION_ITEMS = {
-      l1: [
-        { key:"email",   t:{zh:"邮箱地址", de:"E-Mail-Adressen", en:"Email Addresses"}, d:{zh:"例如 name@domain.com", de:"z.B. name@domain.com", en:"e.g. name@domain.com"}, defaultOn:true },
-        { key:"phone",   t:{zh:"电话号码", de:"Telefonnummern", en:"Phone Numbers"}, d:{zh:"包含国家码/区号", de:"inkl. Länder-/Vorwahl", en:"incl. country/area code"}, defaultOn:true },
-        { key:"bank",    t:{zh:"银行信息（IBAN/卡号）", de:"Bankdaten (IBAN/Karten)", en:"Bank Info (IBAN/Cards)"}, d:{zh:"支付/账号信息", de:"Zahlungs-/Kontodaten", en:"payment/account data"}, defaultOn:true },
-        { key:"address", t:{zh:"地址/邮编", de:"Adressen/PLZ", en:"Addresses/Postcodes"}, d:{zh:"门牌/街道/邮编", de:"Straße/Nummer/PLZ", en:"street/number/postcode"}, defaultOn:true },
-        { key:"id",      t:{zh:"长编号/身份标识", de:"Lange IDs", en:"Long IDs"}, d:{zh:"客户号/证件号等", de:"Kundennr./Ausweis etc.", en:"customer/ID numbers"}, defaultOn:true },
-        { key:"cred",    t:{zh:"登录凭据（用户名/密码/Token）", de:"Zugangsdaten (Login/Passwort/Token)", en:"Credentials (Login/Password/Token)"}, d:{zh:"高风险，优先遮盖", de:"hohes Risiko, bitte abdecken", en:"high risk, redact first"}, defaultOn:true },
-      ],
-      l2: [
-        { key:"url",     t:{zh:"网站/URL", de:"Webseiten/URLs", en:"Websites/URLs"}, d:{zh:"链接、域名", de:"Links/Domains", en:"links/domains"}, defaultOn:true },
-        { key:"handle",  t:{zh:"社交账号（@name）", de:"Handles (@name)", en:"Handles (@name)"}, d:{zh:"平台用户名", de:"Benutzernamen", en:"user handles"}, defaultOn:true },
-        { key:"ref",     t:{zh:"引用编号/代码", de:"Referenzen/Codes", en:"Reference Codes"}, d:{zh:"订单号/工单号等", de:"Ticket/Order etc.", en:"ticket/order etc."}, defaultOn:true },
-      ],
-      l3: [
-        { key:"person",  t:{zh:"人名（实验性）", de:"Personennamen (experimentell)", en:"Person Names (experimental)"}, d:{zh:"可能误判", de:"kann Fehlalarme", en:"may be false"}, defaultOn:false },
-        { key:"org",     t:{zh:"公司/组织（实验性）", de:"Organisationen/Firmen (experimentell)", en:"Organizations (experimental)"}, d:{zh:"可能误判", de:"kann Fehlalarme", en:"may be false"}, defaultOn:false },
-        { key:"title",   t:{zh:"称谓/头衔（实验性）", de:"Anrede/Titel (experimentell)", en:"Titles (experimental)"}, d:{zh:"Mr/Herr/Frau 等", de:"Mr/Herr/Frau usw.", en:"Mr/Herr/Frau etc."}, defaultOn:false },
-      ]
-    };
-
-    /* =========================
-       Minimal v2 rules (text only)
-       - Keep simple for structure demo
-       - Controlled by toggles above
-    ========================== */
-    const RULES_BY_KEY = {
-      email:   { labelKey:"email",   pattern:/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, replace:"[EMAIL]" },
-      phone:   { labelKey:"phone",   pattern:/\+?\d(?:[\d\s-]){7,}\d/g, replace:"[PHONE]", guard:(m)=>m.replace(/\D/g,"").length>=9 && !/[A-Z]/i.test(m) },
-      bank:    { labelKey:"bank",    pattern:/\b[A-Z]{2}\d{2}(?:\s?\d{4}){3,5}\b/g, replace:"[BANK]" }, // common IBAN style
-      address: { labelKey:"address", pattern:/[\u4e00-\u9fff]{2,}(?:省|市|自治区|区|县|镇|乡|街道)?[\u4e00-\u9fff]{2,}(?:路|街|巷|弄|大道|大街|胡同|里|段)\d{1,5}号?/g, replace:"[ADDRESS]" },
-      id:      { labelKey:"id",      pattern:/\b[A-Z0-9]{8,24}\b/gi, replace:"[ID]", guard:(m)=>/[A-Z]/i.test(m)&&/\d/.test(m) },
-      cred:    { labelKey:"cred",    pattern:/\b(password|pwd|pass|token|api[_-]?key|secret|login|username)\b\s*[:=]\s*([^\s]+)/gi, replace:"[CREDENTIAL]" },
-      url:     { labelKey:"url",     pattern:/\bhttps?:\/\/[^\s]+/gi, replace:"[URL]" },
-      handle:  { labelKey:"handle",  pattern:/(^|\s)@[A-Za-z0-9_]{2,32}\b/g, replace:" @[HANDLE]" },
-      ref:     { labelKey:"ref",     pattern:/\b[A-Z]{2,5}-?\d{4,}\b/g, replace:"[REF]" },
-
-      // Experimental placeholders (not implemented as real NER here)
-      person:  null,
-      org:     null,
-      title:   { labelKey:"title", pattern:/\b(Mr|Ms|Mrs|Herr|Frau)\.?\b/g, replace:"[TITLE]" }
-    };
-
-    /* =========================
-       State
-    ========================== */
-    let currentLang = "zh";
-    const enabled = new Set(); // keys enabled
-    let lastHits = [];
-
-    // feedback (local only)
-    const fbKey = "sbs_fb_v2";
-    const fb = { up: 0, down: 0, voted: null };
-
-    /* =========================
-       Helpers
-    ========================== */
-    function $(id){ return document.getElementById(id); }
-
-    function setText(){
-      const t = I18N[currentLang];
-
-      $("ui-slogan").textContent = t.slogan;
-
-      $("ui-in-title").textContent = t.inTitle;
-      $("ui-in-sub").textContent = t.inSub;
-      $("inputText").placeholder = t.placeholder;
-
-      $("ui-panel-title").textContent = t.panelTitle;
-      $("ui-panel-pill").textContent = t.panelPill;
-      $("ui-panel-hint").textContent = t.panelHint;
-
-      $("ui-l1-title").textContent = t.l1Title;
-      $("ui-l1-note").textContent = t.l1Note;
-
-      $("ui-l2-title").textContent = t.l2Title;
-      $("ui-l2-note").textContent = t.l2Note;
-
-      $("ui-l3-title").textContent = t.l3Title;
-      $("ui-l3-note").textContent = t.l3Note;
-
-      $("btnGenerate").textContent = t.btnGenerate;
-      $("btnCopy").textContent = t.btnCopy;
-      $("btnExample").textContent = t.btnExample;
-      $("btnClear").textContent = t.btnClear;
-
-      $("ui-out-title").textContent = t.outTitle;
-      $("ui-out-sub").textContent = t.outSub;
-
-      $("ui-hit-pill").textContent = t.hitPill;
-
-      $("linkLearn").textContent = t.learn;
-      $("linkPrivacy").textContent = t.privacy;
-      $("linkScope").textContent = t.scope;
-
-      $("ui-risk-one").textContent = t.riskOne;
-      $("ui-risk-two").textContent = t.riskTwo;
-
-      $("ui-fb-q").textContent = t.fbQ;
-      $("ui-foot").textContent = t.foot;
-
-      // reset status line text (keep dot state)
-      if ($("status").classList.contains("ok")) $("statusText").textContent = t.statusOk;
-      else if ($("status").classList.contains("warn")) $("statusText").textContent = t.statusWarn;
-      else if ($("status").classList.contains("bad")) $("statusText").textContent = t.statusBad;
-      else $("statusText").textContent = t.statusIdle;
-    }
-
-    function renderChecks(){
-      const groups = [
-        { id:"group-l1", items: DETECTION_ITEMS.l1 },
-        { id:"group-l2", items: DETECTION_ITEMS.l2 },
-        { id:"group-l3", items: DETECTION_ITEMS.l3 },
-      ];
-
-      for (const g of groups){
-        const host = $(g.id);
-        host.innerHTML = "";
-        for (const it of g.items){
-          const checked = enabled.has(it.key);
-          const el = document.createElement("label");
-          el.className = "chk";
-          el.innerHTML = `
-            <input type="checkbox" ${checked ? "checked" : ""} data-key="${it.key}"/>
-            <div>
-              <div class="t">${it.t[currentLang]}</div>
-              <div class="d">${it.d[currentLang]}</div>
-            </div>
-          `;
-          host.appendChild(el);
-        }
-      }
-
-      $("ui-enabled-count").textContent = String(enabled.size);
-    }
-
-    function initDefaults(){
-      // load enabled toggles from localStorage (optional, local-only)
-      const key = "sbs_enabled_v2";
-      const raw = localStorage.getItem(key);
-      if (raw){
-        try{
-          const arr = JSON.parse(raw);
-          if (Array.isArray(arr)){
-            enabled.clear();
-            for (const k of arr) enabled.add(String(k));
-            return;
-          }
-        }catch(e){}
-      }
-      // otherwise defaults from catalog
-      enabled.clear();
-      for (const level of ["l1","l2","l3"]){
-        for (const it of DETECTION_ITEMS[level]){
-          if (it.defaultOn) enabled.add(it.key);
-        }
-      }
-    }
-
-    function saveEnabled(){
-      localStorage.setItem("sbs_enabled_v2", JSON.stringify(Array.from(enabled)));
-      $("ui-enabled-count").textContent = String(enabled.size);
-    }
-
-    function setStatus(kind){
-      const t = I18N[currentLang];
-      const s = $("status");
-      s.classList.remove("ok","warn","bad");
-      if (!kind){
-        $("statusText").textContent = t.statusIdle;
-        return;
-      }
-      s.classList.add(kind);
-      if (kind === "ok") $("statusText").textContent = t.statusOk;
-      if (kind === "warn") $("statusText").textContent = t.statusWarn;
-      if (kind === "bad") $("statusText").textContent = t.statusBad;
-    }
-
-    function applyRules(text){
-      let redacted = text;
-      const hits = [];
-
-      // stable order: high certainty first, broad last
-      const order = ["cred","bank","email","id","address","phone","url","handle","ref","title","person","org"];
-      for (const k of order){
-        if (!enabled.has(k)) continue;
-        const rule = RULES_BY_KEY[k];
-        if (!rule) continue;
-
-        redacted = redacted.replace(rule.pattern, (m) => {
-          // protect already-replaced tokens
-          if (m.includes("[") || m.includes("]")) return m;
-          if (rule.guard && !rule.guard(m)) return m;
-          hits.push({ key: k, label: k, value: m });
-          return rule.replace;
-        });
-      }
-
-      // simple cosmetic merge: repeated address tokens
-      redacted = redacted.replace(/\[ADDRESS\](,\s*\[ADDRESS\])+/g, "[ADDRESS]");
-
-      return { redacted, hits };
-    }
-
-    function summarizeHits(hits){
-      const map = new Map();
-      for (const h of hits){
-        map.set(h.key, (map.get(h.key) || 0) + 1);
-      }
-      return map;
-    }
-
-    function renderRiskBox(hits){
-      const t = I18N[currentLang];
-      const box = $("riskBox");
-      box.innerHTML = "";
-
-      const sum = summarizeHits(hits);
-      // translate labels from catalog
-      const labelForKey = (k) => {
-        for (const level of ["l1","l2","l3"]){
-          const it = DETECTION_ITEMS[level].find(x=>x.key===k);
-          if (it) return it.t[currentLang];
-        }
-        return k;
-      };
-
-      const entries = Array.from(sum.entries()).sort((a,b)=>b[1]-a[1]);
-      if (entries.length === 0){
-        const el = document.createElement("div");
-        el.className = "riskline";
-        el.innerHTML = `
-          <div class="lefty">
-            <div class="k">${currentLang==="zh" ? "未检测到明显敏感项" : currentLang==="de" ? "Keine offensichtlichen Treffer" : "No obvious hits"}</div>
-            <div class="v">${currentLang==="zh" ? "仍建议人工快速浏览" : currentLang==="de" ? "Bitte kurz manuell prüfen" : "Still recommended to skim manually"}</div>
-          </div>
-          <div class="c">0</div>
-        `;
-        box.appendChild(el);
-        return;
-      }
-
-      for (const [k,cnt] of entries){
-        const el = document.createElement("div");
-        el.className = "riskline";
-        el.innerHTML = `
-          <div class="lefty">
-            <div class="k">${labelForKey(k)}</div>
-            <div class="v">${currentLang==="zh" ? "已自动替换为占位符（可人工复核）" : currentLang==="de" ? "Als Platzhalter ersetzt (bitte prüfen)" : "Replaced with placeholders (review if needed)"}</div>
-          </div>
-          <div class="c">${cnt}</div>
-        `;
-        box.appendChild(el);
-      }
-    }
-
-    function exampleText(){
-      if (currentLang === "de"){
-        return `Kontakt: test.user+1@gmail.com
-Telefon: +49 170 1234567
-Datum: 18.04.2024
-IBAN: DE89 3704 0044 0532 0130 00
-Adresse: Musterstraße 12, 10115 Berlin
-Kundennr.: AB12345678
-username: gavin73
-password: mypass123`;
-      }
-      if (currentLang === "en"){
-        return `Contact: test.user+1@gmail.com
-Phone: +1 415 555 0123
-Date: 2024-04-18
-IBAN: DE89 3704 0044 0532 0130 00
-Address: Main Street 45, London
-Ref: AB12345678
-api_key=sk-example123
-password: mypass123`;
-      }
-      return `联系邮箱: test.user+1@gmail.com
-电话: +49 170 1234567
-日期: 2024-04-18
-IBAN: DE89 3704 0044 0532 0130 00
-地址: 上海市黄浦区打浦桥路100号
-编号: AB12345678
-username: gavin73
-password: mypass123`;
-    }
-
-    function loadFeedback(){
-      const raw = localStorage.getItem(fbKey);
-      if (raw){
-        try{
-          const obj = JSON.parse(raw);
-          if (obj && typeof obj === "object"){
-            fb.up = Number(obj.up)||0;
-            fb.down = Number(obj.down)||0;
-            fb.voted = obj.voted || null;
-          }
-        }catch(e){}
-      }
-      $("upCount").textContent = String(fb.up);
-      $("downCount").textContent = String(fb.down);
-      $("btnUp").classList.toggle("active", fb.voted==="up");
-      $("btnDown").classList.toggle("active", fb.voted==="down");
-    }
-
-    function saveFeedback(){
-      localStorage.setItem(fbKey, JSON.stringify(fb));
-      $("upCount").textContent = String(fb.up);
-      $("downCount").textContent = String(fb.down);
-      $("btnUp").classList.toggle("active", fb.voted==="up");
-      $("btnDown").classList.toggle("active", fb.voted==="down");
-    }
-
-    /* =========================
-       Wiring
-    ========================== */
-    function init(){
-      initDefaults();
-      loadFeedback();
-
-      // language buttons
-      document.querySelectorAll(".lang button").forEach(btn=>{
-        btn.addEventListener("click", ()=>{
-          currentLang = btn.dataset.lang;
-          document.querySelectorAll(".lang button").forEach(b=>b.classList.toggle("active", b.dataset.lang===currentLang));
-          setText();
-          renderChecks();
-          // update example/copy button texts
-          $("btnCopy").textContent = I18N[currentLang].btnCopy;
-          $("btnGenerate").textContent = I18N[currentLang].btnGenerate;
-          $("btnExample").textContent = I18N[currentLang].btnExample;
-          $("btnClear").textContent = I18N[currentLang].btnClear;
-
-          // keep output, just refresh status label & risk labels
-          renderRiskBox(lastHits);
-        });
-      });
-
-      // checkboxes
-      $("panel").addEventListener("change", (e)=>{
-        const el = e.target;
-        if (el && el.matches("input[type='checkbox'][data-key]")){
-          const k = el.getAttribute("data-key");
-          if (el.checked) enabled.add(k); else enabled.delete(k);
-          saveEnabled();
-          $("ui-enabled-count").textContent = String(enabled.size);
-        }
-      });
-
-      // generate
-      $("btnGenerate").addEventListener("click", ()=>{
-        const input = $("inputText").value || "";
-        const { redacted, hits } = applyRules(input);
-        lastHits = hits;
-        $("outputText").textContent = redacted;
-        $("hitCount").textContent = String(hits.length);
-
-        // set status severity by hit count (simple MVP heuristic)
-        if (!input.trim()){
-          setStatus(null);
-        } else if (hits.length === 0){
-          setStatus("ok");
-        } else if (hits.length <= 6){
-          setStatus("ok");
-        } else if (hits.length <= 15){
-          setStatus("warn");
-        } else {
-          setStatus("bad");
-        }
-
-        renderRiskBox(hits);
-      });
-
-      // copy
-      $("btnCopy").addEventListener("click", async ()=>{
-        const t = I18N[currentLang];
-        const txt = $("outputText").textContent || "";
-        if (!txt.trim()) return;
-        try{
-          await navigator.clipboard.writeText(txt);
-          const old = $("btnCopy").textContent;
-          $("btnCopy").textContent = t.btnCopied;
-          setTimeout(()=> $("btnCopy").textContent = t.btnCopy, 900);
-        }catch(e){
-          // fallback: select-like (simple)
-          alert(currentLang==="zh" ? "复制失败：请手动选择复制" : currentLang==="de" ? "Kopieren fehlgeschlagen: bitte manuell kopieren" : "Copy failed: please copy manually");
-        }
-      });
-
-      // example / clear
-      $("btnExample").addEventListener("click", ()=>{
-        $("inputText").value = exampleText();
-      });
-      $("btnClear").addEventListener("click", ()=>{
-        $("inputText").value = "";
-        $("outputText").textContent = "";
-        $("hitCount").textContent = "0";
-        lastHits = [];
-        setStatus(null);
-        renderRiskBox([]);
-      });
-
-      // feedback (local only)
-      $("btnUp").addEventListener("click", ()=>{
-        if (fb.voted === "up") return;
-        if (fb.voted === "down") fb.down = Math.max(0, fb.down - 1);
-        fb.up += 1;
-        fb.voted = "up";
-        saveFeedback();
-      });
-      $("btnDown").addEventListener("click", ()=>{
-        if (fb.voted === "down") return;
-        if (fb.voted === "up") fb.up = Math.max(0, fb.up - 1);
-        fb.down += 1;
-        fb.voted = "down";
-        saveFeedback();
-      });
-
-      // initial render
-      setText();
-      renderChecks();
-      setStatus(null);
-      renderRiskBox([]);
-      $("hitCount").textContent = "0";
-      $("ui-enabled-count").textContent = String(enabled.size);
-
-      // set correct button text on load
-      $("btnCopy").textContent = I18N[currentLang].btnCopy;
-      $("btnExample").textContent = I18N[currentLang].btnExample;
-      $("btnClear").textContent = I18N[currentLang].btnClear;
-    }
-
-    init();
-  </script>
+  <!-- JS（顺序非常重要，不要改） -->
+  <script src="./assets/i18n.js" defer></script>
+  <script src="./assets/catalog.js" defer></script>
+  <script src="./assets/rules.js" defer></script>
+  <script src="./assets/app.js" defer></script>
 </body>
 </html>
