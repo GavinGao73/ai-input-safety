@@ -1,4 +1,5 @@
 // Robust PDF text extractor (client-side) for "Word-exported PDFs"
+// - loads PDF.js from cdnjs (stable pinned version 3.11.174)
 // - groups text items by line (y coordinate), keeps reading order
 // - works better with tables/textboxes where items are fragmented
 // - no OCR
@@ -8,14 +9,16 @@ async function loadPdfJs() {
 
   await new Promise((resolve, reject) => {
     const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.js";
+    // ✅ stable version on cdnjs
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
     s.onload = resolve;
     s.onerror = () => reject(new Error("Failed to load PDF.js from CDN"));
     document.head.appendChild(s);
   });
 
+  // Configure worker (must match version)
   window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.js";
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
   return window.pdfjsLib;
 }
@@ -23,6 +26,7 @@ async function loadPdfJs() {
 // Heuristic: group by "line" using rounded y coordinate
 function groupItemsIntoLines(items) {
   const lines = new Map(); // yKey -> array of {x, str}
+
   for (const it of items) {
     if (!it || !it.str) continue;
 
@@ -45,25 +49,23 @@ function groupItemsIntoLines(items) {
   for (const y of sortedY) {
     const parts = lines.get(y).sort((a, b) => a.x - b.x);
 
-    // join with space, but avoid inserting spaces inside words too aggressively
+    // Join with smart spacing
     let line = "";
     for (const p of parts) {
       const s = String(p.str);
 
-      // If last char is hyphen, join without space (hyphenation)
+      // Hyphenation join
       if (line.endsWith("-")) {
         line = line.slice(0, -1) + s;
         continue;
       }
 
-      // If line empty, set; else add space if needed
       if (!line) {
         line = s;
       } else {
         const last = line.slice(-1);
         const first = s.slice(0, 1);
 
-        // Add a space unless punctuation/spacing suggests otherwise
         const needSpace =
           !/\s/.test(last) &&
           !/[\(\[\{\/“"„'’\-–—]$/.test(last) &&
@@ -77,8 +79,6 @@ function groupItemsIntoLines(items) {
     if (line) outLines.push(line);
   }
 
-  // Because we sorted by y desc, this is already top->bottom.
-  // But some PDFs have inverted y; if output looks reversed, we'll detect later.
   return outLines;
 }
 
@@ -88,52 +88,53 @@ async function extractTextFromPdfFile(file) {
 
   const doc = await pdfjsLib.getDocument({
     data: buf,
-    // Some PDFs need these flags; they can improve extraction stability
+    // These flags can improve extraction stability for some PDFs
     disableFontFace: true,
     useSystemFonts: true,
   }).promise;
 
-  let fullText = [];
+  const pages = [];
   let totalChars = 0;
 
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
 
-    // include marked content can help for tagged PDFs, but pdf.js handles internally.
     const content = await page.getTextContent({
       normalizeWhitespace: true,
       disableCombineTextItems: false,
     });
 
-    const lines = groupItemsIntoLines(content.items || []);
+    const items = content.items || [];
+    const lines = groupItemsIntoLines(items);
 
-    // Fallback: if line grouping yields too little, fall back to raw join
-    let pageText = lines.join("\n");
-    const rawJoin = (content.items || [])
+    // Primary: line-based
+    let pageText = lines.join("\n").trim();
+
+    // Fallback: raw join if line-based yields too little
+    const rawJoin = items
       .map(it => (it && it.str ? it.str : ""))
       .filter(Boolean)
       .join(" ")
       .replace(/\s+/g, " ")
       .trim();
 
-    if (pageText.replace(/\s/g, "").length < 20 && rawJoin.replace(/\s/g, "").length > pageText.replace(/\s/g, "").length) {
+    const compactLen = (s) => String(s || "").replace(/\s/g, "").length;
+
+    if (compactLen(pageText) < 20 && compactLen(rawJoin) > compactLen(pageText)) {
       pageText = rawJoin;
     }
 
-    pageText = pageText.trim();
+    pageText = String(pageText || "").trim();
     if (pageText) {
-      fullText.push(pageText);
+      pages.push(pageText);
       totalChars += pageText.length;
-    } else {
-      // keep page separator even if empty? no, skip to reduce noise
     }
   }
 
-  // If extraction produced almost nothing, return empty
+  // If extraction produced almost nothing, treat as failure
   if (totalChars < 10) return "";
 
-  // Join pages with blank line
-  return fullText.join("\n\n");
+  return pages.join("\n\n");
 }
 
 window.extractTextFromPdfFile = extractTextFromPdfFile;
