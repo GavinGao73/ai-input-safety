@@ -8,6 +8,7 @@ function placeholder(key) {
   const map = {
     zh: {
       PHONE: "【电话】",
+      MONEY: "【金额】",
       EMAIL: "【邮箱】",
       ACCOUNT: "【账号】",
       ADDRESS: "【地址】",
@@ -19,6 +20,7 @@ function placeholder(key) {
     },
     de: {
       PHONE: "[Telefon]",
+      MONEY: "[Betrag]",
       EMAIL: "[E-Mail]",
       ACCOUNT: "[Konto]",
       ADDRESS: "[Adresse]",
@@ -30,6 +32,7 @@ function placeholder(key) {
     },
     en: {
       PHONE: "[Phone]",
+      MONEY: "[Amount]",
       EMAIL: "[Email]",
       ACCOUNT: "[Account]",
       ADDRESS: "[Address]",
