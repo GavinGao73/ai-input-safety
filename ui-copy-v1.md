@@ -1,16 +1,20 @@
 # UI Copy v1
 
-## Slogan
-在你把材料交出去之前，先生成一个更安全的版本。
+Slogan
 
-## Short explanation
-- 我们不会记录你输入的内容。
-- 处理在当前页面完成，关闭即消失。
+在将内容提供给 AI 或在线系统之前，先生成一个更安全的版本。
 
-## CTA labels
-- 生成安全版本
-- 复制安全版本，用于粘贴
-- 清空
+Short explanation
 
-## Optional feedback
-这个安全版本有没有帮到你？ 👍 / 👎
+我们不会记录或上传你的内容。
+处理仅在当前页面完成，关闭即消失。
+
+CTA labels
+
+生成安全版本
+复制安全版本
+清空
+
+Document mode hint
+
+文档安全模式会导出不可恢复文本结构的安全视图文件。
