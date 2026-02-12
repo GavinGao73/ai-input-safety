@@ -1,4 +1,4 @@
-ai-input-safety
+## ai-input-safety
 
 A lightweight, privacy-first safety layer designed to reduce unintended sensitive data exposure 
 before content is submitted to AI systems, translators, or online platforms.
