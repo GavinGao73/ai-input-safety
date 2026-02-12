@@ -54,7 +54,6 @@ function placeholder(key) {
 
 // ---- Money range mapping (M2) ----
 function normalizeAmountToNumber(raw) {
-  // tolerate "2 000. 00", "2.000,00", "15000.00"
   let s = String(raw || "").replace(/\s+/g, "");
   const hasDot = s.includes(".");
   const hasComma = s.includes(",");
@@ -124,7 +123,7 @@ function formatCurrencyForM2(currency) {
   return c.toUpperCase();
 }
 
-// ---- init + i18n text ----
+// ---- init ----
 function initEnabled() {
   enabled.clear();
   Object.values(DETECTION_ITEMS).flat().forEach(i => {
@@ -134,22 +133,18 @@ function initEnabled() {
 
 /* ==================== Risk scoring (A) v1 ==================== */
 const RISK_WEIGHTS = {
-  // L1 high
   bank: 28,
   account: 26,
   email: 14,
   phone: 16,
 
-  // L2 medium
   address_de_street: 18,
   handle: 10,
 
-  // L3 low
   ref: 6,
   title: 4,
   number: 2,
 
-  // money handled separately
   money: 0
 };
 
@@ -166,7 +161,7 @@ function riskI18n(lang) {
     adviceLow: "可直接使用；如是报价/合同建议开启金额保护。",
     adviceMid: "建议检查 Top 项；必要时开启金额保护或加严地址/账号遮盖。",
     adviceHigh: "不建议直接发送：请开启更多遮盖选项，并删除落款/签名/账号信息后再试。",
-    meta: (m) => `命中 ${m.hits}｜启用 ${m.enabledCount}｜金额 ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜PDF" : ""}`
+    meta: (m) => `命中 ${m.hits}｜金额 ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜文件" : ""}`
   };
   const de = {
     title: "Risikowert",
@@ -178,7 +173,7 @@ function riskI18n(lang) {
     adviceLow: "Kann so verwendet werden. Für Angebote/Verträge Betragsschutz aktivieren.",
     adviceMid: "Top-Risiken prüfen; ggf. Betragsschutz/Adress- oder Konto-Maskierung aktivieren.",
     adviceHigh: "Nicht direkt senden: mehr Maskierung aktivieren und Signatur/Kontodaten entfernen.",
-    meta: (m) => `Treffer ${m.hits}｜Aktiv ${m.enabledCount}｜Betrag ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜PDF" : ""}`
+    meta: (m) => `Treffer ${m.hits}｜Betrag ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜Datei" : ""}`
   };
   const en = {
     title: "Risk score",
@@ -190,7 +185,7 @@ function riskI18n(lang) {
     adviceLow: "Safe to use. For quotes/contracts, enable money protection.",
     adviceMid: "Review top risks; consider enabling money/address/account masking.",
     adviceHigh: "Do not send as-is: enable more masking and remove signature/account details.",
-    meta: (m) => `Hits ${m.hits}｜Enabled ${m.enabledCount}｜Money ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜PDF" : ""}`
+    meta: (m) => `Hits ${m.hits}｜Money ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜File" : ""}`
   };
   return (lang === "de") ? de : (lang === "en") ? en : zh;
 }
@@ -244,19 +239,16 @@ function computeRiskReport(hitsByKey, meta) {
   for (const [k, c] of Object.entries(hitsByKey || {})) {
     if (!c) continue;
     const w = RISK_WEIGHTS[k] || 0;
-    const capped = Math.min(c, 12); // cap per key to avoid score explosion
+    const capped = Math.min(c, 12);
     score += w * capped;
   }
 
-  // money mode add-on (sensitivity)
   if (meta.moneyMode === "m1") score += 10;
   if (meta.moneyMode === "m2") score += 14;
 
-  // doc-length heuristic
   if (meta.inputLen >= 1500) score += 6;
   if (meta.inputLen >= 4000) score += 8;
 
-  // PDF heuristic
   if (meta.fromPdf) score += 6;
 
   score = clamp(Math.round(score), 0, 100);
@@ -327,36 +319,24 @@ function renderRiskBox(report, meta) {
 function setText() {
   const t = I18N[currentLang];
 
-  $("ui-slogan").textContent = t.slogan;
-  $("ui-in-title").textContent = t.inTitle;
-  $("ui-in-sub").textContent = t.inSub;
-  $("inputText").placeholder = t.placeholder;
+  const s = $("ui-slogan"); if (s) s.textContent = t.slogan;
 
-  $("ui-panel-title").textContent = t.panelTitle;
-  $("ui-panel-pill").textContent = t.panelPill;
-  $("ui-panel-hint").textContent = t.panelHint;
+  const inTitle = $("ui-in-title"); if (inTitle) inTitle.textContent = t.inTitle;
+  const inSub = $("ui-in-sub"); if (inSub) inSub.textContent = t.inSub || "";
 
-  $("ui-l1-title").textContent = t.l1Title;
-  $("ui-l1-note").textContent = t.l1Note;
-  $("ui-l2-title").textContent = t.l2Title;
-  $("ui-l2-note").textContent = t.l2Note;
-  $("ui-l3-title").textContent = t.l3Title;
-  $("ui-l3-note").textContent = t.l3Note;
+  const input = $("inputText"); if (input) input.placeholder = t.placeholder;
 
-  $("btnGenerate").textContent = t.btnGenerate;
-  $("btnCopy").textContent = t.btnCopy;
-  $("btnExample").textContent = t.btnExample;
-  $("btnClear").textContent = t.btnClear;
+  const btnGenerate = $("btnGenerate"); if (btnGenerate) btnGenerate.textContent = t.btnGenerate;
+  const btnCopy = $("btnCopy"); if (btnCopy) btnCopy.textContent = t.btnCopy;
+  const btnClear = $("btnClear"); if (btnClear) btnClear.textContent = t.btnClear;
 
-  $("ui-out-title").textContent = t.outTitle;
-  $("ui-out-sub").textContent = t.outSub;
-  $("ui-hit-pill").textContent = t.hitPill;
+  const outTitle = $("ui-out-title"); if (outTitle) outTitle.textContent = t.outTitle;
+  const outSub = $("ui-out-sub"); if (outSub) outSub.textContent = t.outSub || "";
 
-  $("ui-risk-one").textContent = t.riskOne;
-  $("ui-risk-two").textContent = t.riskTwo;
+  const hitPill = $("ui-hit-pill"); if (hitPill) hitPill.textContent = t.hitPill;
 
-  $("ui-fb-q").textContent = t.fbQ;
-  $("ui-foot").textContent = t.foot;
+  const fbq = $("ui-fb-q"); if (fbq) fbq.textContent = t.fbQ;
+  const foot = $("ui-foot"); if (foot) foot.textContent = t.foot;
 
   // Money UI text (if present)
   const label = $("ui-money-label");
@@ -384,38 +364,24 @@ function setText() {
     }
   }
 
-  // PDF hint (if present)
-  const pdfHint = $("pdfHint");
-  if (pdfHint) {
-    pdfHint.textContent =
-      currentLang === "zh"
-        ? "PDF 可拖拽到这里，或点击选择文件（自动识别文字层；扫描件需人工处理）"
-        : currentLang === "de"
-          ? "PDF hierher ziehen oder Datei wählen (Textlayer automatisch; Scan = manuell)"
-          : "Drag a PDF here or choose a file (text-layer auto; scan = manual)";
-  }
+  // Links
+  const l1 = $("linkLearn"); if (l1) l1.textContent = t.learn;
+  const l2 = $("linkPrivacy"); if (l2) l2.textContent = t.privacy;
+  const l3 = $("linkScope"); if (l3) l3.textContent = t.scope;
 
-  // Share UI (if present)
+  // Share UI (optional static text, fine if not found)
   const st = $("ui-share-title");
   const ss = $("ui-share-sub");
-  const smt = $("ui-share-modal-title");
-  const sn = $("ui-share-note");
-  if (st && ss && smt && sn) {
+  if (st && ss) {
     if (currentLang === "zh") {
-      st.textContent = "分享安全卡片";
-      ss.textContent = "不包含你的原文，仅分享安全处理成果";
-      smt.textContent = "分享预览";
-      sn.textContent = "注意：卡片不包含你的原文内容，只显示处理统计与隐私承诺。";
+      st.textContent = "安全卡片";
+      ss.textContent = "不包含原文，仅展示处理结果与隐私承诺";
     } else if (currentLang === "de") {
-      st.textContent = "Share-Sicherheitskarte";
+      st.textContent = "Sicherheitskarte";
       ss.textContent = "Kein Originaltext – nur Ergebnis & Versprechen";
-      smt.textContent = "Vorschau";
-      sn.textContent = "Hinweis: Die Karte enthält keinen Originaltext, nur Statistik & Datenschutzversprechen.";
     } else {
-      st.textContent = "Share Safety Card";
+      st.textContent = "Safety Card";
       ss.textContent = "No original text — only outcome & promise";
-      smt.textContent = "Preview";
-      sn.textContent = "Note: the card contains no original text, only stats & privacy promise.";
     }
   }
 }
@@ -460,7 +426,6 @@ function applyRules(text) {
           return placeholder("MONEY");
         }
 
-        // m2
         const currencyRaw = cur1 || sym || unit || "";
         const amountRaw = amt1 || amt2 || amt3 || "";
         const currency = formatCurrencyForM2(currencyRaw);
@@ -501,7 +466,8 @@ function applyRules(text) {
     });
   }
 
-  $("hitCount").textContent = String(hits);
+  const hc = $("hitCount");
+  if (hc) hc.textContent = String(hits);
 
   // --- Risk meta
   lastRunMeta.inputLen = (String(text || "")).length;
@@ -541,90 +507,44 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
+  // ✅ 自动刷新卡片（你要求的 1 行）
+  if (window.updateShareAuto) window.updateShareAuto();
+
   return out;
 }
 
-/* ============ PDF helpers ============ */
+/* ============ PDF helpers (still supported, but no PDF hint UI) ============ */
 async function handlePdf(file) {
-  const pdfHint = $("pdfHint");
-
   if (!file) return;
 
   if (file.type !== "application/pdf") {
-    if (pdfHint) {
-      pdfHint.textContent =
-        currentLang === "zh" ? "请选择 PDF 文件" :
-        currentLang === "de" ? "Bitte eine PDF-Datei wählen" :
-        "Please choose a PDF file";
-    }
+    // 现在 UI 不提示，静默忽略（避免页面杂乱）
     return;
-  }
-
-  if (pdfHint) {
-    pdfHint.textContent =
-      currentLang === "zh" ? "正在本地检测 PDF 文本层…" :
-      currentLang === "de" ? "Textlayer wird lokal geprüft…" :
-      "Checking PDF text layer locally…";
   }
 
   try {
     if (!window.probePdfTextLayer) {
-      if (pdfHint) {
-        pdfHint.textContent =
-          currentLang === "zh" ? "PDF 模块未加载：请确认已替换 assets/pdf.js（probePdfTextLayer）并在 index.html 引入" :
-          currentLang === "de" ? "PDF-Modul nicht geladen: assets/pdf.js (probePdfTextLayer) einbinden" :
-          "PDF module not loaded: please include assets/pdf.js (probePdfTextLayer)";
-      }
+      console.warn("PDF module not loaded: probePdfTextLayer missing");
       return;
     }
 
     const probe = await window.probePdfTextLayer(file);
-
-    // ✅ mark source (only if we got a PDF flow)
     lastRunMeta.fromPdf = true;
 
     if (!probe || !probe.hasTextLayer) {
-      // Visual-only document (scan / image-based PDF)
-      if (pdfHint) {
-        pdfHint.textContent =
-          currentLang === "zh"
-            ? "未检测到可解析文本层：该 PDF 可能为扫描件/图片。当前版本不做 OCR，请改用人工处理（手动标记后再导出）。"
-            : currentLang === "de"
-              ? "Kein Textlayer: Scan-/Bild-PDF. In v1 kein OCR. Bitte manuell markieren und dann exportieren."
-              : "No text layer detected (scan/image PDF). No OCR in v1. Please use manual marking then export.";
-      }
+      // v1 无 OCR：不提示 UI，避免干扰（用户可以直接改用粘贴文本）
+      console.warn("No text layer in PDF (scan/image). v1 no OCR.");
       return;
     }
 
     const text = String(probe.text || "").trim();
-    if (!text) {
-      if (pdfHint) {
-        pdfHint.textContent =
-          currentLang === "zh" ? "检测到文本层，但未提取到有效文本。" :
-          currentLang === "de" ? "Textlayer erkannt, aber kein verwertbarer Text extrahiert." :
-          "Text layer detected, but no usable text extracted.";
-      }
-      return;
-    }
+    if (!text) return;
 
-    // ✅ IMPORTANT: do NOT put original PDF text into textarea (reduce user concern)
-    // We only output the safe copy to the right panel.
-    $("outputText").textContent = applyRules(text);
-
-    if (pdfHint) {
-      pdfHint.textContent =
-        currentLang === "zh" ? "已本地识别并生成安全版本（右侧可复制粘贴给 AI）" :
-        currentLang === "de" ? "Lokal erkannt & sichere Version erstellt (rechts kopieren/einfügen)" :
-        "Processed locally & safe copy generated (copy from right)";
-    }
+    const outEl = $("outputText");
+    if (outEl) outEl.textContent = applyRules(text);
 
   } catch (e) {
-    if (pdfHint) {
-      pdfHint.textContent =
-        currentLang === "zh" ? "检测失败：请换一个 PDF 或重试" :
-        currentLang === "de" ? "Fehler: bitte anderes PDF versuchen oder erneut versuchen" :
-        "Failed: try another PDF or retry";
-    }
+    console.warn("PDF processing failed", e);
   }
 }
 
@@ -658,14 +578,18 @@ function bind() {
       b.classList.add("active");
       currentLang = b.dataset.lang;
 
+      window.currentLang = currentLang;
       lastRunMeta.lang = currentLang;
       setText();
 
-      // Re-render output if user already has something in output context:
-      const inTxt = ($("inputText").value || "").trim();
+      const inTxt = ($("inputText") && $("inputText").value ? $("inputText").value : "").trim();
       if (inTxt) {
         lastRunMeta.fromPdf = false;
-        $("outputText").textContent = applyRules(inTxt);
+        const outEl = $("outputText");
+        if (outEl) outEl.textContent = applyRules(inTxt);
+      } else {
+        // no input, but language changed → refresh card anyway
+        if (window.updateShareAuto) window.updateShareAuto(true);
       }
     };
   });
@@ -674,13 +598,15 @@ function bind() {
   if (mm) {
     mm.addEventListener("change", () => {
       moneyMode = mm.value || "off";
-      // regenerate if there is input text in textarea
-      const inTxt = ($("inputText").value || "").trim();
+
+      const inTxt = ($("inputText") && $("inputText").value ? $("inputText").value : "").trim();
       if (inTxt) {
         lastRunMeta.fromPdf = false;
-        $("outputText").textContent = applyRules(inTxt);
+        const outEl = $("outputText");
+        if (outEl) outEl.textContent = applyRules(inTxt);
       } else {
         window.__safe_moneyMode = moneyMode;
+        if (window.updateShareAuto) window.updateShareAuto(true);
       }
     });
 
@@ -688,42 +614,49 @@ function bind() {
     window.__safe_moneyMode = moneyMode;
   }
 
-  $("btnGenerate").onclick = () => {
-    lastRunMeta.fromPdf = false;
-    $("outputText").textContent = applyRules($("inputText").value || "");
-  };
+  const gen = $("btnGenerate");
+  if (gen) {
+    gen.onclick = () => {
+      lastRunMeta.fromPdf = false;
+      const outEl = $("outputText");
+      const inEl = $("inputText");
+      if (outEl) outEl.textContent = applyRules(inEl ? (inEl.value || "") : "");
+    };
+  }
 
-  $("btnClear").onclick = () => {
-    $("inputText").value = "";
-    $("outputText").textContent = "";
-    $("hitCount").textContent = "0";
-    window.__safe_hits = 0;
+  const clr = $("btnClear");
+  if (clr) {
+    clr.onclick = () => {
+      const inEl = $("inputText");
+      const outEl = $("outputText");
+      if (inEl) inEl.value = "";
+      if (outEl) outEl.textContent = "";
 
-    // ✅ reset pdf marker
-    lastRunMeta.fromPdf = false;
+      const hc = $("hitCount");
+      if (hc) hc.textContent = "0";
 
-    // clear risk box UI if present (avoid stale score)
-    const rb = $("riskBox");
-    if (rb) rb.innerHTML = "";
+      window.__safe_hits = 0;
+      lastRunMeta.fromPdf = false;
 
-    const pdfHint = $("pdfHint");
-    if (pdfHint) {
-      pdfHint.textContent =
-        currentLang === "zh"
-          ? "PDF 可拖拽到这里，或点击选择文件（自动识别文字层；扫描件需人工处理）"
-          : currentLang === "de"
-            ? "PDF hierher ziehen oder Datei wählen (Textlayer automatisch; Scan = manuell)"
-            : "Drag a PDF here or choose a file (text-layer auto; scan = manual)";
-    }
-  };
+      const rb = $("riskBox");
+      if (rb) rb.innerHTML = "";
 
-  $("btnCopy").onclick = () => {
-    navigator.clipboard.writeText($("outputText").textContent || "");
-  };
+      if (window.updateShareAuto) window.updateShareAuto(true);
+    };
+  }
+
+  const cp = $("btnCopy");
+  if (cp) {
+    cp.onclick = () => {
+      const outEl = $("outputText");
+      navigator.clipboard.writeText(outEl ? (outEl.textContent || "") : "");
+    };
+  }
 
   bindPdfUI();
 }
 
+window.currentLang = currentLang;
 initEnabled();
 setText();
 bind();
