@@ -45,23 +45,22 @@ header{
   font-size:18px;
   display:flex;
   align-items:center;
-  gap:10px;
+  gap:14px;
 }
 
+/* ===== LOGO: much larger ===== */
 .logo-full{
-  height:28px;
+  height:96px;   /* ~4x from 28px */
   width:auto;
   display:block;
 }
 
 .brand-name{
-  font-weight:700;
-}
-
-.slogan{
-  color:var(--muted);
-  font-size:13px;
-  margin-top:4px;
+  font-weight:800;
+  font-size:22px;
+  letter-spacing:0.2px;
+  line-height:1.1;
+  margin-top:10px;
 }
 
 .lang{
@@ -99,60 +98,50 @@ header{
   border:1px solid rgba(255,255,255,.08);
   border-radius:var(--radius);
   box-shadow:var(--shadow);
-  padding:10px 12px 14px;
+  padding:12px 14px 14px;
 }
 
 h3{
-  margin:4px 0 6px;
+  margin:6px 0 10px;
   font-size:14px;
-}
-
-.sub{
-  color:var(--muted);
-  font-size:12px;
-  margin-bottom:8px;
+  font-weight:800;
 }
 
 textarea{
   width:100%;
-  min-height:260px;
+  min-height:320px;
   background:rgba(10,14,20,.55);
   border:1px solid rgba(255,255,255,.1);
-  border-radius:10px;
+  border-radius:12px;
   color:var(--text);
-  padding:10px;
+  padding:12px;
   font-size:13px;
+  line-height:1.5;
 }
 
 .output{
-  min-height:260px;
+  min-height:320px;
   background:rgba(10,14,20,.55);
   border:1px solid rgba(255,255,255,.1);
-  border-radius:10px;
-  padding:10px;
+  border-radius:12px;
+  padding:12px;
   font-family:var(--mono);
   white-space:pre-wrap;
-}
-
-.actions{
-  display:flex;
-  justify-content:space-between;
-  margin-top:10px;
-  gap:8px;
-  flex-wrap:wrap;
+  line-height:1.55;
 }
 
 .btn{
   border:1px solid var(--line);
   background:transparent;
   color:var(--text);
-  padding:8px 12px;
-  border-radius:10px;
+  padding:9px 14px;
+  border-radius:12px;
   cursor:pointer;
+  font-weight:700;
 }
 
 .btn.primary{
-  background:linear-gradient(135deg, var(--btn), #66b6ff);
+  background:linear-gradient(135deg, rgba(120,255,240,.95), rgba(43,144,255,.95));
   color:#07111b;
   border:0;
 }
@@ -161,14 +150,7 @@ textarea{
   background:rgba(255,255,255,.05);
 }
 
-.pill{
-  border:1px solid var(--line);
-  border-radius:999px;
-  padding:4px 10px;
-  font-size:12px;
-  color:var(--muted);
-}
-
+/* rows */
 .row{
   display:flex;
   justify-content:space-between;
@@ -177,28 +159,20 @@ textarea{
   gap:10px;
 }
 
-footer{
-  margin-top:14px;
-  color:var(--muted);
-  font-size:12px;
-}
-
+/* feedback */
 .feedback{
   display:flex;
   gap:8px;
   align-items:center;
 }
-
 .iconbtn{
   border:1px solid var(--line);
   background:rgba(255,255,255,.05);
   color:var(--text);
-  border-radius:10px;
-  padding:6px 10px;
+  border-radius:12px;
+  padding:7px 12px;
   cursor:pointer;
 }
-
-/* ✅ inline feedback in output row */
 .feedback-inline{
   gap:8px;
 }
@@ -216,8 +190,8 @@ footer{
   align-items:center;
   margin:8px 0 10px;
   padding:10px;
-  border:1px dashed rgba(255,255,255,.18);
-  border-radius:12px;
+  border:1px dashed rgba(255,255,255,.14);
+  border-radius:14px;
   background:rgba(255,255,255,.02);
 }
 .filebar.dragover{
@@ -225,41 +199,97 @@ footer{
   background: rgba(43,144,255,.08);
 }
 .filebar input[type="file"]{
-  max-width: 220px;
+  max-width: 260px;
   color: var(--muted);
 }
 
-.moneybar{
-  display:flex; gap:10px; align-items:center; flex-wrap:wrap;
-  margin:8px 0 10px;
-  padding:10px;
-  border:1px solid rgba(255,255,255,.08);
+/* input watermark */
+.textarea-wrap{
+  position:relative;
+}
+.input-watermark{
+  position:absolute;
+  left:12px;
+  right:12px;
+  bottom:12px;
+  padding:10px 10px 8px;
   border-radius:12px;
-  background:rgba(255,255,255,.02);
+  background:linear-gradient(180deg, rgba(10,14,20,0), rgba(10,14,20,.55));
+  color:rgba(255,255,255,.28);
+  font-size:12px;
+  line-height:1.4;
+  white-space:pre-line;
+  pointer-events:none;
+  user-select:none;
 }
-.moneybar label{ color:var(--muted); font-size:12px; }
-.moneybar select{
-  background:rgba(10,14,20,.55);
-  color:var(--text);
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:10px;
-  padding:6px 10px;
-}
-.moneyhint{ color:var(--muted); font-size:12px; }
 
-/* Share bar */
-.sharebar{
-  display:flex; align-items:flex-start; justify-content:space-between;
-  gap:14px; margin-top:12px; padding:12px;
+/* control row: money + buttons */
+.controlbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-top:10px;
+  padding:10px 10px;
   border:1px solid rgba(255,255,255,.08);
   border-radius:14px;
   background:rgba(255,255,255,.02);
 }
-.sharetitle{ font-weight:700; font-size:13px; }
-.sharesub{ font-size:12px; color:var(--muted); margin-top:2px; max-width:360px; }
-.shareright{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 
-/* ✅ auto preview */
+.moneyctl{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.moneyctl label{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:700;
+}
+.moneyctl select{
+  background:rgba(10,14,20,.55);
+  color:var(--text);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:12px;
+  padding:8px 10px;
+  font-size:12px;
+}
+
+.ctl-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+/* Share bar */
+.sharebar{
+  display:none; /* hidden by default; show after output */
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  margin-top:12px;
+  padding:12px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;
+  background:rgba(255,255,255,.02);
+}
+
+.sharetitle{ font-weight:800; font-size:13px; }
+.sharesub{
+  font-size:12px;
+  color:var(--muted);
+  margin-top:2px;
+  max-width:360px;
+}
+
+.shareright{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+/* auto preview */
 .sharepreview{
   margin-top:10px;
   padding:10px;
@@ -268,84 +298,11 @@ footer{
   border:1px dashed rgba(255,255,255,.10);
 }
 #shareAutoImg{
-  width:min(260px, 100%);
+  width:min(320px, 100%);
   height:auto;
   border-radius:16px;
   display:block;
   box-shadow: 0 10px 40px rgba(0,0,0,.45);
-}
-
-/* ===== Middle Filter (between two cards) ===== */
-.grid{
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 18px;
-  align-items: stretch;
-}
-
-.mid-filter{
-  width: 88px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px 0;
-  opacity: 0.95;
-}
-
-.mid-filter .flow-line{
-  width: 2px;
-  flex: 1;
-  border-radius: 2px;
-  background: linear-gradient(
-    to bottom,
-    rgba(120, 255, 240, 0),
-    rgba(120, 255, 240, 0.45),
-    rgba(120, 255, 240, 0)
-  );
-}
-
-.mid-filter .filter-badge{
-  width: 54px;
-  height: 54px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.28);
-  backdrop-filter: blur(8px);
-}
-
-.mid-filter .filter-icon{
-  width: 34px;
-  height: 34px;
-  display: block;
-  user-select: none;
-  -webkit-user-drag: none;
-}
-
-.mid-filter .filter-text{
-  font-size: 12px;
-  letter-spacing: 0.6px;
-  color: rgba(255,255,255,0.66);
-}
-
-@media (max-width: 980px){
-  .grid{ grid-template-columns: 1fr; }
-  .mid-filter{ display: none; }
-}
-
-.mid-filter .filter-badge{
-  transition: transform .25s ease, box-shadow .25s ease;
-}
-
-.mid-filter .filter-badge:hover{
-  transform: translateY(-2px) scale(1.03);
-  box-shadow: 0 16px 40px rgba(0,0,0,0.35);
 }
 
 /* Risk score card */
@@ -357,77 +314,120 @@ footer{
   background:rgba(255,255,255,.02);
 }
 .riskhead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
-.risktitle{ font-weight:800; font-size:13px; }
-.riskmeta{ margin-top:4px; }
+.risktitle{ font-weight:900; font-size:13px; }
+.riskmeta{ margin-top:4px; color:var(--muted); font-size:12px; }
+
 .riskscore{
-  min-width:92px;
+  min-width:96px;
   text-align:center;
   padding:10px 10px 8px;
   border-radius:14px;
   border:1px solid rgba(255,255,255,.12);
   background:rgba(10,14,20,.35);
 }
-.riskscore .n{ font-size:24px; font-weight:900; line-height:1; }
-.riskscore .l{ font-size:12px; opacity:.9; margin-top:4px; }
+.riskscore .n{ font-size:26px; font-weight:900; line-height:1; }
+.riskscore .l{ font-size:12px; opacity:.9; margin-top:4px; color:rgba(255,255,255,.86); }
 
 .risksec{ margin-top:10px; }
 .risklabel{ font-size:12px; color:var(--muted); margin-bottom:6px; }
 .risklist{ display:flex; flex-direction:column; gap:6px; }
 .riskitem{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:6px 8px;
-  border-radius:10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:7px 10px;
+  border-radius:12px;
   background:rgba(255,255,255,.03);
   border:1px solid rgba(255,255,255,.06);
 }
-.riskitem .rk{ font-size:12px; color:rgba(255,255,255,.85); }
+.riskitem .rk{ font-size:12px; color:rgba(255,255,255,.90); }
 .riskitem .rv{ font-size:12px; color:var(--muted); }
 .riskadvice{ font-size:12px; line-height:1.5; color:rgba(255,255,255,.82); }
 
-/* =========================
-   BRAND SIZE OVERRIDES
-   ========================= */
-
-/* 顶部左上：全称 logo 更大 */
-.logo-full{
-  height: 40px;   /* 原来 28px */
+/* footer note */
+.tiny{
+  font-size:12px;
+  color:var(--muted);
+}
+.footnote{
+  margin-top:10px;
 }
 
-/* 中间列更“存在感” */
+/* links */
+.links{
+  margin-top:12px;
+  display:flex;
+  gap:12px;
+  font-size:12px;
+}
+.links a{
+  color:rgba(120,255,240,.80);
+  text-decoration:none;
+}
+.links a:hover{
+  text-decoration:underline;
+}
+
+/* ===== Middle Filter (between two cards) ===== */
 .mid-filter{
-  width: 124px;   /* 原来 88px */
-  gap: 14px;
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 10px 0;
+  opacity: 0.98;
 }
 
-/* 中间徽章更大、更亮一点 */
-.mid-filter .filter-badge{
-  width: 86px;     /* 原来 54px */
-  height: 86px;
-  border-radius: 24px;
-  box-shadow: 0 18px 54px rgba(0,0,0,0.38);
-}
-
-/* 中间 icon 更大 */
-.mid-filter .filter-icon{
-  width: 58px;     /* 原来 34px */
-  height: 58px;
-}
-
-/* “Filter” 字也跟着稍微大一点 */
-.mid-filter .filter-text{
-  font-size: 13px;     /* 原来 12px */
-  letter-spacing: 1px;
-  opacity: 0.8;
-}
-
-/* 中间竖线更显眼 */
 .mid-filter .flow-line{
-  width: 3px;          /* 原来 2px */
-  border-radius: 3px;
+  width: 4px;
+  flex: 1;
+  border-radius: 4px;
   background: linear-gradient(
     to bottom,
     rgba(120, 255, 240, 0),
-    rgba(120, 255, 240, 0.60),
+    rgba(120, 255, 240, 0.65),
     rgba(120, 255, 240, 0)
   );
+}
+
+.mid-filter .filter-badge{
+  width: 220px;
+  height: 220px;
+  border-radius: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  box-shadow: 0 22px 80px rgba(0,0,0,0.45);
+  backdrop-filter: blur(10px);
+}
+
+.mid-filter .filter-icon{
+  width: 140px;
+  height: 140px;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.mid-filter .filter-text{
+  font-size: 14px;
+  letter-spacing: 1.2px;
+  color: rgba(255,255,255,0.66);
+}
+
+@media (max-width: 980px){
+  .grid{ grid-template-columns: 1fr; }
+  .mid-filter{ display: none; }
+}
+
+.mid-filter .filter-badge{
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+.mid-filter .filter-badge:hover{
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 28px 100px rgba(0,0,0,0.55);
 }
