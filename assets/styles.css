@@ -382,3 +382,9 @@ footer{
   .grid{ grid-template-columns: 1fr; }
   .mid-filter{ display: none; }
 }
+
+.logo-full{
+  height: 28px;
+  width: auto;
+  display: block;
+}
