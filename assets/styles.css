@@ -202,6 +202,14 @@ textarea{
   max-width: 260px;
   color: var(--muted);
 }
+.filename{
+  color: rgba(255,255,255,.55);
+  font-size: 12px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  flex:1;
+}
 
 /* input watermark */
 .textarea-wrap{
@@ -215,7 +223,7 @@ textarea{
   padding:10px 10px 8px;
   border-radius:12px;
   background:linear-gradient(180deg, rgba(10,14,20,0), rgba(10,14,20,.55));
-  color:rgba(255,255,255,.28);
+  color:rgba(255,255,255,.30);
   font-size:12px;
   line-height:1.4;
   white-space:pre-line;
@@ -261,61 +269,105 @@ textarea{
   gap:10px;
 }
 
-/* Share bar */
-.sharebar{
-  display:none; /* hidden by default; show after output */
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:14px;
+/* ===== Fold (details/summary) ===== */
+.fold{
   margin-top:12px;
-  padding:12px;
   border:1px solid rgba(255,255,255,.08);
   border-radius:14px;
   background:rgba(255,255,255,.02);
+  overflow:hidden;
 }
-
-.sharetitle{ font-weight:800; font-size:13px; }
-.sharesub{
-  font-size:12px;
-  color:var(--muted);
-  margin-top:2px;
-  max-width:360px;
-}
-
-.shareright{
+.fold summary{
+  list-style:none;
+  cursor:pointer;
+  padding:12px 12px;
+  font-weight:800;
+  font-size:13px;
   display:flex;
   align-items:center;
-  gap:10px;
-  flex-wrap:wrap;
+  justify-content:space-between;
+}
+.fold summary::-webkit-details-marker{ display:none; }
+.fold summary::after{
+  content:"";
+  width:10px;
+  height:10px;
+  border-right:2px solid rgba(255,255,255,.35);
+  border-bottom:2px solid rgba(255,255,255,.35);
+  transform: rotate(45deg);
+  transition: transform .18s ease, opacity .18s ease;
+  opacity:.9;
+}
+.fold[open] summary::after{
+  transform: rotate(-135deg);
+}
+.riskfold .risk{
+  margin:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  padding:12px;
+}
+.achievefold .achieveBody{
+  padding:12px;
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  justify-content:space-between;
 }
 
-/* auto preview */
-.sharepreview{
-  margin-top:10px;
-  padding:10px;
+/* ===== Achievement body ===== */
+.achLeft{ flex:1; min-width:0; }
+.achSub{
+  font-size:12px;
+  color:var(--muted);
+  margin-bottom:10px;
+}
+.achRight{
+  display:flex;
+  align-items:flex-start;
+}
+.btnDownload{
+  width:92px;           /* fixed width: prevents deformation */
+  justify-content:center;
+}
+
+/* preview fixed height: no page stretching */
+.achPreview{
+  position:relative;
+  height:220px;         /* fixed: prevents page elongation */
   border-radius:16px;
   background:rgba(255,255,255,.03);
   border:1px dashed rgba(255,255,255,.10);
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.achPlaceholder{
+  padding:14px;
+  font-size:12px;
+  color:rgba(255,255,255,.45);
+  text-align:center;
+  line-height:1.5;
 }
 #shareAutoImg{
-  width:min(320px, 100%);
-  height:auto;
+  height:100%;
+  width:auto;
   border-radius:16px;
-  display:block;
+  display:none; /* toggled by share.js */
   box-shadow: 0 10px 40px rgba(0,0,0,.45);
 }
 
-/* Risk score card */
+/* Risk score card (inside fold) */
 .risk{
-  margin-top:12px;
   padding:12px;
   border:1px solid rgba(255,255,255,.08);
   border-radius:14px;
   background:rgba(255,255,255,.02);
 }
 .riskhead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
-.risktitle{ font-weight:900; font-size:13px; }
-.riskmeta{ margin-top:4px; color:var(--muted); font-size:12px; }
+.riskmeta{ margin-top:2px; color:var(--muted); font-size:12px; }
 
 .riskscore{
   min-width:96px;
