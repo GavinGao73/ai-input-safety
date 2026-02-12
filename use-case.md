@@ -1,10 +1,15 @@
 # Primary Use Case
 
-Scenario:
-- A user is about to paste a piece of text (resume, document summary, application material)
-- Before uploading it to AI or another platform, they want to reduce unnecessary personal exposure
+Scenario
 
-The tool is used:
-- Right before uploading
-- For a single piece of text
-- Then closed
+A user is about to submit text or documents to an AI system,
+translation engine, or automated platform.
+
+Before submission, they want to minimize unnecessary sensitive data exposure.
+
+The tool is used
+
+Immediately before AI submission
+For a single piece of content or document
+Without storage or persistence
+Then closed
