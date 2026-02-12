@@ -47,6 +47,14 @@ header{
   align-items:center;
   gap:10px;
 }
+.logo-full{
+  height: 28px;
+  width: auto;
+  display: block;
+}
+.logo{ display:flex; align-items:center; gap:10px; }
+.logo-full{ height:28px; width:auto; display:block; }
+.brand-name{ font-weight:700; }
 
 .dot{
   width:10px;
