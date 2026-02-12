@@ -507,6 +507,9 @@ function applyRules(text) {
   // ✅ Share metrics + expose report (must be BEFORE return)
   window.__safe_hits = hits;
   window.__safe_moneyMode = moneyMode;
+  window.__safe_score = score;            // 0-100
+  window.__safe_level = level;            // "low" | "medium" | "high"  (或你自己的中文也行)
+  window.__safe_breakdown = breakdown;    // { phone:2, email:1, bank:1, address:1 ... }
 
   // --- Risk meta
   lastRunMeta.inputLen = (String(text || "")).length;
