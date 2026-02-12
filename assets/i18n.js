@@ -2,7 +2,6 @@ const I18N = {
   zh: {
     slogan: "在 AI 读取之前，先通过 Filter。",
     inTitle: "输入",
-    inSub: "粘贴准备上传 / 分享 / 提交给 AI 的内容。",
     placeholder: "例如：简历、邮件、咨询材料、报告摘要……",
     panelTitle: "⚙ 识别选项",
     panelPill: "已启用",
@@ -18,8 +17,7 @@ const I18N = {
     btnCopied: "✔ 已复制",
     btnExample: "加载示例",
     btnClear: "清空",
-    outTitle: "安全版本（可复制）",
-    outSub: "可直接粘贴到 AI / 表单 / 邮件。",
+    outTitle: "输出",
     hitPill: "命中",
     statusIdle: "等待生成",
     statusOk: "已生成，请检查",
