@@ -1,6 +1,6 @@
 const I18N = {
   zh: {
-    slogan: "在你上传之前，先生成更安全的版本。",
+    slogan: "在 AI 读取之前，先通过 Filter。",
     inTitle: "输入",
     inSub: "粘贴准备上传 / 分享 / 提交给 AI 的内容。",
     placeholder: "例如：简历、邮件、咨询材料、报告摘要……",
@@ -34,7 +34,7 @@ const I18N = {
     foot: "本工具仅提供风险提示，不构成法律建议。"
   },
   en: {
-    slogan: "Create a safer version before you upload.",
+    slogan: "Filter before AI reads.",
     inTitle: "Input",
     inSub: "Paste what you plan to upload or send to AI.",
     placeholder: "e.g. resume, email, report summary…",
@@ -68,7 +68,7 @@ const I18N = {
     foot: "This tool provides risk hints only."
   },
   de: {
-    slogan: "Vor dem Hochladen eine sicherere Version erzeugen.",
+    slogan: "Filter, bevor KI liest.",
     inTitle: "Eingabe",
     inSub: "Text vor Upload oder KI-Nutzung einfügen.",
     placeholder: "z.B. Lebenslauf, E-Mail, Bericht…",
