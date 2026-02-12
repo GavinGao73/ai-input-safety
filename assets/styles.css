@@ -402,3 +402,39 @@ footer{
   transform: translateY(-2px) scale(1.03);
   box-shadow: 0 16px 40px rgba(0,0,0,0.35);
 }
+
+/* Risk score card */
+.risk{
+  margin-top:12px;
+  padding:12px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;
+  background:rgba(255,255,255,.02);
+}
+.riskhead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.risktitle{ font-weight:800; font-size:13px; }
+.riskmeta{ margin-top:4px; }
+.riskscore{
+  min-width:92px;
+  text-align:center;
+  padding:10px 10px 8px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(10,14,20,.35);
+}
+.riskscore .n{ font-size:24px; font-weight:900; line-height:1; }
+.riskscore .l{ font-size:12px; opacity:.9; margin-top:4px; }
+
+.risksec{ margin-top:10px; }
+.risklabel{ font-size:12px; color:var(--muted); margin-bottom:6px; }
+.risklist{ display:flex; flex-direction:column; gap:6px; }
+.riskitem{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:6px 8px;
+  border-radius:10px;
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.06);
+}
+.riskitem .rk{ font-size:12px; color:rgba(255,255,255,.85); }
+.riskitem .rv{ font-size:12px; color:var(--muted); }
+.riskadvice{ font-size:12px; line-height:1.5; color:rgba(255,255,255,.82); }
