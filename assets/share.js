@@ -1,525 +1,177 @@
-// assets/share.js
-// Share card generator (no user text included). Creates a premium-looking image + badge.
-// Sizes: 1080x1350 (4:5), 1080x1080, 1200x628.
-// Outputs: PNG data URL, downloadable. Uses Web Share API when available.
-
-(function () {
-  function $(id){ return document.getElementById(id); }
-
-  function getLang(){
-    // from app.js global variable
-    return window.currentLang || "zh";
-  }
-
-  function t(){
-    const lang = getLang();
-    const dict = {
-      zh: {
-        shareTitle: "分享安全卡片",
-        shareSub: "不包含你的原文，仅分享安全处理成果",
-        modalTitle: "分享预览",
-        note: "注意：卡片不包含你的原文内容，只显示处理统计与隐私承诺。",
-        copyText: "我刚用 Safe Before Send 本地清洗了一段敏感信息：已遮盖 {hits} 项。推荐你也在发送前做一次风险控制。",
-        badge: "本地生成 · 不上传 · 不保存",
-        line1: "Safe Before Send",
-        line2: "在发送前，先做一次信息风控",
-        statHits: "已遮盖",
-        statUnit: "项",
-        statMoney: "金额保护",
-        mOff: "关闭",
-        m1: "精确遮盖",
-        m2: "区间遮盖"
-      },
-      de: {
-        shareTitle: "Share-Sicherheitskarte",
-        shareSub: "Kein Originaltext – nur Ergebnis & Versprechen",
-        modalTitle: "Vorschau",
-        note: "Hinweis: Die Karte enthält keinen Originaltext, nur Statistik & Datenschutzversprechen.",
-        copyText: "Ich habe gerade mit Safe Before Send lokal sensible Infos bereinigt: {hits} Treffer maskiert. Empfehlung: vor dem Senden kurz prüfen.",
-        badge: "Lokal · kein Upload · keine Speicherung",
-        line1: "Safe Before Send",
-        line2: "Vor dem Senden: Risiko reduzieren",
-        statHits: "Maskiert",
-        statUnit: "Treffer",
-        statMoney: "Betragsschutz",
-        mOff: "Aus",
-        m1: "Genau",
-        m2: "Bereich"
-      },
-      en: {
-        shareTitle: "Share Safety Card",
-        shareSub: "No original text — only outcome & promise",
-        modalTitle: "Preview",
-        note: "Note: the card contains no original text, only stats & privacy promise.",
-        copyText: "I just used Safe Before Send locally: {hits} sensitive items masked. Recommend doing a quick safety pass before sending.",
-        badge: "Local · no upload · no storage",
-        line1: "Safe Before Send",
-        line2: "Before you send: reduce leakage risk",
-        statHits: "Masked",
-        statUnit: "items",
-        statMoney: "Money mode",
-        mOff: "Off",
-        m1: "Exact",
-        m2: "Range"
-      }
-    };
-    return dict[lang] || dict.zh;
-  }
-
-  function getMetrics(){
-  const hits = Number(window.__safe_hits || 0);
-  const moneyMode = String(window.__safe_moneyMode || "off");
-
-  const score = Number(window.__safe_score ?? NaN);
-  const level = String(window.__safe_level || "");
-  const breakdown = window.__safe_breakdown || null;
-
-  return { hits, moneyMode, score, level, breakdown };
-}
-
-  function formatMoneyMode(m){
-    const L = t();
-    if (m === "m1") return L.m1;
-    if (m === "m2") return L.m2;
-    return L.mOff;
-  }
-
-  function sizes(kind){
-    if (kind === "wide") return { w: 1200, h: 628 };
-    if (kind === "square") return { w: 1080, h: 1080 };
-    return { w: 1080, h: 1350 }; // story default
-  }
-
-  function nowStamp(){
-    const d = new Date();
-    const pad = (n)=> String(n).padStart(2,"0");
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  }
-
-  function roundRect(ctx, x,y,w,h,r){
-    const rr = Math.min(r, w/2, h/2);
-    ctx.beginPath();
-    ctx.moveTo(x+rr, y);
-    ctx.arcTo(x+w, y, x+w, y+h, rr);
-    ctx.arcTo(x+w, y+h, x, y+h, rr);
-    ctx.arcTo(x, y+h, x, y, rr);
-    ctx.arcTo(x, y, x+w, y, rr);
-    ctx.closePath();
-  }
-
-  // ========= Logo assets (Filter) =========
-  const LOGO_ICON_SRC = "./assets/logo-filter-icon.png";
-  const LOGO_FULL_SRC = "./assets/logo-filter-full.png";
-
-  const _imgCache = new Map();
-  function loadImg(src){
-    if (_imgCache.has(src)) return _imgCache.get(src);
-    const p = new Promise((resolve) => {
-      const img = new Image();
-      // Same-origin assets (GitHub Pages) OK. We set it anyway to be safe.
-      img.crossOrigin = "anonymous";
-      img.onload = () => resolve(img);
-      img.onerror = () => resolve(null);
-      img.src = src;
-    });
-    _imgCache.set(src, p);
-    return p;
-  }
-
-  function drawBadge(ctx, x, y, text){
-    // badge pill with subtle glow
-    ctx.save();
-    ctx.font = "600 30px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    const padX = 22, padY = 14;
-    const w = ctx.measureText(text).width + padX*2;
-    const h = 54;
-    ctx.shadowColor = "rgba(0,0,0,.35)";
-    ctx.shadowBlur = 18;
-    ctx.fillStyle = "rgba(255,255,255,.10)";
-    ctx.strokeStyle = "rgba(255,255,255,.18)";
-    ctx.lineWidth = 2;
-    roundRect(ctx, x, y, w, h, 22);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.stroke();
-
-    ctx.fillStyle = "rgba(255,255,255,.92)";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, x + padX, y + h/2);
-    ctx.restore();
-    return { w, h };
-  }
-
-  function drawLogoMark(ctx, x, y){
-    // Fallback vector mark (old lock). Used only if image logo not available.
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.globalAlpha = 0.92;
-
-    // outer circle
-    ctx.fillStyle = "rgba(255,255,255,.12)";
-    ctx.strokeStyle = "rgba(255,255,255,.22)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0,0,46,0,Math.PI*2);
-    ctx.fill();
-    ctx.stroke();
-
-    // lock body
-    ctx.fillStyle = "rgba(255,255,255,.92)";
-    roundRect(ctx, -18, -4, 36, 30, 10);
-    ctx.fill();
-
-    // shackle
-    ctx.strokeStyle = "rgba(255,255,255,.92)";
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.arc(0, -10, 16, Math.PI*1.1, Math.PI*1.9);
-    ctx.stroke();
-
-    // keyhole
-    ctx.fillStyle = "rgba(0,0,0,.45)";
-    ctx.beginPath();
-    ctx.arc(0, 10, 4, 0, Math.PI*2);
-    ctx.fill();
-    ctx.fillRect(-2, 10, 4, 10);
-
-    ctx.restore();
-  }
-
-  function drawIconFrame(ctx, cx, cy, size){
-    // Soft framed tile behind icon (tech-y)
-    const x = cx - size/2;
-    const y = cy - size/2;
-
-    ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,.45)";
-    ctx.shadowBlur = 26;
-    ctx.fillStyle = "rgba(255,255,255,.08)";
-    ctx.strokeStyle = "rgba(255,255,255,.14)";
-    ctx.lineWidth = 2;
-    roundRect(ctx, x, y, size, size, Math.round(size * 0.28));
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  function drawImageContain(ctx, img, x, y, w, h){
-    // Maintain aspect ratio, contain within w/h
-    const iw = img.naturalWidth || img.width;
-    const ih = img.naturalHeight || img.height;
-    if (!iw || !ih) return;
-
-    const r = Math.min(w / iw, h / ih);
-    const nw = iw * r;
-    const nh = ih * r;
-    const nx = x + (w - nw) / 2;
-    const ny = y + (h - nh) / 2;
-    ctx.drawImage(img, nx, ny, nw, nh);
-  }
-
-  async function drawCard(kind){
-    const { w, h } = sizes(kind);
-    const L = t();
-    const { hits, moneyMode } = getMetrics();
-
-    // preload logos (safe fallback)
-    const [logoIcon, logoFull] = await Promise.all([
-      loadImg(LOGO_ICON_SRC),
-      loadImg(LOGO_FULL_SRC)
-    ]);
-
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-
-    // Background gradient (premium look)
-    const g = ctx.createLinearGradient(0,0,w,h);
-    g.addColorStop(0, "rgba(12,16,24,1)");
-    g.addColorStop(0.5, "rgba(18,22,34,1)");
-    g.addColorStop(1, "rgba(10,14,20,1)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0,0,w,h);
-
-    // Soft blobs
-    ctx.save();
-    ctx.globalAlpha = 0.55;
-    ctx.filter = "blur(40px)";
-    ctx.fillStyle = "rgba(255,255,255,.10)";
-    ctx.beginPath(); ctx.arc(w*0.20, h*0.18, Math.min(w,h)*0.18, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,.06)";
-    ctx.beginPath(); ctx.arc(w*0.85, h*0.30, Math.min(w,h)*0.22, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,.08)";
-    ctx.beginPath(); ctx.arc(w*0.70, h*0.85, Math.min(w,h)*0.26, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
-    ctx.filter = "none";
-
-    const pad = (kind === "wide") ? 70 : 84;
-
-    // Main panel
-    ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,.55)";
-    ctx.shadowBlur = 40;
-    ctx.fillStyle = "rgba(255,255,255,.06)";
-    ctx.strokeStyle = "rgba(255,255,255,.12)";
-    ctx.lineWidth = 2;
-    roundRect(ctx, pad, pad, w-pad*2, h-pad*2, 34);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.stroke();
-    ctx.restore();
-
-    // Top brand row
-    const brandX = pad + 56;
-    const brandY = pad + 70;
-
-    // === TOP ICON (replace old lock mark) ===
-    const iconSize = (kind === "wide") ? 92 : 104;  // bigger than before, more brand presence
-    const iconCx = pad + 76;
-    const iconCy = brandY;
-
-    drawIconFrame(ctx, iconCx, iconCy, iconSize);
-
-    if (logoIcon) {
-      ctx.save();
-      ctx.globalAlpha = 0.98;
-      drawImageContain(ctx, logoIcon, iconCx - iconSize/2, iconCy - iconSize/2, iconSize, iconSize);
-      ctx.restore();
-    } else {
-      // fallback
-      drawLogoMark(ctx, iconCx, iconCy);
-    }
-
-    ctx.save();
-    ctx.fillStyle = "rgba(255,255,255,.95)";
-    ctx.font = (kind === "wide") ? "800 46px system-ui, -apple-system, Segoe UI, Roboto, Arial"
-                                 : "900 54px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText(L.line1, brandX + 120, brandY + 16);
-
-    ctx.fillStyle = "rgba(255,255,255,.70)";
-    ctx.font = (kind === "wide") ? "500 26px system-ui, -apple-system, Segoe UI, Roboto, Arial"
-                                 : "500 28px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText(L.line2, brandX + 120, brandY + 60);
-    ctx.restore();
-
-    // Badge
-    const badgeText = L.badge;
-    drawBadge(ctx, pad + 56, brandY + 98, badgeText);
-
-    // Stats section
-    const statX = pad + 56;
-    const statY = brandY + 190;
-
-    const cardGap = 18;
-    const cardW = (w - pad*2 - 56*2 - cardGap) / 2;
-    const cardH = (kind === "wide") ? 190 : 210;
-
-    function statCard(x, y, title, value){
-      ctx.save();
-      ctx.fillStyle = "rgba(255,255,255,.08)";
-      ctx.strokeStyle = "rgba(255,255,255,.14)";
-      ctx.lineWidth = 2;
-      roundRect(ctx, x, y, cardW, cardH, 26);
-      ctx.fill(); ctx.stroke();
-
-      ctx.fillStyle = "rgba(255,255,255,.72)";
-      ctx.font = "650 26px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-      ctx.fillText(title, x + 26, y + 54);
-
-      ctx.fillStyle = "rgba(255,255,255,.95)";
-      ctx.font = (kind === "wide") ? "900 74px system-ui, -apple-system, Segoe UI, Roboto, Arial"
-                                   : "900 82px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-      ctx.fillText(value, x + 26, y + 140);
-
-      ctx.restore();
-    }
-
-    // === MID ICON watermark (highlight "Filter") ===
-    if (logoIcon) {
-      const midSize = (kind === "wide") ? 240 : 260;
-      const midX = w/2 - midSize/2;
-      const midY = statY + cardH/2 - midSize/2 + 10;
-
-      ctx.save();
-      ctx.globalAlpha = 0.10;          // subtle but visible
-      ctx.filter = "blur(0px)";
-      drawImageContain(ctx, logoIcon, midX, midY, midSize, midSize);
-      ctx.restore();
-    }
-
-    statCard(statX, statY, `${L.statHits}`, `${hits} ${L.statUnit}`);
-    statCard(statX + cardW + cardGap, statY, `${L.statMoney}`, formatMoneyMode(moneyMode));
-
-    // Bottom: pledge + date + URL
-    const bottomY = h - pad - 70;
-
-    ctx.save();
-    ctx.fillStyle = "rgba(255,255,255,.60)";
-    ctx.font = "600 26px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText(L.badge, pad + 56, bottomY);
-
-    ctx.fillStyle = "rgba(255,255,255,.45)";
-    ctx.font = "500 22px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText(nowStamp(), pad + 56, bottomY + 40);
-
-    // URL (keep right-aligned)
-    ctx.textAlign = "right";
-    ctx.fillStyle = "rgba(255,255,255,.35)";
-    ctx.fillText("gavingao73.github.io/ai-input-safety", w - pad - 56, bottomY + 40);
-    ctx.restore();
-
-    // === Bottom small full logo (brand) ===
-    if (logoFull) {
-      const fullW = (kind === "wide") ? 240 : 260;  // small but readable
-      const fullH = 70;
-      const fx = w - pad - 56 - fullW;
-      const fy = bottomY - 10 - fullH;
-
-      ctx.save();
-      ctx.globalAlpha = 0.82;
-      drawImageContain(ctx, logoFull, fx, fy, fullW, fullH);
-      ctx.restore();
-    }
-
-    // Corner watermark text (small)
-    ctx.save();
-    ctx.globalAlpha = 0.22;
-    ctx.font = "800 20px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillStyle = "rgba(255,255,255,.9)";
-    ctx.textAlign = "right";
-    ctx.fillText("SAFE • LOCAL", w - pad - 40, pad + 52);
-    ctx.restore();
-
-    return canvas;
-  }
-
-  function canvasToPngDataUrl(canvas){
-    return canvas.toDataURL("image/png", 1.0);
-  }
-
-  function downloadDataUrl(dataUrl, filename){
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }
-
-  async function shareSystem(dataUrl){
-    // Web Share API with files (mobile)
-    try{
-      if (!navigator.share) return false;
-
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-      const file = new File([blob], "safe-before-send.png", { type: "image/png" });
-
-      if (navigator.canShare && !navigator.canShare({ files: [file] })) {
-        return false;
-      }
-
-      await navigator.share({
-        files: [file],
-        title: "Safe Before Send",
-        text: t().copyText.replace("{hits}", String(getMetrics().hits))
-      });
-      return true;
-    }catch(e){
-      return false;
-    }
-  }
-
-  function openModal(){
-    const m = $("shareModal");
-    if (!m) return;
-    m.setAttribute("aria-hidden", "false");
-  }
-  function closeModal(){
-    const m = $("shareModal");
-    if (!m) return;
-    m.setAttribute("aria-hidden", "true");
-  }
-
-  function setModalI18n(){
-    const L = t();
-    if ($("ui-share-title")) $("ui-share-title").textContent = L.shareTitle;
-    if ($("ui-share-sub")) $("ui-share-sub").textContent = L.shareSub;
-    if ($("ui-share-modal-title")) $("ui-share-modal-title").textContent = L.modalTitle;
-    if ($("ui-share-note")) $("ui-share-note").textContent = L.note;
-  }
-
-  function getShareKind(){
-    const sel = $("shareSize");
-    return (sel && sel.value) ? sel.value : "story";
-  }
-
-  async function makeCard(){
-    setModalI18n();
-    const kind = getShareKind();
-    const canvas = await drawCard(kind);
-    const dataUrl = canvasToPngDataUrl(canvas);
-    const img = $("sharePreviewImg");
-    if (img) img.src = dataUrl;
-    return { kind, dataUrl };
-  }
-
-  function copyShareText(){
-    const txt = t().copyText.replace("{hits}", String(getMetrics().hits));
-    navigator.clipboard.writeText(txt);
-  }
-
-  function bind(){
-    const previewBtn = $("btnSharePreview");
-    const downloadBtn = $("btnShareDownload");
-    const downloadBtn2 = $("btnShareDownload2");
-    const closeBtn = $("btnShareClose");
-    const mask = $("shareMask");
-    const sysBtn = $("btnShareSystem");
-    const copyBtn = $("btnShareCopyText");
-
-    if (previewBtn) previewBtn.onclick = async () => {
-      await makeCard();
-      openModal();
-    };
-
-    if (downloadBtn) downloadBtn.onclick = async () => {
-      const { kind, dataUrl } = await makeCard();
-      const file = `safe-before-send_${kind}_${nowStamp()}.png`;
-      downloadDataUrl(dataUrl, file);
-    };
-
-    if (downloadBtn2) downloadBtn2.onclick = async () => {
-      const { kind, dataUrl } = await makeCard();
-      const file = `safe-before-send_${kind}_${nowStamp()}.png`;
-      downloadDataUrl(dataUrl, file);
-    };
-
-    if (copyBtn) copyBtn.onclick = () => copyShareText();
-
-    if (sysBtn) sysBtn.onclick = async () => {
-      const { dataUrl } = await makeCard();
-      const ok = await shareSystem(dataUrl);
-      if (!ok) {
-        const file = `safe-before-send_${getShareKind()}_${nowStamp()}.png`;
-        downloadDataUrl(dataUrl, file);
-      }
-    };
-
-    if (closeBtn) closeBtn.onclick = () => closeModal();
-    if (mask) mask.onclick = () => closeModal();
-
-    setModalI18n();
-  }
-
-  window.addEventListener("DOMContentLoaded", () => {
-    // warm preload (non-blocking)
-    loadImg(LOGO_ICON_SRC);
-    loadImg(LOGO_FULL_SRC);
-    bind();
-  });
-
-})();
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Input Safety Filter</title>
+  <meta name="robots" content="noindex" />
+
+  <link rel="stylesheet" href="./assets/styles.css" />
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo">
+          <img
+            src="./assets/logo-filter-full.png"
+            class="logo-full"
+            alt="Filter"
+            loading="eager"
+            decoding="async"
+          />
+          <span class="brand-name">AI Input Filter</span>
+        </div>
+
+        <div class="slogan" id="ui-slogan"></div>
+      </div>
+
+      <div class="lang">
+        <button data-lang="de">DE</button>
+        <button data-lang="en">EN</button>
+        <button data-lang="zh" class="active">中文</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <h3 id="ui-in-title"></h3>
+        <div class="sub" id="ui-in-sub"></div>
+
+        <div class="outbox">
+          <div class="filebar">
+            <input id="pdfFile" type="file" accept="application/pdf" />
+            <div class="filehint" id="pdfHint">PDF（文字型）可拖拽到这里，或点击选择文件</div>
+          </div>
+
+          <textarea id="inputText" spellcheck="false"></textarea>
+        </div>
+
+        <div class="moneybar">
+          <label id="ui-money-label" for="moneyMode">金额保护：</label>
+          <select id="moneyMode">
+            <option value="off">关闭</option>
+            <option value="m1">M1 精确遮盖</option>
+            <option value="m2">M2 区间遮盖</option>
+          </select>
+          <span class="moneyhint" id="ui-money-hint">报价/合同建议开启</span>
+        </div>
+
+        <details id="panel">
+          <summary>
+            <span id="ui-panel-title"></span>
+            <span class="pill"><span id="ui-panel-pill"></span> <strong id="ui-enabled-count">0</strong></span>
+          </summary>
+
+          <div class="hint" id="ui-panel-hint"></div>
+
+          <div class="opt-group">
+            <div class="opt-title" id="ui-l1-title"></div>
+            <div class="opt-note" id="ui-l1-note"></div>
+            <div class="checks" id="group-l1"></div>
+          </div>
+
+          <div class="opt-group">
+            <div class="opt-title" id="ui-l2-title"></div>
+            <div class="opt-note" id="ui-l2-note"></div>
+            <div class="checks" id="group-l2"></div>
+          </div>
+
+          <div class="opt-group">
+            <div class="opt-title" id="ui-l3-title"></div>
+            <div class="opt-note" id="ui-l3-note"></div>
+            <div class="checks" id="group-l3"></div>
+          </div>
+        </details>
+
+        <div class="actions">
+          <button class="btn primary" id="btnGenerate"></button>
+          <div class="mini">
+            <span class="pill"><span id="ui-hit-pill"></span> <strong id="hitCount">0</strong></span>
+            <button class="btn secondary" id="btnExample"></button>
+            <button class="btn secondary" id="btnClear"></button>
+          </div>
+        </div>
+      </section>
+
+      <div class="mid-filter" aria-hidden="true">
+        <div class="flow-line"></div>
+        <div class="filter-badge">
+          <img
+            src="./assets/logo-filter-icon.png"
+            class="filter-icon"
+            alt="Filter"
+            loading="eager"
+            decoding="async"
+          />
+        </div>
+        <div class="flow-line"></div>
+        <div class="filter-text">Filter</div>
+      </div>
+
+      <section class="card right">
+        <h3 id="ui-out-title"></h3>
+        <div class="sub" id="ui-out-sub"></div>
+
+        <div class="outbox">
+          <div class="output" id="outputText"></div>
+        </div>
+
+        <!-- ✅ 复制 + 反馈放在同一行 -->
+        <div class="row">
+          <button class="btn primary" id="btnCopy"></button>
+
+          <div class="feedback feedback-inline">
+            <div class="fbq" id="ui-fb-q"></div>
+            <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
+            <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
+          </div>
+        </div>
+
+        <div class="status" id="status" style="margin-top:10px;">
+          <span class="dot2"></span>
+          <span id="statusText"></span>
+        </div>
+
+        <!-- ✅ Share：自动生成 + 自动展示 + 只保留下载 -->
+        <div class="sharebar">
+          <div class="shareleft">
+            <div class="sharetitle" id="ui-share-title">安全卡片</div>
+            <div class="sharesub" id="ui-share-sub">不包含原文，仅展示处理结果与隐私承诺</div>
+
+            <!-- 自动生成的卡片缩略图 -->
+            <div class="sharepreview">
+              <img id="shareAutoImg" alt="Safety card preview" />
+            </div>
+          </div>
+
+          <div class="shareright">
+            <button class="btn primary" id="btnShareDownload">下载卡片</button>
+          </div>
+        </div>
+
+        <div class="risk" id="riskBox"></div>
+
+        <div class="links">
+          <a id="linkLearn" href="./docs.html" target="_blank"></a>
+          <a id="linkPrivacy" href="./privacy.html" target="_blank"></a>
+          <a id="linkScope" href="./mvp.html" target="_blank"></a>
+        </div>
+      </section>
+    </div>
+
+    <footer>
+      <div class="tiny" id="ui-foot"></div>
+    </footer>
+  </div>
+
+  <!-- JS（顺序非常重要，不要改） -->
+  <script src="./assets/i18n.js" defer></script>
+  <script src="./assets/catalog.js" defer></script>
+  <script src="./assets/rules.js" defer></script>
+  <script src="./assets/pdf.js" defer></script>
+  <script src="./assets/app.js" defer></script>
+  <script src="./assets/share.js" defer></script>
+</body>
+</html>
