@@ -13,7 +13,18 @@
   <div class="wrap">
     <header>
       <div class="brand">
-        <div class="logo"><span class="dot"></span><span>Safe Before Send</span></div>
+        <!-- ✅ Brand: Full logo + name (keep your existing slogan binding) -->
+        <div class="logo">
+          <img
+            src="./assets/logo-filter-full.png"
+            class="logo-full"
+            alt="Filter"
+            loading="eager"
+            decoding="async"
+          />
+          <span class="brand-name">Safe Before Send</span>
+        </div>
+
         <div class="slogan" id="ui-slogan"></div>
       </div>
 
@@ -85,6 +96,22 @@
           </div>
         </div>
       </section>
+
+      <!-- ✅ Middle Filter (between two cards) -->
+      <div class="mid-filter" aria-hidden="true">
+        <div class="flow-line"></div>
+        <div class="filter-badge">
+          <img
+            src="./assets/logo-filter-icon.png"
+            class="filter-icon"
+            alt="Filter"
+            loading="eager"
+            decoding="async"
+          />
+        </div>
+        <div class="flow-line"></div>
+        <div class="filter-text">Filter</div>
+      </div>
 
       <section class="card right">
         <h3 id="ui-out-title"></h3>
