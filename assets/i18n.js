@@ -1,107 +1,99 @@
 const I18N = {
   zh: {
-    slogan: "在 AI 读取之前，先通过 Filter。",
+    // headings
     inTitle: "在 AI 读取之前，先通过 Filter。",
-    inSub: "",
+    outTitle: "过滤后文本，可直接粘贴给 AI。",
+
+    // input
     placeholder: "粘贴准备上传给 AI 的文字或文件内容…",
-    panelTitle: "⚙ 识别选项",
-    panelPill: "已启用",
-    panelHint: "默认设置已足够，需要时再调整。",
-    l1Title: "🟢 高风险信息（建议开启）",
-    l1Note: "结构化信息，误判概率低。",
-    l2Title: "🟡 扩展识别（可选）",
-    l2Note: "补充常见场景。",
-    l3Title: "🔵 实验性识别（默认关闭）",
-    l3Note: "可能存在误判。",
-    btnGenerate: "生成安全版本",
-    btnCopy: "复制安全版本",
-    btnCopied: "✔ 已复制",
-    btnExample: "加载示例",
+    inputWatermark:
+      "提示：不要粘贴完整身份证号/银行卡号/签名落款。\n尽量删除姓名+地址+账号的组合信息。\n本工具仅在本地运行，不上传、不保存。",
+
+    // controls
+    moneyLabel: "金额：",
+    moneyOff: "关闭",
+    moneyM1: "精确",
+    moneyM2: "区间",
+    btnGenerate: "过滤输入内容",
     btnClear: "清空",
-    outTitle: "生成安全版本，直接粘贴给 AI。",
-    outSub: "",
-    hitPill: "命中",
-    statusIdle: "",
-    statusOk: "",
-    statusWarn: "",
-    statusBad: "",
-    riskOne: "AI 系统可能识别并关联你未注意的敏感信息。",
-    riskTwo: "本工具仅在本地运行，不上传、不保存内容。",
+
+    // output
+    btnCopy: "复制",
+    btnCopied: "✔ 已复制",
+
+    // feedback
+    fbQ: "有帮助吗？",
+
+    // share
+    shareTitle: "安全卡片",
+    shareSub: "不含原文，仅展示处理结果与隐私承诺",
+    btnDownload: "下载",
+
+    // footer / links
     learn: "了解更多",
     privacy: "隐私原则",
     scope: "MVP 范围",
-    fbQ: "有帮助吗？",
     foot: "本工具仅提供风险提示，不构成法律建议。"
   },
 
   en: {
-    slogan: "Filter before AI reads.",
     inTitle: "Filter before AI reads.",
-    inSub: "",
-    placeholder: "Paste text (or extracted file content) before uploading to AI…",
-    panelTitle: "⚙ Detection Options",
-    panelPill: "Enabled",
-    panelHint: "Defaults are enough for most users.",
-    l1Title: "🟢 High Risk (recommended)",
-    l1Note: "Structured patterns, low false positives.",
-    l2Title: "🟡 Extended (optional)",
-    l2Note: "Extra coverage.",
-    l3Title: "🔵 Experimental (off by default)",
-    l3Note: "May contain false detections.",
-    btnGenerate: "Generate Safe Copy",
-    btnCopy: "Copy Safe Copy",
-    btnCopied: "✔ Copied",
-    btnExample: "Load Example",
+    outTitle: "Filtered text — paste directly into AI.",
+
+    placeholder: "Paste text you plan to send to AI…",
+    inputWatermark:
+      "Tip: avoid pasting full IDs, bank numbers, signatures.\nRemove combinations like name+address+account.\nRuns locally — no upload, no storage.",
+
+    moneyLabel: "Money:",
+    moneyOff: "Off",
+    moneyM1: "Exact",
+    moneyM2: "Range",
+    btnGenerate: "Run Filter",
     btnClear: "Clear",
-    outTitle: "Safe copy — paste to AI.",
-    outSub: "",
-    hitPill: "Hits",
-    statusIdle: "",
-    statusOk: "",
-    statusWarn: "",
-    statusBad: "",
-    riskOne: "AI systems may infer sensitive details you did not intend to reveal.",
-    riskTwo: "All processing runs locally. Nothing is stored or transmitted.",
-    learn: "Learn More",
-    privacy: "Privacy",
-    scope: "MVP Scope",
+
+    btnCopy: "Copy",
+    btnCopied: "✔ Copied",
+
     fbQ: "Helpful?",
-    foot: "This tool provides risk hints only."
+
+    shareTitle: "Safety Card",
+    shareSub: "No original text — stats & privacy pledge only",
+    btnDownload: "Download",
+
+    learn: "Learn",
+    privacy: "Privacy",
+    scope: "MVP",
+    foot: "Risk hints only. Not legal advice."
   },
 
   de: {
-    slogan: "Filter, bevor KI liest.",
     inTitle: "Filter, bevor KI liest.",
-    inSub: "",
-    placeholder: "Text (oder extrahierten Dateiinhalt) vor dem KI-Upload einfügen…",
-    panelTitle: "⚙ Erkennungsoptionen",
-    panelPill: "Aktiv",
-    panelHint: "Standard reicht meist aus.",
-    l1Title: "🟢 Hoher Schutz",
-    l1Note: "Strukturiert, geringe Fehlalarme.",
-    l2Title: "🟡 Erweitert",
-    l2Note: "Zusätzliche Erkennung.",
-    l3Title: "🔵 Experimentell",
-    l3Note: "Kann Fehlalarme enthalten.",
-    btnGenerate: "Sichere Version erzeugen",
+    outTitle: "Gefilterter Text — direkt in KI einfügen.",
+
+    placeholder: "Text einfügen, den du an KI senden willst…",
+    inputWatermark:
+      "Tipp: keine vollständigen Ausweise/Kontonummern/Signaturen.\nKombis wie Name+Adresse+Konto vermeiden.\nLäuft lokal — kein Upload, keine Speicherung.",
+
+    moneyLabel: "Betrag:",
+    moneyOff: "Aus",
+    moneyM1: "Genau",
+    moneyM2: "Bereich",
+    btnGenerate: "Filter anwenden",
+    btnClear: "Leeren",
+
     btnCopy: "Kopieren",
     btnCopied: "✔ Kopiert",
-    btnExample: "Beispiel laden",
-    btnClear: "Leeren",
-    outTitle: "Sichere Version — in KI einfügen.",
-    outSub: "",
-    hitPill: "Treffer",
-    statusIdle: "",
-    statusOk: "",
-    statusWarn: "",
-    statusBad: "",
-    riskOne: "KI-Systeme können sensible Informationen erkennen, die unbeabsichtigt offengelegt werden.",
-    riskTwo: "Verarbeitung erfolgt ausschließlich lokal. Keine Speicherung.",
-    learn: "Mehr erfahren",
-    privacy: "Datenschutz",
-    scope: "MVP-Umfang",
+
     fbQ: "Hilfreich?",
-    foot: "Kein Ersatz für Rechtsberatung."
+
+    shareTitle: "Sicherheitskarte",
+    shareSub: "Kein Originaltext — nur Statistik & Versprechen",
+    btnDownload: "Download",
+
+    learn: "Mehr",
+    privacy: "Datenschutz",
+    scope: "MVP",
+    foot: "Nur Risikohinweise. Keine Rechtsberatung."
   }
 };
 
