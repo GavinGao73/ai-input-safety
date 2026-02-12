@@ -40,9 +40,9 @@
         <div class="sub" id="ui-in-sub"></div>
 
         <div class="outbox">
+          <!-- 文件输入：保留结构，但不再强调 PDF / 扫描件文案 -->
           <div class="filebar">
             <input id="pdfFile" type="file" accept="application/pdf" />
-            <div class="filehint" id="pdfHint">PDF（文字型）可拖拽到这里，或点击选择文件</div>
           </div>
 
           <textarea id="inputText" spellcheck="false"></textarea>
@@ -58,38 +58,10 @@
           <span class="moneyhint" id="ui-money-hint">报价/合同建议开启</span>
         </div>
 
-        <details id="panel">
-          <summary>
-            <span id="ui-panel-title"></span>
-            <span class="pill"><span id="ui-panel-pill"></span> <strong id="ui-enabled-count">0</strong></span>
-          </summary>
-
-          <div class="hint" id="ui-panel-hint"></div>
-
-          <div class="opt-group">
-            <div class="opt-title" id="ui-l1-title"></div>
-            <div class="opt-note" id="ui-l1-note"></div>
-            <div class="checks" id="group-l1"></div>
-          </div>
-
-          <div class="opt-group">
-            <div class="opt-title" id="ui-l2-title"></div>
-            <div class="opt-note" id="ui-l2-note"></div>
-            <div class="checks" id="group-l2"></div>
-          </div>
-
-          <div class="opt-group">
-            <div class="opt-title" id="ui-l3-title"></div>
-            <div class="opt-note" id="ui-l3-note"></div>
-            <div class="checks" id="group-l3"></div>
-          </div>
-        </details>
-
         <div class="actions">
           <button class="btn primary" id="btnGenerate"></button>
           <div class="mini">
             <span class="pill"><span id="ui-hit-pill"></span> <strong id="hitCount">0</strong></span>
-            <button class="btn secondary" id="btnExample"></button>
             <button class="btn secondary" id="btnClear"></button>
           </div>
         </div>
