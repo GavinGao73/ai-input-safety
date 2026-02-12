@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Input Safety Filter</title>
   <meta name="robots" content="noindex" />
-
   <link rel="stylesheet" href="./assets/styles.css" />
 </head>
 
@@ -23,8 +22,6 @@
           />
           <span class="brand-name">AI Input Filter</span>
         </div>
-
-        <div class="slogan" id="ui-slogan"></div>
       </div>
 
       <div class="lang">
@@ -35,38 +32,45 @@
     </header>
 
     <div class="grid">
+      <!-- ================= LEFT: INPUT ================= -->
       <section class="card">
         <h3 id="ui-in-title"></h3>
-        <div class="sub" id="ui-in-sub"></div>
 
-        <div class="outbox">
-          <!-- 文件输入：保留结构，但不再强调 PDF / 扫描件文案 -->
+        <div class="outbox outbox-input">
           <div class="filebar">
-            <input id="pdfFile" type="file" />
+            <input id="pdfFile" type="file" accept="application/pdf" />
           </div>
 
-          <textarea id="inputText" spellcheck="false"></textarea>
+          <div class="textarea-wrap">
+            <textarea id="inputText" spellcheck="false"></textarea>
+            <div class="input-watermark" id="ui-input-watermark" aria-hidden="true"></div>
+          </div>
         </div>
 
-        <div class="moneybar">
-          <label id="ui-money-label" for="moneyMode">金额保护：</label>
-          <select id="moneyMode">
-            <option value="off">关闭</option>
-            <option value="m1">M1 精确遮盖</option>
-            <option value="m2">M2 区间遮盖</option>
-          </select>
-          <span class="moneyhint" id="ui-money-hint">报价/合同建议开启</span>
-        </div>
+        <!-- control row: money + run + clear -->
+        <div class="controlbar">
+          <div class="moneyctl">
+            <label id="ui-money-label" for="moneyMode"></label>
+            <select id="moneyMode">
+              <option value="off">关闭</option>
+              <option value="m1">M1</option>
+              <option value="m2">M2</option>
+            </select>
+          </div>
 
-        <div class="actions">
-          <button class="btn primary" id="btnGenerate"></button>
-          <div class="mini">
-            <span class="pill"><span id="ui-hit-pill"></span> <strong id="hitCount">0</strong></span>
+          <div class="ctl-actions">
+            <button class="btn primary" id="btnGenerate"></button>
             <button class="btn secondary" id="btnClear"></button>
           </div>
         </div>
+
+        <!-- risk card moved to LEFT -->
+        <div class="risk" id="riskBox"></div>
+
+        <div class="tiny footnote" id="ui-foot"></div>
       </section>
 
+      <!-- ================= MIDDLE FILTER ================= -->
       <div class="mid-filter" aria-hidden="true">
         <div class="flow-line"></div>
         <div class="filter-badge">
@@ -82,15 +86,15 @@
         <div class="filter-text">Filter</div>
       </div>
 
+      <!-- ================= RIGHT: OUTPUT ================= -->
       <section class="card right">
         <h3 id="ui-out-title"></h3>
-        <div class="sub" id="ui-out-sub"></div>
 
         <div class="outbox">
           <div class="output" id="outputText"></div>
         </div>
 
-        <!-- ✅ 复制 + 反馈放在同一行 -->
+        <!-- copy + feedback on one row -->
         <div class="row">
           <button class="btn primary" id="btnCopy"></button>
 
@@ -101,23 +105,21 @@
           </div>
         </div>
 
-        <!-- ✅ Share：自动生成 + 自动展示 + 只保留下载 -->
-        <div class="sharebar">
+        <!-- Share: auto preview after output; download only -->
+        <div class="sharebar" id="shareBar" aria-hidden="true">
           <div class="shareleft">
-            <div class="sharetitle" id="ui-share-title">安全卡片</div>
-            <div class="sharesub" id="ui-share-sub">不包含原文，仅展示处理结果与隐私承诺</div>
+            <div class="sharetitle" id="ui-share-title"></div>
+            <div class="sharesub" id="ui-share-sub"></div>
 
-            <div class="sharepreview">
+            <div class="sharepreview" id="sharePreviewWrap">
               <img id="shareAutoImg" alt="Safety card preview" />
             </div>
           </div>
 
           <div class="shareright">
-            <button class="btn primary" id="btnShareDownload">下载卡片</button>
+            <button class="btn primary" id="btnShareDownload"></button>
           </div>
         </div>
-
-        <div class="risk" id="riskBox"></div>
 
         <div class="links">
           <a id="linkLearn" href="./docs.html" target="_blank"></a>
@@ -126,10 +128,6 @@
         </div>
       </section>
     </div>
-
-    <footer>
-      <div class="tiny" id="ui-foot"></div>
-    </footer>
   </div>
 
   <!-- JS（顺序非常重要，不要改） -->
