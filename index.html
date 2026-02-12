@@ -13,7 +13,6 @@
   <div class="wrap">
     <header>
       <div class="brand">
-        <!-- ✅ Brand: Full logo + name (keep your existing slogan binding) -->
         <div class="logo">
           <img
             src="./assets/logo-filter-full.png"
@@ -49,7 +48,6 @@
           <textarea id="inputText" spellcheck="false"></textarea>
         </div>
 
-        <!-- ✅ Money protection (M1/M2) -->
         <div class="moneybar">
           <label id="ui-money-label" for="moneyMode">金额保护：</label>
           <select id="moneyMode">
@@ -97,7 +95,6 @@
         </div>
       </section>
 
-      <!-- ✅ Middle Filter (between two cards) -->
       <div class="mid-filter" aria-hidden="true">
         <div class="flow-line"></div>
         <div class="filter-badge">
@@ -121,15 +118,24 @@
           <div class="output" id="outputText"></div>
         </div>
 
+        <!-- ✅ 输出操作区：复制按钮 + 反馈（移到右侧） -->
         <div class="row">
           <button class="btn primary" id="btnCopy"></button>
-          <div class="status" id="status">
-            <span class="dot2"></span>
-            <span id="statusText"></span>
+
+          <div class="feedback" style="display:flex;align-items:center;gap:10px;justify-content:flex-end;">
+            <div class="fbq" id="ui-fb-q"></div>
+            <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
+            <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
           </div>
         </div>
 
-        <!-- ✅ Share -->
+        <!-- 状态提示保留（如你后续也想删，我再一并处理 app.js 的状态逻辑） -->
+        <div class="status" id="status" style="margin-top:10px;">
+          <span class="dot2"></span>
+          <span id="statusText"></span>
+        </div>
+
+        <!-- ✅ Share：只保留“下载卡片”对用户可见 -->
         <div class="sharebar">
           <div class="shareleft">
             <div class="sharetitle" id="ui-share-title">分享安全卡片</div>
@@ -137,18 +143,22 @@
           </div>
 
           <div class="shareright">
-            <select id="shareSize">
-              <option value="story">1080×1350（通用/小红书/公众号）</option>
-              <option value="square">1080×1080（朋友圈/头像风格）</option>
-              <option value="wide">1200×628（Twitter/LinkedIn）</option>
-            </select>
-            <button class="btn secondary" id="btnSharePreview">预览</button>
             <button class="btn primary" id="btnShareDownload">下载卡片</button>
+
+            <!-- ⚠️ 为避免现有 share.js 报错：先隐藏但保留 DOM -->
+            <div style="display:none;">
+              <select id="shareSize">
+                <option value="story">1080×1350（通用/小红书/公众号）</option>
+                <option value="square">1080×1080（朋友圈/头像风格）</option>
+                <option value="wide">1200×628（Twitter/LinkedIn）</option>
+              </select>
+              <button class="btn secondary" id="btnSharePreview">预览</button>
+            </div>
           </div>
         </div>
 
-        <!-- Share modal -->
-        <div class="modal" id="shareModal" aria-hidden="true">
+        <!-- ⚠️ 同理：先隐藏 modal，后续改 share.js 时彻底删除 -->
+        <div class="modal" id="shareModal" aria-hidden="true" style="display:none;">
           <div class="modalMask" id="shareMask"></div>
           <div class="modalCard">
             <div class="modalHead">
@@ -191,11 +201,7 @@
           <div class="b" id="ui-risk-two"></div>
         </div>
 
-        <div class="feedback">
-          <div class="fbq" id="ui-fb-q"></div>
-          <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
-          <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
-        </div>
+        <!-- ✅ footer 反馈已移走，这里留空以保持布局稳定（如你要彻底删 trust 区域，下一步一起做） -->
       </div>
 
       <div class="tiny" id="ui-foot"></div>
