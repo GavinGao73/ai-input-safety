@@ -103,6 +103,25 @@
     ctx.closePath();
   }
 
+  // ========= Logo assets (Filter) =========
+  const LOGO_ICON_SRC = "./assets/logo-filter-icon.png";
+  const LOGO_FULL_SRC = "./assets/logo-filter-full.png";
+
+  const _imgCache = new Map();
+  function loadImg(src){
+    if (_imgCache.has(src)) return _imgCache.get(src);
+    const p = new Promise((resolve) => {
+      const img = new Image();
+      // Same-origin assets (GitHub Pages) OK. We set it anyway to be safe.
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+    _imgCache.set(src, p);
+    return p;
+  }
+
   function drawBadge(ctx, x, y, text){
     // badge pill with subtle glow
     ctx.save();
@@ -128,7 +147,7 @@
   }
 
   function drawLogoMark(ctx, x, y){
-    // Minimal lock mark (vector-like) for branding
+    // Fallback vector mark (old lock). Used only if image logo not available.
     ctx.save();
     ctx.translate(x, y);
     ctx.globalAlpha = 0.92;
@@ -164,10 +183,48 @@
     ctx.restore();
   }
 
-  function drawCard(kind){
+  function drawIconFrame(ctx, cx, cy, size){
+    // Soft framed tile behind icon (tech-y)
+    const x = cx - size/2;
+    const y = cy - size/2;
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,.45)";
+    ctx.shadowBlur = 26;
+    ctx.fillStyle = "rgba(255,255,255,.08)";
+    ctx.strokeStyle = "rgba(255,255,255,.14)";
+    ctx.lineWidth = 2;
+    roundRect(ctx, x, y, size, size, Math.round(size * 0.28));
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawImageContain(ctx, img, x, y, w, h){
+    // Maintain aspect ratio, contain within w/h
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+    if (!iw || !ih) return;
+
+    const r = Math.min(w / iw, h / ih);
+    const nw = iw * r;
+    const nh = ih * r;
+    const nx = x + (w - nw) / 2;
+    const ny = y + (h - nh) / 2;
+    ctx.drawImage(img, nx, ny, nw, nh);
+  }
+
+  async function drawCard(kind){
     const { w, h } = sizes(kind);
     const L = t();
     const { hits, moneyMode } = getMetrics();
+
+    // preload logos (safe fallback)
+    const [logoIcon, logoFull] = await Promise.all([
+      loadImg(LOGO_ICON_SRC),
+      loadImg(LOGO_FULL_SRC)
+    ]);
 
     const canvas = document.createElement("canvas");
     canvas.width = w;
@@ -214,30 +271,44 @@
     const brandX = pad + 56;
     const brandY = pad + 70;
 
-    drawLogoMark(ctx, pad + 76, brandY);
+    // === TOP ICON (replace old lock mark) ===
+    const iconSize = (kind === "wide") ? 92 : 104;  // bigger than before, more brand presence
+    const iconCx = pad + 76;
+    const iconCy = brandY;
+
+    drawIconFrame(ctx, iconCx, iconCy, iconSize);
+
+    if (logoIcon) {
+      ctx.save();
+      ctx.globalAlpha = 0.98;
+      drawImageContain(ctx, logoIcon, iconCx - iconSize/2, iconCy - iconSize/2, iconSize, iconSize);
+      ctx.restore();
+    } else {
+      // fallback
+      drawLogoMark(ctx, iconCx, iconCy);
+    }
 
     ctx.save();
     ctx.fillStyle = "rgba(255,255,255,.95)";
     ctx.font = (kind === "wide") ? "800 46px system-ui, -apple-system, Segoe UI, Roboto, Arial"
                                  : "900 54px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.textBaseline = "alphabetic";
-    ctx.fillText(L.line1, brandX + 90, brandY + 16);
+    ctx.fillText(L.line1, brandX + 120, brandY + 16);
 
     ctx.fillStyle = "rgba(255,255,255,.70)";
     ctx.font = (kind === "wide") ? "500 26px system-ui, -apple-system, Segoe UI, Roboto, Arial"
                                  : "500 28px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText(L.line2, brandX + 90, brandY + 60);
+    ctx.fillText(L.line2, brandX + 120, brandY + 60);
     ctx.restore();
 
     // Badge
     const badgeText = L.badge;
-    const b = drawBadge(ctx, pad + 56, brandY + 98, badgeText);
+    drawBadge(ctx, pad + 56, brandY + 98, badgeText);
 
     // Stats section
     const statX = pad + 56;
     const statY = brandY + 190;
 
-    // Two stat cards
     const cardGap = 18;
     const cardW = (w - pad*2 - 56*2 - cardGap) / 2;
     const cardH = (kind === "wide") ? 190 : 210;
@@ -262,10 +333,23 @@
       ctx.restore();
     }
 
+    // === MID ICON watermark (highlight "Filter") ===
+    if (logoIcon) {
+      const midSize = (kind === "wide") ? 240 : 260;
+      const midX = w/2 - midSize/2;
+      const midY = statY + cardH/2 - midSize/2 + 10;
+
+      ctx.save();
+      ctx.globalAlpha = 0.10;          // subtle but visible
+      ctx.filter = "blur(0px)";
+      drawImageContain(ctx, logoIcon, midX, midY, midSize, midSize);
+      ctx.restore();
+    }
+
     statCard(statX, statY, `${L.statHits}`, `${hits} ${L.statUnit}`);
     statCard(statX + cardW + cardGap, statY, `${L.statMoney}`, formatMoneyMode(moneyMode));
 
-    // Bottom: privacy pledge + date + URL
+    // Bottom: pledge + date + URL
     const bottomY = h - pad - 70;
 
     ctx.save();
@@ -277,14 +361,28 @@
     ctx.font = "500 22px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.fillText(nowStamp(), pad + 56, bottomY + 40);
 
+    // URL (keep right-aligned)
     ctx.textAlign = "right";
     ctx.fillStyle = "rgba(255,255,255,.35)";
     ctx.fillText("gavingao73.github.io/ai-input-safety", w - pad - 56, bottomY + 40);
     ctx.restore();
 
-    // Corner watermark badge (small)
+    // === Bottom small full logo (brand) ===
+    if (logoFull) {
+      const fullW = (kind === "wide") ? 240 : 260;  // small but readable
+      const fullH = 70;
+      const fx = w - pad - 56 - fullW;
+      const fy = bottomY - 10 - fullH;
+
+      ctx.save();
+      ctx.globalAlpha = 0.82;
+      drawImageContain(ctx, logoFull, fx, fy, fullW, fullH);
+      ctx.restore();
+    }
+
+    // Corner watermark text (small)
     ctx.save();
-    ctx.globalAlpha = 0.28;
+    ctx.globalAlpha = 0.22;
     ctx.font = "800 20px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.fillStyle = "rgba(255,255,255,.9)";
     ctx.textAlign = "right";
@@ -316,7 +414,6 @@
       const blob = await res.blob();
       const file = new File([blob], "safe-before-send.png", { type: "image/png" });
 
-      // Some browsers require canShare
       if (navigator.canShare && !navigator.canShare({ files: [file] })) {
         return false;
       }
@@ -356,10 +453,10 @@
     return (sel && sel.value) ? sel.value : "story";
   }
 
-  function makeCard(){
+  async function makeCard(){
     setModalI18n();
     const kind = getShareKind();
-    const canvas = drawCard(kind);
+    const canvas = await drawCard(kind);
     const dataUrl = canvasToPngDataUrl(canvas);
     const img = $("sharePreviewImg");
     if (img) img.src = dataUrl;
@@ -380,19 +477,19 @@
     const sysBtn = $("btnShareSystem");
     const copyBtn = $("btnShareCopyText");
 
-    if (previewBtn) previewBtn.onclick = () => {
-      const { dataUrl } = makeCard();
+    if (previewBtn) previewBtn.onclick = async () => {
+      await makeCard();
       openModal();
     };
 
-    if (downloadBtn) downloadBtn.onclick = () => {
-      const { kind, dataUrl } = makeCard();
+    if (downloadBtn) downloadBtn.onclick = async () => {
+      const { kind, dataUrl } = await makeCard();
       const file = `safe-before-send_${kind}_${nowStamp()}.png`;
       downloadDataUrl(dataUrl, file);
     };
 
-    if (downloadBtn2) downloadBtn2.onclick = () => {
-      const { kind, dataUrl } = makeCard();
+    if (downloadBtn2) downloadBtn2.onclick = async () => {
+      const { kind, dataUrl } = await makeCard();
       const file = `safe-before-send_${kind}_${nowStamp()}.png`;
       downloadDataUrl(dataUrl, file);
     };
@@ -400,10 +497,9 @@
     if (copyBtn) copyBtn.onclick = () => copyShareText();
 
     if (sysBtn) sysBtn.onclick = async () => {
-      const { dataUrl } = makeCard();
+      const { dataUrl } = await makeCard();
       const ok = await shareSystem(dataUrl);
       if (!ok) {
-        // fallback: download
         const file = `safe-before-send_${getShareKind()}_${nowStamp()}.png`;
         downloadDataUrl(dataUrl, file);
       }
@@ -412,12 +508,13 @@
     if (closeBtn) closeBtn.onclick = () => closeModal();
     if (mask) mask.onclick = () => closeModal();
 
-    // Update i18n when language changes (app.js triggers regeneration anyway)
     setModalI18n();
   }
 
-  // wait for DOM + app.js
   window.addEventListener("DOMContentLoaded", () => {
+    // warm preload (non-blocking)
+    loadImg(LOGO_ICON_SRC);
+    loadImg(LOGO_FULL_SRC);
     bind();
   });
 
