@@ -1,24 +1,25 @@
 // PDF text-layer probe (NOT a content export tool)
-// Purpose:
-// - Detect whether PDF contains machine-readable text layer
-// - Provide temporary text for in-memory risk detection ONLY
-// - Never used for final document output
+
+let __pdfjsPromise = null;
 
 async function loadPdfJs() {
   if (window.pdfjsLib) return window.pdfjsLib;
+  if (__pdfjsPromise) return __pdfjsPromise;
 
-  await new Promise((resolve, reject) => {
+  __pdfjsPromise = new Promise((resolve, reject) => {
     const s = document.createElement("script");
     s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-    s.onload = resolve;
+    s.onload = () => resolve(window.pdfjsLib);
     s.onerror = () => reject(new Error("Failed to load PDF.js"));
     document.head.appendChild(s);
   });
 
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+  const lib = await __pdfjsPromise;
+
+  lib.GlobalWorkerOptions.workerSrc =
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-  return window.pdfjsLib;
+  return lib;
 }
 
 async function probePdfTextLayer(file) {
@@ -57,18 +58,11 @@ async function probePdfTextLayer(file) {
     }
   }
 
-  // If almost no text detected → treat as visual-only document
   if (totalChars < 20) {
-    return {
-      hasTextLayer: false,
-      text: ""
-    };
+    return { hasTextLayer: false, text: "" };
   }
 
-  return {
-    hasTextLayer: true,
-    text: pages.join("\n\n") // in-memory only
-  };
+  return { hasTextLayer: true, text: pages.join("\n\n") };
 }
 
 window.probePdfTextLayer = probePdfTextLayer;
