@@ -1,177 +1,381 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Input Safety Filter</title>
-  <meta name="robots" content="noindex" />
+// assets/share.js
+// Share card generator (no user text included).
+// v2: Auto-generate + auto-preview + single download button (no modal, no size options)
 
-  <link rel="stylesheet" href="./assets/styles.css" />
-</head>
+(function () {
+  function $(id){ return document.getElementById(id); }
 
-<body>
-  <div class="wrap">
-    <header>
-      <div class="brand">
-        <div class="logo">
-          <img
-            src="./assets/logo-filter-full.png"
-            class="logo-full"
-            alt="Filter"
-            loading="eager"
-            decoding="async"
-          />
-          <span class="brand-name">AI Input Filter</span>
-        </div>
+  function getLang(){
+    return window.currentLang || "zh";
+  }
 
-        <div class="slogan" id="ui-slogan"></div>
-      </div>
+  function t(){
+    const lang = getLang();
+    const dict = {
+      zh: {
+        shareTitle: "安全卡片",
+        shareSub: "不包含原文，仅展示处理结果与隐私承诺",
+        badge: "本地生成 · 不上传 · 不保存",
+        line1: "AI Input Filter",
+        line2: "在 AI 读取之前，先通过 Filter。",
+        statHits: "已遮盖",
+        statUnit: "项",
+        statMoney: "金额保护",
+        mOff: "关闭",
+        m1: "精确遮盖",
+        m2: "区间遮盖"
+      },
+      de: {
+        shareTitle: "Sicherheitskarte",
+        shareSub: "Kein Originaltext – nur Ergebnis & Versprechen",
+        badge: "Lokal · kein Upload · keine Speicherung",
+        line1: "AI Input Filter",
+        line2: "Filter, bevor KI liest.",
+        statHits: "Maskiert",
+        statUnit: "Treffer",
+        statMoney: "Betragsschutz",
+        mOff: "Aus",
+        m1: "Genau",
+        m2: "Bereich"
+      },
+      en: {
+        shareTitle: "Safety Card",
+        shareSub: "No original text — only outcome & promise",
+        badge: "Local · no upload · no storage",
+        line1: "AI Input Filter",
+        line2: "Filter before AI reads.",
+        statHits: "Masked",
+        statUnit: "items",
+        statMoney: "Money mode",
+        mOff: "Off",
+        m1: "Exact",
+        m2: "Range"
+      }
+    };
+    return dict[lang] || dict.zh;
+  }
 
-      <div class="lang">
-        <button data-lang="de">DE</button>
-        <button data-lang="en">EN</button>
-        <button data-lang="zh" class="active">中文</button>
-      </div>
-    </header>
+  function getMetrics(){
+    const hits = Number(window.__safe_hits || 0);
+    const moneyMode = String(window.__safe_moneyMode || "off");
+    return { hits, moneyMode };
+  }
 
-    <div class="grid">
-      <section class="card">
-        <h3 id="ui-in-title"></h3>
-        <div class="sub" id="ui-in-sub"></div>
+  function formatMoneyMode(m){
+    const L = t();
+    if (m === "m1") return L.m1;
+    if (m === "m2") return L.m2;
+    return L.mOff;
+  }
 
-        <div class="outbox">
-          <div class="filebar">
-            <input id="pdfFile" type="file" accept="application/pdf" />
-            <div class="filehint" id="pdfHint">PDF（文字型）可拖拽到这里，或点击选择文件</div>
-          </div>
+  function nowStamp(){
+    const d = new Date();
+    const pad = (n)=> String(n).padStart(2,"0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
 
-          <textarea id="inputText" spellcheck="false"></textarea>
-        </div>
+  function roundRect(ctx, x,y,w,h,r){
+    const rr = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+rr, y);
+    ctx.arcTo(x+w, y, x+w, y+h, rr);
+    ctx.arcTo(x+w, y+h, x, y+h, rr);
+    ctx.arcTo(x, y+h, x, y, rr);
+    ctx.arcTo(x, y, x+w, y, rr);
+    ctx.closePath();
+  }
 
-        <div class="moneybar">
-          <label id="ui-money-label" for="moneyMode">金额保护：</label>
-          <select id="moneyMode">
-            <option value="off">关闭</option>
-            <option value="m1">M1 精确遮盖</option>
-            <option value="m2">M2 区间遮盖</option>
-          </select>
-          <span class="moneyhint" id="ui-money-hint">报价/合同建议开启</span>
-        </div>
+  // ========= Logo assets (Filter) =========
+  const LOGO_ICON_SRC = "./assets/logo-filter-icon.png";
+  const LOGO_FULL_SRC = "./assets/logo-filter-full.png";
 
-        <details id="panel">
-          <summary>
-            <span id="ui-panel-title"></span>
-            <span class="pill"><span id="ui-panel-pill"></span> <strong id="ui-enabled-count">0</strong></span>
-          </summary>
+  const _imgCache = new Map();
+  function loadImg(src){
+    if (_imgCache.has(src)) return _imgCache.get(src);
+    const p = new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+    _imgCache.set(src, p);
+    return p;
+  }
 
-          <div class="hint" id="ui-panel-hint"></div>
+  function drawBadge(ctx, x, y, text){
+    ctx.save();
+    ctx.font = "600 26px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    const padX = 20, padY = 12;
+    const w = ctx.measureText(text).width + padX*2;
+    const h = 48;
 
-          <div class="opt-group">
-            <div class="opt-title" id="ui-l1-title"></div>
-            <div class="opt-note" id="ui-l1-note"></div>
-            <div class="checks" id="group-l1"></div>
-          </div>
+    ctx.shadowColor = "rgba(0,0,0,.35)";
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = "rgba(255,255,255,.10)";
+    ctx.strokeStyle = "rgba(255,255,255,.18)";
+    ctx.lineWidth = 2;
+    roundRect(ctx, x, y, w, h, 18);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.stroke();
 
-          <div class="opt-group">
-            <div class="opt-title" id="ui-l2-title"></div>
-            <div class="opt-note" id="ui-l2-note"></div>
-            <div class="checks" id="group-l2"></div>
-          </div>
+    ctx.fillStyle = "rgba(255,255,255,.92)";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, x + padX, y + h/2);
+    ctx.restore();
+    return { w, h };
+  }
 
-          <div class="opt-group">
-            <div class="opt-title" id="ui-l3-title"></div>
-            <div class="opt-note" id="ui-l3-note"></div>
-            <div class="checks" id="group-l3"></div>
-          </div>
-        </details>
+  function drawIconFrame(ctx, cx, cy, size){
+    const x = cx - size/2;
+    const y = cy - size/2;
 
-        <div class="actions">
-          <button class="btn primary" id="btnGenerate"></button>
-          <div class="mini">
-            <span class="pill"><span id="ui-hit-pill"></span> <strong id="hitCount">0</strong></span>
-            <button class="btn secondary" id="btnExample"></button>
-            <button class="btn secondary" id="btnClear"></button>
-          </div>
-        </div>
-      </section>
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,.45)";
+    ctx.shadowBlur = 26;
+    ctx.fillStyle = "rgba(255,255,255,.08)";
+    ctx.strokeStyle = "rgba(255,255,255,.14)";
+    ctx.lineWidth = 2;
+    roundRect(ctx, x, y, size, size, Math.round(size * 0.28));
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.stroke();
+    ctx.restore();
+  }
 
-      <div class="mid-filter" aria-hidden="true">
-        <div class="flow-line"></div>
-        <div class="filter-badge">
-          <img
-            src="./assets/logo-filter-icon.png"
-            class="filter-icon"
-            alt="Filter"
-            loading="eager"
-            decoding="async"
-          />
-        </div>
-        <div class="flow-line"></div>
-        <div class="filter-text">Filter</div>
-      </div>
+  function drawImageContain(ctx, img, x, y, w, h){
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+    if (!iw || !ih) return;
 
-      <section class="card right">
-        <h3 id="ui-out-title"></h3>
-        <div class="sub" id="ui-out-sub"></div>
+    const r = Math.min(w / iw, h / ih);
+    const nw = iw * r;
+    const nh = ih * r;
+    const nx = x + (w - nw) / 2;
+    const ny = y + (h - nh) / 2;
+    ctx.drawImage(img, nx, ny, nw, nh);
+  }
 
-        <div class="outbox">
-          <div class="output" id="outputText"></div>
-        </div>
+  async function drawCard(){
+    // single size (story-like, good for sharing)
+    const w = 1080, h = 1350;
+    const L = t();
+    const { hits, moneyMode } = getMetrics();
 
-        <!-- ✅ 复制 + 反馈放在同一行 -->
-        <div class="row">
-          <button class="btn primary" id="btnCopy"></button>
+    const [logoIcon, logoFull] = await Promise.all([
+      loadImg(LOGO_ICON_SRC),
+      loadImg(LOGO_FULL_SRC)
+    ]);
 
-          <div class="feedback feedback-inline">
-            <div class="fbq" id="ui-fb-q"></div>
-            <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
-            <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
-          </div>
-        </div>
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
 
-        <div class="status" id="status" style="margin-top:10px;">
-          <span class="dot2"></span>
-          <span id="statusText"></span>
-        </div>
+    // Background gradient
+    const g = ctx.createLinearGradient(0,0,w,h);
+    g.addColorStop(0, "rgba(12,16,24,1)");
+    g.addColorStop(0.5, "rgba(18,22,34,1)");
+    g.addColorStop(1, "rgba(10,14,20,1)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,w,h);
 
-        <!-- ✅ Share：自动生成 + 自动展示 + 只保留下载 -->
-        <div class="sharebar">
-          <div class="shareleft">
-            <div class="sharetitle" id="ui-share-title">安全卡片</div>
-            <div class="sharesub" id="ui-share-sub">不包含原文，仅展示处理结果与隐私承诺</div>
+    // Soft blobs
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.filter = "blur(40px)";
+    ctx.fillStyle = "rgba(255,255,255,.10)";
+    ctx.beginPath(); ctx.arc(w*0.20, h*0.18, Math.min(w,h)*0.18, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.06)";
+    ctx.beginPath(); ctx.arc(w*0.85, h*0.30, Math.min(w,h)*0.22, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.08)";
+    ctx.beginPath(); ctx.arc(w*0.70, h*0.85, Math.min(w,h)*0.26, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+    ctx.filter = "none";
 
-            <!-- 自动生成的卡片缩略图 -->
-            <div class="sharepreview">
-              <img id="shareAutoImg" alt="Safety card preview" />
-            </div>
-          </div>
+    const pad = 84;
 
-          <div class="shareright">
-            <button class="btn primary" id="btnShareDownload">下载卡片</button>
-          </div>
-        </div>
+    // Main panel
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,.55)";
+    ctx.shadowBlur = 40;
+    ctx.fillStyle = "rgba(255,255,255,.06)";
+    ctx.strokeStyle = "rgba(255,255,255,.12)";
+    ctx.lineWidth = 2;
+    roundRect(ctx, pad, pad, w-pad*2, h-pad*2, 34);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.stroke();
+    ctx.restore();
 
-        <div class="risk" id="riskBox"></div>
+    // Top brand row
+    const brandY = pad + 70;
+    const iconSize = 104;
+    const iconCx = pad + 76;
+    const iconCy = brandY;
 
-        <div class="links">
-          <a id="linkLearn" href="./docs.html" target="_blank"></a>
-          <a id="linkPrivacy" href="./privacy.html" target="_blank"></a>
-          <a id="linkScope" href="./mvp.html" target="_blank"></a>
-        </div>
-      </section>
-    </div>
+    drawIconFrame(ctx, iconCx, iconCy, iconSize);
 
-    <footer>
-      <div class="tiny" id="ui-foot"></div>
-    </footer>
-  </div>
+    if (logoIcon) {
+      ctx.save();
+      ctx.globalAlpha = 0.98;
+      drawImageContain(ctx, logoIcon, iconCx - iconSize/2, iconCy - iconSize/2, iconSize, iconSize);
+      ctx.restore();
+    }
 
-  <!-- JS（顺序非常重要，不要改） -->
-  <script src="./assets/i18n.js" defer></script>
-  <script src="./assets/catalog.js" defer></script>
-  <script src="./assets/rules.js" defer></script>
-  <script src="./assets/pdf.js" defer></script>
-  <script src="./assets/app.js" defer></script>
-  <script src="./assets/share.js" defer></script>
-</body>
-</html>
+    ctx.save();
+    ctx.fillStyle = "rgba(255,255,255,.95)";
+    ctx.font = "900 54px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillText(L.line1, pad + 190, brandY + 16);
+
+    ctx.fillStyle = "rgba(255,255,255,.70)";
+    ctx.font = "500 28px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillText(L.line2, pad + 190, brandY + 60);
+    ctx.restore();
+
+    // Badge
+    drawBadge(ctx, pad + 56, brandY + 98, L.badge);
+
+    // Stats cards
+    const statX = pad + 56;
+    const statY = brandY + 190;
+    const gap = 18;
+    const cardW = (w - pad*2 - 56*2 - gap) / 2;
+    const cardH = 210;
+
+    function statCard(x, y, title, value){
+      ctx.save();
+      ctx.fillStyle = "rgba(255,255,255,.08)";
+      ctx.strokeStyle = "rgba(255,255,255,.14)";
+      ctx.lineWidth = 2;
+      roundRect(ctx, x, y, cardW, cardH, 26);
+      ctx.fill(); ctx.stroke();
+
+      ctx.fillStyle = "rgba(255,255,255,.72)";
+      ctx.font = "650 26px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+      ctx.fillText(title, x + 26, y + 54);
+
+      ctx.fillStyle = "rgba(255,255,255,.95)";
+      ctx.font = "900 82px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+      ctx.fillText(value, x + 26, y + 140);
+
+      ctx.restore();
+    }
+
+    // watermark icon
+    if (logoIcon) {
+      const midSize = 260;
+      const midX = w/2 - midSize/2;
+      const midY = statY + cardH/2 - midSize/2 + 10;
+      ctx.save();
+      ctx.globalAlpha = 0.10;
+      drawImageContain(ctx, logoIcon, midX, midY, midSize, midSize);
+      ctx.restore();
+    }
+
+    statCard(statX, statY, `${L.statHits}`, `${hits} ${L.statUnit}`);
+    statCard(statX + cardW + gap, statY, `${L.statMoney}`, formatMoneyMode(moneyMode));
+
+    // Bottom
+    const bottomY = h - pad - 70;
+
+    ctx.save();
+    ctx.fillStyle = "rgba(255,255,255,.60)";
+    ctx.font = "600 26px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillText(L.badge, pad + 56, bottomY);
+
+    ctx.fillStyle = "rgba(255,255,255,.45)";
+    ctx.font = "500 22px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillText(nowStamp(), pad + 56, bottomY + 40);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(255,255,255,.35)";
+    ctx.fillText("gavingao73.github.io/ai-input-safety", w - pad - 56, bottomY + 40);
+    ctx.restore();
+
+    // small full logo (brand)
+    if (logoFull) {
+      const fullW = 260;
+      const fullH = 70;
+      const fx = w - pad - 56 - fullW;
+      const fy = bottomY - 10 - fullH;
+
+      ctx.save();
+      ctx.globalAlpha = 0.82;
+      drawImageContain(ctx, logoFull, fx, fy, fullW, fullH);
+      ctx.restore();
+    }
+
+    return canvas;
+  }
+
+  function canvasToPngDataUrl(canvas){
+    return canvas.toDataURL("image/png", 1.0);
+  }
+
+  function downloadDataUrl(dataUrl, filename){
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  // cache latest card to avoid regenerating on download click
+  let _lastDataUrl = "";
+  let _lastLang = "";
+  let _lastHits = null;
+  let _lastMoney = null;
+
+  async function updateShareAuto(force){
+    const { hits, moneyMode } = getMetrics();
+    const lang = getLang();
+
+    const shouldSkip =
+      !force &&
+      _lastDataUrl &&
+      _lastLang === lang &&
+      _lastHits === hits &&
+      _lastMoney === moneyMode;
+
+    if (shouldSkip) return;
+
+    const imgEl = $("shareAutoImg");
+    if (!imgEl) return;
+
+    const canvas = await drawCard();
+    const dataUrl = canvasToPngDataUrl(canvas);
+
+    _lastDataUrl = dataUrl;
+    _lastLang = lang;
+    _lastHits = hits;
+    _lastMoney = moneyMode;
+
+    imgEl.src = dataUrl;
+  }
+
+  function bind(){
+    const downloadBtn = $("btnShareDownload");
+    if (downloadBtn) {
+      downloadBtn.onclick = async () => {
+        await updateShareAuto(true);
+        const file = `ai-input-filter_card_${nowStamp()}.png`;
+        if (_lastDataUrl) downloadDataUrl(_lastDataUrl, file);
+      };
+    }
+  }
+
+  window.updateShareAuto = updateShareAuto;
+
+  window.addEventListener("DOMContentLoaded", () => {
+    // warm preload
+    loadImg(LOGO_ICON_SRC);
+    loadImg(LOGO_FULL_SRC);
+
+    bind();
+    updateShareAuto(true);
+  });
+
+})();
