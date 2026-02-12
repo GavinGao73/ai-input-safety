@@ -20,3 +20,18 @@
 ## D6: Metrics (minimal)
 - Only anonymous usage signals: page open, key button clicks, optional 👍/👎.
 - No content logging, no user identification.
+
+## D7: Threat Model Clarification
+
+Primary risk target is machine / AI / automated extraction,
+not human visual inspection.
+
+## D8: Document Safety Strategy
+
+Documents are processed using a Raster Secure Model
+to eliminate recoverable text-layer data.
+
+## D9: No OCR by Design
+
+OCR is intentionally excluded to avoid privacy ambiguity,
+false positives, and reconstruction errors.
