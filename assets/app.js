@@ -298,7 +298,6 @@ function renderRiskBox(report, meta) {
     report.level === "mid" ? t.adviceMid :
     t.adviceLow;
 
-  // 不强依赖 CSS（无 CSS 也能正常显示）
   box.innerHTML = `
     <div class="riskhead" style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
       <div class="riskleft">
@@ -390,10 +389,10 @@ function setText() {
   if (pdfHint) {
     pdfHint.textContent =
       currentLang === "zh"
-        ? "PDF（文字型）可拖拽到这里，或点击选择文件"
+        ? "PDF 可拖拽到这里，或点击选择文件（自动识别文字层；扫描件需人工处理）"
         : currentLang === "de"
-          ? "Text-PDF hierher ziehen oder Datei auswählen"
-          : "Drag a text-based PDF here or choose a file";
+          ? "PDF hierher ziehen oder Datei wählen (Textlayer automatisch; Scan = manuell)"
+          : "Drag a PDF here or choose a file (text-layer auto; scan = manual)";
   }
 
   // Share UI (if present)
@@ -504,13 +503,6 @@ function applyRules(text) {
 
   $("hitCount").textContent = String(hits);
 
-  // ✅ Share metrics + expose report (must be BEFORE return)
-  window.__safe_hits = hits;
-  window.__safe_moneyMode = moneyMode;
-  window.__safe_score = score;            // 0-100
-  window.__safe_level = level;            // "low" | "medium" | "high"  (或你自己的中文也行)
-  window.__safe_breakdown = breakdown;    // { phone:2, email:1, bank:1, address:1 ... }
-
   // --- Risk meta
   lastRunMeta.inputLen = (String(text || "")).length;
   lastRunMeta.enabledCount = enabled.size;
@@ -525,6 +517,12 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
+  // ✅ Share metrics (local-only globals used by share.js)
+  window.__safe_hits = hits;
+  window.__safe_moneyMode = moneyMode;
+  window.__safe_breakdown = hitsByKey;
+  window.__safe_score = report.score;
+  window.__safe_level = report.level;
   window.__safe_report = {
     hits,
     hitsByKey,
@@ -549,7 +547,6 @@ function applyRules(text) {
 /* ============ PDF helpers ============ */
 async function handlePdf(file) {
   const pdfHint = $("pdfHint");
-  const inputEl = $("inputText");
 
   if (!file) return;
 
@@ -565,54 +562,68 @@ async function handlePdf(file) {
 
   if (pdfHint) {
     pdfHint.textContent =
-      currentLang === "zh" ? "正在本地解析 PDF 文本…" :
-      currentLang === "de" ? "PDF-Text wird lokal extrahiert…" :
-      "Extracting PDF text locally…";
+      currentLang === "zh" ? "正在本地检测 PDF 文本层…" :
+      currentLang === "de" ? "Textlayer wird lokal geprüft…" :
+      "Checking PDF text layer locally…";
   }
 
   try {
-    if (!window.extractTextFromPdfFile) {
+    if (!window.probePdfTextLayer) {
       if (pdfHint) {
         pdfHint.textContent =
-          currentLang === "zh" ? "PDF 模块未加载：请确认已添加 assets/pdf.js 并在 index.html 引入" :
-          currentLang === "de" ? "PDF-Modul nicht geladen: bitte assets/pdf.js einbinden" :
-          "PDF module not loaded: please include assets/pdf.js";
+          currentLang === "zh" ? "PDF 模块未加载：请确认已替换 assets/pdf.js（probePdfTextLayer）并在 index.html 引入" :
+          currentLang === "de" ? "PDF-Modul nicht geladen: assets/pdf.js (probePdfTextLayer) einbinden" :
+          "PDF module not loaded: please include assets/pdf.js (probePdfTextLayer)";
       }
       return;
     }
 
-    const text = await window.extractTextFromPdfFile(file);
+    const probe = await window.probePdfTextLayer(file);
 
-    if (!text || !text.trim()) {
-      if (pdfHint) {
-        pdfHint.textContent =
-          currentLang === "zh" ? "未提取到文本：该 PDF 可能是扫描件（无文字层）" :
-          currentLang === "de" ? "Kein Text gefunden: evtl. Scan-PDF (ohne Textlayer)" :
-          "No text extracted: this PDF may be a scan (no text layer)";
-      }
-      return;
-    }
-
-    // ✅ mark source
+    // ✅ mark source (only if we got a PDF flow)
     lastRunMeta.fromPdf = true;
 
-    inputEl.value = text;
+    if (!probe || !probe.hasTextLayer) {
+      // Visual-only document (scan / image-based PDF)
+      if (pdfHint) {
+        pdfHint.textContent =
+          currentLang === "zh"
+            ? "未检测到可解析文本层：该 PDF 可能为扫描件/图片。当前版本不做 OCR，请改用人工处理（手动标记后再导出）。"
+            : currentLang === "de"
+              ? "Kein Textlayer: Scan-/Bild-PDF. In v1 kein OCR. Bitte manuell markieren und dann exportieren."
+              : "No text layer detected (scan/image PDF). No OCR in v1. Please use manual marking then export.";
+      }
+      return;
+    }
 
-    const btn = $("btnGenerate");
-    if (btn) btn.click();
+    const text = String(probe.text || "").trim();
+    if (!text) {
+      if (pdfHint) {
+        pdfHint.textContent =
+          currentLang === "zh" ? "检测到文本层，但未提取到有效文本。" :
+          currentLang === "de" ? "Textlayer erkannt, aber kein verwertbarer Text extrahiert." :
+          "Text layer detected, but no usable text extracted.";
+      }
+      return;
+    }
+
+    // ✅ IMPORTANT: do NOT put original PDF text into textarea (reduce user concern)
+    // We only output the safe copy to the right panel.
+    $("outputText").textContent = applyRules(text);
 
     if (pdfHint) {
       pdfHint.textContent =
-        currentLang === "zh" ? "已提取文本并生成安全版本（右侧已更新）" :
-        currentLang === "de" ? "Text extrahiert & sichere Version erstellt (rechts aktualisiert)" :
-        "Text extracted & safe copy generated (updated on the right)";
+        currentLang === "zh" ? "已本地识别并生成安全版本（右侧可复制粘贴给 AI）" :
+        currentLang === "de" ? "Lokal erkannt & sichere Version erstellt (rechts kopieren/einfügen)" :
+        "Processed locally & safe copy generated (copy from right)";
     }
+
   } catch (e) {
     if (pdfHint) {
       pdfHint.textContent =
-        currentLang === "zh" ? "解析失败：请换一个文字型 PDF" :
-        currentLang === "de" ? "Fehler: bitte eine textbasierte PDF versuchen" :
-        "Failed: try a text-based PDF";
+        currentLang === "zh" ? "检测失败：请换一个 PDF 或重试" :
+        currentLang === "de" ? "Fehler: bitte anderes PDF versuchen oder erneut versuchen" :
+        "Failed: try another PDF or retry";
     }
   }
 }
@@ -650,8 +661,11 @@ function bind() {
       lastRunMeta.lang = currentLang;
       setText();
 
-      if (($("inputText").value || "").trim()) {
-        $("outputText").textContent = applyRules($("inputText").value || "");
+      // Re-render output if user already has something in output context:
+      const inTxt = ($("inputText").value || "").trim();
+      if (inTxt) {
+        lastRunMeta.fromPdf = false;
+        $("outputText").textContent = applyRules(inTxt);
       }
     };
   });
@@ -660,9 +674,11 @@ function bind() {
   if (mm) {
     mm.addEventListener("change", () => {
       moneyMode = mm.value || "off";
-      // regenerate; applyRules will update __safe_* globals + riskBox
-      if (($("inputText").value || "").trim()) {
-        $("outputText").textContent = applyRules($("inputText").value || "");
+      // regenerate if there is input text in textarea
+      const inTxt = ($("inputText").value || "").trim();
+      if (inTxt) {
+        lastRunMeta.fromPdf = false;
+        $("outputText").textContent = applyRules(inTxt);
       } else {
         window.__safe_moneyMode = moneyMode;
       }
@@ -673,8 +689,7 @@ function bind() {
   }
 
   $("btnGenerate").onclick = () => {
-    // manual input: treat as not-from-pdf unless last was pdf upload
-    // (we keep lastRunMeta.fromPdf as-is; clear will reset it)
+    lastRunMeta.fromPdf = false;
     $("outputText").textContent = applyRules($("inputText").value || "");
   };
 
@@ -690,6 +705,16 @@ function bind() {
     // clear risk box UI if present (avoid stale score)
     const rb = $("riskBox");
     if (rb) rb.innerHTML = "";
+
+    const pdfHint = $("pdfHint");
+    if (pdfHint) {
+      pdfHint.textContent =
+        currentLang === "zh"
+          ? "PDF 可拖拽到这里，或点击选择文件（自动识别文字层；扫描件需人工处理）"
+          : currentLang === "de"
+            ? "PDF hierher ziehen oder Datei wählen (Textlayer automatisch; Scan = manuell)"
+            : "Drag a PDF here or choose a file (text-layer auto; scan = manual)";
+    }
   };
 
   $("btnCopy").onclick = () => {
