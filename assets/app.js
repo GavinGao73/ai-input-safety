@@ -123,7 +123,7 @@ function formatCurrencyForM2(currency) {
   return c.toUpperCase();
 }
 
-// ---- init ----
+// ---- init enabled ----
 function initEnabled() {
   enabled.clear();
   Object.values(DETECTION_ITEMS).flat().forEach(i => {
@@ -137,14 +137,11 @@ const RISK_WEIGHTS = {
   account: 26,
   email: 14,
   phone: 16,
-
   address_de_street: 18,
   handle: 10,
-
   ref: 6,
   title: 4,
   number: 2,
-
   money: 0
 };
 
@@ -158,9 +155,9 @@ function riskI18n(lang) {
     high: "高风险",
     top: "主要风险来源",
     advice: "建议",
-    adviceLow: "可直接使用；如是报价/合同建议开启金额保护。",
-    adviceMid: "建议检查 Top 项；必要时开启金额保护或加严地址/账号遮盖。",
-    adviceHigh: "不建议直接发送：请开启更多遮盖选项，并删除落款/签名/账号信息后再试。",
+    adviceLow: "可以使用；如果是报价/合同类内容，建议开启金额保护。",
+    adviceMid: "请检查 Top 项；必要时加强金额/地址/账号遮盖。",
+    adviceHigh: "不建议直接发送：请删签名落款/账号信息，并加严遮盖后再试。",
     meta: (m) => `命中 ${m.hits}｜金额 ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜文件" : ""}`
   };
   const de = {
@@ -170,9 +167,9 @@ function riskI18n(lang) {
     high: "Hoch",
     top: "Top-Risiken",
     advice: "Empfehlung",
-    adviceLow: "Kann so verwendet werden. Für Angebote/Verträge Betragsschutz aktivieren.",
-    adviceMid: "Top-Risiken prüfen; ggf. Betragsschutz/Adress- oder Konto-Maskierung aktivieren.",
-    adviceHigh: "Nicht direkt senden: mehr Maskierung aktivieren und Signatur/Kontodaten entfernen.",
+    adviceLow: "Kann verwendet werden. Für Angebote/Verträge Betragsschutz aktivieren.",
+    adviceMid: "Top-Risiken prüfen; ggf. Betrag/Adresse/Konto stärker maskieren.",
+    adviceHigh: "Nicht direkt senden: Signatur/Kontodaten entfernen und mehr Maskierung aktivieren.",
     meta: (m) => `Treffer ${m.hits}｜Betrag ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜Datei" : ""}`
   };
   const en = {
@@ -182,9 +179,9 @@ function riskI18n(lang) {
     high: "High",
     top: "Top risk sources",
     advice: "Advice",
-    adviceLow: "Safe to use. For quotes/contracts, enable money protection.",
-    adviceMid: "Review top risks; consider enabling money/address/account masking.",
-    adviceHigh: "Do not send as-is: enable more masking and remove signature/account details.",
+    adviceLow: "Ok to use. For quotes/contracts, enable money protection.",
+    adviceMid: "Review top risks; consider stronger money/address/account masking.",
+    adviceHigh: "Do not send as-is: remove signature/account details and mask more.",
     meta: (m) => `Hits ${m.hits}｜Money ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜File" : ""}`
   };
   return (lang === "de") ? de : (lang === "en") ? en : zh;
@@ -291,26 +288,26 @@ function renderRiskBox(report, meta) {
     t.adviceLow;
 
   box.innerHTML = `
-    <div class="riskhead" style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+    <div class="riskhead">
       <div class="riskleft">
-        <div class="risktitle" style="font-weight:800;font-size:13px;">${t.title}</div>
-        <div class="riskmeta tiny muted" style="margin-top:4px;opacity:.8;">${t.meta(meta)}</div>
+        <div class="risktitle">${t.title}</div>
+        <div class="riskmeta tiny muted">${t.meta(meta)}</div>
       </div>
 
-      <div class="riskscore" style="min-width:92px;text-align:center;padding:10px 10px 8px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(10,14,20,.35);">
-        <div class="n" style="font-size:24px;font-weight:900;line-height:1;">${report.score}</div>
-        <div class="l" style="font-size:12px;opacity:.9;margin-top:4px;">${levelText}</div>
+      <div class="riskscore">
+        <div class="n">${report.score}</div>
+        <div class="l">${levelText}</div>
       </div>
     </div>
 
-    <div class="risksec" style="margin-top:10px;">
-      <div class="risklabel" style="font-size:12px;opacity:.8;margin-bottom:6px;">${t.top}</div>
-      <div class="risklist" style="display:flex;flex-direction:column;gap:6px;">${topHtml}</div>
+    <div class="risksec">
+      <div class="risklabel">${t.top}</div>
+      <div class="risklist">${topHtml}</div>
     </div>
 
-    <div class="risksec" style="margin-top:10px;">
-      <div class="risklabel" style="font-size:12px;opacity:.8;margin-bottom:6px;">${t.advice}</div>
-      <div class="riskadvice" style="font-size:12px;line-height:1.5;opacity:.9;">${advice}</div>
+    <div class="risksec">
+      <div class="risklabel">${t.advice}</div>
+      <div class="riskadvice">${advice}</div>
     </div>
   `;
 }
@@ -319,71 +316,44 @@ function renderRiskBox(report, meta) {
 function setText() {
   const t = I18N[currentLang];
 
-  const s = $("ui-slogan"); if (s) s.textContent = t.slogan;
+  // headings
+  if ($("ui-in-title")) $("ui-in-title").textContent = t.inTitle;
+  if ($("ui-out-title")) $("ui-out-title").textContent = t.outTitle;
 
-  const inTitle = $("ui-in-title"); if (inTitle) inTitle.textContent = t.inTitle;
-  const inSub = $("ui-in-sub"); if (inSub) inSub.textContent = t.inSub || "";
+  // input
+  if ($("inputText")) $("inputText").placeholder = t.placeholder;
+  if ($("ui-input-watermark")) $("ui-input-watermark").textContent = t.inputWatermark;
 
-  const input = $("inputText"); if (input) input.placeholder = t.placeholder;
-
-  const btnGenerate = $("btnGenerate"); if (btnGenerate) btnGenerate.textContent = t.btnGenerate;
-  const btnCopy = $("btnCopy"); if (btnCopy) btnCopy.textContent = t.btnCopy;
-  const btnClear = $("btnClear"); if (btnClear) btnClear.textContent = t.btnClear;
-
-  const outTitle = $("ui-out-title"); if (outTitle) outTitle.textContent = t.outTitle;
-  const outSub = $("ui-out-sub"); if (outSub) outSub.textContent = t.outSub || "";
-
-  const hitPill = $("ui-hit-pill"); if (hitPill) hitPill.textContent = t.hitPill;
-
-  const fbq = $("ui-fb-q"); if (fbq) fbq.textContent = t.fbQ;
-  const foot = $("ui-foot"); if (foot) foot.textContent = t.foot;
-
-  // Money UI text (if present)
+  // money
   const label = $("ui-money-label");
-  const hint = $("ui-money-hint");
   const sel = $("moneyMode");
-  if (label && hint && sel) {
-    if (currentLang === "zh") {
-      label.textContent = "金额保护：";
-      hint.textContent = "报价/合同建议开启";
-      sel.options[0].text = "关闭";
-      sel.options[1].text = "M1 精确遮盖";
-      sel.options[2].text = "M2 区间遮盖";
-    } else if (currentLang === "de") {
-      label.textContent = "Betragsschutz:";
-      hint.textContent = "Für Angebote/Verträge empfohlen";
-      sel.options[0].text = "Aus";
-      sel.options[1].text = "M1 Genau verbergen";
-      sel.options[2].text = "M2 Bereich verbergen";
-    } else {
-      label.textContent = "Money protection:";
-      hint.textContent = "Recommended for quotes/contracts";
-      sel.options[0].text = "Off";
-      sel.options[1].text = "M1 Exact mask";
-      sel.options[2].text = "M2 Range mask";
-    }
+  if (label) label.textContent = t.moneyLabel;
+  if (sel && sel.options && sel.options.length >= 3) {
+    sel.options[0].text = t.moneyOff;
+    sel.options[1].text = t.moneyM1;
+    sel.options[2].text = t.moneyM2;
   }
 
-  // Links
-  const l1 = $("linkLearn"); if (l1) l1.textContent = t.learn;
-  const l2 = $("linkPrivacy"); if (l2) l2.textContent = t.privacy;
-  const l3 = $("linkScope"); if (l3) l3.textContent = t.scope;
+  // buttons
+  if ($("btnGenerate")) $("btnGenerate").textContent = t.btnGenerate;
+  if ($("btnClear")) $("btnClear").textContent = t.btnClear;
+  if ($("btnCopy")) $("btnCopy").textContent = t.btnCopy;
 
-  // Share UI (optional static text, fine if not found)
-  const st = $("ui-share-title");
-  const ss = $("ui-share-sub");
-  if (st && ss) {
-    if (currentLang === "zh") {
-      st.textContent = "安全卡片";
-      ss.textContent = "不包含原文，仅展示处理结果与隐私承诺";
-    } else if (currentLang === "de") {
-      st.textContent = "Sicherheitskarte";
-      ss.textContent = "Kein Originaltext – nur Ergebnis & Versprechen";
-    } else {
-      st.textContent = "Safety Card";
-      ss.textContent = "No original text — only outcome & promise";
-    }
-  }
+  // feedback
+  if ($("ui-fb-q")) $("ui-fb-q").textContent = t.fbQ;
+
+  // share
+  if ($("ui-share-title")) $("ui-share-title").textContent = t.shareTitle;
+  if ($("ui-share-sub")) $("ui-share-sub").textContent = t.shareSub;
+  if ($("btnShareDownload")) $("btnShareDownload").textContent = t.btnDownload;
+
+  // links
+  if ($("linkLearn")) $("linkLearn").textContent = t.learn;
+  if ($("linkPrivacy")) $("linkPrivacy").textContent = t.privacy;
+  if ($("linkScope")) $("linkScope").textContent = t.scope;
+
+  // footer
+  if ($("ui-foot")) $("ui-foot").textContent = t.foot;
 }
 
 // ---- rule application ----
@@ -422,9 +392,7 @@ function applyRules(text) {
       out = out.replace(r.pattern, (m, cur1, amt1, sym, amt2, amt3, unit) => {
         addHit("money");
 
-        if (moneyMode === "m1") {
-          return placeholder("MONEY");
-        }
+        if (moneyMode === "m1") return placeholder("MONEY");
 
         const currencyRaw = cur1 || sym || unit || "";
         const amountRaw = amt1 || amt2 || amt3 || "";
@@ -432,9 +400,7 @@ function applyRules(text) {
         const num = normalizeAmountToNumber(amountRaw);
         const range = moneyRangeLabel(currencyRaw, num);
 
-        if (currentLang === "zh") {
-          return (currency ? currency : "") + "【" + range + "】";
-        }
+        if (currentLang === "zh") return (currency ? currency : "") + "【" + range + "】";
         return (currency ? currency : "") + "[" + range + "]";
       });
 
@@ -465,9 +431,6 @@ function applyRules(text) {
       return placeholder(tag);
     });
   }
-
-  const hc = $("hitCount");
-  if (hc) hc.textContent = String(hits);
 
   // --- Risk meta
   lastRunMeta.inputLen = (String(text || "")).length;
@@ -507,44 +470,35 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
-  // ✅ 自动刷新卡片（你要求的 1 行）
-  if (window.updateShareAuto) window.updateShareAuto();
+  // ✅（你要的“自动刷新卡片”1 行）：通知 share.js 更新缩略图
+  window.dispatchEvent(new Event("safe:updated"));
 
   return out;
 }
 
-/* ============ PDF helpers (still supported, but no PDF hint UI) ============ */
+/* ============ PDF helpers (text-layer probe) ============ */
 async function handlePdf(file) {
   if (!file) return;
-
-  if (file.type !== "application/pdf") {
-    // 现在 UI 不提示，静默忽略（避免页面杂乱）
-    return;
-  }
+  if (file.type !== "application/pdf") return;
 
   try {
-    if (!window.probePdfTextLayer) {
-      console.warn("PDF module not loaded: probePdfTextLayer missing");
-      return;
-    }
+    if (!window.probePdfTextLayer) return;
 
     const probe = await window.probePdfTextLayer(file);
     lastRunMeta.fromPdf = true;
 
     if (!probe || !probe.hasTextLayer) {
-      // v1 无 OCR：不提示 UI，避免干扰（用户可以直接改用粘贴文本）
-      console.warn("No text layer in PDF (scan/image). v1 no OCR.");
+      // v1 no OCR: do nothing (keep UI quiet)
       return;
     }
 
     const text = String(probe.text || "").trim();
     if (!text) return;
 
-    const outEl = $("outputText");
-    if (outEl) outEl.textContent = applyRules(text);
-
+    // output only (avoid putting original text into textarea)
+    $("outputText").textContent = applyRules(text);
   } catch (e) {
-    console.warn("PDF processing failed", e);
+    // keep quiet in minimal UI
   }
 }
 
@@ -556,6 +510,8 @@ function bindPdfUI() {
     pdfInput.addEventListener("change", (e) => {
       const f = e.target.files && e.target.files[0];
       handlePdf(f);
+      // reset file input so re-upload same file works
+      e.target.value = "";
     });
   }
 
@@ -578,18 +534,17 @@ function bind() {
       b.classList.add("active");
       currentLang = b.dataset.lang;
 
-      window.currentLang = currentLang;
       lastRunMeta.lang = currentLang;
       setText();
 
-      const inTxt = ($("inputText") && $("inputText").value ? $("inputText").value : "").trim();
+      // keep already filtered output as-is; only regenerate if textarea has content
+      const inTxt = ($("inputText").value || "").trim();
       if (inTxt) {
         lastRunMeta.fromPdf = false;
-        const outEl = $("outputText");
-        if (outEl) outEl.textContent = applyRules(inTxt);
+        $("outputText").textContent = applyRules(inTxt);
       } else {
-        // no input, but language changed → refresh card anyway
-        if (window.updateShareAuto) window.updateShareAuto(true);
+        // still refresh share labels
+        window.dispatchEvent(new Event("safe:updated"));
       }
     };
   });
@@ -598,15 +553,13 @@ function bind() {
   if (mm) {
     mm.addEventListener("change", () => {
       moneyMode = mm.value || "off";
-
-      const inTxt = ($("inputText") && $("inputText").value ? $("inputText").value : "").trim();
+      const inTxt = ($("inputText").value || "").trim();
       if (inTxt) {
         lastRunMeta.fromPdf = false;
-        const outEl = $("outputText");
-        if (outEl) outEl.textContent = applyRules(inTxt);
+        $("outputText").textContent = applyRules(inTxt);
       } else {
         window.__safe_moneyMode = moneyMode;
-        if (window.updateShareAuto) window.updateShareAuto(true);
+        window.dispatchEvent(new Event("safe:updated"));
       }
     });
 
@@ -614,49 +567,57 @@ function bind() {
     window.__safe_moneyMode = moneyMode;
   }
 
-  const gen = $("btnGenerate");
-  if (gen) {
-    gen.onclick = () => {
-      lastRunMeta.fromPdf = false;
-      const outEl = $("outputText");
-      const inEl = $("inputText");
-      if (outEl) outEl.textContent = applyRules(inEl ? (inEl.value || "") : "");
-    };
-  }
+  $("btnGenerate").onclick = () => {
+    lastRunMeta.fromPdf = false;
+    $("outputText").textContent = applyRules($("inputText").value || "");
+  };
 
-  const clr = $("btnClear");
-  if (clr) {
-    clr.onclick = () => {
-      const inEl = $("inputText");
-      const outEl = $("outputText");
-      if (inEl) inEl.value = "";
-      if (outEl) outEl.textContent = "";
+  $("btnClear").onclick = () => {
+    $("inputText").value = "";
+    $("outputText").textContent = "";
 
-      const hc = $("hitCount");
-      if (hc) hc.textContent = "0";
+    window.__safe_hits = 0;
+    window.__safe_breakdown = {};
+    window.__safe_score = 0;
+    window.__safe_level = "low";
+    window.__safe_report = null;
 
-      window.__safe_hits = 0;
-      lastRunMeta.fromPdf = false;
+    lastRunMeta.fromPdf = false;
 
-      const rb = $("riskBox");
-      if (rb) rb.innerHTML = "";
+    const rb = $("riskBox");
+    if (rb) rb.innerHTML = "";
 
-      if (window.updateShareAuto) window.updateShareAuto(true);
-    };
-  }
+    window.dispatchEvent(new Event("safe:updated"));
+  };
 
-  const cp = $("btnCopy");
-  if (cp) {
-    cp.onclick = () => {
-      const outEl = $("outputText");
-      navigator.clipboard.writeText(outEl ? (outEl.textContent || "") : "");
-    };
-  }
+  $("btnCopy").onclick = async () => {
+    const t = I18N[currentLang];
+    try {
+      await navigator.clipboard.writeText($("outputText").textContent || "");
+      const btn = $("btnCopy");
+      if (btn) {
+        const old = btn.textContent;
+        btn.textContent = t.btnCopied || old;
+        setTimeout(() => { btn.textContent = t.btnCopy || old; }, 900);
+      }
+    } catch (e) {}
+  };
+
+  // feedback (minimal local counters)
+  const up = $("btnUp");
+  const down = $("btnDown");
+  if (up) up.onclick = () => {
+    const n = Number($("upCount").textContent || "0") + 1;
+    $("upCount").textContent = String(n);
+  };
+  if (down) down.onclick = () => {
+    const n = Number($("downCount").textContent || "0") + 1;
+    $("downCount").textContent = String(n);
+  };
 
   bindPdfUI();
 }
 
-window.currentLang = currentLang;
 initEnabled();
 setText();
 bind();
