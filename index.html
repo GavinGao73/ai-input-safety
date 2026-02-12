@@ -118,69 +118,36 @@
           <div class="output" id="outputText"></div>
         </div>
 
-        <!-- ✅ 输出操作区：复制按钮 + 反馈（移到右侧） -->
+        <!-- ✅ 复制 + 反馈放在同一行 -->
         <div class="row">
           <button class="btn primary" id="btnCopy"></button>
 
-          <div class="feedback" style="display:flex;align-items:center;gap:10px;justify-content:flex-end;">
+          <div class="feedback feedback-inline">
             <div class="fbq" id="ui-fb-q"></div>
             <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
             <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
           </div>
         </div>
 
-        <!-- 状态提示保留（如你后续也想删，我再一并处理 app.js 的状态逻辑） -->
         <div class="status" id="status" style="margin-top:10px;">
           <span class="dot2"></span>
           <span id="statusText"></span>
         </div>
 
-        <!-- ✅ Share：只保留“下载卡片”对用户可见 -->
+        <!-- ✅ Share：自动生成 + 自动展示 + 只保留下载 -->
         <div class="sharebar">
           <div class="shareleft">
-            <div class="sharetitle" id="ui-share-title">分享安全卡片</div>
-            <div class="sharesub" id="ui-share-sub">不包含你的原文，仅分享安全处理成果</div>
+            <div class="sharetitle" id="ui-share-title">安全卡片</div>
+            <div class="sharesub" id="ui-share-sub">不包含原文，仅展示处理结果与隐私承诺</div>
+
+            <!-- 自动生成的卡片缩略图 -->
+            <div class="sharepreview">
+              <img id="shareAutoImg" alt="Safety card preview" />
+            </div>
           </div>
 
           <div class="shareright">
             <button class="btn primary" id="btnShareDownload">下载卡片</button>
-
-            <!-- ⚠️ 为避免现有 share.js 报错：先隐藏但保留 DOM -->
-            <div style="display:none;">
-              <select id="shareSize">
-                <option value="story">1080×1350（通用/小红书/公众号）</option>
-                <option value="square">1080×1080（朋友圈/头像风格）</option>
-                <option value="wide">1200×628（Twitter/LinkedIn）</option>
-              </select>
-              <button class="btn secondary" id="btnSharePreview">预览</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ⚠️ 同理：先隐藏 modal，后续改 share.js 时彻底删除 -->
-        <div class="modal" id="shareModal" aria-hidden="true" style="display:none;">
-          <div class="modalMask" id="shareMask"></div>
-          <div class="modalCard">
-            <div class="modalHead">
-              <div class="modalTitle" id="ui-share-modal-title">分享预览</div>
-              <button class="iconbtn close" id="btnShareClose">✕</button>
-            </div>
-
-            <div class="modalBody">
-              <div class="previewWrap">
-                <img id="sharePreviewImg" alt="Share preview" />
-              </div>
-
-              <div class="modalActions">
-                <button class="btn secondary" id="btnShareCopyText">复制分享文案</button>
-                <button class="btn secondary" id="btnShareSystem">系统分享</button>
-                <button class="btn primary" id="btnShareDownload2">下载图片</button>
-              </div>
-
-              <div class="tiny muted" id="ui-share-note">
-                注意：卡片不包含你的原文内容，只显示处理统计与隐私承诺。
-              </div>
-            </div>
           </div>
         </div>
 
@@ -195,15 +162,6 @@
     </div>
 
     <footer>
-      <div class="trust">
-        <div class="msg">
-          <div class="a" id="ui-risk-one"></div>
-          <div class="b" id="ui-risk-two"></div>
-        </div>
-
-        <!-- ✅ footer 反馈已移走，这里留空以保持布局稳定（如你要彻底删 trust 区域，下一步一起做） -->
-      </div>
-
       <div class="tiny" id="ui-foot"></div>
     </footer>
   </div>
