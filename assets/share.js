@@ -1,6 +1,6 @@
 // assets/share.js
-// Share card generator (no user text included).
-// v2: Auto-generate + auto-preview + single download button (no modal, no size options)
+// Auto share card generator (NO original text). Generates preview only after filtering.
+// Trigger: window event "safe:updated" (dispatched by app.js after applyRules()).
 
 (function () {
   function $(id){ return document.getElementById(id); }
@@ -14,7 +14,7 @@
     const dict = {
       zh: {
         shareTitle: "安全卡片",
-        shareSub: "不包含原文，仅展示处理结果与隐私承诺",
+        shareSub: "不含原文，仅展示处理结果与隐私承诺",
         badge: "本地生成 · 不上传 · 不保存",
         line1: "AI Input Filter",
         line2: "在 AI 读取之前，先通过 Filter。",
@@ -22,31 +22,31 @@
         statUnit: "项",
         statMoney: "金额保护",
         mOff: "关闭",
-        m1: "精确遮盖",
-        m2: "区间遮盖"
+        m1: "精确",
+        m2: "区间"
       },
       de: {
         shareTitle: "Sicherheitskarte",
-        shareSub: "Kein Originaltext – nur Ergebnis & Versprechen",
+        shareSub: "Kein Originaltext — nur Ergebnis & Versprechen",
         badge: "Lokal · kein Upload · keine Speicherung",
         line1: "AI Input Filter",
         line2: "Filter, bevor KI liest.",
         statHits: "Maskiert",
         statUnit: "Treffer",
-        statMoney: "Betragsschutz",
+        statMoney: "Betrag",
         mOff: "Aus",
         m1: "Genau",
         m2: "Bereich"
       },
       en: {
         shareTitle: "Safety Card",
-        shareSub: "No original text — only outcome & promise",
+        shareSub: "No original text — stats & privacy pledge only",
         badge: "Local · no upload · no storage",
         line1: "AI Input Filter",
         line2: "Filter before AI reads.",
         statHits: "Masked",
         statUnit: "items",
-        statMoney: "Money mode",
+        statMoney: "Money",
         mOff: "Off",
         m1: "Exact",
         m2: "Range"
@@ -68,23 +68,6 @@
     return L.mOff;
   }
 
-  function nowStamp(){
-    const d = new Date();
-    const pad = (n)=> String(n).padStart(2,"0");
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  }
-
-  function roundRect(ctx, x,y,w,h,r){
-    const rr = Math.min(r, w/2, h/2);
-    ctx.beginPath();
-    ctx.moveTo(x+rr, y);
-    ctx.arcTo(x+w, y, x+w, y+h, rr);
-    ctx.arcTo(x+w, y+h, x, y+h, rr);
-    ctx.arcTo(x, y+h, x, y, rr);
-    ctx.arcTo(x, y, x+w, y, rr);
-    ctx.closePath();
-  }
-
   // ========= Logo assets (Filter) =========
   const LOGO_ICON_SRC = "./assets/logo-filter-icon.png";
   const LOGO_FULL_SRC = "./assets/logo-filter-full.png";
@@ -103,45 +86,15 @@
     return p;
   }
 
-  function drawBadge(ctx, x, y, text){
-    ctx.save();
-    ctx.font = "600 26px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    const padX = 20, padY = 12;
-    const w = ctx.measureText(text).width + padX*2;
-    const h = 48;
-
-    ctx.shadowColor = "rgba(0,0,0,.35)";
-    ctx.shadowBlur = 18;
-    ctx.fillStyle = "rgba(255,255,255,.10)";
-    ctx.strokeStyle = "rgba(255,255,255,.18)";
-    ctx.lineWidth = 2;
-    roundRect(ctx, x, y, w, h, 18);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.stroke();
-
-    ctx.fillStyle = "rgba(255,255,255,.92)";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, x + padX, y + h/2);
-    ctx.restore();
-    return { w, h };
-  }
-
-  function drawIconFrame(ctx, cx, cy, size){
-    const x = cx - size/2;
-    const y = cy - size/2;
-
-    ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,.45)";
-    ctx.shadowBlur = 26;
-    ctx.fillStyle = "rgba(255,255,255,.08)";
-    ctx.strokeStyle = "rgba(255,255,255,.14)";
-    ctx.lineWidth = 2;
-    roundRect(ctx, x, y, size, size, Math.round(size * 0.28));
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.stroke();
-    ctx.restore();
+  function roundRect(ctx, x,y,w,h,r){
+    const rr = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+rr, y);
+    ctx.arcTo(x+w, y, x+w, y+h, rr);
+    ctx.arcTo(x+w, y+h, x, y+h, rr);
+    ctx.arcTo(x, y+h, x, y, rr);
+    ctx.arcTo(x, y, x+w, y, rr);
+    ctx.closePath();
   }
 
   function drawImageContain(ctx, img, x, y, w, h){
@@ -157,8 +110,14 @@
     ctx.drawImage(img, nx, ny, nw, nh);
   }
 
+  function nowStamp(){
+    const d = new Date();
+    const pad = (n)=> String(n).padStart(2,"0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+
   async function drawCard(){
-    // single size (story-like, good for sharing)
+    // fixed size for preview: compact but premium
     const w = 1080, h = 1350;
     const L = t();
     const { hits, moneyMode } = getMetrics();
@@ -209,40 +168,69 @@
     ctx.stroke();
     ctx.restore();
 
-    // Top brand row
-    const brandY = pad + 70;
-    const iconSize = 104;
-    const iconCx = pad + 76;
-    const iconCy = brandY;
+    // Top icon frame
+    const iconSize = 112;
+    const iconX = pad + 56;
+    const iconY = pad + 56;
 
-    drawIconFrame(ctx, iconCx, iconCy, iconSize);
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,.45)";
+    ctx.shadowBlur = 26;
+    ctx.fillStyle = "rgba(255,255,255,.08)";
+    ctx.strokeStyle = "rgba(255,255,255,.14)";
+    ctx.lineWidth = 2;
+    roundRect(ctx, iconX, iconY, iconSize, iconSize, 30);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.stroke();
+    ctx.restore();
 
     if (logoIcon) {
       ctx.save();
       ctx.globalAlpha = 0.98;
-      drawImageContain(ctx, logoIcon, iconCx - iconSize/2, iconCy - iconSize/2, iconSize, iconSize);
+      drawImageContain(ctx, logoIcon, iconX, iconY, iconSize, iconSize);
       ctx.restore();
     }
 
+    // Title + subtitle
     ctx.save();
     ctx.fillStyle = "rgba(255,255,255,.95)";
     ctx.font = "900 54px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText(L.line1, pad + 190, brandY + 16);
+    ctx.fillText(L.line1, pad + 56 + iconSize + 26, pad + 110);
 
-    ctx.fillStyle = "rgba(255,255,255,.70)";
-    ctx.font = "500 28px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText(L.line2, pad + 190, brandY + 60);
+    ctx.fillStyle = "rgba(255,255,255,.72)";
+    ctx.font = "600 30px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillText(L.line2, pad + 56 + iconSize + 26, pad + 160);
     ctx.restore();
 
     // Badge
-    drawBadge(ctx, pad + 56, brandY + 98, L.badge);
+    const badgeText = L.badge;
+    ctx.save();
+    ctx.font = "650 30px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    const padX = 22, padY = 14;
+    const bw = ctx.measureText(badgeText).width + padX*2;
+    const bh = 54;
+    ctx.shadowColor = "rgba(0,0,0,.35)";
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = "rgba(255,255,255,.10)";
+    ctx.strokeStyle = "rgba(255,255,255,.18)";
+    ctx.lineWidth = 2;
+    roundRect(ctx, pad + 56, pad + 210, bw, bh, 22);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(255,255,255,.92)";
+    ctx.textBaseline = "middle";
+    ctx.fillText(badgeText, pad + 56 + padX, pad + 210 + bh/2);
+    ctx.restore();
 
     // Stats cards
     const statX = pad + 56;
-    const statY = brandY + 190;
+    const statY = pad + 320;
     const gap = 18;
     const cardW = (w - pad*2 - 56*2 - gap) / 2;
-    const cardH = 210;
+    const cardH = 220;
 
     function statCard(x, y, title, value){
       ctx.save();
@@ -258,31 +246,29 @@
 
       ctx.fillStyle = "rgba(255,255,255,.95)";
       ctx.font = "900 82px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-      ctx.fillText(value, x + 26, y + 140);
-
-      ctx.restore();
-    }
-
-    // watermark icon
-    if (logoIcon) {
-      const midSize = 260;
-      const midX = w/2 - midSize/2;
-      const midY = statY + cardH/2 - midSize/2 + 10;
-      ctx.save();
-      ctx.globalAlpha = 0.10;
-      drawImageContain(ctx, logoIcon, midX, midY, midSize, midSize);
+      ctx.fillText(value, x + 26, y + 150);
       ctx.restore();
     }
 
     statCard(statX, statY, `${L.statHits}`, `${hits} ${L.statUnit}`);
     statCard(statX + cardW + gap, statY, `${L.statMoney}`, formatMoneyMode(moneyMode));
 
-    // Bottom
-    const bottomY = h - pad - 70;
+    // Watermark icon mid
+    if (logoIcon) {
+      const midSize = 280;
+      const midX = w/2 - midSize/2;
+      const midY = statY + cardH + 80;
+      ctx.save();
+      ctx.globalAlpha = 0.10;
+      drawImageContain(ctx, logoIcon, midX, midY, midSize, midSize);
+      ctx.restore();
+    }
 
+    // Bottom pledge + date + url
+    const bottomY = h - pad - 70;
     ctx.save();
     ctx.fillStyle = "rgba(255,255,255,.60)";
-    ctx.font = "600 26px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.font = "650 26px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.fillText(L.badge, pad + 56, bottomY);
 
     ctx.fillStyle = "rgba(255,255,255,.45)";
@@ -294,13 +280,11 @@
     ctx.fillText("gavingao73.github.io/ai-input-safety", w - pad - 56, bottomY + 40);
     ctx.restore();
 
-    // small full logo (brand)
+    // Small full logo
     if (logoFull) {
-      const fullW = 260;
-      const fullH = 70;
+      const fullW = 320, fullH = 86;
       const fx = w - pad - 56 - fullW;
-      const fy = bottomY - 10 - fullH;
-
+      const fy = bottomY - 18 - fullH;
       ctx.save();
       ctx.globalAlpha = 0.82;
       drawImageContain(ctx, logoFull, fx, fy, fullW, fullH);
@@ -323,59 +307,81 @@
     a.remove();
   }
 
-  // cache latest card to avoid regenerating on download click
-  let _lastDataUrl = "";
-  let _lastLang = "";
-  let _lastHits = null;
-  let _lastMoney = null;
+  let lastDataUrl = "";
+  let isBusy = false;
 
-  async function updateShareAuto(force){
-    const { hits, moneyMode } = getMetrics();
-    const lang = getLang();
+  function showBar(show){
+    const bar = $("shareBar");
+    if (!bar) return;
+    if (show) {
+      bar.setAttribute("aria-hidden", "false");
+      bar.style.display = "flex";
+    } else {
+      bar.setAttribute("aria-hidden", "true");
+      bar.style.display = "none";
+    }
+  }
 
-    const shouldSkip =
-      !force &&
-      _lastDataUrl &&
-      _lastLang === lang &&
-      _lastHits === hits &&
-      _lastMoney === moneyMode;
+  async function refreshCard(){
+    if (isBusy) return;
+    const { hits } = getMetrics();
+    const img = $("shareAutoImg");
 
-    if (shouldSkip) return;
+    // no output => hide
+    const outText = String(($("outputText") && $("outputText").textContent) || "").trim();
+    if (!outText || hits <= 0) {
+      lastDataUrl = "";
+      if (img) img.removeAttribute("src");
+      showBar(false);
+      return;
+    }
 
-    const imgEl = $("shareAutoImg");
-    if (!imgEl) return;
+    showBar(true);
+    if (!img) return;
 
-    const canvas = await drawCard();
-    const dataUrl = canvasToPngDataUrl(canvas);
-
-    _lastDataUrl = dataUrl;
-    _lastLang = lang;
-    _lastHits = hits;
-    _lastMoney = moneyMode;
-
-    imgEl.src = dataUrl;
+    isBusy = true;
+    try{
+      const canvas = await drawCard();
+      lastDataUrl = canvasToPngDataUrl(canvas);
+      img.src = lastDataUrl;
+    } finally{
+      isBusy = false;
+    }
   }
 
   function bind(){
-    const downloadBtn = $("btnShareDownload");
-    if (downloadBtn) {
-      downloadBtn.onclick = async () => {
-        await updateShareAuto(true);
+    const btn = $("btnShareDownload");
+    if (btn) {
+      btn.onclick = async () => {
+        if (!lastDataUrl) await refreshCard();
+        if (!lastDataUrl) return;
         const file = `ai-input-filter_card_${nowStamp()}.png`;
-        if (_lastDataUrl) downloadDataUrl(_lastDataUrl, file);
+        downloadDataUrl(lastDataUrl, file);
       };
     }
   }
 
-  window.updateShareAuto = updateShareAuto;
+  function setI18n(){
+    const L = t();
+    if ($("ui-share-title")) $("ui-share-title").textContent = L.shareTitle;
+    if ($("ui-share-sub")) $("ui-share-sub").textContent = L.shareSub;
+  }
 
   window.addEventListener("DOMContentLoaded", () => {
-    // warm preload
     loadImg(LOGO_ICON_SRC);
     loadImg(LOGO_FULL_SRC);
 
+    setI18n();
     bind();
-    updateShareAuto(true);
+
+    // initial hidden
+    showBar(false);
+
+    // auto refresh after filter
+    window.addEventListener("safe:updated", () => {
+      setI18n();
+      refreshCard();
+    });
   });
 
 })();
