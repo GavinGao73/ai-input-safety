@@ -67,11 +67,15 @@
   }
 
   function getMetrics(){
-    // app.js will set these globals
-    const hits = Number(window.__safe_hits || 0);
-    const moneyMode = String(window.__safe_moneyMode || "off");
-    return { hits, moneyMode };
-  }
+  const hits = Number(window.__safe_hits || 0);
+  const moneyMode = String(window.__safe_moneyMode || "off");
+
+  const score = Number(window.__safe_score ?? NaN);
+  const level = String(window.__safe_level || "");
+  const breakdown = window.__safe_breakdown || null;
+
+  return { hits, moneyMode, score, level, breakdown };
+}
 
   function formatMoneyMode(m){
     const L = t();
