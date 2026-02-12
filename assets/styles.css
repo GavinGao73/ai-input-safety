@@ -383,3 +383,51 @@ footer{
 .riskitem .rk{ font-size:12px; color:rgba(255,255,255,.85); }
 .riskitem .rv{ font-size:12px; color:var(--muted); }
 .riskadvice{ font-size:12px; line-height:1.5; color:rgba(255,255,255,.82); }
+
+/* =========================
+   BRAND SIZE OVERRIDES
+   ========================= */
+
+/* 顶部左上：全称 logo 更大 */
+.logo-full{
+  height: 40px;   /* 原来 28px */
+}
+
+/* 中间列更“存在感” */
+.mid-filter{
+  width: 124px;   /* 原来 88px */
+  gap: 14px;
+}
+
+/* 中间徽章更大、更亮一点 */
+.mid-filter .filter-badge{
+  width: 86px;     /* 原来 54px */
+  height: 86px;
+  border-radius: 24px;
+  box-shadow: 0 18px 54px rgba(0,0,0,0.38);
+}
+
+/* 中间 icon 更大 */
+.mid-filter .filter-icon{
+  width: 58px;     /* 原来 34px */
+  height: 58px;
+}
+
+/* “Filter” 字也跟着稍微大一点 */
+.mid-filter .filter-text{
+  font-size: 13px;     /* 原来 12px */
+  letter-spacing: 1px;
+  opacity: 0.8;
+}
+
+/* 中间竖线更显眼 */
+.mid-filter .flow-line{
+  width: 3px;          /* 原来 2px */
+  border-radius: 3px;
+  background: linear-gradient(
+    to bottom,
+    rgba(120, 255, 240, 0),
+    rgba(120, 255, 240, 0.60),
+    rgba(120, 255, 240, 0)
+  );
+}
