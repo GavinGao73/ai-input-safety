@@ -39,6 +39,7 @@
         <div class="outbox outbox-input">
           <div class="filebar">
             <input id="pdfFile" type="file" accept="application/pdf" />
+            <span class="filename" id="fileName" aria-live="polite"></span>
           </div>
 
           <div class="textarea-wrap">
@@ -64,8 +65,13 @@
           </div>
         </div>
 
-        <!-- risk card moved to LEFT -->
-        <div class="risk" id="riskBox"></div>
+        <!-- Risk (foldable, default closed) -->
+        <details class="fold riskfold" id="riskFold">
+          <summary>
+            <span id="ui-risk-title"></span>
+          </summary>
+          <div class="risk" id="riskBox"></div>
+        </details>
 
         <div class="tiny footnote" id="ui-foot"></div>
       </section>
@@ -105,21 +111,27 @@
           </div>
         </div>
 
-        <!-- Share: auto preview after output; download only -->
-        <div class="sharebar" id="shareBar" aria-hidden="true">
-          <div class="shareleft">
-            <div class="sharetitle" id="ui-share-title"></div>
-            <div class="sharesub" id="ui-share-sub"></div>
+        <!-- Achievement (foldable; collapsed shows title only) -->
+        <details class="fold achievefold" id="achieveFold">
+          <summary>
+            <span id="ui-ach-title"></span>
+          </summary>
 
-            <div class="sharepreview" id="sharePreviewWrap">
-              <img id="shareAutoImg" alt="Safety card preview" />
+          <div class="achieveBody">
+            <div class="achLeft">
+              <div class="achSub" id="ui-ach-sub"></div>
+
+              <div class="achPreview" id="achPreviewWrap">
+                <div class="achPlaceholder" id="achPlaceholder"></div>
+                <img id="shareAutoImg" alt="Filter achievement preview" />
+              </div>
+            </div>
+
+            <div class="achRight">
+              <button class="btn primary btnDownload" id="btnShareDownload"></button>
             </div>
           </div>
-
-          <div class="shareright">
-            <button class="btn primary" id="btnShareDownload"></button>
-          </div>
-        </div>
+        </details>
 
         <div class="links">
           <a id="linkLearn" href="./docs.html" target="_blank"></a>
