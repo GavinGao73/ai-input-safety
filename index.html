@@ -10,7 +10,7 @@
 
 <body>
   <div class="wrap">
-    <header>
+    <header class="topbar">
       <div class="brand">
         <div class="logo">
           <img
@@ -24,7 +24,7 @@
         </div>
       </div>
 
-      <div class="lang">
+      <div class="lang" aria-label="language">
         <button data-lang="de">DE</button>
         <button data-lang="en">EN</button>
         <button data-lang="zh" class="active">中文</button>
@@ -37,13 +37,18 @@
         <h3 id="ui-in-title"></h3>
 
         <div class="outbox outbox-input">
-          <div class="filebar">
+          <div class="filebar" id="filebar">
             <input id="pdfFile" type="file" accept="application/pdf" />
-            <span class="filename" id="fileName" aria-live="polite"></span>
+            <span class="filename" id="fileName"></span>
           </div>
 
-          <div class="textarea-wrap">
+          <div class="textarea-wrap" id="textareaWrap">
+            <!-- ✅ overlay: 用于高亮命中（不影响编辑） -->
+            <div class="input-overlay" id="inputOverlay" aria-hidden="true"></div>
+
             <textarea id="inputText" spellcheck="false"></textarea>
+
+            <!-- ✅ watermark: 风险提示（有输入后自动消失） -->
             <div class="input-watermark" id="ui-input-watermark" aria-hidden="true"></div>
           </div>
         </div>
@@ -65,12 +70,14 @@
           </div>
         </div>
 
-        <!-- Risk (foldable, default closed) -->
-        <details class="fold riskfold" id="riskFold">
-          <summary>
-            <span id="ui-risk-title"></span>
+        <!-- ✅ 风险评分：默认折叠，有生成后自动展开 -->
+        <details class="panel" id="riskDetails">
+          <summary class="panel-summary">
+            <span class="panel-title" id="ui-risk-title"></span>
           </summary>
-          <div class="risk" id="riskBox"></div>
+          <div class="panel-body">
+            <div class="risk" id="riskBox"></div>
+          </div>
         </details>
 
         <div class="tiny footnote" id="ui-foot"></div>
@@ -79,15 +86,16 @@
       <!-- ================= MIDDLE FILTER ================= -->
       <div class="mid-filter" aria-hidden="true">
         <div class="flow-line"></div>
-        <div class="filter-badge">
-          <img
-            src="./assets/logo-filter-icon.png"
-            class="filter-icon"
-            alt="Filter"
-            loading="eager"
-            decoding="async"
-          />
-        </div>
+
+        <!-- ✅ 去掉背景卡片：只显示图标 -->
+        <img
+          src="./assets/logo-filter-icon.png"
+          class="mid-icon"
+          alt="Filter"
+          loading="eager"
+          decoding="async"
+        />
+
         <div class="flow-line"></div>
         <div class="filter-text">Filter</div>
       </div>
@@ -111,28 +119,32 @@
           </div>
         </div>
 
-        <!-- Achievement (foldable; collapsed shows title only) -->
-        <details class="fold achievefold" id="achieveFold">
-          <summary>
-            <span id="ui-ach-title"></span>
+        <!-- ✅ 过滤成就：默认折叠；生成后自动展开；预览容器固定高度 -->
+        <details class="panel" id="shareDetails">
+          <summary class="panel-summary">
+            <span class="panel-title" id="ui-share-title"></span>
           </summary>
 
-          <div class="achieveBody">
-            <div class="achLeft">
-              <div class="achSub" id="ui-ach-sub"></div>
+          <div class="panel-body">
+            <div class="sharebar" id="shareBar">
+              <div class="shareleft">
+                <div class="sharesub" id="ui-share-sub"></div>
 
-              <div class="achPreview" id="achPreviewWrap">
-                <div class="achPlaceholder" id="achPlaceholder"></div>
-                <img id="shareAutoImg" alt="Filter achievement preview" />
+                <div class="sharepreview fixed" id="sharePreviewWrap">
+                  <!-- 没生成时显示 placeholder；生成后显示图片 -->
+                  <div class="share-placeholder" id="sharePlaceholder"></div>
+                  <img id="shareAutoImg" alt="Card preview" />
+                </div>
               </div>
-            </div>
 
-            <div class="achRight">
-              <button class="btn primary btnDownload" id="btnShareDownload"></button>
+              <div class="shareright">
+                <button class="btn primary btn-fixed" id="btnShareDownload"></button>
+              </div>
             </div>
           </div>
         </details>
 
+        <!-- links at bottom -->
         <div class="links">
           <a id="linkLearn" href="./docs.html" target="_blank"></a>
           <a id="linkPrivacy" href="./privacy.html" target="_blank"></a>
