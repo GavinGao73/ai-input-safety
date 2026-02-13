@@ -6,6 +6,18 @@ let moneyMode = "off"; // off | m1 | m2
 
 let lastOutputPlain = "";
 
+// ================= Stage 3 state (minimal glue) =================
+let lastUploadedFile = null;       // File object (pdf or image)
+let lastFileKind = "";             // "pdf" | "image" | ""
+let lastProbe = null;              // { hasTextLayer, text }
+let lastPdfOriginalText = "";      // extracted text for readable PDF
+let lastStage3Mode = "none";       // "A" | "B" | "none"
+
+function show(el, yes){
+  if (!el) return;
+  el.style.display = yes ? "" : "none";
+}
+
 // --- Risk scoring meta (local only) ---
 let lastRunMeta = {
   fromPdf: false,
@@ -409,6 +421,45 @@ function renderRiskBox(report, meta) {
   `;
 }
 
+/* ================= Stage 3 UI texts (fallback-safe) ================= */
+function stage3Text(key){
+  // If i18n.js later provides these keys, it can override by t.btnExportText etc.
+  const map = {
+    zh: {
+      btnExportText: "导出文本",
+      btnExportPdf: "红删PDF",
+      btnManual: "人工处理"
+    },
+    de: {
+      btnExportText: "Text",
+      btnExportPdf: "Raster-PDF",
+      btnManual: "Manuell"
+    },
+    en: {
+      btnExportText: "Export text",
+      btnExportPdf: "Raster PDF",
+      btnManual: "Manual"
+    }
+  };
+  const m = map[currentLang] || map.zh;
+  return m[key] || "";
+}
+
+function setStage3Ui(mode){
+  lastStage3Mode = mode || "none";
+  const btnText = $("btnExportText");
+  const btnPdf  = $("btnExportRasterPdf");
+  const btnMan  = $("btnManualRedact");
+
+  show(btnText, lastStage3Mode === "A");
+  show(btnPdf,  lastStage3Mode === "A");
+  show(btnMan,  lastStage3Mode === "B");
+
+  if (btnText) btnText.textContent = stage3Text("btnExportText");
+  if (btnPdf)  btnPdf.textContent  = stage3Text("btnExportPdf");
+  if (btnMan)  btnMan.textContent  = stage3Text("btnManual");
+}
+
 /* ================= UI text ================= */
 function setText() {
   const t = I18N[currentLang];
@@ -448,6 +499,9 @@ function setText() {
   if ($("linkScope")) $("linkScope").textContent = t.scope;
 
   if ($("ui-foot")) $("ui-foot").textContent = t.foot;
+
+  // ✅ language switch should refresh Stage 3 button labels without changing mode
+  setStage3Ui(lastStage3Mode);
 }
 
 /* ================= rule application ================= */
@@ -563,40 +617,65 @@ function applyRules(text) {
   return out;
 }
 
-/* ================= PDF handlers ================= */
-async function handlePdf(file) {
+/* ================= Stage 3 file handler (PDF + image) ================= */
+async function handleFile(file) {
   if (!file) return;
-  if (file.type !== "application/pdf") return;
+
+  lastUploadedFile = file;
+  lastProbe = null;
+  lastPdfOriginalText = "";
+  lastFileKind = (file.type === "application/pdf") ? "pdf" : (file.type && file.type.startsWith("image/") ? "image" : "");
+
+  // Default: hide Stage 3 buttons until mode determined
+  setStage3Ui("none");
+
+  // ---------- Image: always Mode B ----------
+  if (lastFileKind === "image") {
+    lastRunMeta.fromPdf = false;
+    setStage3Ui("B");
+    return;
+  }
+
+  // ---------- PDF ----------
+  if (lastFileKind !== "pdf") return;
 
   try {
     if (!window.probePdfTextLayer) return;
 
     const probe = await window.probePdfTextLayer(file);
-    lastRunMeta.fromPdf = true;
+    lastProbe = probe || null;
 
-    if (!probe || !probe.hasTextLayer) return;
+    // hasTextLayer=false => Mode B
+    if (!probe || !probe.hasTextLayer) {
+      lastRunMeta.fromPdf = false;
+      setStage3Ui("B");
+      return;
+    }
+
+    // hasTextLayer=true => Mode A
+    lastRunMeta.fromPdf = true;
+    setStage3Ui("A");
 
     const text = String(probe.text || "").trim();
+    lastPdfOriginalText = text;
+
     if (!text) return;
 
     const ta = $("inputText");
     if (ta) {
       ta.value = text;
-      // PDF 模式：开启 overlay（可见命中标记），并允许滚动同步
-      ta.readOnly = false; // 保持可编辑（overlay 仅辅助标记）
+      ta.readOnly = false; // keep editable
     }
 
     updateInputWatermarkVisibility();
 
-    // 先跑规则（会更新 __safe_* 指标 + 风险卡）
+    // Run rules and update cards
     applyRules(text);
 
-    // ✅ 立刻渲染 PDF overlay（避免“点一下才消失/刷新”的重叠现象）
+    // Draw overlay immediately
     renderInputOverlayForPdf(text);
 
-    // ✅ 触发成就卡刷新（share.js 监听）
     window.dispatchEvent(new Event("safe:updated"));
-
   } catch (e) {}
 }
 
@@ -607,7 +686,7 @@ function bindPdfUI() {
   pdfInput.addEventListener("change", (e) => {
     const f = e.target.files && e.target.files[0];
     if (f && $("pdfName")) $("pdfName").textContent = f.name || "";
-    handlePdf(f);
+    handleFile(f);
     // allow re-upload same file
     e.target.value = "";
   });
@@ -698,6 +777,13 @@ function bind() {
     }
     if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
 
+    // ✅ Stage 3 state reset
+    lastUploadedFile = null;
+    lastFileKind = "";
+    lastProbe = null;
+    lastPdfOriginalText = "";
+    setStage3Ui("none");
+
     window.dispatchEvent(new Event("safe:updated"));
   };
 
@@ -741,6 +827,60 @@ function bind() {
         overlay.scrollLeft = ta.scrollLeft;
       }
     });
+  }
+
+  // ================= Stage 3 buttons =================
+
+  // Mode A: export filtered text
+  const btnExportText = $("btnExportText");
+  if (btnExportText) {
+    btnExportText.onclick = () => {
+      const out = String(lastOutputPlain || "").trim();
+      if (!out) return;
+
+      const blob = new Blob([out], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `safe_text_${Date.now()}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 500);
+    };
+  }
+
+  // Mode A: export raster secure PDF (auto-redact)
+  const btnExportRasterPdf = $("btnExportRasterPdf");
+  if (btnExportRasterPdf) {
+    btnExportRasterPdf.onclick = async () => {
+      const f = lastUploadedFile;
+      if (!f || lastFileKind !== "pdf") return;
+      if (!lastProbe || !lastProbe.hasTextLayer) return;
+      if (!window.RasterExport || !window.RasterExport.exportRasterSecurePdfFromReadablePdf) return;
+
+      await window.RasterExport.exportRasterSecurePdfFromReadablePdf({
+        file: f,
+        lang: currentLang,
+        enabledKeys: Array.from(enabled),
+        moneyMode: moneyMode
+      });
+    };
+  }
+
+  // Mode B: manual redact session -> export (UI includes export button)
+  const btnManual = $("btnManualRedact");
+  if (btnManual) {
+    btnManual.onclick = async () => {
+      const f = lastUploadedFile;
+      if (!f) return;
+      if (!window.RedactUI || !window.RedactUI.start) return;
+
+      await window.RedactUI.start({
+        file: f,
+        fileKind: lastFileKind,  // "pdf" | "image"
+        lang: currentLang
+      });
+    };
   }
 
   bindPdfUI();
