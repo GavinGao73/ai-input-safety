@@ -22,7 +22,7 @@ const I18N = {
     riskTitle: "风险评分",
 
     shareTitle: "过滤成就",
-    shareSub: "不含原文；仅显示本地处理统计与隐私声明。",
+    shareSub: "不含原文；仅展示本地处理统计与隐私声明。仅用于支持与鼓励作者。",
     achvPlaceholder: "生成后显示预览",
 
     btnDownload: "下载",
@@ -33,7 +33,7 @@ const I18N = {
     privacy: "隐私原则",
     scope: "MVP 范围",
 
-    foot: "了解更多  隐私原则  MVP 范围"
+    foot: "过滤和修改仅为建议，不构成法律承诺"
   },
 
   en: {
@@ -59,7 +59,7 @@ const I18N = {
     riskTitle: "Risk score",
 
     shareTitle: "Filter achievement",
-    shareSub: "No original text — local stats & privacy statement only.",
+    shareSub: "No original text. Local-only stats and a privacy notice. For support & encouragement only.",
     achvPlaceholder: "Preview appears after filtering",
 
     btnDownload: "Download",
@@ -70,7 +70,7 @@ const I18N = {
     privacy: "Privacy",
     scope: "MVP Scope",
 
-    foot: "Learn More  Privacy  MVP Scope"
+    foot: "Filtering and edits are suggestions only. No legal commitment."
   },
 
   de: {
@@ -96,7 +96,7 @@ const I18N = {
     riskTitle: "Risikowert",
 
     shareTitle: "Filter-Ergebnis",
-    shareSub: "Kein Originaltext — nur lokale Statistik & Datenschutzhinweis.",
+    shareSub: "Kein Originaltext. Nur lokale Statistik & Datenschutzhinweis. Nur zur Unterstützung.",
     achvPlaceholder: "Vorschau nach dem Filtern",
 
     btnDownload: "Download",
@@ -107,7 +107,7 @@ const I18N = {
     privacy: "Datenschutz",
     scope: "MVP-Umfang",
 
-    foot: "Mehr erfahren  Datenschutz  MVP-Umfang"
+    foot: "Filterung und Änderungen sind nur Vorschläge. Keine rechtliche Zusage."
   }
 };
 
