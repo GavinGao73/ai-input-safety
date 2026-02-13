@@ -337,13 +337,9 @@ const PRIORITY = [
 ];
 
 function highlightInputHits(text){
-  // 以“命中原文高亮”为目标：不做替换，只包裹命中片段
-  // 注意：这里不追求完美重叠处理，重点是“可读+可比对”
   let s = String(text || "");
   if (!s) return "";
 
-  // 为避免破坏 HTML：先 escape，再在 escape 后做“安全包裹”
-  // 但 regex 需要在原文本上跑，所以用“标记区间”方式。
   const marks = [];
   const raw = s;
 
@@ -354,8 +350,11 @@ function highlightInputHits(text){
     const r = RULES_BY_KEY[key];
     if (!r || !r.pattern) continue;
 
-    // 收集所有 match 区间
-    const re = new RegExp(r.pattern.source, r.pattern.flags.includes("g") ? r.pattern.flags : (r.pattern.flags + "g"));
+    const re = new RegExp(
+      r.pattern.source,
+      r.pattern.flags.includes("g") ? r.pattern.flags : (r.pattern.flags + "g")
+    );
+
     let m;
     while ((m = re.exec(raw)) !== null) {
       const start = m.index;
@@ -367,7 +366,6 @@ function highlightInputHits(text){
 
   if (!marks.length) return escapeHtml(raw);
 
-  // 合并区间
   marks.sort((a,b)=> a[0]-b[0] || a[1]-b[1]);
   const merged = [];
   for (const [s0,e0] of marks){
@@ -376,7 +374,6 @@ function highlightInputHits(text){
     else last[1] = Math.max(last[1], e0);
   }
 
-  // 输出带 span 的 HTML（基于原文切片 escape）
   let out = "";
   let cur = 0;
   for (const [a,b] of merged){
@@ -405,6 +402,16 @@ function renderInputOverlay(){
   ov.scrollLeft = ta.scrollLeft;
 }
 /* ==================== Input overlay end ==================== */
+
+function setPageHeightMode() {
+  // ✅ 两档页面高度：有生成内容/面板展开 => expanded
+  const body = document.body;
+  const outHas = String(($("outputText") && $("outputText").textContent) || "").trim().length > 0;
+  const riskOpen = !!($("riskDetails") && $("riskDetails").open);
+  const shareOpen = !!($("shareDetails") && $("shareDetails").open);
+  if (outHas || riskOpen || shareOpen) body.classList.add("expanded");
+  else body.classList.remove("expanded");
+}
 
 function setText() {
   const t = I18N[currentLang];
@@ -451,9 +458,7 @@ function setText() {
 }
 
 function maskHtmlForOutput(s){
-  // 将占位符标记为 .mark，便于比对；复制仍走 textContent
   let out = escapeHtml(String(s || ""));
-  // 中/英/德占位符
   const patterns = [
     /【电话】|【邮箱】|【账号】|【地址】|【账号名】|【编号】|【称谓】|【数字】|【金额】/g,
     /\[Telefon\]|\[E-Mail\]|\[Konto\]|\[Adresse\]|\[Handle\]|\[Referenz\]|\[Anrede\]|\[Zahl\]|\[Betrag\]/g,
@@ -542,7 +547,7 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
-  // ✅ share metrics (local-only globals used by share.js)
+  // ✅ Share metrics (local-only globals used by share.js)
   window.__safe_hits = hits;
   window.__safe_moneyMode = moneyMode;
   window.__safe_breakdown = hitsByKey;
@@ -566,12 +571,15 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
-  // ✅ 自动展开风险评分（生成后）
+  // ✅ 自动展开风险评分
   const rd = $("riskDetails");
   if (rd) rd.open = true;
 
-  // ✅（自动刷新卡片）通知 share.js 更新缩略图
+  // ✅ 自动刷新卡片
   window.dispatchEvent(new Event("safe:updated"));
+
+  // ✅ 两档高度更新
+  setPageHeightMode();
 
   return out;
 }
@@ -592,24 +600,32 @@ async function handlePdf(file) {
     const text = String(probe.text || "").trim();
     if (!text) return;
 
-    // output only
-    const filtered = applyRules(text);
+    // ✅ 1) 写入左侧输入框（用于验证水印消失 + 输入命中高亮）
+    const ta = $("inputText");
+    if (ta) {
+      ta.value = text;
+      syncWatermark();
+      renderInputOverlay();
+    }
 
-    // ✅ 输出高亮（占位符）
+    // ✅ 2) 同步生成右侧输出
+    const filtered = applyRules(text);
     const outEl = $("outputText");
     if (outEl) outEl.innerHTML = maskHtmlForOutput(filtered);
 
-    // ✅ 自动展开过滤成就（share.js 也会展开，但这里先开）
+    // ✅ 3) 自动展开过滤成就
     const sd = $("shareDetails");
     if (sd) sd.open = true;
 
-    // 输入侧：保持 textarea 空（你原设计）
+    // ✅ 两档高度更新
+    setPageHeightMode();
+
   } catch (e) {}
 }
 
 function bindPdfUI() {
   const pdfInput = $("pdfFile");
-  const filebar = $("filebar");
+  const filebar = $("filebar") || document.querySelector(".filebar");
   const fileName = $("fileName");
 
   if (pdfInput) {
@@ -617,7 +633,7 @@ function bindPdfUI() {
       const f = e.target.files && e.target.files[0];
       if (f && fileName) fileName.textContent = f.name;
       handlePdf(f);
-      e.target.value = ""; // allow re-upload same file
+      e.target.value = "";
     });
   }
 
@@ -647,7 +663,6 @@ function bind() {
 
       setText();
 
-      // re-render overlays/output if has input
       renderInputOverlay();
       syncWatermark();
 
@@ -659,6 +674,7 @@ function bind() {
         if (outEl) outEl.innerHTML = maskHtmlForOutput(filtered);
       } else {
         window.dispatchEvent(new Event("safe:updated"));
+        setPageHeightMode();
       }
     };
   });
@@ -680,6 +696,7 @@ function bind() {
         if (outEl) outEl.innerHTML = maskHtmlForOutput(filtered);
       } else {
         window.dispatchEvent(new Event("safe:updated"));
+        setPageHeightMode();
       }
     });
 
@@ -694,16 +711,22 @@ function bind() {
     ta.addEventListener("input", () => {
       renderInputOverlay();
       syncWatermark();
+      setPageHeightMode();
     });
     ta.addEventListener("scroll", () => {
       ov.scrollTop = ta.scrollTop;
       ov.scrollLeft = ta.scrollLeft;
     });
 
-    // 初始渲染
     renderInputOverlay();
     syncWatermark();
   }
+
+  // details toggle -> height mode
+  const rd = $("riskDetails");
+  const sd = $("shareDetails");
+  if (rd) rd.addEventListener("toggle", setPageHeightMode);
+  if (sd) sd.addEventListener("toggle", setPageHeightMode);
 
   // generate
   const gen = $("btnGenerate");
@@ -713,9 +736,10 @@ function bind() {
     const outEl = $("outputText");
     if (outEl) outEl.innerHTML = maskHtmlForOutput(filtered);
 
-    // ✅ 自动展开右侧过滤成就
-    const sd = $("shareDetails");
-    if (sd) sd.open = true;
+    const sd2 = $("shareDetails");
+    if (sd2) sd2.open = true;
+
+    setPageHeightMode();
   };
 
   // clear
@@ -736,16 +760,16 @@ function bind() {
     const rb = $("riskBox");
     if (rb) rb.innerHTML = "";
 
-    // collapse panels on clear
-    const rd = $("riskDetails");
-    if (rd) rd.open = false;
-    const sd = $("shareDetails");
-    if (sd) sd.open = false;
+    const rd2 = $("riskDetails");
+    if (rd2) rd2.open = false;
+    const sd2 = $("shareDetails");
+    if (sd2) sd2.open = false;
 
     renderInputOverlay();
     syncWatermark();
 
     window.dispatchEvent(new Event("safe:updated"));
+    setPageHeightMode();
   };
 
   // copy
@@ -772,10 +796,12 @@ function bind() {
   };
   if (down) down.onclick = () => {
     const n = Number($("downCount").textContent || "0") + 1;
+    $("upCount").textContent = $("upCount").textContent || "0";
     $("downCount").textContent = String(n);
   };
 
   bindPdfUI();
+  setPageHeightMode();
 }
 
 initEnabled();
