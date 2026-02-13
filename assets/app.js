@@ -15,90 +15,11 @@ let lastRunMeta = {
 
 function $(id) { return document.getElementById(id); }
 
-// ---- Local i18n fallback (do NOT depend on assets/i18n.js completeness) ----
-function uiText(lang) {
-  const zh = {
-    inTitle: "在 AI 读取之前，先通过 Filter。",
-    outTitle: "过滤后文本，可直接粘贴给 AI。",
-    placeholder: "粘贴准备上传给 AI 的文字或文件内容…",
-    inputWatermark:
-      "AI 系统可以解析文档中的隐藏文本结构。\n本工具仅在本地运行，不上传、不保存内容。",
-    moneyLabel: "金额：",
-    moneyOff: "关闭",
-    moneyM1: "M1",
-    moneyM2: "M2",
-    btnGenerate: "过滤输入内容",
-    btnClear: "清空",
-    btnCopy: "复制",
-    btnCopied: "✔ 已复制",
-    fbQ: "有帮助吗？",
-    foot: "本工具仅提供风险提示，不构成法律建议。",
-    riskTitle: "风险评分",
-    learn: "了解更多",
-    privacy: "隐私原则",
-    scope: "MVP 范围",
-    fileNone: "未选择文件",
-    achieveTitle: "过滤成就",
-    achieveSub: "不含原文，仅展示处理统计与隐私承诺",
-    achievePlaceholder: "生成过滤结果后，这里会显示成就卡片预览。",
-    btnDownload: "下载"
-  };
-
-  const en = {
-    inTitle: "Filter before AI reads.",
-    outTitle: "Filtered text — paste to AI directly.",
-    placeholder: "Paste what you plan to upload or send to AI…",
-    inputWatermark:
-      "AI systems can extract hidden text-layer data.\nAll processing runs locally. Nothing is stored or transmitted.",
-    moneyLabel: "Money:",
-    moneyOff: "Off",
-    moneyM1: "M1",
-    moneyM2: "M2",
-    btnGenerate: "Filter input",
-    btnClear: "Clear",
-    btnCopy: "Copy",
-    btnCopied: "✔ Copied",
-    fbQ: "Helpful?",
-    foot: "Risk hints only. Not legal advice.",
-    riskTitle: "Risk score",
-    learn: "Learn more",
-    privacy: "Privacy",
-    scope: "MVP scope",
-    fileNone: "No file selected",
-    achieveTitle: "Filter achievement",
-    achieveSub: "No original text — stats & privacy pledge only",
-    achievePlaceholder: "After you filter, an achievement card preview will appear here.",
-    btnDownload: "Download"
-  };
-
-  const de = {
-    inTitle: "Filter, bevor KI liest.",
-    outTitle: "Gefilterter Text — direkt in KI einfügen.",
-    placeholder: "Text einfügen, den du an KI senden willst…",
-    inputWatermark:
-      "KI-Systeme lesen auch verborgene Textlayer-Daten.\nVerarbeitung erfolgt ausschließlich lokal. Keine Speicherung.",
-    moneyLabel: "Betrag:",
-    moneyOff: "Aus",
-    moneyM1: "M1",
-    moneyM2: "M2",
-    btnGenerate: "Eingabe filtern",
-    btnClear: "Leeren",
-    btnCopy: "Kopieren",
-    btnCopied: "✔ Kopiert",
-    fbQ: "Hilfreich?",
-    foot: "Nur Risikohinweise. Keine Rechtsberatung.",
-    riskTitle: "Risikowert",
-    learn: "Mehr erfahren",
-    privacy: "Datenschutz",
-    scope: "MVP-Umfang",
-    fileNone: "Keine Datei gewählt",
-    achieveTitle: "Filter-Erfolg",
-    achieveSub: "Kein Originaltext — nur Statistik & Versprechen",
-    achievePlaceholder: "Nach dem Filtern erscheint hier eine Vorschau der Erfolgskarte.",
-    btnDownload: "Download"
-  };
-
-  return (lang === "de") ? de : (lang === "en") ? en : zh;
+function escapeHtml(s){
+  return String(s || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }
 
 function placeholder(key) {
@@ -237,34 +158,37 @@ function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
 function riskI18n(lang) {
   const zh = {
+    title: "风险评分",
     low: "低风险",
     mid: "中风险",
     high: "高风险",
     top: "主要风险来源",
     advice: "建议",
-    adviceLow: "可以使用；如为报价/合同类内容，可开启金额保护。",
+    adviceLow: "可以使用；报价/合同类内容建议开启金额保护。",
     adviceMid: "请检查 Top 项；必要时加强金额/地址/账号遮盖。",
     adviceHigh: "不建议直接发送：请删签名落款/账号信息，并加严遮盖后再试。",
     meta: (m) => `命中 ${m.hits}｜金额 ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜文件" : ""}`
   };
   const de = {
+    title: "Risikowert",
     low: "Niedrig",
     mid: "Mittel",
     high: "Hoch",
     top: "Top-Risiken",
     advice: "Empfehlung",
-    adviceLow: "Kann verwendet werden. Für Angebote/Verträge ggf. Betragsschutz aktivieren.",
+    adviceLow: "Kann verwendet werden. Für Angebote/Verträge Betragsschutz aktivieren.",
     adviceMid: "Top-Risiken prüfen; ggf. Betrag/Adresse/Konto stärker maskieren.",
     adviceHigh: "Nicht direkt senden: Signatur/Kontodaten entfernen und mehr Maskierung aktivieren.",
     meta: (m) => `Treffer ${m.hits}｜Betrag ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜Datei" : ""}`
   };
   const en = {
+    title: "Risk score",
     low: "Low",
     mid: "Medium",
     high: "High",
     top: "Top risk sources",
     advice: "Advice",
-    adviceLow: "Ok to use. For quotes/contracts, consider money protection.",
+    adviceLow: "Ok to use. For quotes/contracts, enable money protection.",
     adviceMid: "Review top risks; consider stronger money/address/account masking.",
     adviceHigh: "Do not send as-is: remove signature/account details and mask more.",
     meta: (m) => `Hits ${m.hits}｜Money ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜File" : ""}`
@@ -353,11 +277,10 @@ function computeRiskReport(hitsByKey, meta) {
 
 function renderRiskBox(report, meta) {
   const box = $("riskBox");
-  const fold = $("riskFold");
-  if (!box || !fold) return;
+  if (!box) return;
 
-  const tt = riskI18n(currentLang);
-  const levelText = report.level === "high" ? tt.high : report.level === "mid" ? tt.mid : tt.low;
+  const t = riskI18n(currentLang);
+  const levelText = report.level === "high" ? t.high : report.level === "mid" ? t.mid : t.low;
 
   const topHtml = (report.top && report.top.length)
     ? report.top.map(x => {
@@ -369,14 +292,15 @@ function renderRiskBox(report, meta) {
     : `<div class="tiny muted">-</div>`;
 
   const advice =
-    report.level === "high" ? tt.adviceHigh :
-    report.level === "mid" ? tt.adviceMid :
-    tt.adviceLow;
+    report.level === "high" ? t.adviceHigh :
+    report.level === "mid" ? t.adviceMid :
+    t.adviceLow;
 
   box.innerHTML = `
     <div class="riskhead">
       <div class="riskleft">
-        <div class="riskmeta">${tt.meta(meta)}</div>
+        <div class="risktitle">${t.title}</div>
+        <div class="riskmeta">${t.meta(meta)}</div>
       </div>
 
       <div class="riskscore">
@@ -386,30 +310,108 @@ function renderRiskBox(report, meta) {
     </div>
 
     <div class="risksec">
-      <div class="risklabel">${tt.top}</div>
+      <div class="risklabel">${t.top}</div>
       <div class="risklist">${topHtml}</div>
     </div>
 
     <div class="risksec">
-      <div class="risklabel">${tt.advice}</div>
+      <div class="risklabel">${t.advice}</div>
       <div class="riskadvice">${advice}</div>
     </div>
   `;
+}
+/* ==================== Risk scoring end ==================== */
 
-  // risk fold stays collapsed by default; only open when user chooses
+/* ==================== Input overlay highlight ==================== */
+const PRIORITY = [
+  "email",
+  "bank",
+  "account",
+  "phone",
+  "money",
+  "address_de_street",
+  "handle",
+  "ref",
+  "title",
+  "number"
+];
+
+function highlightInputHits(text){
+  // 以“命中原文高亮”为目标：不做替换，只包裹命中片段
+  // 注意：这里不追求完美重叠处理，重点是“可读+可比对”
+  let s = String(text || "");
+  if (!s) return "";
+
+  // 为避免破坏 HTML：先 escape，再在 escape 后做“安全包裹”
+  // 但 regex 需要在原文本上跑，所以用“标记区间”方式。
+  const marks = [];
+  const raw = s;
+
+  for (const key of PRIORITY) {
+    if (key !== "money" && !enabled.has(key)) continue;
+    if (key === "money" && moneyMode === "off") continue;
+
+    const r = RULES_BY_KEY[key];
+    if (!r || !r.pattern) continue;
+
+    // 收集所有 match 区间
+    const re = new RegExp(r.pattern.source, r.pattern.flags.includes("g") ? r.pattern.flags : (r.pattern.flags + "g"));
+    let m;
+    while ((m = re.exec(raw)) !== null) {
+      const start = m.index;
+      const end = m.index + m[0].length;
+      if (end > start) marks.push([start, end]);
+      if (m[0].length === 0) break;
+    }
+  }
+
+  if (!marks.length) return escapeHtml(raw);
+
+  // 合并区间
+  marks.sort((a,b)=> a[0]-b[0] || a[1]-b[1]);
+  const merged = [];
+  for (const [s0,e0] of marks){
+    const last = merged[merged.length-1];
+    if (!last || s0 > last[1]) merged.push([s0,e0]);
+    else last[1] = Math.max(last[1], e0);
+  }
+
+  // 输出带 span 的 HTML（基于原文切片 escape）
+  let out = "";
+  let cur = 0;
+  for (const [a,b] of merged){
+    if (a > cur) out += escapeHtml(raw.slice(cur, a));
+    out += `<span class="hit">${escapeHtml(raw.slice(a,b))}</span>`;
+    cur = b;
+  }
+  if (cur < raw.length) out += escapeHtml(raw.slice(cur));
+  return out;
 }
 
+function syncWatermark(){
+  const wrap = $("textareaWrap");
+  const txt = ($("inputText") && $("inputText").value) ? String($("inputText").value) : "";
+  if (!wrap) return;
+  if (txt.trim().length > 0) wrap.classList.add("has-input");
+  else wrap.classList.remove("has-input");
+}
+
+function renderInputOverlay(){
+  const ov = $("inputOverlay");
+  const ta = $("inputText");
+  if (!ov || !ta) return;
+  ov.innerHTML = highlightInputHits(ta.value || "");
+  ov.scrollTop = ta.scrollTop;
+  ov.scrollLeft = ta.scrollLeft;
+}
+/* ==================== Input overlay end ==================== */
+
 function setText() {
-  const t = uiText(currentLang);
+  const t = I18N[currentLang];
 
-  window.currentLang = currentLang;
-
-  // headings
   if ($("ui-in-title")) $("ui-in-title").textContent = t.inTitle;
   if ($("ui-out-title")) $("ui-out-title").textContent = t.outTitle;
 
-  // input
-  if ($("inputText")) $("inputText").placeholder = t.placeholder;
   if ($("ui-input-watermark")) $("ui-input-watermark").textContent = t.inputWatermark;
 
   // money
@@ -430,13 +432,13 @@ function setText() {
   // feedback
   if ($("ui-fb-q")) $("ui-fb-q").textContent = t.fbQ;
 
-  // risk title (summary)
-  if ($("ui-risk-title")) $("ui-risk-title").textContent = t.riskTitle;
+  // risk/share panel titles
+  if ($("ui-risk-title")) $("ui-risk-title").textContent = t.riskPanelTitle;
+  if ($("ui-share-title")) $("ui-share-title").textContent = t.shareTitle;
 
-  // achievement (summary + sub + placeholder + download)
-  if ($("ui-ach-title")) $("ui-ach-title").textContent = t.achieveTitle;
-  if ($("ui-ach-sub")) $("ui-ach-sub").textContent = t.achieveSub;
-  if ($("achPlaceholder")) $("achPlaceholder").textContent = t.achievePlaceholder;
+  // share texts
+  if ($("ui-share-sub")) $("ui-share-sub").textContent = t.shareSub;
+  if ($("sharePlaceholder")) $("sharePlaceholder").textContent = t.sharePlaceholder;
   if ($("btnShareDownload")) $("btnShareDownload").textContent = t.btnDownload;
 
   // links
@@ -446,10 +448,21 @@ function setText() {
 
   // footer
   if ($("ui-foot")) $("ui-foot").textContent = t.foot;
+}
 
-  // filename default
-  const fn = $("fileName");
-  if (fn && !fn.textContent) fn.textContent = t.fileNone;
+function maskHtmlForOutput(s){
+  // 将占位符标记为 .mark，便于比对；复制仍走 textContent
+  let out = escapeHtml(String(s || ""));
+  // 中/英/德占位符
+  const patterns = [
+    /【电话】|【邮箱】|【账号】|【地址】|【账号名】|【编号】|【称谓】|【数字】|【金额】/g,
+    /\[Telefon\]|\[E-Mail\]|\[Konto\]|\[Adresse\]|\[Handle\]|\[Referenz\]|\[Anrede\]|\[Zahl\]|\[Betrag\]/g,
+    /\[Phone\]|\[Email\]|\[Account\]|\[Address\]|\[Handle\]|\[Ref\]|\[Title\]|\[Number\]|\[Amount\]/g
+  ];
+  for (const re of patterns){
+    out = out.replace(re, (m)=> `<span class="mark">${m}</span>`);
+  }
+  return out;
 }
 
 // ---- rule application ----
@@ -457,19 +470,6 @@ function applyRules(text) {
   let out = String(text || "");
   let hits = 0;
   const hitsByKey = {};
-
-  const PRIORITY = [
-    "email",
-    "bank",
-    "account",
-    "phone",
-    "money",
-    "address_de_street",
-    "handle",
-    "ref",
-    "title",
-    "number"
-  ];
 
   function addHit(key) {
     hits++;
@@ -542,7 +542,7 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
-  // ✅ Share metrics (local-only globals used by share.js)
+  // ✅ share metrics (local-only globals used by share.js)
   window.__safe_hits = hits;
   window.__safe_moneyMode = moneyMode;
   window.__safe_breakdown = hitsByKey;
@@ -566,7 +566,11 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
-  // ✅ 你要的“自动刷新成就卡片”触发
+  // ✅ 自动展开风险评分（生成后）
+  const rd = $("riskDetails");
+  if (rd) rd.open = true;
+
+  // ✅（自动刷新卡片）通知 share.js 更新缩略图
   window.dispatchEvent(new Event("safe:updated"));
 
   return out;
@@ -575,10 +579,6 @@ function applyRules(text) {
 /* ============ PDF helpers (text-layer probe) ============ */
 async function handlePdf(file) {
   if (!file) return;
-
-  const fn = $("fileName");
-  if (fn) fn.textContent = file.name || uiText(currentLang).fileNone;
-
   if (file.type !== "application/pdf") return;
 
   try {
@@ -592,30 +592,32 @@ async function handlePdf(file) {
     const text = String(probe.text || "").trim();
     if (!text) return;
 
-    // ✅ 用户现在希望：选择 PDF 后，输入框也有内容
-    const input = $("inputText");
-    if (input) input.value = text;
+    // output only
+    const filtered = applyRules(text);
 
-    // 同时生成过滤结果
-    const out = applyRules(text);
+    // ✅ 输出高亮（占位符）
     const outEl = $("outputText");
-    if (outEl) outEl.textContent = out;
+    if (outEl) outEl.innerHTML = maskHtmlForOutput(filtered);
 
-  } catch (e) {
-    // keep quiet in minimal UI
-  }
+    // ✅ 自动展开过滤成就（share.js 也会展开，但这里先开）
+    const sd = $("shareDetails");
+    if (sd) sd.open = true;
+
+    // 输入侧：保持 textarea 空（你原设计）
+  } catch (e) {}
 }
 
 function bindPdfUI() {
   const pdfInput = $("pdfFile");
-  const filebar = document.querySelector(".filebar");
+  const filebar = $("filebar");
+  const fileName = $("fileName");
 
   if (pdfInput) {
     pdfInput.addEventListener("change", (e) => {
       const f = e.target.files && e.target.files[0];
+      if (f && fileName) fileName.textContent = f.name;
       handlePdf(f);
-      // reset so same file can be chosen again
-      e.target.value = "";
+      e.target.value = ""; // allow re-upload same file
     });
   }
 
@@ -626,44 +628,57 @@ function bindPdfUI() {
       e.preventDefault();
       filebar.classList.remove("dragover");
       const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f && fileName) fileName.textContent = f.name;
       handlePdf(f);
     });
   }
 }
 
 function bind() {
+  // lang
   document.querySelectorAll(".lang button").forEach(b => {
     b.onclick = () => {
       document.querySelectorAll(".lang button").forEach(x => x.classList.remove("active"));
       b.classList.add("active");
+
       currentLang = b.dataset.lang;
       window.currentLang = currentLang;
-
       lastRunMeta.lang = currentLang;
+
       setText();
+
+      // re-render overlays/output if has input
+      renderInputOverlay();
+      syncWatermark();
 
       const inTxt = ($("inputText").value || "").trim();
       if (inTxt) {
         lastRunMeta.fromPdf = false;
-        const out = applyRules(inTxt);
-        if ($("outputText")) $("outputText").textContent = out;
+        const filtered = applyRules(inTxt);
+        const outEl = $("outputText");
+        if (outEl) outEl.innerHTML = maskHtmlForOutput(filtered);
       } else {
         window.dispatchEvent(new Event("safe:updated"));
       }
     };
   });
 
+  // money
   const mm = $("moneyMode");
   if (mm) {
     mm.addEventListener("change", () => {
       moneyMode = mm.value || "off";
+      window.__safe_moneyMode = moneyMode;
+
+      renderInputOverlay();
+
       const inTxt = ($("inputText").value || "").trim();
       if (inTxt) {
         lastRunMeta.fromPdf = false;
-        const out = applyRules(inTxt);
-        if ($("outputText")) $("outputText").textContent = out;
+        const filtered = applyRules(inTxt);
+        const outEl = $("outputText");
+        if (outEl) outEl.innerHTML = maskHtmlForOutput(filtered);
       } else {
-        window.__safe_moneyMode = moneyMode;
         window.dispatchEvent(new Event("safe:updated"));
       }
     });
@@ -672,17 +687,43 @@ function bind() {
     window.__safe_moneyMode = moneyMode;
   }
 
+  // input overlay sync
+  const ta = $("inputText");
+  const ov = $("inputOverlay");
+  if (ta && ov) {
+    ta.addEventListener("input", () => {
+      renderInputOverlay();
+      syncWatermark();
+    });
+    ta.addEventListener("scroll", () => {
+      ov.scrollTop = ta.scrollTop;
+      ov.scrollLeft = ta.scrollLeft;
+    });
+
+    // 初始渲染
+    renderInputOverlay();
+    syncWatermark();
+  }
+
+  // generate
   const gen = $("btnGenerate");
   if (gen) gen.onclick = () => {
     lastRunMeta.fromPdf = false;
-    const out = applyRules($("inputText").value || "");
-    if ($("outputText")) $("outputText").textContent = out;
+    const filtered = applyRules(($("inputText").value || ""));
+    const outEl = $("outputText");
+    if (outEl) outEl.innerHTML = maskHtmlForOutput(filtered);
+
+    // ✅ 自动展开右侧过滤成就
+    const sd = $("shareDetails");
+    if (sd) sd.open = true;
   };
 
+  // clear
   const clr = $("btnClear");
   if (clr) clr.onclick = () => {
     if ($("inputText")) $("inputText").value = "";
-    if ($("outputText")) $("outputText").textContent = "";
+    if ($("outputText")) $("outputText").innerHTML = "";
+    if ($("fileName")) $("fileName").textContent = "";
 
     window.__safe_hits = 0;
     window.__safe_breakdown = {};
@@ -695,21 +736,34 @@ function bind() {
     const rb = $("riskBox");
     if (rb) rb.innerHTML = "";
 
+    // collapse panels on clear
+    const rd = $("riskDetails");
+    if (rd) rd.open = false;
+    const sd = $("shareDetails");
+    if (sd) sd.open = false;
+
+    renderInputOverlay();
+    syncWatermark();
+
     window.dispatchEvent(new Event("safe:updated"));
   };
 
-  const copy = $("btnCopy");
-  if (copy) copy.onclick = async () => {
-    const t = uiText(currentLang);
+  // copy
+  const cpy = $("btnCopy");
+  if (cpy) cpy.onclick = async () => {
+    const t = I18N[currentLang];
     try {
       await navigator.clipboard.writeText(($("outputText") && $("outputText").textContent) || "");
-      const old = copy.textContent;
-      copy.textContent = t.btnCopied || old;
-      setTimeout(() => { copy.textContent = t.btnCopy || old; }, 900);
+      const btn = $("btnCopy");
+      if (btn) {
+        const old = btn.textContent;
+        btn.textContent = t.btnCopied || old;
+        setTimeout(() => { btn.textContent = t.btnCopy || old; }, 900);
+      }
     } catch (e) {}
   };
 
-  // feedback (minimal local counters)
+  // feedback
   const up = $("btnUp");
   const down = $("btnDown");
   if (up) up.onclick = () => {
