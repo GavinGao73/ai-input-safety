@@ -3,19 +3,12 @@
   --muted:#8fa0b6;
   --text:#e8eef7;
   --line:#223044;
-
   --btn:#2b90ff;
   --shadow: 0 10px 30px rgba(0,0,0,.35);
   --radius: 14px;
-  --max: 1180px;
-
+  --max: 1060px;
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
-
-  --hit-bg: rgba(255, 196, 0, 0.18);
-  --hit-bd: rgba(255, 196, 0, 0.35);
-  --mask-bg: rgba(120, 255, 240, 0.16);
-  --mask-bd: rgba(120, 255, 240, 0.34);
 }
 
 *{box-sizing:border-box}
@@ -29,69 +22,62 @@ body{
   color:var(--text);
 }
 
-/* ✅ 两档页面高度：默认/展开 */
-body:not(.expanded) .card{ min-height: 560px; }
-body.expanded .card{ min-height: 690px; }
-
 .wrap{
   max-width:var(--max);
   margin:0 auto;
-  padding:18px 18px 36px;
+  padding:18px 16px 34px;
 }
 
-/* ===== Header alignment ===== */
-.topbar{
+header{
   display:flex;
   justify-content:space-between;
-  align-items:center;
-  margin-bottom:14px;
+  align-items:flex-start;
+  margin-bottom:16px;
 }
 
+/* ===== header logo (icon only) ===== */
 .logo{
   display:flex;
   align-items:center;
-  gap:14px;
+  gap:12px;
 }
-
-.logo-full{
-  height:60px;
+.logo-top-icon{
+  height:44px;
   width:auto;
   display:block;
 }
-
 .brand-name{
   font-weight:900;
-  font-size:22px;
-  letter-spacing:.2px;
+  font-size:20px;
+  letter-spacing:0.2px;
   line-height:1.1;
+  margin-top:2px;
 }
 
+/* ===== lang aligned with title ===== */
 .lang{
   display:flex;
-  gap:8px;
-  align-items:center;
+  gap:6px;
+  margin-top:6px;
 }
 .lang button{
   background:transparent;
-  border:1px solid rgba(255,255,255,.16);
-  color:rgba(255,255,255,.72);
-  padding:7px 12px;
+  border:1px solid var(--line);
+  color:var(--muted);
+  padding:6px 10px;
   border-radius:999px;
   cursor:pointer;
-  font-weight:700;
 }
 .lang button.active{
-  background:rgba(43,144,255,.22);
+  background:rgba(43,144,255,.2);
   color:var(--text);
-  border-color: rgba(43,144,255,.35);
 }
 
-/* ===== Layout ===== */
 .grid{
   display:grid;
   grid-template-columns: 1fr auto 1fr;
-  gap: 18px;
-  align-items: stretch;
+  gap:18px;
+  align-items:stretch;
 }
 
 @media (max-width: 980px){
@@ -105,73 +91,95 @@ body.expanded .card{ min-height: 690px; }
   border-radius:var(--radius);
   box-shadow:var(--shadow);
   padding:12px 14px 14px;
-  display:flex;
-  flex-direction:column;
 }
 
-/* ✅ 统一标题到内容区距离（左右一致） */
+/* make columns equal height behavior */
+.card-col{
+  display:flex;
+  flex-direction:column;
+  min-height: 680px;
+}
+
 h3{
-  margin:6px 0 8px;
+  margin:6px 0 10px;
   font-size:14px;
   font-weight:900;
 }
-.outbox{ margin-top: 8px; } /* 标题到“第一块内容”的间距统一 */
 
-/* ===== file bar ===== */
+/* ========= top bar "card" for alignment ========= */
+.barcard{
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;
+  background:rgba(255,255,255,.02);
+  padding:10px;
+}
+.barcard-top{
+  margin-bottom:10px;
+}
+
 .filebar{
   display:flex;
+  gap:10px;
   align-items:center;
-  gap:12px;
-  margin:0 0 10px;
   padding:10px;
   border:1px dashed rgba(255,255,255,.14);
   border-radius:14px;
   background:rgba(255,255,255,.02);
 }
-.filebar.dragover{
-  border-color: rgba(43,144,255,.55);
-  background: rgba(43,144,255,.08);
+.filebar-compact{
+  margin:0;
 }
 .filebar input[type="file"]{
-  max-width: 260px;
-  color: rgba(255,255,255,.78);
+  max-width:260px;
+  color:var(--muted);
 }
 .filename{
-  flex:1;
-  min-width:0;
-  color: rgba(255,255,255,.55);
+  color:rgba(255,255,255,.55);
   font-size:12px;
+  white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
-  white-space:nowrap;
+  flex:1;
+  text-align:right;
 }
 
-/* ===== input+output boxes ===== */
-.textarea-wrap{
-  position:relative;
-}
+.outbox{ width:100%; }
 
 textarea{
   width:100%;
-  height: 340px;
-  resize: none;
-  background: transparent;
+  height:320px;
+  max-height:320px;
+  background:rgba(10,14,20,.55);
   border:1px solid rgba(255,255,255,.10);
   border-radius:12px;
-  color: transparent;             /* overlay 显示文本 */
-  caret-color: var(--text);
+  color:var(--text);
   padding:12px;
   font-size:13px;
   line-height:1.55;
   overflow:auto;
-  position:relative;
-  z-index:2;
 }
 
-/* ✅ 右侧输出：高度也按两档变化，吃掉“上部空白” */
+/* watermark */
+.textarea-wrap{ position:relative; }
+.input-watermark{
+  position:absolute;
+  left:12px;
+  right:12px;
+  bottom:12px;
+  padding:10px 10px 8px;
+  border-radius:12px;
+  background:linear-gradient(180deg, rgba(10,14,20,0), rgba(10,14,20,.55));
+  color:rgba(255,255,255,.28);
+  font-size:12px;
+  line-height:1.4;
+  white-space:pre-line;
+  pointer-events:none;
+  user-select:none;
+}
+
 .output{
-  height: 340px;
-  overflow:auto;
+  height:320px;
+  max-height:320px;
   background:rgba(10,14,20,.55);
   border:1px solid rgba(255,255,255,.10);
   border-radius:12px;
@@ -180,88 +188,24 @@ textarea{
   white-space:pre-wrap;
   line-height:1.55;
   font-size:13px;
-}
-body.expanded textarea{ height: 370px; }
-body.expanded .output{ height: 370px; }
-
-/* ✅ 输入 overlay */
-.input-overlay{
-  position:absolute;
-  inset:0;
-  padding:12px;
-  border-radius:12px;
-  background:rgba(10,14,20,.55);
-  z-index:1;
   overflow:auto;
-
-  font-size:13px;
-  line-height:1.55;
-  white-space:pre-wrap;
-  font-family:var(--sans);
-  color:rgba(255,255,255,.88);
 }
-.input-overlay .hit{
-  background: var(--hit-bg);
-  border: 1px solid var(--hit-bd);
-  border-radius: 8px;
-  padding: 0 3px;
+.output-scroll{ overflow:auto; }
+
+/* highlight placeholders in output */
+.hl{
+  background: rgba(255, 92, 92, 0.14);
+  border: 1px solid rgba(255, 92, 92, 0.35);
+  color: rgba(255,255,255,.95);
+  padding: 1px 6px;
+  border-radius: 999px;
 }
 
-/* watermark */
-.input-watermark{
-  position:absolute;
-  left:12px;
-  right:12px;
-  bottom:12px;
-  padding:10px 10px 8px;
-  border-radius:12px;
-  background:linear-gradient(180deg, rgba(10,14,20,0), rgba(10,14,20,.68));
-  color:rgba(255,255,255,.28);
-  font-size:12px;
-  line-height:1.4;
-  white-space:pre-line;
-  pointer-events:none;
-  user-select:none;
-  z-index:3;
-}
-.textarea-wrap.has-input .input-watermark{ display:none; }
-
-/* ===== buttons / controls ===== */
-.controlbar{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  margin-top:10px;
-  padding:10px;
-  border:1px solid rgba(255,255,255,.08);
-  border-radius:14px;
-  background:rgba(255,255,255,.02);
-}
-
-.moneyctl{
-  display:flex;
-  align-items:center;
-  gap:10px;
-}
-.moneyctl label{
-  color:rgba(255,255,255,.60);
-  font-size:12px;
-  font-weight:800;
-}
-.moneyctl select{
-  background:rgba(10,14,20,.55);
-  color:rgba(255,255,255,.90);
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:12px;
-  padding:8px 10px;
-  font-size:12px;
-}
-
+/* ===== buttons ===== */
 .btn{
-  border:1px solid rgba(255,255,255,.16);
-  background:rgba(255,255,255,.03);
-  color:rgba(255,255,255,.90);
+  border:1px solid var(--line);
+  background:transparent;
+  color:var(--text);
   padding:9px 14px;
   border-radius:12px;
   cursor:pointer;
@@ -276,82 +220,127 @@ body.expanded .output{ height: 370px; }
   background:rgba(255,255,255,.05);
 }
 .btn-fixed{
-  width:84px;
+  width:88px;
+  min-width:88px;
   text-align:center;
 }
 
-/* ===== row / feedback ===== */
-.row{
+.top-actions{
   display:flex;
+  gap:10px;
   justify-content:space-between;
+}
+.top-actions .btn{
+  flex:1;
+}
+.top-actions .btn.secondary{
+  flex:0 0 96px;
+}
+
+/* ===== controlbar (left money row & right feedback row) ===== */
+.controlbar{
+  display:flex;
   align-items:center;
+  justify-content:space-between;
+  gap:12px;
   margin-top:10px;
+  padding:10px 10px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;
+  background:rgba(255,255,255,.02);
+}
+.controlbar-eq{ min-height:56px; }
+
+.moneyctl{
+  display:flex;
+  align-items:center;
   gap:10px;
 }
+.moneyctl label{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+}
+.moneyctl select{
+  background:rgba(10,14,20,.55);
+  color:var(--text);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:12px;
+  padding:8px 10px;
+  font-size:12px;
+}
+
+.ctl-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+/* ===== feedback ===== */
 .feedback{
   display:flex;
   gap:8px;
   align-items:center;
+  width:100%;
+  justify-content:space-between;
+}
+.feedback-inline{
+  gap:10px;
+}
+.feedback-inline .fbq{
+  color:var(--muted);
+  font-size:12px;
+  white-space:nowrap;
 }
 .iconbtn{
-  border:1px solid rgba(255,255,255,.16);
-  background:rgba(255,255,255,.04);
-  color:rgba(255,255,255,.92);
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.05);
+  color:var(--text);
   border-radius:12px;
   padding:7px 12px;
   cursor:pointer;
-  font-weight:800;
-}
-.feedback-inline .fbq{
-  color:rgba(255,255,255,.60);
-  font-size:12px;
-  margin-right:2px;
-  white-space:nowrap;
 }
 
-/* ===== details panels (risk/share) ===== */
-.panel{
-  margin-top:12px;
+/* ===== fold cards: risk & achievement equal ===== */
+.fold{
+  margin-top:10px;
   border:1px solid rgba(255,255,255,.08);
   border-radius:14px;
   background:rgba(255,255,255,.02);
   overflow:hidden;
 }
-.panel-summary{
+.fold-eq{
+  /* same footprint both sides */
+  min-height:56px;
+}
+.fold-sum{
   list-style:none;
   cursor:pointer;
-  padding:10px 12px;
+  padding:12px 12px;
+  font-weight:900;
+  font-size:13px;
+  color:rgba(255,255,255,.92);
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:10px;
 }
-.panel-summary::-webkit-details-marker{ display:none; }
-.panel-title{
-  font-weight:900;
-  font-size:13px;
-  color:rgba(255,255,255,.90);
-}
-
-/* ✅ 面板内容：默认/展开两档高度（超出滚动，不撑卡片） */
-.panel-body{
+.fold summary::-webkit-details-marker { display:none; }
+.fold-body{
   padding:12px;
-  border-top:1px solid rgba(255,255,255,.08);
+  border-top:1px solid rgba(255,255,255,.06);
+  max-height: 260px; /* ✅ 过多内容用滚动条 */
   overflow:auto;
-  max-height: 220px;
 }
-body.expanded .panel-body{ max-height: 320px; }
 
-/* Risk content card */
+/* Risk card inner */
 .risk{
-  padding:12px;
-  border:1px solid rgba(255,255,255,.08);
-  border-radius:14px;
-  background:rgba(255,255,255,.02);
+  padding:0;
+  border:0;
+  background:transparent;
 }
 .riskhead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
 .risktitle{ font-weight:900; font-size:13px; }
-.riskmeta{ margin-top:4px; color:rgba(255,255,255,.55); font-size:12px; }
+.riskmeta{ margin-top:4px; color:var(--muted); font-size:12px; }
 .riskscore{
   min-width:96px;
   text-align:center;
@@ -363,7 +352,7 @@ body.expanded .panel-body{ max-height: 320px; }
 .riskscore .n{ font-size:26px; font-weight:900; line-height:1; }
 .riskscore .l{ font-size:12px; opacity:.9; margin-top:4px; color:rgba(255,255,255,.86); }
 .risksec{ margin-top:10px; }
-.risklabel{ font-size:12px; color:rgba(255,255,255,.60); margin-bottom:6px; }
+.risklabel{ font-size:12px; color:var(--muted); margin-bottom:6px; }
 .risklist{ display:flex; flex-direction:column; gap:6px; }
 .riskitem{
   display:flex;
@@ -375,78 +364,73 @@ body.expanded .panel-body{ max-height: 320px; }
   border:1px solid rgba(255,255,255,.06);
 }
 .riskitem .rk{ font-size:12px; color:rgba(255,255,255,.90); }
-.riskitem .rv{ font-size:12px; color:rgba(255,255,255,.62); }
+.riskitem .rv{ font-size:12px; color:var(--muted); }
 .riskadvice{ font-size:12px; line-height:1.5; color:rgba(255,255,255,.82); }
 
-/* ===== Share block (inside details) ===== */
-.sharebar{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:14px;
-}
-.sharesub{
+/* ===== achievement layout ===== */
+.achv-sub{
   font-size:12px;
-  color:rgba(255,255,255,.60);
-  margin-top:2px;
-  max-width:360px;
+  color:var(--muted);
+  margin-bottom:10px;
 }
-.sharepreview{
-  margin-top:10px;
-  padding:10px;
+.achv-preview{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+}
+.achv-previewbox{
+  flex:1;
   border-radius:16px;
   background:rgba(255,255,255,.03);
   border:1px dashed rgba(255,255,255,.10);
+  height: 220px;              /* ✅ 固定高度，不撑页面 */
   position:relative;
-}
-.sharepreview.fixed{
-  height: 240px;
   overflow:hidden;
   display:flex;
   align-items:center;
   justify-content:center;
 }
-.share-placeholder{
+#shareAutoImg{
+  max-width: 100%;
+  max-height: 100%;
+  border-radius:14px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.45);
+  display:none;
+}
+.achv-placeholder{
   position:absolute;
   inset:0;
   display:flex;
   align-items:center;
   justify-content:center;
-  color:rgba(255,255,255,.26);
+  color:rgba(255,255,255,.28);
   font-size:12px;
-  pointer-events:none;
+  text-align:center;
+  padding:12px;
 }
-#shareAutoImg{
-  width: 100%;
-  max-width: 320px;
-  height:auto;
-  border-radius:16px;
-  display:block;
-  box-shadow: 0 10px 40px rgba(0,0,0,.45);
-  opacity:0;
-  transform: translateY(2px);
-  transition: opacity .18s ease, transform .18s ease;
-}
-
-/* ===== Output mask highlight ===== */
-.mark{
-  background: var(--mask-bg);
-  border: 1px solid var(--mask-bd);
-  border-radius: 8px;
-  padding: 0 3px;
-}
-
-/* ===== Right card bottom alignment ===== */
-/* 让“过滤成就 + links”整体贴底，避免中间留大空白 */
-.card.right .bottom-stack{
-  margin-top:auto;
+.achv-right{
+  flex:0 0 92px;
   display:flex;
-  flex-direction:column;
-  gap:10px;
+  justify-content:flex-end;
 }
 
-/* links 放到最底，不再把 share 顶上去 */
+/* bottom fixed areas aligned */
+.bottom-fixed{
+  margin-top:auto;
+  padding-top:12px;
+}
+.tiny{
+  font-size:12px;
+  color:var(--muted);
+}
+.footnote{
+  border-top:1px solid rgba(255,255,255,.06);
+  padding-top:12px;
+}
+
+/* links */
 .links{
+  border-top:1px solid rgba(255,255,255,.06);
   display:flex;
   gap:12px;
   font-size:12px;
@@ -454,35 +438,24 @@ body.expanded .panel-body{ max-height: 320px; }
 .links a{
   color:rgba(120,255,240,.80);
   text-decoration:none;
-  font-weight:800;
 }
 .links a:hover{ text-decoration:underline; }
 
-/* footer note */
-.tiny{
-  font-size:12px;
-  color:rgba(255,255,255,.55);
-}
-.footnote{
-  margin-top:10px;
-}
-
-/* ===== Middle filter (swap-ready) ===== */
+/* ===== Middle Filter (logo swapped) ===== */
 .mid-filter{
-  width: 180px;
+  width: 150px;
   display:flex;
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap: 16px;
-  padding: 10px 0;
-  opacity: 0.98;
+  gap:14px;
+  padding:10px 0;
+  opacity:0.98;
 }
-
 .mid-filter .flow-line{
-  width: 4px;
-  flex: 1;
-  border-radius: 4px;
+  width:4px;
+  flex:1;
+  border-radius:4px;
   background: linear-gradient(
     to bottom,
     rgba(120, 255, 240, 0),
@@ -491,28 +464,23 @@ body.expanded .panel-body{ max-height: 320px; }
   );
 }
 
-/* ✅ 中间如果换成“图标+文字”的 full logo，直接用这个 class */
-.mid-logo-full{
-  width: 240px;
-  height: auto;
+/* plain badge (no card feel, but keep subtle) */
+.filter-badge-plain{
+  background:transparent;
+  border:0;
+  box-shadow:none;
+  backdrop-filter:none;
+  width:auto;
+  height:auto;
+  border-radius:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.filter-full{
+  width: 120px;
+  height:auto;
   display:block;
-  object-fit:contain;
-  filter: drop-shadow(0 18px 60px rgba(0,0,0,.55));
   user-select:none;
   -webkit-user-drag:none;
-}
-
-/* 仍保留 icon-only 的情况（你当前是这种），缩小 30%：180 -> 126 */
-.mid-icon{
-  width: 126px;
-  height: 126px;
-  object-fit: contain;
-  user-select:none;
-  -webkit-user-drag:none;
-  filter: drop-shadow(0 18px 60px rgba(0,0,0,.55));
-}
-
-/* ✅ 你说的：去掉底部的“Filter”文字 */
-.mid-filter .filter-text{
-  display:none;
 }
