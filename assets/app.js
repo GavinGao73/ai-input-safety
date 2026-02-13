@@ -106,8 +106,9 @@ function renderInputOverlayForPdf(originalText){
   // ✅ 开启 PDF overlay 模式（CSS 会让 textarea 文字透明，避免重叠）
   wrap.classList.add("pdf-overlay-on");
 
-  // sync scroll
+  // sync scroll (both directions)
   overlay.scrollTop = ta.scrollTop;
+  overlay.scrollLeft = ta.scrollLeft;
 }
 
 /* mark hits in original input (keeps original chars) */
@@ -591,9 +592,7 @@ async function handlePdf(file) {
     applyRules(text);
 
     // ✅ 立刻渲染 PDF overlay（避免“点一下才消失/刷新”的重叠现象）
-    if (typeof renderInputOverlayForPdf === "function") {
-      renderInputOverlayForPdf(text);
-    }
+    renderInputOverlayForPdf(text);
 
     // ✅ 触发成就卡刷新（share.js 监听）
     window.dispatchEvent(new Event("safe:updated"));
@@ -625,13 +624,18 @@ function bind() {
 
       setText();
 
-      const inTxt = ($("inputText").value || "").trim();
+      const ta = $("inputText");
+      const inTxt = (ta && ta.value) ? String(ta.value).trim() : "";
+
+      // ✅ 不再强制 lastRunMeta.fromPdf=false（这是“标记不稳定”的根因）
       if (inTxt) {
-        lastRunMeta.fromPdf = false;
         applyRules(inTxt);
       } else {
         window.dispatchEvent(new Event("safe:updated"));
       }
+
+      // ✅ 语言切换后，如果仍是 PDF 模式，立刻重画 overlay（避免切换后消失）
+      if (ta) renderInputOverlayForPdf(ta.value || "");
     };
   });
 
@@ -646,6 +650,8 @@ function bind() {
         window.__safe_moneyMode = moneyMode;
         window.dispatchEvent(new Event("safe:updated"));
       }
+      // ✅ money 改变后，PDF overlay 也要同步（命中颜色稳定）
+      renderInputOverlayForPdf($("inputText").value || "");
     });
 
     moneyMode = mm.value || "off";
@@ -653,14 +659,14 @@ function bind() {
   }
 
   $("btnGenerate").onclick = () => {
-  // ✅ 手动过滤：视为非 PDF 模式，关闭 overlay
-  lastRunMeta.fromPdf = false;
-  const wrap = $("inputWrap");
-  if (wrap) wrap.classList.remove("pdf-overlay-on");
-  if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
+    // ✅ 手动过滤：视为非 PDF 模式，关闭 overlay
+    lastRunMeta.fromPdf = false;
+    const wrap = $("inputWrap");
+    if (wrap) wrap.classList.remove("pdf-overlay-on");
+    if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
 
-  applyRules($("inputText").value || "");
-};
+    applyRules($("inputText").value || "");
+  };
 
   $("btnClear").onclick = () => {
     if ($("inputText")) $("inputText").value = "";
@@ -730,7 +736,10 @@ function bind() {
     // sync overlay scrolling
     ta.addEventListener("scroll", () => {
       const overlay = $("inputOverlay");
-      if (overlay) overlay.scrollTop = ta.scrollTop;
+      if (overlay) {
+        overlay.scrollTop = ta.scrollTop;
+        overlay.scrollLeft = ta.scrollLeft;
+      }
     });
   }
 
