@@ -182,7 +182,6 @@
     if (pat instanceof RegExp) return pat;
 
     if (typeof pat === "string") {
-      // treat as source with global by default
       try { return new RegExp(pat, "g"); } catch (_) { return null; }
     }
 
@@ -206,16 +205,25 @@
   }
 
   function buildRuleMatchers(enabledKeys, moneyMode) {
-    // ✅ Strongest fix: do NOT rely on enabledKeys (key mismatch often causes 0 matchers)
-    // ✅ Also accept rules where pattern is not a RegExp (string/object forms)
+    // ✅ 关键：与“文本过滤”保持同一套开关/定义
+    // - 如果传入 enabledKeys：严格按 enabledKeys 过滤（money 仍受 moneyMode 控制）
+    // - 如果 enabledKeys 为空/不可用：回退到 RULES_BY_KEY 全量（money 仍受 moneyMode 控制）
     const matchers = [];
     const src = window.RULES_BY_KEY || {};
+
+    const keys = Array.isArray(enabledKeys) ? enabledKeys : [];
+    const enabledSet = new Set(keys);
+
+    const useAll = (keys.length === 0); // fallback only when truly unavailable
 
     for (const [k, r] of Object.entries(src)) {
       if (!r) continue;
 
-      // Keep money gated
-      if (k === "money" && (!moneyMode || moneyMode === "off")) continue;
+      if (k === "money") {
+        if (!moneyMode || moneyMode === "off") continue;
+      } else {
+        if (!useAll && !enabledSet.has(k)) continue;
+      }
 
       const raw = (r.pattern != null) ? r.pattern
                 : (r.re != null) ? r.re
@@ -301,16 +309,15 @@
 
     // 1) Build pageText (NO separators). Use hasEOL to add '\n' only at line end.
     let pageText = "";
-    const itemRanges = []; // { idx, start, end, len }
+    const itemRanges = []; // { idx, start, end }
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
       const s = String(it.str || "");
       const start = pageText.length;
       pageText += s;
       const end = pageText.length;
-      itemRanges.push({ idx: i, start, end, len: Math.max(1, s.length) });
+      itemRanges.push({ idx: i, start, end });
 
-      // only add line break when pdf.js indicates it; won't break emails inside line
       if (it && it.hasEOL) pageText += "\n";
     }
 
@@ -357,8 +364,9 @@
         const x1 = bb.x + bb.w * (localStart / len);
         const x2 = bb.x + bb.w * (localEnd / len);
 
-        const padX = Math.max(1, bb.w * 0.01);
-        const padY = Math.max(1, bb.h * 0.10);
+        // padding: small, conservative
+        const padX = Math.max(1, bb.w * 0.006);
+        const padY = Math.max(1, bb.h * 0.08);
 
         rects.push({
           x: x1 - padX,
@@ -369,18 +377,50 @@
       }
     }
 
-    // 5) Merge nearby rects
-    rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-    const out = [];
+    // 4.5) Clamp extreme-wide rects (prevent “black wall”)
+    // If a single rect is wider than 45% of page width, we split it into 2–4 chunks.
+    const MAX_W_RATIO = 0.45;
+    const pageW = Number(viewport && viewport.width) || 0;
+    const normalized = [];
     for (const r of rects) {
       if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
+
+      if (pageW > 0 && r.w > pageW * MAX_W_RATIO) {
+        const parts = Math.min(4, Math.max(2, Math.ceil(r.w / (pageW * 0.22))));
+        const chunkW = r.w / parts;
+        for (let i = 0; i < parts; i++) {
+          normalized.push({
+            x: r.x + i * chunkW,
+            y: r.y,
+            w: chunkW,
+            h: r.h
+          });
+        }
+      } else {
+        normalized.push(r);
+      }
+    }
+
+    // 5) Merge nearby rects (STRICT: avoid cross-column merge)
+    normalized.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+    const out = [];
+    for (const r of normalized) {
       const last = out[out.length - 1];
       if (!last) { out.push({ ...r }); continue; }
 
-      const yClose = Math.abs(last.y - r.y) < 6 || Math.abs((last.y + last.h) - (r.y + r.h)) < 6;
-      const overlapX = !(r.x > last.x + last.w + 8 || last.x > r.x + r.w + 8);
+      // tighter y tolerance
+      const yClose = Math.abs(last.y - r.y) < 4 || Math.abs((last.y + last.h) - (r.y + r.h)) < 4;
 
-      if (yClose && overlapX) {
+      // compute gap and overlap precisely
+      const gap =
+        (r.x > last.x + last.w) ? (r.x - (last.x + last.w))
+        : (last.x > r.x + r.w) ? (last.x - (r.x + r.w))
+        : 0;
+
+      const overlapX = !(r.x > last.x + last.w || last.x > r.x + r.w);
+
+      // merge only if real overlap OR tiny gap
+      if (yClose && (overlapX || gap <= 2)) {
         const nx = Math.min(last.x, r.x);
         const ny = Math.min(last.y, r.y);
         const nr = Math.max(last.x + last.w, r.x + r.w);
@@ -389,6 +429,16 @@
       } else {
         out.push({ ...r });
       }
+    }
+
+    // Final clamp to canvas bounds
+    const canvasW = Number(viewport && viewport.width) || 0;
+    const canvasH = Number(viewport && viewport.height) || 0;
+    for (const r of out) {
+      r.x = clamp(r.x, 0, canvasW);
+      r.y = clamp(r.y, 0, canvasH);
+      r.w = clamp(r.w, 1, Math.max(1, canvasW - r.x));
+      r.h = clamp(r.h, 1, Math.max(1, canvasH - r.y));
     }
 
     return out;
@@ -506,3 +556,5 @@
 
   window.RasterExport = RasterExport;
 })();
+
+
