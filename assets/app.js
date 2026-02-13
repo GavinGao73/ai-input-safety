@@ -102,8 +102,11 @@ function renderInputOverlayForPdf(originalText){
 
   const marked = markHitsInOriginal(originalText);
   overlay.innerHTML = marked;
+
+  // ✅ 开启 PDF overlay 模式（CSS 会让 textarea 文字透明，避免重叠）
   wrap.classList.add("pdf-overlay-on");
 
+  // sync scroll
   overlay.scrollTop = ta.scrollTop;
 }
 
@@ -640,9 +643,14 @@ function bind() {
   }
 
   $("btnGenerate").onclick = () => {
-    lastRunMeta.fromPdf = false;
-    applyRules($("inputText").value || "");
-  };
+  // ✅ 手动过滤：视为非 PDF 模式，关闭 overlay
+  lastRunMeta.fromPdf = false;
+  const wrap = $("inputWrap");
+  if (wrap) wrap.classList.remove("pdf-overlay-on");
+  if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
+
+  applyRules($("inputText").value || "");
+};
 
   $("btnClear").onclick = () => {
     if ($("inputText")) $("inputText").value = "";
