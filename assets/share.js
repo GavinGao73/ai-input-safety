@@ -1,7 +1,3 @@
-// assets/share.js
-// Achievement card generator (NO original text).
-// Trigger: window event "safe:updated" (dispatched by app.js after applyRules()).
-
 (function () {
   function $(id){ return document.getElementById(id); }
 
@@ -62,7 +58,6 @@
     return L.mOff;
   }
 
-  // ========= Logo assets (Filter) =========
   const LOGO_ICON_SRC = "./assets/logo-filter-icon.png";
   const LOGO_FULL_SRC = "./assets/logo-filter-full.png";
 
@@ -305,7 +300,7 @@
         img.removeAttribute("src");
         img.style.display = "none";
       }
-      if (ph) ph.style.display = "block";
+      if (ph) ph.style.display = "flex";
     }
   }
 
