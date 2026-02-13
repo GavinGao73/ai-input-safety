@@ -1,3 +1,6 @@
+// =========================
+// assets/i18n.js (FULL)
+// =========================
 const I18N = {
   zh: {
     inTitle: "在 AI 读取之前，先通过 Filter。",
@@ -22,7 +25,11 @@ const I18N = {
     riskTitle: "风险评分",
 
     shareTitle: "过滤成就",
-    shareSub: "不含原文；仅展示本地处理统计与隐私声明。仅用于支持与鼓励作者。",
+
+    // ✅ 你要的分行 + 右对齐（CSS 已用 white-space:pre-line 支持）
+    shareSub:
+      "不含原文；\n仅展示\n过滤数据\n与\n隐私声明；\n仅用于\n对作者的\n支持与鼓励。",
+
     achvPlaceholder: "生成后显示预览",
 
     btnDownload: "下载",
@@ -33,6 +40,7 @@ const I18N = {
     privacy: "隐私原则",
     scope: "MVP 范围",
 
+    // ✅ footer 文案保持，但字号/颜色已由 CSS 统一到 links
     foot: "过滤和修改仅为建议，不构成法律承诺"
   },
 
@@ -59,7 +67,11 @@ const I18N = {
     riskTitle: "Risk score",
 
     shareTitle: "Filter achievement",
-    shareSub: "No original text. Local-only stats and a privacy notice. For support & encouragement only.",
+
+    // ✅ 英文不要“每词一行”，否则很怪：用 4–5 行更自然
+    shareSub:
+      "No original text.\nLocal-only stats\nand a privacy notice.\nFor support & encouragement\nonly.",
+
     achvPlaceholder: "Preview appears after filtering",
 
     btnDownload: "Download",
@@ -96,9 +108,14 @@ const I18N = {
     riskTitle: "Risikowert",
 
     shareTitle: "Filter-Ergebnis",
-    shareSub: "Kein Originaltext. Nur lokale Statistik & Datenschutzhinweis. Nur zur Unterstützung.",
+
+    // ✅ 德语长词多：分行更短 + CSS 断行兜底
+    shareSub:
+      "Kein Originaltext.\nNur lokale Statistik\nund Datenschutzhinweis.\nNur zur Unterstützung\nund als Ermutigung.",
+
     achvPlaceholder: "Vorschau nach dem Filtern",
 
+    // 你原来是 Download（短），继续保留短的
     btnDownload: "Download",
 
     fbQ: "Hilfreich?",
