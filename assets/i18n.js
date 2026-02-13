@@ -28,7 +28,7 @@ const I18N = {
 
     // ✅ 你要的分行 + 右对齐（CSS 已用 white-space:pre-line 支持）
     shareSub:
-      "不含原文；\n仅展示\n过滤数据\n与\n隐私声明；\n仅用于\n对作者的\n支持与鼓励。",
+      "不含原文\n仅展示\n过滤数据\n与\n隐私声明\n仅用于\n对作者的\n支持与鼓励",
 
     achvPlaceholder: "生成后显示预览",
 
