@@ -543,3 +543,19 @@ textarea{
   color: rgba(255,255,255,.82);
   text-shadow: 0 0 22px rgba(43,144,255,.14);
 }
+
+/* === font-size unify === */
+textarea,
+.output{
+  font-size: 13px;
+}
+
+#ui-foot{
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.input-watermark{
+  font-size: 13px;
+  line-height: 1.45;
+}
