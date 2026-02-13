@@ -6,6 +6,14 @@
  * - NO OCR / NO logs / NO storage
  * ======================================================= */
 
+/* =========================================================
+ * raster-export.js
+ * Raster Secure PDF export pipeline (in-memory only)
+ * - PDF/image -> 600 DPI raster -> opaque redaction + placeholder (pixels)
+ * - Export PDF as images only (no text layer)
+ * - NO OCR / NO logs / NO storage
+ * ======================================================= */
+
 (function () {
   "use strict";
 
@@ -166,221 +174,226 @@
     return { pdf, pages, dpi: dpi || DEFAULT_DPI };
   }
 
-  // --------- Rules -> redaction rects ----------
-  function buildRuleMatchers(enabledKeys, moneyMode) {
-    const matchers = [];
+  // --------- Rules -> matchers ----------
+  function normalizeToRegExp(pat) {
+    // Accept RegExp | string | {source, flags} | {pattern, flags}
+    if (!pat) return null;
 
-    const PRIORITY = [
-      "email",
-      "bank",
-      "account",
-      "phone",
-      "money",
-      "address_de_street",
-      "handle",
-      "ref",
-      "title",
-      "number"
-    ];
+    if (pat instanceof RegExp) return pat;
 
-    const keys = Array.isArray(enabledKeys) ? enabledKeys : [];
-    const enabledSet = new Set(keys);
-
-    for (const k of PRIORITY) {
-      if (k === "money") {
-        if (!moneyMode || moneyMode === "off") continue;
-      } else {
-        if (keys.length > 0 && !enabledSet.has(k)) continue;
-      }
-
-      const r = (window.RULES_BY_KEY && window.RULES_BY_KEY[k]) || null;
-      if (!r || !r.pattern) continue;
-
-      let pat = r.pattern;
-      if (!(pat instanceof RegExp)) continue;
-
-      const flags = pat.flags.includes("g") ? pat.flags : (pat.flags + "g");
-      pat = new RegExp(pat.source, flags);
-
-      matchers.push({ key: k, re: pat });
+    if (typeof pat === "string") {
+      // treat as source with global by default
+      try { return new RegExp(pat, "g"); } catch (_) { return null; }
     }
 
-    // fallback: include other regex in RULES_BY_KEY if needed
-    if (matchers.length === 0 && window.RULES_BY_KEY) {
-      for (const [k, r] of Object.entries(window.RULES_BY_KEY)) {
-        if (!r || !r.pattern || !(r.pattern instanceof RegExp)) continue;
-        if (k === "money" && (!moneyMode || moneyMode === "off")) continue;
+    if (typeof pat === "object") {
+      const src = (typeof pat.source === "string") ? pat.source
+                : (typeof pat.pattern === "string") ? pat.pattern
+                : null;
+      if (!src) return null;
 
-        let pat = r.pattern;
-        const flags = pat.flags.includes("g") ? pat.flags : (pat.flags + "g");
-        pat = new RegExp(pat.source, flags);
+      const flags = (typeof pat.flags === "string") ? pat.flags : "";
+      try { return new RegExp(src, flags); } catch (_) { return null; }
+    }
 
-        matchers.push({ key: k, re: pat });
-      }
+    return null;
+  }
+
+  function forceGlobal(re) {
+    if (!(re instanceof RegExp)) return null;
+    const flags = re.flags.includes("g") ? re.flags : (re.flags + "g");
+    try { return new RegExp(re.source, flags); } catch (_) { return null; }
+  }
+
+  function buildRuleMatchers(enabledKeys, moneyMode) {
+    // ✅ Strongest fix: do NOT rely on enabledKeys (key mismatch often causes 0 matchers)
+    // ✅ Also accept rules where pattern is not a RegExp (string/object forms)
+    const matchers = [];
+    const src = window.RULES_BY_KEY || {};
+
+    for (const [k, r] of Object.entries(src)) {
+      if (!r) continue;
+
+      // Keep money gated
+      if (k === "money" && (!moneyMode || moneyMode === "off")) continue;
+
+      const raw = (r.pattern != null) ? r.pattern
+                : (r.re != null) ? r.re
+                : (r.regex != null) ? r.regex
+                : null;
+
+      const re0 = normalizeToRegExp(raw);
+      const re = forceGlobal(re0);
+      if (!re) continue;
+
+      matchers.push({ key: k, re });
     }
 
     return matchers;
   }
 
-  // ✅ FIX: robust matching for readable PDF
-  // Strategy: build full page text -> run regex -> map spans back to items -> create rects
-function textItemsToRects(pdfjsLib, page, viewport, textContent, matchers) {
-  const Util = pdfjsLib.Util;
-  const items = (textContent && textContent.items) ? textContent.items : [];
-  const rects = [];
+  // --------- Text items -> rects ----------
+  function textItemsToRects(pdfjsLib, page, viewport, textContent, matchers) {
+    const Util = pdfjsLib.Util;
+    const items = (textContent && textContent.items) ? textContent.items : [];
+    const rects = [];
 
-  if (!items.length || !matchers || !matchers.length) return rects;
+    if (!items.length || !matchers || !matchers.length) return rects;
 
-  function getAllMatchRanges(re, s) {
-    const out = [];
-    re.lastIndex = 0;
-    let m;
-    while ((m = re.exec(s)) !== null) {
-      const a = m.index;
-      const b = a + String(m[0] || "").length;
-      if (b > a) out.push([a, b]);
-      if (m[0] === "") re.lastIndex++;
-    }
-    return out;
-  }
-
-  function bboxForItem(it) {
-    const m = Util.transform(viewport.transform, it.transform);
-
-    const w = Number(it.width || 0);
-    let h = Number(it.height || 0);
-
-    if (!Number.isFinite(h) || h <= 0) {
-      h = Math.hypot(m[2], m[3]) || Math.hypot(m[0], m[1]) || 10;
-      h = h * 1.15;
+    function getAllMatchRanges(re, s) {
+      const out = [];
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(s)) !== null) {
+        const a = m.index;
+        const b = a + String(m[0] || "").length;
+        if (b > a) out.push([a, b]);
+        if (m[0] === "") re.lastIndex++;
+      }
+      return out;
     }
 
-    let ww = w;
-    if (!Number.isFinite(ww) || ww <= 0) {
-      const s = String(it.str || "");
-      const approxCharW = (h * 0.55);
-      ww = Math.max(approxCharW * s.length, 6);
-    }
+    function bboxForItem(it) {
+      const m = Util.transform(viewport.transform, it.transform);
 
-    function tp(x, y) {
+      const w = Number(it.width || 0);
+      let h = Number(it.height || 0);
+
+      if (!Number.isFinite(h) || h <= 0) {
+        h = Math.hypot(m[2], m[3]) || Math.hypot(m[0], m[1]) || 10;
+        h = h * 1.15;
+      }
+
+      let ww = w;
+      if (!Number.isFinite(ww) || ww <= 0) {
+        const s = String(it.str || "");
+        const approxCharW = (h * 0.55);
+        ww = Math.max(approxCharW * s.length, 6);
+      }
+
+      function tp(x, y) {
+        return {
+          x: m[0] * x + m[2] * y + m[4],
+          y: m[1] * x + m[3] * y + m[5]
+        };
+      }
+
+      const p1 = tp(0, 0);
+      const p2 = tp(ww, 0);
+      const p3 = tp(0, h);
+      const p4 = tp(ww, h);
+
+      const xs = [p1.x, p2.x, p3.x, p4.x];
+      const ys = [p1.y, p2.y, p3.y, p4.y];
+
+      const minX = Math.min.apply(null, xs);
+      const maxX = Math.max.apply(null, xs);
+      const minY = Math.min.apply(null, ys);
+      const maxY = Math.max.apply(null, ys);
+
       return {
-        x: m[0] * x + m[2] * y + m[4],
-        y: m[1] * x + m[3] * y + m[5]
+        x: minX,
+        y: minY,
+        w: Math.max(1, maxX - minX),
+        h: Math.max(1, maxY - minY)
       };
     }
 
-    const p1 = tp(0, 0);
-    const p2 = tp(ww, 0);
-    const p3 = tp(0, h);
-    const p4 = tp(ww, h);
-
-    const xs = [p1.x, p2.x, p3.x, p4.x];
-    const ys = [p1.y, p2.y, p3.y, p4.y];
-
-    const minX = Math.min.apply(null, xs);
-    const maxX = Math.max.apply(null, xs);
-    const minY = Math.min.apply(null, ys);
-    const maxY = Math.max.apply(null, ys);
-
-    return {
-      x: minX,
-      y: minY,
-      w: Math.max(1, maxX - minX),
-      h: Math.max(1, maxY - minY)
-    };
-  }
-
-  // 1) Build pageText WITHOUT separators (critical!)
-  //    Also track each item's [start,end) in this concatenated string.
-  let pageText = "";
-  const itemRanges = []; // [{ idx, start, end, len }]
-  for (let i = 0; i < items.length; i++) {
-    const s = String(items[i].str || "");
-    const start = pageText.length;
-    pageText += s;            // ✅ no SEP, no space
-    const end = pageText.length;
-    itemRanges.push({ idx: i, start, end, len: Math.max(1, s.length) });
-  }
-
-  // 2) Match on pageText
-  const spans = [];
-  for (const m of matchers) {
-    const re0 = m.re;
-    if (!(re0 instanceof RegExp)) continue;
-    const flags = re0.flags.includes("g") ? re0.flags : (re0.flags + "g");
-    const re = new RegExp(re0.source, flags);
-    const rs = getAllMatchRanges(re, pageText);
-    for (const r of rs) spans.push(r);
-  }
-  if (!spans.length) return rects;
-
-  // 3) Merge spans
-  spans.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  const mergedSpans = [];
-  for (const sp of spans) {
-    const last = mergedSpans[mergedSpans.length - 1];
-    if (!last) { mergedSpans.push([sp[0], sp[1]]); continue; }
-    if (sp[0] <= last[1] + 1) last[1] = Math.max(last[1], sp[1]);
-    else mergedSpans.push([sp[0], sp[1]]);
-  }
-
-  // 4) Map spans back to items + slice bbox horizontally
-  for (const [A, B] of mergedSpans) {
-    for (const r of itemRanges) {
-      const a = Math.max(A, r.start);
-      const b = Math.min(B, r.end);
-      if (b <= a) continue;
-
-      const it = items[r.idx];
+    // 1) Build pageText (NO separators). Use hasEOL to add '\n' only at line end.
+    let pageText = "";
+    const itemRanges = []; // { idx, start, end, len }
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
       const s = String(it.str || "");
-      if (!s) continue;
+      const start = pageText.length;
+      pageText += s;
+      const end = pageText.length;
+      itemRanges.push({ idx: i, start, end, len: Math.max(1, s.length) });
 
-      const localStart = a - r.start;
-      const localEnd = b - r.start;
-
-      const bb = bboxForItem(it);
-      const len = Math.max(1, s.length);
-
-      const x1 = bb.x + bb.w * (localStart / len);
-      const x2 = bb.x + bb.w * (localEnd / len);
-
-      const padX = Math.max(1, bb.w * 0.01);
-      const padY = Math.max(1, bb.h * 0.10);
-
-      rects.push({
-        x: x1 - padX,
-        y: bb.y - padY,
-        w: (x2 - x1) + padX * 2,
-        h: bb.h + padY * 2
-      });
+      // only add line break when pdf.js indicates it; won't break emails inside line
+      if (it && it.hasEOL) pageText += "\n";
     }
+
+    // 2) Match on pageText
+    const spans = [];
+    for (const m of matchers) {
+      const re0 = m.re;
+      if (!(re0 instanceof RegExp)) continue;
+      const flags = re0.flags.includes("g") ? re0.flags : (re0.flags + "g");
+      let re;
+      try { re = new RegExp(re0.source, flags); } catch (_) { continue; }
+      const rs = getAllMatchRanges(re, pageText);
+      for (const r of rs) spans.push(r);
+    }
+    if (!spans.length) return rects;
+
+    // 3) Merge spans
+    spans.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const mergedSpans = [];
+    for (const sp of spans) {
+      const last = mergedSpans[mergedSpans.length - 1];
+      if (!last) { mergedSpans.push([sp[0], sp[1]]); continue; }
+      if (sp[0] <= last[1] + 1) last[1] = Math.max(last[1], sp[1]);
+      else mergedSpans.push([sp[0], sp[1]]);
+    }
+
+    // 4) Map spans back to items + slice bbox horizontally
+    for (const [A, B] of mergedSpans) {
+      for (const r of itemRanges) {
+        const a = Math.max(A, r.start);
+        const b = Math.min(B, r.end);
+        if (b <= a) continue;
+
+        const it = items[r.idx];
+        const s = String(it.str || "");
+        if (!s) continue;
+
+        const localStart = a - r.start;
+        const localEnd = b - r.start;
+
+        const bb = bboxForItem(it);
+        const len = Math.max(1, s.length);
+
+        const x1 = bb.x + bb.w * (localStart / len);
+        const x2 = bb.x + bb.w * (localEnd / len);
+
+        const padX = Math.max(1, bb.w * 0.01);
+        const padY = Math.max(1, bb.h * 0.10);
+
+        rects.push({
+          x: x1 - padX,
+          y: bb.y - padY,
+          w: (x2 - x1) + padX * 2,
+          h: bb.h + padY * 2
+        });
+      }
+    }
+
+    // 5) Merge nearby rects
+    rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+    const out = [];
+    for (const r of rects) {
+      if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
+      const last = out[out.length - 1];
+      if (!last) { out.push({ ...r }); continue; }
+
+      const yClose = Math.abs(last.y - r.y) < 6 || Math.abs((last.y + last.h) - (r.y + r.h)) < 6;
+      const overlapX = !(r.x > last.x + last.w + 8 || last.x > r.x + r.w + 8);
+
+      if (yClose && overlapX) {
+        const nx = Math.min(last.x, r.x);
+        const ny = Math.min(last.y, r.y);
+        const nr = Math.max(last.x + last.w, r.x + r.w);
+        const nb = Math.max(last.y + last.h, r.y + r.h);
+        last.x = nx; last.y = ny; last.w = nr - nx; last.h = nb - ny;
+      } else {
+        out.push({ ...r });
+      }
+    }
+
+    return out;
   }
 
-  // 5) Merge nearby rects
-  rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-  const out = [];
-  for (const r of rects) {
-    if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
-    const last = out[out.length - 1];
-    if (!last) { out.push({ ...r }); continue; }
-
-    const yClose = Math.abs(last.y - r.y) < 6 || Math.abs((last.y + last.h) - (r.y + r.h)) < 6;
-    const overlapX = !(r.x > last.x + last.w + 8 || last.x > r.x + r.w + 8);
-
-    if (yClose && overlapX) {
-      const nx = Math.min(last.x, r.x);
-      const ny = Math.min(last.y, r.y);
-      const nr = Math.max(last.x + last.w, r.x + r.w);
-      const nb = Math.max(last.y + last.h, r.y + r.h);
-      last.x = nx; last.y = ny; last.w = nr - nx; last.h = nb - ny;
-    } else {
-      out.push({ ...r });
-    }
-  }
-
-  return out;
-}
-  
   async function autoRedactReadablePdf({ file, lang, enabledKeys, moneyMode, dpi }) {
     const pdfjsLib = await loadPdfJsIfNeeded();
     const { pdf, pages } = await renderPdfToCanvases(file, dpi || DEFAULT_DPI);
