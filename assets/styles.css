@@ -1,3 +1,7 @@
+/* =========================
+   assets/styles.css (FULL)
+   ========================= */
+
 :root{
   --bg:#0b0f14;
   --muted:#8fa0b6;
@@ -401,7 +405,8 @@ textarea{
   text-align:right;
   line-height:1.35;
 
-  /* ✅ 多语言长单词断行 */
+  /* ✅ 允许按 \n 分行显示 + 多语言长单词断行 */
+  white-space:pre-line;
   overflow-wrap:anywhere;
   word-break: break-word;
   hyphens:auto;
@@ -418,6 +423,16 @@ textarea{
 /* footnote color = links */
 .accent-link{
   color: rgba(120,255,240,.80);
+}
+
+/* ✅ 兜底：你找不到 #ui-foot 的问题，用多选择器全部兜住 */
+.legal-note,
+#ui-foot,
+#uiFoot,
+[data-role="footnote"]{
+  font-size:12px;                 /* 与 links 一致 */
+  line-height:1.35;
+  color: rgba(120,255,240,.80);   /* 与“了解更多”同色系 */
 }
 
 /* links: remove line */
@@ -537,4 +552,3 @@ textarea{
   color: rgba(255,255,255,.82);
   text-shadow: 0 0 22px rgba(43,144,255,.14);
 }
-
