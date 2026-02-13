@@ -3,9 +3,13 @@
   --muted:#8fa0b6;
   --text:#e8eef7;
   --line:#223044;
-  --btn:#2b90ff;
+
+  --accent: rgba(120,255,240,.86);
+  --accent2: rgba(43,144,255,.72);
+
   --shadow: 0 10px 30px rgba(0,0,0,.35);
   --radius: 14px;
+
   --max: 1060px;
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
@@ -35,7 +39,7 @@ header{
   margin-bottom:16px;
 }
 
-/* ===== header logo (icon only) ===== */
+/* header logo */
 .logo{
   display:flex;
   align-items:center;
@@ -52,9 +56,10 @@ header{
   letter-spacing:0.2px;
   line-height:1.1;
   margin-top:2px;
+  color: rgba(255,255,255,.94);
 }
 
-/* ===== lang aligned with title ===== */
+/* lang aligned */
 .lang{
   display:flex;
   gap:6px;
@@ -69,8 +74,9 @@ header{
   cursor:pointer;
 }
 .lang button.active{
-  background:rgba(43,144,255,.2);
+  background:rgba(43,144,255,.20);
   color:var(--text);
+  border-color: rgba(43,144,255,.35);
 }
 
 .grid{
@@ -93,20 +99,23 @@ header{
   padding:12px 14px 14px;
 }
 
-/* make columns equal height behavior */
+/* columns */
 .card-col{
   display:flex;
   flex-direction:column;
   min-height: 680px;
 }
 
+/* titles: add slight accent tone */
 h3{
   margin:6px 0 10px;
   font-size:14px;
   font-weight:900;
+  color: var(--accent);
+  text-shadow: 0 0 18px rgba(43,144,255,.10);
 }
 
-/* ========= top bar "card" for alignment ========= */
+/* barcard */
 .barcard{
   border:1px solid rgba(255,255,255,.08);
   border-radius:14px;
@@ -117,22 +126,26 @@ h3{
   margin-bottom:10px;
 }
 
+/* filebar: SINGLE layer, no dashed */
 .filebar{
   display:flex;
   gap:10px;
   align-items:center;
-  padding:10px;
-  border:1px dashed rgba(255,255,255,.14);
-  border-radius:14px;
-  background:rgba(255,255,255,.02);
 }
-.filebar-compact{
-  margin:0;
+.filebar-flat{
+  padding:0;
+  border:0;
+  background:transparent;
 }
 .filebar input[type="file"]{
-  max-width:260px;
-  color:var(--muted);
+  /* keep input accessible but visually hidden */
+  position:absolute;
+  width:1px;
+  height:1px;
+  opacity:0;
+  pointer-events:none;
 }
+
 .filename{
   color:rgba(255,255,255,.55);
   font-size:12px;
@@ -143,65 +156,7 @@ h3{
   text-align:right;
 }
 
-.outbox{ width:100%; }
-
-textarea{
-  width:100%;
-  height:320px;
-  max-height:320px;
-  background:rgba(10,14,20,.55);
-  border:1px solid rgba(255,255,255,.10);
-  border-radius:12px;
-  color:var(--text);
-  padding:12px;
-  font-size:13px;
-  line-height:1.55;
-  overflow:auto;
-}
-
-/* watermark */
-.textarea-wrap{ position:relative; }
-.input-watermark{
-  position:absolute;
-  left:12px;
-  right:12px;
-  bottom:12px;
-  padding:10px 10px 8px;
-  border-radius:12px;
-  background:linear-gradient(180deg, rgba(10,14,20,0), rgba(10,14,20,.55));
-  color:rgba(255,255,255,.28);
-  font-size:12px;
-  line-height:1.4;
-  white-space:pre-line;
-  pointer-events:none;
-  user-select:none;
-}
-
-.output{
-  height:320px;
-  max-height:320px;
-  background:rgba(10,14,20,.55);
-  border:1px solid rgba(255,255,255,.10);
-  border-radius:12px;
-  padding:12px;
-  font-family:var(--mono);
-  white-space:pre-wrap;
-  line-height:1.55;
-  font-size:13px;
-  overflow:auto;
-}
-.output-scroll{ overflow:auto; }
-
-/* highlight placeholders in output */
-.hl{
-  background: rgba(255, 92, 92, 0.14);
-  border: 1px solid rgba(255, 92, 92, 0.35);
-  color: rgba(255,255,255,.95);
-  padding: 1px 6px;
-  border-radius: 999px;
-}
-
-/* ===== buttons ===== */
+/* buttons */
 .btn{
   border:1px solid var(--line);
   background:transparent;
@@ -219,25 +174,60 @@ textarea{
 .btn.secondary{
   background:rgba(255,255,255,.05);
 }
-.btn-fixed{
-  width:88px;
-  min-width:88px;
-  text-align:center;
-}
+.btn-s{ padding:8px 12px; border-radius:12px; }
+.btn-mini{ width:88px; min-width:88px; text-align:center; }
+.btn-fixed{ width:88px; min-width:88px; text-align:center; }
 
+/* top actions: right aligned */
 .top-actions{
   display:flex;
   gap:10px;
-  justify-content:space-between;
-}
-.top-actions .btn{
-  flex:1;
-}
-.top-actions .btn.secondary{
-  flex:0 0 96px;
+  justify-content:flex-end;
+  align-items:center;
 }
 
-/* ===== controlbar (left money row & right feedback row) ===== */
+/* input / output boxes fixed height */
+.outbox{ width:100%; }
+
+textarea{
+  width:100%;
+  height:320px;
+  max-height:320px;
+  background:rgba(10,14,20,.55);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:12px;
+  color:rgba(255,255,255,.92);
+  padding:12px;
+  font-size:13px;
+  line-height:1.55;
+  overflow:auto;
+}
+
+.output{
+  height:320px;
+  max-height:320px;
+  background:rgba(10,14,20,.55);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:12px;
+  padding:12px;
+  font-family:var(--mono);
+  white-space:pre-wrap;
+  line-height:1.55;
+  font-size:13px;
+  overflow:auto;
+}
+.output-scroll{ overflow:auto; }
+
+/* output highlight */
+.hl{
+  background: rgba(255, 92, 92, 0.14);
+  border: 1px solid rgba(255, 92, 92, 0.35);
+  color: rgba(255,255,255,.96);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+/* controlbars */
 .controlbar{
   display:flex;
   align-items:center;
@@ -270,27 +260,21 @@ textarea{
   font-size:12px;
 }
 
-.ctl-actions{
-  display:flex;
-  align-items:center;
-  gap:10px;
-}
-
-/* ===== feedback ===== */
+/* feedback right aligned */
 .feedback{
   display:flex;
   gap:8px;
   align-items:center;
   width:100%;
-  justify-content:space-between;
 }
-.feedback-inline{
-  gap:10px;
+.feedback-right{
+  justify-content:flex-end;
 }
 .feedback-inline .fbq{
   color:var(--muted);
   font-size:12px;
   white-space:nowrap;
+  margin-right:6px;
 }
 .iconbtn{
   border:1px solid var(--line);
@@ -301,7 +285,7 @@ textarea{
   cursor:pointer;
 }
 
-/* ===== fold cards: risk & achievement equal ===== */
+/* fold cards */
 .fold{
   margin-top:10px;
   border:1px solid rgba(255,255,255,.08);
@@ -309,10 +293,7 @@ textarea{
   background:rgba(255,255,255,.02);
   overflow:hidden;
 }
-.fold-eq{
-  /* same footprint both sides */
-  min-height:56px;
-}
+.fold-eq{ min-height:56px; }
 .fold-sum{
   list-style:none;
   cursor:pointer;
@@ -325,22 +306,23 @@ textarea{
   justify-content:space-between;
 }
 .fold summary::-webkit-details-marker { display:none; }
+
+/* ✅ 给 fold-body 更安全的 padding，避免“分数卡被吃掉”视觉问题 */
 .fold-body{
-  padding:12px;
-  border-top:1px solid rgba(255,255,255,.06);
-  max-height: 260px; /* ✅ 过多内容用滚动条 */
+  padding:14px 12px 12px;
+  max-height: 260px;
   overflow:auto;
 }
 
-/* Risk card inner */
+/* risk inner */
 .risk{
   padding:0;
   border:0;
   background:transparent;
 }
 .riskhead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
-.risktitle{ font-weight:900; font-size:13px; }
-.riskmeta{ margin-top:4px; color:var(--muted); font-size:12px; }
+.riskmeta{ margin-top:2px; color:var(--muted); font-size:12px; }
+
 .riskscore{
   min-width:96px;
   text-align:center;
@@ -351,6 +333,7 @@ textarea{
 }
 .riskscore .n{ font-size:26px; font-weight:900; line-height:1; }
 .riskscore .l{ font-size:12px; opacity:.9; margin-top:4px; color:rgba(255,255,255,.86); }
+
 .risksec{ margin-top:10px; }
 .risklabel{ font-size:12px; color:var(--muted); margin-bottom:6px; }
 .risklist{ display:flex; flex-direction:column; gap:6px; }
@@ -367,12 +350,7 @@ textarea{
 .riskitem .rv{ font-size:12px; color:var(--muted); }
 .riskadvice{ font-size:12px; line-height:1.5; color:rgba(255,255,255,.82); }
 
-/* ===== achievement layout ===== */
-.achv-sub{
-  font-size:12px;
-  color:var(--muted);
-  margin-bottom:10px;
-}
+/* achievement */
 .achv-preview{
   display:flex;
   gap:12px;
@@ -383,7 +361,7 @@ textarea{
   border-radius:16px;
   background:rgba(255,255,255,.03);
   border:1px dashed rgba(255,255,255,.10);
-  height: 220px;              /* ✅ 固定高度，不撑页面 */
+  height: 220px;
   position:relative;
   overflow:hidden;
   display:flex;
@@ -411,26 +389,31 @@ textarea{
 .achv-right{
   flex:0 0 92px;
   display:flex;
-  justify-content:flex-end;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:8px;
+}
+.achv-sub{
+  font-size:12px;
+  color:rgba(255,255,255,.48);
+  text-align:right;
+  line-height:1.35;
+  max-width:92px;
 }
 
-/* bottom fixed areas aligned */
+/* bottom fixed */
 .bottom-fixed{
   margin-top:auto;
   padding-top:12px;
 }
-.tiny{
-  font-size:12px;
-  color:var(--muted);
-}
-.footnote{
-  border-top:1px solid rgba(255,255,255,.06);
-  padding-top:12px;
+
+/* footnote color = links */
+.accent-link{
+  color: rgba(120,255,240,.80);
 }
 
-/* links */
+/* links: remove line */
 .links{
-  border-top:1px solid rgba(255,255,255,.06);
   display:flex;
   gap:12px;
   font-size:12px;
@@ -441,7 +424,58 @@ textarea{
 }
 .links a:hover{ text-decoration:underline; }
 
-/* ===== Middle Filter (logo swapped) ===== */
+/* ===== input watermark (hide after content) ===== */
+.textarea-wrap{ position:relative; }
+
+.input-watermark{
+  position:absolute;
+  left:12px;
+  right:12px;
+  bottom:12px;
+  padding:10px 10px 8px;
+  border-radius:12px;
+  background:linear-gradient(180deg, rgba(10,14,20,0), rgba(10,14,20,.55));
+  color:rgba(255,255,255,.28);
+  font-size:12px;
+  line-height:1.4;
+  white-space:pre-line;
+  pointer-events:none;
+  user-select:none;
+}
+
+#inputWrap.has-content .input-watermark{
+  display:none;
+}
+
+/* ===== PDF overlay marking ===== */
+.input-overlay{
+  display:none;
+  position:absolute;
+  left:0; right:0; top:0; bottom:0;
+  padding:12px;
+  border-radius:12px;
+  overflow:auto;
+  white-space:pre-wrap;
+  font-size:13px;
+  line-height:1.55;
+  font-family:var(--sans);
+  pointer-events:none;
+}
+#inputWrap.pdf-overlay-on .input-overlay{
+  display:block;
+}
+#inputWrap.pdf-overlay-on textarea{
+  color: rgba(255,255,255,.92);
+  /* textarea 仍可编辑；overlay 仅用于“命中标记可视化” */
+}
+.hit{
+  background: rgba(255, 92, 92, 0.12);
+  border: 1px solid rgba(255, 92, 92, 0.28);
+  border-radius: 10px;
+  padding: 0 4px;
+}
+
+/* ===== Middle Filter (logo shrink 30%) ===== */
 .mid-filter{
   width: 150px;
   display:flex;
@@ -463,24 +497,26 @@ textarea{
     rgba(120, 255, 240, 0)
   );
 }
-
-/* plain badge (no card feel, but keep subtle) */
 .filter-badge-plain{
   background:transparent;
   border:0;
   box-shadow:none;
-  backdrop-filter:none;
   width:auto;
   height:auto;
-  border-radius:0;
   display:flex;
   align-items:center;
   justify-content:center;
 }
 .filter-full{
-  width: 120px;
+  width: 84px; /* ✅ 再缩小约 30% */
   height:auto;
   display:block;
   user-select:none;
   -webkit-user-drag:none;
+}
+.mid-title{
+  font-weight:900;
+  letter-spacing:.6px;
+  color: rgba(255,255,255,.82);
+  text-shadow: 0 0 22px rgba(43,144,255,.14);
 }
