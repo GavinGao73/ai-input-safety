@@ -4,6 +4,9 @@ window.currentLang = currentLang;
 const enabled = new Set();
 let moneyMode = "off"; // off | m1 | m2
 
+// keep last filtered plain text for copy
+let lastOutputPlain = "";
+
 // --- Risk scoring meta (local only) ---
 let lastRunMeta = {
   fromPdf: false,
@@ -15,11 +18,13 @@ let lastRunMeta = {
 
 function $(id) { return document.getElementById(id); }
 
-function escapeHtml(s){
+function escapeHTML(s){
   return String(s || "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function placeholder(key) {
@@ -61,7 +66,20 @@ function placeholder(key) {
   return (map[currentLang] && map[currentLang][key]) || `[${key}]`;
 }
 
-// ---- Money range mapping (M2) ----
+/* ============ output rendering (highlight placeholders) ============ */
+function renderOutput(outPlain){
+  lastOutputPlain = String(outPlain || "");
+  const host = $("outputText");
+  if (!host) return;
+
+  const html = escapeHTML(lastOutputPlain)
+    // highlight placeholders 【...】 or [...]
+    .replace(/(【[^【】]{1,24}】|\[[^\[\]]{1,24}\])/g, `<span class="hl">$1</span>`);
+
+  host.innerHTML = html;
+}
+
+/* ============ Money range mapping (M2) ============ */
 function normalizeAmountToNumber(raw) {
   let s = String(raw || "").replace(/\s+/g, "");
   const hasDot = s.includes(".");
@@ -132,7 +150,7 @@ function formatCurrencyForM2(currency) {
   return c.toUpperCase();
 }
 
-// ---- init enabled ----
+/* ============ init enabled ============ */
 function initEnabled() {
   enabled.clear();
   Object.values(DETECTION_ITEMS).flat().forEach(i => {
@@ -140,7 +158,7 @@ function initEnabled() {
   });
 }
 
-/* ==================== Risk scoring (A) v1 ==================== */
+/* ==================== Risk scoring v1 ==================== */
 const RISK_WEIGHTS = {
   bank: 28,
   account: 26,
@@ -164,9 +182,9 @@ function riskI18n(lang) {
     high: "高风险",
     top: "主要风险来源",
     advice: "建议",
-    adviceLow: "可以使用；报价/合同类内容建议开启金额保护。",
-    adviceMid: "请检查 Top 项；必要时加强金额/地址/账号遮盖。",
-    adviceHigh: "不建议直接发送：请删签名落款/账号信息，并加严遮盖后再试。",
+    adviceLow: "可以继续使用；合同/报价类建议开启金额保护。",
+    adviceMid: "建议检查 Top 项；必要时加严遮盖。",
+    adviceHigh: "不建议直接发送：请删除签名落款/账号信息，并加严遮盖后再试。",
     meta: (m) => `命中 ${m.hits}｜金额 ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜文件" : ""}`
   };
   const de = {
@@ -177,7 +195,7 @@ function riskI18n(lang) {
     top: "Top-Risiken",
     advice: "Empfehlung",
     adviceLow: "Kann verwendet werden. Für Angebote/Verträge Betragsschutz aktivieren.",
-    adviceMid: "Top-Risiken prüfen; ggf. Betrag/Adresse/Konto stärker maskieren.",
+    adviceMid: "Top-Risiken prüfen; ggf. stärker maskieren.",
     adviceHigh: "Nicht direkt senden: Signatur/Kontodaten entfernen und mehr Maskierung aktivieren.",
     meta: (m) => `Treffer ${m.hits}｜Betrag ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜Datei" : ""}`
   };
@@ -189,7 +207,7 @@ function riskI18n(lang) {
     top: "Top risk sources",
     advice: "Advice",
     adviceLow: "Ok to use. For quotes/contracts, enable money protection.",
-    adviceMid: "Review top risks; consider stronger money/address/account masking.",
+    adviceMid: "Review top risks; consider stronger masking.",
     adviceHigh: "Do not send as-is: remove signature/account details and mask more.",
     meta: (m) => `Hits ${m.hits}｜Money ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜File" : ""}`
   };
@@ -322,104 +340,22 @@ function renderRiskBox(report, meta) {
 }
 /* ==================== Risk scoring end ==================== */
 
-/* ==================== Input overlay highlight ==================== */
-const PRIORITY = [
-  "email",
-  "bank",
-  "account",
-  "phone",
-  "money",
-  "address_de_street",
-  "handle",
-  "ref",
-  "title",
-  "number"
-];
-
-function highlightInputHits(text){
-  let s = String(text || "");
-  if (!s) return "";
-
-  const marks = [];
-  const raw = s;
-
-  for (const key of PRIORITY) {
-    if (key !== "money" && !enabled.has(key)) continue;
-    if (key === "money" && moneyMode === "off") continue;
-
-    const r = RULES_BY_KEY[key];
-    if (!r || !r.pattern) continue;
-
-    const re = new RegExp(
-      r.pattern.source,
-      r.pattern.flags.includes("g") ? r.pattern.flags : (r.pattern.flags + "g")
-    );
-
-    let m;
-    while ((m = re.exec(raw)) !== null) {
-      const start = m.index;
-      const end = m.index + m[0].length;
-      if (end > start) marks.push([start, end]);
-      if (m[0].length === 0) break;
-    }
-  }
-
-  if (!marks.length) return escapeHtml(raw);
-
-  marks.sort((a,b)=> a[0]-b[0] || a[1]-b[1]);
-  const merged = [];
-  for (const [s0,e0] of marks){
-    const last = merged[merged.length-1];
-    if (!last || s0 > last[1]) merged.push([s0,e0]);
-    else last[1] = Math.max(last[1], e0);
-  }
-
-  let out = "";
-  let cur = 0;
-  for (const [a,b] of merged){
-    if (a > cur) out += escapeHtml(raw.slice(cur, a));
-    out += `<span class="hit">${escapeHtml(raw.slice(a,b))}</span>`;
-    cur = b;
-  }
-  if (cur < raw.length) out += escapeHtml(raw.slice(cur));
-  return out;
-}
-
-function syncWatermark(){
-  const wrap = $("textareaWrap");
-  const txt = ($("inputText") && $("inputText").value) ? String($("inputText").value) : "";
-  if (!wrap) return;
-  if (txt.trim().length > 0) wrap.classList.add("has-input");
-  else wrap.classList.remove("has-input");
-}
-
-function renderInputOverlay(){
-  const ov = $("inputOverlay");
-  const ta = $("inputText");
-  if (!ov || !ta) return;
-  ov.innerHTML = highlightInputHits(ta.value || "");
-  ov.scrollTop = ta.scrollTop;
-  ov.scrollLeft = ta.scrollLeft;
-}
-/* ==================== Input overlay end ==================== */
-
-function setPageHeightMode() {
-  // ✅ 两档页面高度：有生成内容/面板展开 => expanded
-  const body = document.body;
-  const outHas = String(($("outputText") && $("outputText").textContent) || "").trim().length > 0;
-  const riskOpen = !!($("riskDetails") && $("riskDetails").open);
-  const shareOpen = !!($("shareDetails") && $("shareDetails").open);
-  if (outHas || riskOpen || shareOpen) body.classList.add("expanded");
-  else body.classList.remove("expanded");
-}
-
 function setText() {
   const t = I18N[currentLang];
+
+  window.currentLang = currentLang;
 
   if ($("ui-in-title")) $("ui-in-title").textContent = t.inTitle;
   if ($("ui-out-title")) $("ui-out-title").textContent = t.outTitle;
 
+  if ($("inputText")) $("inputText").placeholder = t.placeholder;
   if ($("ui-input-watermark")) $("ui-input-watermark").textContent = t.inputWatermark;
+
+  // fold titles
+  if ($("ui-risk-title")) $("ui-risk-title").textContent = t.riskTitle || "风险评分";
+  if ($("ui-share-title")) $("ui-share-title").textContent = t.shareTitle;
+  if ($("ui-share-sub")) $("ui-share-sub").textContent = t.shareSub;
+  if ($("ui-achv-placeholder")) $("ui-achv-placeholder").textContent = t.achvPlaceholder;
 
   // money
   const label = $("ui-money-label");
@@ -433,48 +369,40 @@ function setText() {
 
   // buttons
   if ($("btnGenerate")) $("btnGenerate").textContent = t.btnGenerate;
-  if ($("btnClear")) $("btnClear").textContent = t.btnClear;
   if ($("btnCopy")) $("btnCopy").textContent = t.btnCopy;
+  if ($("btnClear")) $("btnClear").textContent = t.btnClear;
+  if ($("btnShareDownload")) $("btnShareDownload").textContent = t.btnDownload;
 
   // feedback
   if ($("ui-fb-q")) $("ui-fb-q").textContent = t.fbQ;
-
-  // risk/share panel titles
-  if ($("ui-risk-title")) $("ui-risk-title").textContent = t.riskPanelTitle;
-  if ($("ui-share-title")) $("ui-share-title").textContent = t.shareTitle;
-
-  // share texts
-  if ($("ui-share-sub")) $("ui-share-sub").textContent = t.shareSub;
-  if ($("sharePlaceholder")) $("sharePlaceholder").textContent = t.sharePlaceholder;
-  if ($("btnShareDownload")) $("btnShareDownload").textContent = t.btnDownload;
 
   // links
   if ($("linkLearn")) $("linkLearn").textContent = t.learn;
   if ($("linkPrivacy")) $("linkPrivacy").textContent = t.privacy;
   if ($("linkScope")) $("linkScope").textContent = t.scope;
 
-  // footer
+  // footnote (left bottom fixed)
   if ($("ui-foot")) $("ui-foot").textContent = t.foot;
 }
 
-function maskHtmlForOutput(s){
-  let out = escapeHtml(String(s || ""));
-  const patterns = [
-    /【电话】|【邮箱】|【账号】|【地址】|【账号名】|【编号】|【称谓】|【数字】|【金额】/g,
-    /\[Telefon\]|\[E-Mail\]|\[Konto\]|\[Adresse\]|\[Handle\]|\[Referenz\]|\[Anrede\]|\[Zahl\]|\[Betrag\]/g,
-    /\[Phone\]|\[Email\]|\[Account\]|\[Address\]|\[Handle\]|\[Ref\]|\[Title\]|\[Number\]|\[Amount\]/g
-  ];
-  for (const re of patterns){
-    out = out.replace(re, (m)=> `<span class="mark">${m}</span>`);
-  }
-  return out;
-}
-
-// ---- rule application ----
+/* ============ rule application ============ */
 function applyRules(text) {
   let out = String(text || "");
   let hits = 0;
   const hitsByKey = {};
+
+  const PRIORITY = [
+    "email",
+    "bank",
+    "account",
+    "phone",
+    "money",
+    "address_de_street",
+    "handle",
+    "ref",
+    "title",
+    "number"
+  ];
 
   function addHit(key) {
     hits++;
@@ -547,7 +475,7 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
-  // ✅ Share metrics (local-only globals used by share.js)
+  // Share metrics (local-only globals used by share.js)
   window.__safe_hits = hits;
   window.__safe_moneyMode = moneyMode;
   window.__safe_breakdown = hitsByKey;
@@ -563,6 +491,8 @@ function applyRules(text) {
     fromPdf: lastRunMeta.fromPdf
   };
 
+  // render output + risk
+  renderOutput(out);
   renderRiskBox(report, {
     hits,
     enabledCount: enabled.size,
@@ -571,20 +501,20 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
-  // ✅ 自动展开风险评分
+  // auto expand risk + achv when there is output
+  const hasOut = String(out || "").trim().length > 0;
   const rd = $("riskDetails");
-  if (rd) rd.open = true;
+  const ad = $("achvDetails");
+  if (rd) rd.open = hasOut;
+  if (ad) ad.open = hasOut;
 
-  // ✅ 自动刷新卡片
+  // auto refresh achievement card
   window.dispatchEvent(new Event("safe:updated"));
-
-  // ✅ 两档高度更新
-  setPageHeightMode();
 
   return out;
 }
 
-/* ============ PDF helpers (text-layer probe) ============ */
+/* ============ PDF helpers (default: write into input + generate output) ============ */
 async function handlePdf(file) {
   if (!file) return;
   if (file.type !== "application/pdf") return;
@@ -600,103 +530,62 @@ async function handlePdf(file) {
     const text = String(probe.text || "").trim();
     if (!text) return;
 
-    // ✅ 1) 写入左侧输入框（用于验证水印消失 + 输入命中高亮）
+    // ✅ 默认写入输入框，便于对比
     const ta = $("inputText");
-    if (ta) {
-      ta.value = text;
-      syncWatermark();
-      renderInputOverlay();
-    }
+    if (ta) ta.value = text;
 
-    // ✅ 2) 同步生成右侧输出
-    const filtered = applyRules(text);
-    const outEl = $("outputText");
-    if (outEl) outEl.innerHTML = maskHtmlForOutput(filtered);
+    // ✅ 同步生成输出 + 风险 + 成就
+    applyRules(text);
 
-    // ✅ 3) 自动展开过滤成就
-    const sd = $("shareDetails");
-    if (sd) sd.open = true;
-
-    // ✅ 两档高度更新
-    setPageHeightMode();
-
-  } catch (e) {}
+  } catch (e) {
+    // minimal UI: keep quiet
+  }
 }
 
 function bindPdfUI() {
   const pdfInput = $("pdfFile");
-  const filebar = $("filebar") || document.querySelector(".filebar");
-  const fileName = $("fileName");
 
   if (pdfInput) {
     pdfInput.addEventListener("change", (e) => {
       const f = e.target.files && e.target.files[0];
-      if (f && fileName) fileName.textContent = f.name;
-      handlePdf(f);
-      e.target.value = "";
-    });
-  }
-
-  if (filebar) {
-    filebar.addEventListener("dragover", (e) => { e.preventDefault(); filebar.classList.add("dragover"); });
-    filebar.addEventListener("dragleave", () => filebar.classList.remove("dragover"));
-    filebar.addEventListener("drop", (e) => {
-      e.preventDefault();
-      filebar.classList.remove("dragover");
-      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-      if (f && fileName) fileName.textContent = f.name;
+      if (f && $("pdfName")) $("pdfName").textContent = f.name || "";
       handlePdf(f);
     });
   }
 }
 
 function bind() {
-  // lang
   document.querySelectorAll(".lang button").forEach(b => {
     b.onclick = () => {
       document.querySelectorAll(".lang button").forEach(x => x.classList.remove("active"));
       b.classList.add("active");
-
       currentLang = b.dataset.lang;
       window.currentLang = currentLang;
+
       lastRunMeta.lang = currentLang;
-
       setText();
-
-      renderInputOverlay();
-      syncWatermark();
 
       const inTxt = ($("inputText").value || "").trim();
       if (inTxt) {
         lastRunMeta.fromPdf = false;
-        const filtered = applyRules(inTxt);
-        const outEl = $("outputText");
-        if (outEl) outEl.innerHTML = maskHtmlForOutput(filtered);
+        applyRules(inTxt);
       } else {
         window.dispatchEvent(new Event("safe:updated"));
-        setPageHeightMode();
       }
     };
   });
 
-  // money
   const mm = $("moneyMode");
   if (mm) {
     mm.addEventListener("change", () => {
       moneyMode = mm.value || "off";
-      window.__safe_moneyMode = moneyMode;
-
-      renderInputOverlay();
-
       const inTxt = ($("inputText").value || "").trim();
       if (inTxt) {
         lastRunMeta.fromPdf = false;
-        const filtered = applyRules(inTxt);
-        const outEl = $("outputText");
-        if (outEl) outEl.innerHTML = maskHtmlForOutput(filtered);
+        applyRules(inTxt);
       } else {
+        window.__safe_moneyMode = moneyMode;
         window.dispatchEvent(new Event("safe:updated"));
-        setPageHeightMode();
       }
     });
 
@@ -704,50 +593,15 @@ function bind() {
     window.__safe_moneyMode = moneyMode;
   }
 
-  // input overlay sync
-  const ta = $("inputText");
-  const ov = $("inputOverlay");
-  if (ta && ov) {
-    ta.addEventListener("input", () => {
-      renderInputOverlay();
-      syncWatermark();
-      setPageHeightMode();
-    });
-    ta.addEventListener("scroll", () => {
-      ov.scrollTop = ta.scrollTop;
-      ov.scrollLeft = ta.scrollLeft;
-    });
-
-    renderInputOverlay();
-    syncWatermark();
-  }
-
-  // details toggle -> height mode
-  const rd = $("riskDetails");
-  const sd = $("shareDetails");
-  if (rd) rd.addEventListener("toggle", setPageHeightMode);
-  if (sd) sd.addEventListener("toggle", setPageHeightMode);
-
-  // generate
-  const gen = $("btnGenerate");
-  if (gen) gen.onclick = () => {
+  $("btnGenerate").onclick = () => {
     lastRunMeta.fromPdf = false;
-    const filtered = applyRules(($("inputText").value || ""));
-    const outEl = $("outputText");
-    if (outEl) outEl.innerHTML = maskHtmlForOutput(filtered);
-
-    const sd2 = $("shareDetails");
-    if (sd2) sd2.open = true;
-
-    setPageHeightMode();
+    applyRules($("inputText").value || "");
   };
 
-  // clear
-  const clr = $("btnClear");
-  if (clr) clr.onclick = () => {
+  // ✅ 清空移动到右侧：清空输入+输出+风险+成就
+  $("btnClear").onclick = () => {
     if ($("inputText")) $("inputText").value = "";
-    if ($("outputText")) $("outputText").innerHTML = "";
-    if ($("fileName")) $("fileName").textContent = "";
+    renderOutput("");
 
     window.__safe_hits = 0;
     window.__safe_breakdown = {};
@@ -760,24 +614,20 @@ function bind() {
     const rb = $("riskBox");
     if (rb) rb.innerHTML = "";
 
-    const rd2 = $("riskDetails");
-    if (rd2) rd2.open = false;
-    const sd2 = $("shareDetails");
-    if (sd2) sd2.open = false;
+    const rd = $("riskDetails");
+    const ad = $("achvDetails");
+    if (rd) rd.open = false;
+    if (ad) ad.open = false;
 
-    renderInputOverlay();
-    syncWatermark();
+    if ($("pdfName")) $("pdfName").textContent = "";
 
     window.dispatchEvent(new Event("safe:updated"));
-    setPageHeightMode();
   };
 
-  // copy
-  const cpy = $("btnCopy");
-  if (cpy) cpy.onclick = async () => {
+  $("btnCopy").onclick = async () => {
     const t = I18N[currentLang];
     try {
-      await navigator.clipboard.writeText(($("outputText") && $("outputText").textContent) || "");
+      await navigator.clipboard.writeText(lastOutputPlain || "");
       const btn = $("btnCopy");
       if (btn) {
         const old = btn.textContent;
@@ -787,7 +637,7 @@ function bind() {
     } catch (e) {}
   };
 
-  // feedback
+  // feedback counters (local)
   const up = $("btnUp");
   const down = $("btnDown");
   if (up) up.onclick = () => {
@@ -796,12 +646,19 @@ function bind() {
   };
   if (down) down.onclick = () => {
     const n = Number($("downCount").textContent || "0") + 1;
-    $("upCount").textContent = $("upCount").textContent || "0";
     $("downCount").textContent = String(n);
   };
 
   bindPdfUI();
-  setPageHeightMode();
+
+  // watermark should disappear when there is content
+  const ta = $("inputText");
+  if (ta) {
+    ta.addEventListener("input", () => {
+      // just trigger reflow; watermark is overlay, it doesn't block typing
+      // (no-op, but keeps behavior explicit)
+    });
+  }
 }
 
 initEnabled();
