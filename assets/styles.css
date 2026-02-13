@@ -115,14 +115,14 @@ h3{
   font-size:14px;
   font-weight:900;
 }
-.outbox{ margin-top: 8px; } /* ✅ 右侧输出与左侧选择文件的上边距对齐感觉 */
+.outbox{ margin-top: 8px; } /* 标题到“第一块内容”的间距统一 */
 
 /* ===== file bar ===== */
 .filebar{
   display:flex;
   align-items:center;
   gap:12px;
-  margin:0 0 10px; /* 由 outbox 统一控制顶部间距 */
+  margin:0 0 10px;
   padding:10px;
   border:1px dashed rgba(255,255,255,.14);
   border-radius:14px;
@@ -147,6 +147,10 @@ h3{
 }
 
 /* ===== input+output boxes ===== */
+.textarea-wrap{
+  position:relative;
+}
+
 textarea{
   width:100%;
   height: 340px;
@@ -154,7 +158,7 @@ textarea{
   background: transparent;
   border:1px solid rgba(255,255,255,.10);
   border-radius:12px;
-  color: transparent;
+  color: transparent;             /* overlay 显示文本 */
   caret-color: var(--text);
   padding:12px;
   font-size:13px;
@@ -164,6 +168,7 @@ textarea{
   z-index:2;
 }
 
+/* ✅ 右侧输出：高度也按两档变化，吃掉“上部空白” */
 .output{
   height: 340px;
   overflow:auto;
@@ -176,10 +181,8 @@ textarea{
   line-height:1.55;
   font-size:13px;
 }
-
-.textarea-wrap{
-  position:relative;
-}
+body.expanded textarea{ height: 370px; }
+body.expanded .output{ height: 370px; }
 
 /* ✅ 输入 overlay */
 .input-overlay{
@@ -197,7 +200,6 @@ textarea{
   font-family:var(--sans);
   color:rgba(255,255,255,.88);
 }
-
 .input-overlay .hit{
   background: var(--hit-bg);
   border: 1px solid var(--hit-bd);
@@ -222,10 +224,7 @@ textarea{
   user-select:none;
   z-index:3;
 }
-
-.textarea-wrap.has-input .input-watermark{
-  display:none;
-}
+.textarea-wrap.has-input .input-watermark{ display:none; }
 
 /* ===== buttons / controls ===== */
 .controlbar{
@@ -328,7 +327,6 @@ textarea{
   gap:10px;
 }
 .panel-summary::-webkit-details-marker{ display:none; }
-
 .panel-title{
   font-weight:900;
   font-size:13px;
@@ -342,9 +340,7 @@ textarea{
   overflow:auto;
   max-height: 220px;
 }
-body.expanded .panel-body{
-  max-height: 320px;
-}
+body.expanded .panel-body{ max-height: 320px; }
 
 /* Risk content card */
 .risk{
@@ -356,7 +352,6 @@ body.expanded .panel-body{
 .riskhead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
 .risktitle{ font-weight:900; font-size:13px; }
 .riskmeta{ margin-top:4px; color:rgba(255,255,255,.55); font-size:12px; }
-
 .riskscore{
   min-width:96px;
   text-align:center;
@@ -367,7 +362,6 @@ body.expanded .panel-body{
 }
 .riskscore .n{ font-size:26px; font-weight:900; line-height:1; }
 .riskscore .l{ font-size:12px; opacity:.9; margin-top:4px; color:rgba(255,255,255,.86); }
-
 .risksec{ margin-top:10px; }
 .risklabel{ font-size:12px; color:rgba(255,255,255,.60); margin-bottom:6px; }
 .risklist{ display:flex; flex-direction:column; gap:6px; }
@@ -442,10 +436,17 @@ body.expanded .panel-body{
   padding: 0 3px;
 }
 
-/* ===== links at bottom ===== */
-.links{
+/* ===== Right card bottom alignment ===== */
+/* 让“过滤成就 + links”整体贴底，避免中间留大空白 */
+.card.right .bottom-stack{
   margin-top:auto;
-  padding-top:12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+/* links 放到最底，不再把 share 顶上去 */
+.links{
   display:flex;
   gap:12px;
   font-size:12px;
@@ -466,7 +467,7 @@ body.expanded .panel-body{
   margin-top:10px;
 }
 
-/* ===== Middle filter (icon only) ===== */
+/* ===== Middle filter (swap-ready) ===== */
 .mid-filter{
   width: 180px;
   display:flex;
@@ -490,7 +491,18 @@ body.expanded .panel-body{
   );
 }
 
-/* ✅ 中间 logo 缩小 30%（原 180 -> 126） */
+/* ✅ 中间如果换成“图标+文字”的 full logo，直接用这个 class */
+.mid-logo-full{
+  width: 240px;
+  height: auto;
+  display:block;
+  object-fit:contain;
+  filter: drop-shadow(0 18px 60px rgba(0,0,0,.55));
+  user-select:none;
+  -webkit-user-drag:none;
+}
+
+/* 仍保留 icon-only 的情况（你当前是这种），缩小 30%：180 -> 126 */
 .mid-icon{
   width: 126px;
   height: 126px;
@@ -500,8 +512,7 @@ body.expanded .panel-body{
   filter: drop-shadow(0 18px 60px rgba(0,0,0,.55));
 }
 
+/* ✅ 你说的：去掉底部的“Filter”文字 */
 .mid-filter .filter-text{
-  font-size: 14px;
-  letter-spacing: 1.2px;
-  color: rgba(255,255,255,0.66);
+  display:none;
 }
