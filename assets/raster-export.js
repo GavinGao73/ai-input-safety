@@ -168,40 +168,63 @@
 
   // --------- Rules -> redaction rects (conservative item-level) ----------
   function buildRuleMatchers(enabledKeys, moneyMode) {
-    // expects global RULES_BY_KEY from your rules.js
-    const keys = Array.isArray(enabledKeys) ? enabledKeys : [];
-    const matchers = [];
+  // expects global RULES_BY_KEY from rules.js
+  const matchers = [];
 
-    const PRIORITY = [
-      "email",
-      "bank",
-      "account",
-      "phone",
-      "money",
-      "address_de_street",
-      "handle",
-      "ref",
-      "title",
-      "number"
-    ];
+  const PRIORITY = [
+    "email",
+    "bank",
+    "account",
+    "phone",
+    "money",
+    "address_de_street",
+    "handle",
+    "ref",
+    "title",
+    "number"
+  ];
 
-    for (const k of PRIORITY) {
-      if (k !== "money" && keys.indexOf(k) === -1) continue;
+  // ✅ 如果 enabledKeys 不可用/为空/不匹配：直接启用所有可用规则（除了 money 仍受 moneyMode 控制）
+  const keys = Array.isArray(enabledKeys) ? enabledKeys : [];
+  const enabledSet = new Set(keys);
+
+  for (const k of PRIORITY) {
+    if (k === "money") {
+      if (!moneyMode || moneyMode === "off") continue;
+    } else {
+      // 如果传入 enabledKeys，则按 enabledKeys 过滤；否则不过滤（全启用）
+      if (keys.length > 0 && !enabledSet.has(k)) continue;
+    }
+
+    const r = (window.RULES_BY_KEY && window.RULES_BY_KEY[k]) || null;
+    if (!r || !r.pattern) continue;
+
+    let pat = r.pattern;
+    if (!(pat instanceof RegExp)) continue;
+
+    // ✅ 确保 global，便于多次命中/区间切片
+    const flags = pat.flags.includes("g") ? pat.flags : (pat.flags + "g");
+    pat = new RegExp(pat.source, flags);
+
+    matchers.push({ key: k, re: pat });
+  }
+
+  // ✅ 兜底：如果 PRIORITY 里没有覆盖到（规则文件变化），把 RULES_BY_KEY 里剩余的也加进来
+  if (matchers.length === 0 && window.RULES_BY_KEY) {
+    for (const [k, r] of Object.entries(window.RULES_BY_KEY)) {
+      if (!r || !r.pattern || !(r.pattern instanceof RegExp)) continue;
       if (k === "money" && (!moneyMode || moneyMode === "off")) continue;
 
-      const r = (window.RULES_BY_KEY && window.RULES_BY_KEY[k]) || null;
-      if (!r || !r.pattern) continue;
-
-      // Ensure global regex
       let pat = r.pattern;
-      if (!(pat instanceof RegExp)) continue;
       const flags = pat.flags.includes("g") ? pat.flags : (pat.flags + "g");
       pat = new RegExp(pat.source, flags);
 
       matchers.push({ key: k, re: pat });
     }
-    return matchers;
   }
+
+  return matchers;
+}
 
 function textItemsToRects(pdfjsLib, viewport, textContent, matchers) {
   const Util = pdfjsLib.Util;
