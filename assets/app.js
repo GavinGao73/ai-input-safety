@@ -613,6 +613,15 @@ function applyRules(text) {
   const ta = $("inputText");
   if (ta) renderInputOverlayForPdf(ta.value || "");
 
+  // ✅ Stage 3 export snapshot (CRITICAL for trust):
+  // Ensure Text export & Raster-PDF export use exactly the same rule state.
+  window.__export_snapshot = {
+    enabledKeys: Array.from(enabled || []),
+    moneyMode: (typeof moneyMode === "string" ? moneyMode : "off"),
+    lang: currentLang,
+    fromPdf: !!lastRunMeta.fromPdf
+  };
+
   window.dispatchEvent(new Event("safe:updated"));
   return out;
 }
@@ -784,6 +793,8 @@ function bind() {
     lastPdfOriginalText = "";
     setStage3Ui("none");
 
+    window.__export_snapshot = null;
+
     window.dispatchEvent(new Event("safe:updated"));
   };
 
@@ -858,11 +869,19 @@ function bind() {
       if (!lastProbe || !lastProbe.hasTextLayer) return;
       if (!window.RasterExport || !window.RasterExport.exportRasterSecurePdfFromReadablePdf) return;
 
+      // ✅ Use snapshot to guarantee rule consistency with current text output
+      const snap = window.__export_snapshot || {};
+      const enabledKeys = Array.isArray(snap.enabledKeys) ? snap.enabledKeys : Array.from(enabled || []);
+      const mm = (typeof snap.moneyMode === "string") ? snap.moneyMode : (typeof moneyMode === "string" ? moneyMode : "off");
+      const lang = snap.lang || currentLang;
+
       await window.RasterExport.exportRasterSecurePdfFromReadablePdf({
         file: f,
-        lang: currentLang,
-        enabledKeys: Array.from(enabled),
-        moneyMode: moneyMode
+        lang: lang,
+        enabledKeys: enabledKeys,
+        moneyMode: mm,
+        dpi: 600,
+        filename: `raster_secure_${Date.now()}.pdf`
       });
     };
   }
