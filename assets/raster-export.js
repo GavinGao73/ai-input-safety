@@ -6,14 +6,6 @@
  * - NO OCR / NO logs / NO storage
  * ======================================================= */
 
-/* =========================================================
- * raster-export.js
- * Raster Secure PDF export pipeline (in-memory only)
- * - PDF/image -> 600 DPI raster -> opaque redaction + placeholder (pixels)
- * - Export PDF as images only (no text layer)
- * - NO OCR / NO logs / NO storage
- * ======================================================= */
-
 (function () {
   "use strict";
 
@@ -29,10 +21,8 @@
 
   // --------- Safe dynamic loaders (no logs) ----------
   async function loadPdfJsIfNeeded() {
-    // Prefer already loaded by your existing pdf.js probe loader
     if (window.pdfjsLib && window.pdfjsLib.getDocument) return window.pdfjsLib;
 
-    // Minimal fallback: try common CDN for pdf.js
     const url = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
     await new Promise((resolve, reject) => {
       const s = document.createElement("script");
@@ -43,7 +33,6 @@
       document.head.appendChild(s);
     });
 
-    // Worker
     try {
       window.pdfjsLib.GlobalWorkerOptions.workerSrc =
         "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -54,7 +43,6 @@
   }
 
   async function loadPdfLibIfNeeded() {
-    // pdf-lib for assembling image-only PDF
     if (window.PDFLib && window.PDFLib.PDFDocument) return window.PDFLib;
 
     const url = "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
@@ -126,11 +114,9 @@
       const h = clamp(r.h, 0, canvas.height - y);
       if (w <= 0 || h <= 0) continue;
 
-      // 100% opaque cover
       ctx.fillStyle = "#000";
       ctx.fillRect(x, y, w, h);
 
-      // placeholder (pixel text)
       const fs = clamp(Math.min(h * 0.45, w * 0.12) * fontScale, 10, 64);
       ctx.fillStyle = "#fff";
       ctx.font = `700 ${fs}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
@@ -154,7 +140,7 @@
     const loadingTask = pdfjsLib.getDocument({ data: ab });
     const pdf = await loadingTask.promise;
 
-    const scale = (dpi || DEFAULT_DPI) / 72; // 72pt/in
+    const scale = (dpi || DEFAULT_DPI) / 72;
     const pages = [];
     for (let p = 1; p <= pdf.numPages; p++) {
       const page = await pdf.getPage(p);
@@ -174,30 +160,7 @@
     return { pdf, pages, dpi: dpi || DEFAULT_DPI };
   }
 
-  // --------- Rules -> matchers ----------
-  function normalizeToRegExp(pat) {
-    // Accept RegExp | string | {source, flags} | {pattern, flags}
-    if (!pat) return null;
-
-    if (pat instanceof RegExp) return pat;
-
-    if (typeof pat === "string") {
-      try { return new RegExp(pat, "g"); } catch (_) { return null; }
-    }
-
-    if (typeof pat === "object") {
-      const src = (typeof pat.source === "string") ? pat.source
-                : (typeof pat.pattern === "string") ? pat.pattern
-                : null;
-      if (!src) return null;
-
-      const flags = (typeof pat.flags === "string") ? pat.flags : "";
-      try { return new RegExp(src, flags); } catch (_) { return null; }
-    }
-
-    return null;
-  }
-
+  // --------- Rules -> matchers (STRICT: same as text mode) ----------
   function forceGlobal(re) {
     if (!(re instanceof RegExp)) return null;
     const flags = re.flags.includes("g") ? re.flags : (re.flags + "g");
@@ -205,33 +168,35 @@
   }
 
   function buildRuleMatchers(enabledKeys, moneyMode) {
-    // ✅ 关键：与“文本过滤”保持同一套开关/定义
-    // - 如果传入 enabledKeys：严格按 enabledKeys 过滤（money 仍受 moneyMode 控制）
-    // - 如果 enabledKeys 为空/不可用：回退到 RULES_BY_KEY 全量（money 仍受 moneyMode 控制）
     const matchers = [];
-    const src = window.RULES_BY_KEY || {};
+    const rules = window.RULES_BY_KEY || {};
 
-    const keys = Array.isArray(enabledKeys) ? enabledKeys : [];
-    const enabledSet = new Set(keys);
+    const PRIORITY = [
+      "email",
+      "bank",
+      "account",
+      "phone",
+      "money",
+      "address_de_street",
+      "handle",
+      "ref",
+      "title",
+      "number"
+    ];
 
-    const useAll = (keys.length === 0); // fallback only when truly unavailable
+    const enabledSet = new Set(Array.isArray(enabledKeys) ? enabledKeys : []);
 
-    for (const [k, r] of Object.entries(src)) {
-      if (!r) continue;
-
+    for (const k of PRIORITY) {
       if (k === "money") {
         if (!moneyMode || moneyMode === "off") continue;
       } else {
-        if (!useAll && !enabledSet.has(k)) continue;
+        if (!enabledSet.has(k)) continue;
       }
 
-      const raw = (r.pattern != null) ? r.pattern
-                : (r.re != null) ? r.re
-                : (r.regex != null) ? r.regex
-                : null;
+      const r = rules[k];
+      if (!r || !r.pattern) continue;
 
-      const re0 = normalizeToRegExp(raw);
-      const re = forceGlobal(re0);
+      const re = forceGlobal(r.pattern);
       if (!re) continue;
 
       matchers.push({ key: k, re });
@@ -240,8 +205,8 @@
     return matchers;
   }
 
-  // --------- Text items -> rects ----------
-  function textItemsToRects(pdfjsLib, page, viewport, textContent, matchers) {
+  // --------- Text items -> rects (FIXED offsets + conservative merge) ----------
+  function textItemsToRects(pdfjsLib, viewport, textContent, matchers) {
     const Util = pdfjsLib.Util;
     const items = (textContent && textContent.items) ? textContent.items : [];
     const rects = [];
@@ -264,18 +229,18 @@
     function bboxForItem(it) {
       const m = Util.transform(viewport.transform, it.transform);
 
-      const w = Number(it.width || 0);
-      let h = Number(it.height || 0);
+      const w0 = Number(it.width || 0);
+      let h0 = Number(it.height || 0);
 
-      if (!Number.isFinite(h) || h <= 0) {
-        h = Math.hypot(m[2], m[3]) || Math.hypot(m[0], m[1]) || 10;
-        h = h * 1.15;
+      if (!Number.isFinite(h0) || h0 <= 0) {
+        h0 = Math.hypot(m[2], m[3]) || Math.hypot(m[0], m[1]) || 10;
+        h0 = h0 * 1.15;
       }
 
-      let ww = w;
+      let ww = w0;
       if (!Number.isFinite(ww) || ww <= 0) {
         const s = String(it.str || "");
-        const approxCharW = (h * 0.55);
+        const approxCharW = (h0 * 0.55);
         ww = Math.max(approxCharW * s.length, 6);
       }
 
@@ -288,16 +253,22 @@
 
       const p1 = tp(0, 0);
       const p2 = tp(ww, 0);
-      const p3 = tp(0, h);
-      const p4 = tp(ww, h);
+      const p3 = tp(0, h0);
+      const p4 = tp(ww, h0);
 
       const xs = [p1.x, p2.x, p3.x, p4.x];
       const ys = [p1.y, p2.y, p3.y, p4.y];
 
-      const minX = Math.min.apply(null, xs);
-      const maxX = Math.max.apply(null, xs);
-      const minY = Math.min.apply(null, ys);
-      const maxY = Math.max.apply(null, ys);
+      let minX = Math.min.apply(null, xs);
+      let maxX = Math.max.apply(null, xs);
+      let minY = Math.min.apply(null, ys);
+      let maxY = Math.max.apply(null, ys);
+
+      // Clamp into viewport bounds to avoid “fly-away” boxes
+      minX = clamp(minX, 0, viewport.width);
+      maxX = clamp(maxX, 0, viewport.width);
+      minY = clamp(minY, 0, viewport.height);
+      maxY = clamp(maxY, 0, viewport.height);
 
       return {
         x: minX,
@@ -307,18 +278,15 @@
       };
     }
 
-    // 1) Build pageText (NO separators). Use hasEOL to add '\n' only at line end.
+    // 1) Build pageText WITHOUT any separators (offsets stay consistent)
     let pageText = "";
-    const itemRanges = []; // { idx, start, end }
+    const itemRanges = []; // { idx, start, end, len }
     for (let i = 0; i < items.length; i++) {
-      const it = items[i];
-      const s = String(it.str || "");
+      const s = String(items[i].str || "");
       const start = pageText.length;
       pageText += s;
       const end = pageText.length;
-      itemRanges.push({ idx: i, start, end });
-
-      if (it && it.hasEOL) pageText += "\n";
+      itemRanges.push({ idx: i, start, end, len: Math.max(1, s.length) });
     }
 
     // 2) Match on pageText
@@ -326,9 +294,9 @@
     for (const m of matchers) {
       const re0 = m.re;
       if (!(re0 instanceof RegExp)) continue;
-      const flags = re0.flags.includes("g") ? re0.flags : (re0.flags + "g");
-      let re;
-      try { re = new RegExp(re0.source, flags); } catch (_) { continue; }
+      const re = forceGlobal(re0);
+      if (!re) continue;
+
       const rs = getAllMatchRanges(re, pageText);
       for (const r of rs) spans.push(r);
     }
@@ -364,81 +332,66 @@
         const x1 = bb.x + bb.w * (localStart / len);
         const x2 = bb.x + bb.w * (localEnd / len);
 
-        // padding: small, conservative
-        const padX = Math.max(1, bb.w * 0.006);
-        const padY = Math.max(1, bb.h * 0.08);
+        const padX = Math.max(1, bb.w * 0.01);
+        const padY = Math.max(1, bb.h * 0.12);
 
-        rects.push({
-          x: x1 - padX,
-          y: bb.y - padY,
-          w: (x2 - x1) + padX * 2,
-          h: bb.h + padY * 2
-        });
+        let rx = x1 - padX;
+        let ry = bb.y - padY;
+        let rw = (x2 - x1) + padX * 2;
+        let rh = bb.h + padY * 2;
+
+        // Clamp & sanity filter (prevents “black wall”)
+        rx = clamp(rx, 0, viewport.width);
+        ry = clamp(ry, 0, viewport.height);
+        rw = clamp(rw, 1, viewport.width - rx);
+        rh = clamp(rh, 6, viewport.height - ry);
+
+        // Drop absurd rectangles (usually from bad transforms)
+        if (rw > viewport.width * 0.85 && rh > viewport.height * 0.20) continue;
+        if (rw > viewport.width * 0.92) continue;
+        if (rh > viewport.height * 0.35) continue;
+
+        rects.push({ x: rx, y: ry, w: rw, h: rh });
       }
     }
 
-    // 4.5) Clamp extreme-wide rects (prevent “black wall”)
-    // If a single rect is wider than 45% of page width, we split it into 2–4 chunks.
-    const MAX_W_RATIO = 0.45;
-    const pageW = Number(viewport && viewport.width) || 0;
-    const normalized = [];
+    // 5) Conservative merge nearby rects (same line only)
+    rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+    const out = [];
     for (const r of rects) {
       if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
 
-      if (pageW > 0 && r.w > pageW * MAX_W_RATIO) {
-        const parts = Math.min(4, Math.max(2, Math.ceil(r.w / (pageW * 0.22))));
-        const chunkW = r.w / parts;
-        for (let i = 0; i < parts; i++) {
-          normalized.push({
-            x: r.x + i * chunkW,
-            y: r.y,
-            w: chunkW,
-            h: r.h
-          });
-        }
-      } else {
-        normalized.push(r);
-      }
-    }
-
-    // 5) Merge nearby rects (STRICT: avoid cross-column merge)
-    normalized.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-    const out = [];
-    for (const r of normalized) {
       const last = out[out.length - 1];
       if (!last) { out.push({ ...r }); continue; }
 
-      // tighter y tolerance
-      const yClose = Math.abs(last.y - r.y) < 4 || Math.abs((last.y + last.h) - (r.y + r.h)) < 4;
+      const rBottom = r.y + r.h;
+      const lBottom = last.y + last.h;
 
-      // compute gap and overlap precisely
-      const gap =
-        (r.x > last.x + last.w) ? (r.x - (last.x + last.w))
-        : (last.x > r.x + r.w) ? (last.x - (r.x + r.w))
-        : 0;
+      // vertical overlap ratio
+      const vOverlap = Math.max(0, Math.min(lBottom, rBottom) - Math.max(last.y, r.y));
+      const vMinH = Math.max(1, Math.min(last.h, r.h));
+      const vOk = (vOverlap / vMinH) >= 0.55;
 
-      const overlapX = !(r.x > last.x + last.w || last.x > r.x + r.w);
+      // horizontal gap
+      const gap = r.x - (last.x + last.w);
+      const gapOk = gap >= -8 && gap <= 14;
 
-      // merge only if real overlap OR tiny gap
-      if (yClose && (overlapX || gap <= 2)) {
+      // height similarity (avoid merging title blocks with body blocks)
+      const hRatio = Math.min(last.h, r.h) / Math.max(last.h, r.h);
+      const hOk = hRatio >= 0.55;
+
+      if (vOk && gapOk && hOk) {
         const nx = Math.min(last.x, r.x);
         const ny = Math.min(last.y, r.y);
         const nr = Math.max(last.x + last.w, r.x + r.w);
         const nb = Math.max(last.y + last.h, r.y + r.h);
-        last.x = nx; last.y = ny; last.w = nr - nx; last.h = nb - ny;
+        last.x = nx;
+        last.y = ny;
+        last.w = nr - nx;
+        last.h = nb - ny;
       } else {
         out.push({ ...r });
       }
-    }
-
-    // Final clamp to canvas bounds
-    const canvasW = Number(viewport && viewport.width) || 0;
-    const canvasH = Number(viewport && viewport.height) || 0;
-    for (const r of out) {
-      r.x = clamp(r.x, 0, canvasW);
-      r.y = clamp(r.y, 0, canvasH);
-      r.w = clamp(r.w, 1, Math.max(1, canvasW - r.x));
-      r.h = clamp(r.h, 1, Math.max(1, canvasH - r.y));
     }
 
     return out;
@@ -454,7 +407,7 @@
     for (const p of pages) {
       const page = await pdf.getPage(p.pageNumber);
       const textContent = await page.getTextContent();
-      const rects = textItemsToRects(pdfjsLib, page, p.viewport, textContent, matchers);
+      const rects = textItemsToRects(pdfjsLib, p.viewport, textContent, matchers);
       drawRedactionsOnCanvas(p.canvas, rects, { placeholder });
     }
 
@@ -472,7 +425,6 @@
     });
     if (!img) throw new Error("Image load failed");
 
-    // Keep original pixels; treat as 600dpi for PDF sizing
     const c = createCanvas(img.naturalWidth || img.width, img.naturalHeight || img.height);
     const ctx = c.getContext("2d", { alpha: false });
     ctx.drawImage(img, 0, 0, c.width, c.height);
@@ -495,12 +447,7 @@
       const pageHpt = (p.height * 72) / (dpi || DEFAULT_DPI);
 
       const page = doc.addPage([pageWpt, pageHpt]);
-      page.drawImage(png, {
-        x: 0,
-        y: 0,
-        width: pageWpt,
-        height: pageHpt
-      });
+      page.drawImage(png, { x: 0, y: 0, width: pageWpt, height: pageHpt });
     }
 
     const pdfBytes = await doc.save({ useObjectStreams: true });
@@ -512,7 +459,6 @@
   // Public API
   // ======================================================
   const RasterExport = {
-    // Mode A: readable PDF -> auto redact -> export
     async exportRasterSecurePdfFromReadablePdf(opts) {
       const file = opts && opts.file;
       if (!file) return;
@@ -531,7 +477,6 @@
       await exportCanvasesToPdf(pages, dpi, name);
     },
 
-    // Mode B: visual result from UI -> export
     async exportRasterSecurePdfFromVisual(result) {
       if (!result || !result.pages || !result.pages.length) return;
       const lang = result.lang || "zh";
@@ -548,7 +493,6 @@
       await exportCanvasesToPdf(result.pages, dpi, name);
     },
 
-    // Utilities used by RedactUI (optional use)
     renderPdfToCanvases,
     renderImageToCanvas,
     drawRedactionsOnCanvas
@@ -556,5 +500,3 @@
 
   window.RasterExport = RasterExport;
 })();
-
-
