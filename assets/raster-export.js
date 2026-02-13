@@ -384,38 +384,56 @@ function textItemsToRects(pdfjsLib, viewport, textContent, matchers) {
 
   // 5) Conservative merge: same line only
   rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-  const out = [];
-  for (const r of rects) {
-    if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
 
-    const last = out[out.length - 1];
-    if (!last) { out.push({ ...r }); continue; }
+const out = [];
 
-    const rB = r.y + r.h;
-    const lB = last.y + last.h;
-    const vOverlap = Math.max(0, Math.min(lB, rB) - Math.max(last.y, r.y));
-    const vMinH = Math.max(1, Math.min(last.h, r.h));
-    const vOk = (vOverlap / vMinH) >= 0.6;
+for (const r of rects) {
 
-    const gap = r.x - (last.x + last.w);
-    const gapOk = gap >= -6 && gap <= 10;
+  if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
 
-    const hRatio = Math.min(last.h, r.h) / Math.max(last.h, r.h);
-    const hOk = hRatio >= 0.65;
+  const last = out[out.length - 1];
 
-    if (vOk && gapOk && hOk) {
-      const nx = Math.min(last.x, r.x);
-      const ny = Math.min(last.y, r.y);
-      const nr = Math.max(last.x + last.w, r.x + r.w);
-      const nb = Math.max(last.y + last.h, r.y + r.h);
-      last.x = nx; last.y = ny; last.w = nr - nx; last.h = nb - ny;
-    } else {
-      out.push({ ...r });
-    }
+  if (!last) {
+    out.push({ ...r });
+    continue;
   }
 
-  return out;
+  const rTop = r.y;
+  const rBot = r.y + r.h;
+  const lTop = last.y;
+  const lBot = last.y + last.h;
+
+  const overlap = Math.max(0, Math.min(lBot, rBot) - Math.max(lTop, rTop));
+  const minH = Math.max(1, Math.min(last.h, r.h));
+
+  const sameLine = (overlap / minH) > 0.72;
+
+  const heightRatio = Math.min(last.h, r.h) / Math.max(last.h, r.h);
+  const similarHeight = heightRatio > 0.78;
+
+  const gap = r.x - (last.x + last.w);
+  const near = gap >= -4 && gap <= 8;
+
+  if (sameLine && similarHeight && near) {
+
+    const nx = Math.min(last.x, r.x);
+    const ny = Math.min(last.y, r.y);
+    const nr = Math.max(last.x + last.w, r.x + r.w);
+    const nb = Math.max(last.y + last.h, r.y + r.h);
+
+    last.x = nx;
+    last.y = ny;
+    last.w = nr - nx;
+    last.h = nb - ny;
+
+  } else {
+
+    out.push({ ...r });
+
+  }
 }
+
+return out;
 
   async function autoRedactReadablePdf({ file, lang, enabledKeys, moneyMode, dpi }) {
     const pdfjsLib = await loadPdfJsIfNeeded();
