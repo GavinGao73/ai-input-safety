@@ -3,29 +3,29 @@ const I18N = {
     inTitle: "在 AI 读取之前，先通过 Filter。",
     outTitle: "过滤后文本，可直接粘贴给 AI。",
 
-    placeholder: "粘贴准备上传给 AI 的文字或文件内容…",
-
+    placeholder: "例如：简历、邮件、咨询材料、报告摘要……",
     inputWatermark:
-      "AI 系统可以解析文档中的隐藏文本结构。\n" +
-      "本工具仅在本地运行，不上传、不保存内容。",
+      "AI 系统可以解析文档中的隐藏文本结构。\n本工具仅在本地运行，不上传、不保存内容。",
 
     moneyLabel: "金额：",
     moneyOff: "关闭",
     moneyM1: "M1",
     moneyM2: "M2",
 
-    btnGenerate: "过滤输入内容",
-    btnClear: "清空",
+    btnGenerate: "过滤",
     btnCopy: "复制",
     btnCopied: "✔ 已复制",
+    btnClear: "清空",
 
-    fbQ: "有帮助吗？",
+    riskTitle: "风险评分",
 
-    riskPanelTitle: "风险评分",
     shareTitle: "过滤成就",
     shareSub: "不含原文，仅展示处理结果与隐私承诺",
-    sharePlaceholder: "生成后显示预览",
+    achvPlaceholder: "生成后显示预览",
+
     btnDownload: "下载",
+
+    fbQ: "有帮助吗？",
 
     learn: "了解更多",
     privacy: "隐私原则",
@@ -36,66 +36,66 @@ const I18N = {
 
   en: {
     inTitle: "Filter before AI reads.",
-    outTitle: "Filtered text — paste into AI directly.",
+    outTitle: "Filtered text — ready to paste into AI.",
 
-    placeholder: "Paste what you plan to send to AI…",
-
+    placeholder: "e.g. resume, email, report summary…",
     inputWatermark:
-      "AI systems can extract hidden text-layer data.\n" +
-      "All processing runs locally. Nothing is stored or transmitted.",
+      "AI systems can extract hidden text-layer data.\nAll processing runs locally. Nothing is stored or transmitted.",
 
     moneyLabel: "Money:",
     moneyOff: "Off",
     moneyM1: "M1",
     moneyM2: "M2",
 
-    btnGenerate: "Filter input",
-    btnClear: "Clear",
+    btnGenerate: "Filter",
     btnCopy: "Copy",
     btnCopied: "✔ Copied",
+    btnClear: "Clear",
+
+    riskTitle: "Risk score",
+
+    shareTitle: "Filter achievement",
+    shareSub: "No original text — stats & privacy pledge only",
+    achvPlaceholder: "Preview appears after filtering",
+
+    btnDownload: "Download",
 
     fbQ: "Helpful?",
-
-    riskPanelTitle: "Risk score",
-    shareTitle: "Filter highlights",
-    shareSub: "No original text — stats & privacy pledge only",
-    sharePlaceholder: "Preview appears after filtering",
-    btnDownload: "Download",
 
     learn: "Learn More",
     privacy: "Privacy",
     scope: "MVP Scope",
 
-    foot: "Risk hints only."
+    foot: "This tool provides risk hints only."
   },
 
   de: {
     inTitle: "Filter, bevor KI liest.",
     outTitle: "Gefilterter Text — direkt in KI einfügen.",
 
-    placeholder: "Text einfügen, den du an KI senden willst…",
-
+    placeholder: "z.B. Lebenslauf, E-Mail, Bericht…",
     inputWatermark:
-      "KI-Systeme lesen auch verborgene Textlayer-Daten.\n" +
-      "Verarbeitung erfolgt ausschließlich lokal. Keine Speicherung.",
+      "KI-Systeme lesen auch verborgene Textlayer-Daten.\nVerarbeitung erfolgt ausschließlich lokal. Keine Speicherung.",
 
     moneyLabel: "Betrag:",
     moneyOff: "Aus",
     moneyM1: "M1",
     moneyM2: "M2",
 
-    btnGenerate: "Eingabe filtern",
-    btnClear: "Leeren",
+    btnGenerate: "Filtern",
     btnCopy: "Kopieren",
     btnCopied: "✔ Kopiert",
+    btnClear: "Leeren",
 
-    fbQ: "Hilfreich?",
+    riskTitle: "Risikowert",
 
-    riskPanelTitle: "Risikowert",
     shareTitle: "Filter-Ergebnis",
     shareSub: "Kein Originaltext — nur Ergebnis & Versprechen",
-    sharePlaceholder: "Vorschau nach dem Filtern",
+    achvPlaceholder: "Vorschau nach dem Filtern",
+
     btnDownload: "Download",
+
+    fbQ: "Hilfreich?",
 
     learn: "Mehr erfahren",
     privacy: "Datenschutz",
