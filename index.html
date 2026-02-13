@@ -12,7 +12,6 @@
   <div class="wrap">
     <header>
       <div class="brand">
-        <!-- ✅ LOGO 对调：左上角使用 icon -->
         <div class="logo">
           <img
             src="./assets/logo-filter-icon.png"
@@ -37,22 +36,27 @@
       <section class="card card-col" id="leftCard">
         <h3 id="ui-in-title"></h3>
 
-        <!-- ✅ 左侧：选择文件卡（作为对齐基准） -->
+        <!-- ✅ 单层卡：取消“嵌套两层边框” -->
         <div class="barcard barcard-top">
-          <div class="filebar filebar-compact">
+          <div class="filebar filebar-flat">
             <input id="pdfFile" type="file" accept="application/pdf" />
+            <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn"></label>
             <div class="filename" id="pdfName" aria-hidden="true"></div>
           </div>
         </div>
 
         <div class="outbox outbox-input">
-          <div class="textarea-wrap">
+          <div class="textarea-wrap" id="inputWrap">
             <textarea id="inputText" spellcheck="false"></textarea>
+
+            <!-- ✅ PDF 模式下显示“命中标记层”（不影响原始文本） -->
+            <div class="input-overlay" id="inputOverlay" aria-hidden="true"></div>
+
+            <!-- ✅ 风险提示：有内容时自动隐藏 -->
             <div class="input-watermark" id="ui-input-watermark" aria-hidden="true"></div>
           </div>
         </div>
 
-        <!-- ✅ control row: money + filter -->
         <div class="controlbar controlbar-eq" id="leftControlBar">
           <div class="moneyctl">
             <label id="ui-money-label" for="moneyMode"></label>
@@ -64,11 +68,11 @@
           </div>
 
           <div class="ctl-actions">
-            <button class="btn primary" id="btnGenerate"></button>
+            <button class="btn primary btn-s" id="btnGenerate"></button>
           </div>
         </div>
 
-        <!-- ✅ 风险评分：做成折叠卡，默认折叠；生成后自动展开 -->
+        <!-- ✅ 风险评分：summary 作为唯一标题；内容里不再重复“风险评分” -->
         <details class="fold fold-eq" id="riskDetails">
           <summary class="fold-sum" id="ui-risk-title"></summary>
           <div class="fold-body">
@@ -76,15 +80,14 @@
           </div>
         </details>
 
-        <!-- ✅ 左侧底部：法律提示固定在底部 -->
-        <div class="bottom-fixed tiny footnote" id="ui-foot"></div>
+        <!-- ✅ 左侧底部：用与链接一致的颜色；去掉分割线 -->
+        <div class="bottom-fixed tiny footnote accent-link" id="ui-foot"></div>
       </section>
 
       <!-- ================= MIDDLE FILTER ================= -->
       <div class="mid-filter" aria-hidden="true">
         <div class="flow-line"></div>
 
-        <!-- ✅ LOGO 对调：中间使用 full（图标+文字），并移除底部 “Filter” 文本 -->
         <div class="filter-badge filter-badge-plain">
           <img
             src="./assets/logo-filter-full.png"
@@ -96,17 +99,18 @@
         </div>
 
         <div class="flow-line"></div>
+        <div class="mid-title" id="ui-mid-title">Filter</div>
       </div>
 
       <!-- ================= RIGHT: OUTPUT ================= -->
       <section class="card card-col right" id="rightCard">
         <h3 id="ui-out-title"></h3>
 
-        <!-- ✅ 右侧：复制+清空 放到输出框上方，并做成“卡片”，位置与左侧选择文件卡对齐 -->
+        <!-- ✅ 顶部卡：复制/清空靠右；复制缩小 -->
         <div class="barcard barcard-top">
           <div class="top-actions">
-            <button class="btn primary" id="btnCopy"></button>
-            <button class="btn secondary" id="btnClear"></button>
+            <button class="btn primary btn-s btn-mini" id="btnCopy"></button>
+            <button class="btn secondary btn-s btn-mini" id="btnClear"></button>
           </div>
         </div>
 
@@ -114,22 +118,20 @@
           <div class="output output-scroll" id="outputText"></div>
         </div>
 
-        <!-- ✅ “有帮助吗”做成卡片，与左侧金额卡持平 -->
+        <!-- ✅ 有帮助吗：右对齐（不平均分布） -->
         <div class="controlbar controlbar-eq" id="rightFeedbackBar">
-          <div class="feedback feedback-inline">
+          <div class="feedback feedback-inline feedback-right">
             <div class="fbq" id="ui-fb-q"></div>
             <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
             <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
           </div>
         </div>
 
-        <!-- ✅ 过滤成就：折叠卡（默认折叠；生成后自动展开），与左侧风险评分对齐 -->
+        <!-- ✅ 过滤成就：把说明文字挪到“下载”按钮下方 -->
         <details class="fold fold-eq" id="achvDetails">
           <summary class="fold-sum" id="ui-share-title"></summary>
 
           <div class="fold-body">
-            <div class="achv-sub" id="ui-share-sub"></div>
-
             <div class="achv-preview">
               <div class="achv-previewbox">
                 <img id="shareAutoImg" alt="achievement preview" />
@@ -137,13 +139,14 @@
               </div>
 
               <div class="achv-right">
-                <button class="btn primary btn-fixed" id="btnShareDownload"></button>
+                <button class="btn primary btn-fixed btn-s" id="btnShareDownload"></button>
+                <div class="achv-sub" id="ui-share-sub"></div>
               </div>
             </div>
           </div>
         </details>
 
-        <!-- ✅ 右侧底部链接固定在底部，与左侧底部文案同一水平线 -->
+        <!-- ✅ 右侧底部链接：去掉分割线；与左侧底部同一水平线 -->
         <div class="bottom-fixed links">
           <a id="linkLearn" href="./docs.html" target="_blank"></a>
           <a id="linkPrivacy" href="./privacy.html" target="_blank"></a>
