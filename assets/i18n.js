@@ -63,7 +63,7 @@ const I18N = {
 
     shareTitle: "Filter achievement",
     shareSub:
-      "No original text\nLocal-only stats\nand a privacy notice\nSupport & encouragement only",
+      "No original text.\nOnly\nlocal filter stats\nand\na privacy notice.\nFor support\n& encouragement\nonly.",
     achvPlaceholder: "Preview appears after filtering",
 
     btnDownload: "Download",
@@ -101,7 +101,7 @@ const I18N = {
 
     shareTitle: "Filter-Ergebnis",
     shareSub:
-      "Kein Originaltext\nNur lokale Statistik\nund Datenschutzhinweis\nNur zur Unterstützung",
+      "Kein Originaltext.\nNur\nlokale Statistik\nund\nDatenschutzhinweis.\nNur zur\nUnterstützung\nund Ermutigung.",
     achvPlaceholder: "Vorschau nach dem Filtern",
 
     btnDownload: "Download",
