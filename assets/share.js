@@ -1,7 +1,6 @@
 // assets/share.js
-// "Achievement card" generator (NO original text).
+// Auto card generator (NO original text). Generates preview only after filtering.
 // Trigger: window event "safe:updated" (dispatched by app.js after applyRules()).
-// UI: shown inside <details id="achieveFold"> (collapsed shows title only).
 
 (function () {
   function $(id){ return document.getElementById(id); }
@@ -14,13 +13,9 @@
     const lang = getLang();
     const dict = {
       zh: {
-        title: "过滤成就",
-        sub: "不含原文，仅展示处理统计与隐私承诺",
-        placeholder: "生成过滤结果后，这里会显示成就卡片预览。",
-        btn: "下载",
         badge: "本地生成 · 不上传 · 不保存",
         line1: "AI Input Filter",
-        line2: "Filter before AI reads.",
+        line2: "在 AI 读取之前，先通过 Filter。",
         statHits: "已遮盖",
         statUnit: "项",
         statMoney: "金额保护",
@@ -29,13 +24,9 @@
         m2: "区间"
       },
       de: {
-        title: "Filter-Erfolg",
-        sub: "Kein Originaltext — nur Statistik & Versprechen",
-        placeholder: "Nach dem Filtern erscheint hier eine Vorschau der Erfolgskarte.",
-        btn: "Download",
         badge: "Lokal · kein Upload · keine Speicherung",
         line1: "AI Input Filter",
-        line2: "Filter before AI reads.",
+        line2: "Filter, bevor KI liest.",
         statHits: "Maskiert",
         statUnit: "Treffer",
         statMoney: "Betrag",
@@ -44,10 +35,6 @@
         m2: "Bereich"
       },
       en: {
-        title: "Filter achievement",
-        sub: "No original text — stats & privacy pledge only",
-        placeholder: "After you filter, an achievement card preview will appear here.",
-        btn: "Download",
         badge: "Local · no upload · no storage",
         line1: "AI Input Filter",
         line2: "Filter before AI reads.",
@@ -75,7 +62,6 @@
     return L.mOff;
   }
 
-  // ========= Logo assets =========
   const LOGO_ICON_SRC = "./assets/logo-filter-icon.png";
   const LOGO_FULL_SRC = "./assets/logo-filter-full.png";
 
@@ -108,7 +94,6 @@
     const iw = img.naturalWidth || img.width;
     const ih = img.naturalHeight || img.height;
     if (!iw || !ih) return;
-
     const r = Math.min(w / iw, h / ih);
     const nw = iw * r;
     const nh = ih * r;
@@ -124,7 +109,6 @@
   }
 
   async function drawCard(){
-    // fixed size (story)
     const w = 1080, h = 1350;
     const L = t();
     const { hits, moneyMode } = getMetrics();
@@ -139,7 +123,6 @@
     canvas.height = h;
     const ctx = canvas.getContext("2d");
 
-    // Background
     const g = ctx.createLinearGradient(0,0,w,h);
     g.addColorStop(0, "rgba(12,16,24,1)");
     g.addColorStop(0.5, "rgba(18,22,34,1)");
@@ -147,7 +130,6 @@
     ctx.fillStyle = g;
     ctx.fillRect(0,0,w,h);
 
-    // blobs
     ctx.save();
     ctx.globalAlpha = 0.55;
     ctx.filter = "blur(40px)";
@@ -162,7 +144,6 @@
 
     const pad = 84;
 
-    // main panel
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,.55)";
     ctx.shadowBlur = 40;
@@ -175,7 +156,6 @@
     ctx.stroke();
     ctx.restore();
 
-    // icon tile
     const iconSize = 112;
     const iconX = pad + 56;
     const iconY = pad + 56;
@@ -199,7 +179,6 @@
       ctx.restore();
     }
 
-    // title
     ctx.save();
     ctx.fillStyle = "rgba(255,255,255,.95)";
     ctx.font = "900 54px system-ui, -apple-system, Segoe UI, Roboto, Arial";
@@ -210,7 +189,6 @@
     ctx.fillText(L.line2, pad + 56 + iconSize + 26, pad + 160);
     ctx.restore();
 
-    // badge
     const badgeText = L.badge;
     ctx.save();
     ctx.font = "650 30px system-ui, -apple-system, Segoe UI, Roboto, Arial";
@@ -226,12 +204,12 @@
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.stroke();
+
     ctx.fillStyle = "rgba(255,255,255,.92)";
     ctx.textBaseline = "middle";
     ctx.fillText(badgeText, pad + 56 + padX, pad + 210 + bh/2);
     ctx.restore();
 
-    // stats
     const statX = pad + 56;
     const statY = pad + 320;
     const gap = 18;
@@ -259,7 +237,6 @@
     statCard(statX, statY, `${L.statHits}`, `${hits} ${L.statUnit}`);
     statCard(statX + cardW + gap, statY, `${L.statMoney}`, formatMoneyMode(moneyMode));
 
-    // watermark
     if (logoIcon) {
       const midSize = 280;
       const midX = w/2 - midSize/2;
@@ -270,7 +247,6 @@
       ctx.restore();
     }
 
-    // bottom
     const bottomY = h - pad - 70;
     ctx.save();
     ctx.fillStyle = "rgba(255,255,255,.60)";
@@ -315,27 +291,13 @@
   let lastDataUrl = "";
   let isBusy = false;
 
-  function setAchieveI18n(){
-    const L = t();
-    const titleEl = $("ui-ach-title");
-    const subEl = $("ui-ach-sub");
-    const ph = $("achPlaceholder");
-    const btn = $("btnShareDownload");
-    if (titleEl) titleEl.textContent = L.title;
-    if (subEl) subEl.textContent = L.sub;
-    if (ph) ph.textContent = L.placeholder;
-    if (btn) btn.textContent = L.btn;
-  }
-
-  function setPreviewState(has){
+  function setPreviewState(hasImg){
     const img = $("shareAutoImg");
-    const ph = $("achPlaceholder");
-    if (has) {
-      if (ph) ph.style.display = "none";
-      if (img) img.style.display = "block";
-    } else {
-      if (ph) ph.style.display = "block";
-      if (img) img.style.display = "none";
+    const ph = $("sharePlaceholder");
+    if (ph) ph.style.display = hasImg ? "none" : "flex";
+    if (img) {
+      img.style.opacity = hasImg ? "1" : "0";
+      img.style.transform = hasImg ? "translateY(0)" : "translateY(2px)";
     }
   }
 
@@ -345,23 +307,29 @@
     const outText = String(($("outputText") && $("outputText").textContent) || "").trim();
     const { hits } = getMetrics();
 
-    // Only generate AFTER there is output + at least 1 hit.
-    if (!outText || hits <= 0) {
+    // 没输出：保持 placeholder
+    if (!outText) {
       lastDataUrl = "";
-      const img = $("shareAutoImg");
-      if (img) img.removeAttribute("src");
+      if ($("shareAutoImg")) $("shareAutoImg").removeAttribute("src");
       setPreviewState(false);
       return;
     }
 
-    setPreviewState(true);
-
+    // 有输出：生成（即使 hits=0 也允许生成成就卡）
     isBusy = true;
     try{
       const canvas = await drawCard();
       lastDataUrl = canvasToPngDataUrl(canvas);
+
       const img = $("shareAutoImg");
       if (img) img.src = lastDataUrl;
+
+      setPreviewState(true);
+
+      // ✅ 自动展开
+      const d = $("shareDetails");
+      if (d) d.open = true;
+
     } finally{
       isBusy = false;
     }
@@ -373,7 +341,7 @@
       btn.onclick = async () => {
         if (!lastDataUrl) await refreshCard();
         if (!lastDataUrl) return;
-        const file = `ai-input-filter_achievement_${nowStamp()}.png`;
+        const file = `ai-input-filter_card_${nowStamp()}.png`;
         downloadDataUrl(lastDataUrl, file);
       };
     }
@@ -383,14 +351,10 @@
     loadImg(LOGO_ICON_SRC);
     loadImg(LOGO_FULL_SRC);
 
-    setAchieveI18n();
     bind();
-
-    // collapsed by default: only title visible; body hidden
     setPreviewState(false);
 
     window.addEventListener("safe:updated", () => {
-      setAchieveI18n();
       refreshCard();
     });
   });
