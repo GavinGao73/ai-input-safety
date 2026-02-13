@@ -39,7 +39,8 @@
         <!-- ✅ 单层卡：取消“嵌套两层边框” -->
         <div class="barcard barcard-top">
           <div class="filebar filebar-flat">
-            <input id="pdfFile" type="file" accept="application/pdf" />
+            <!-- ✅ Stage 3: accept PDF + image -->
+            <input id="pdfFile" type="file" accept="application/pdf,image/*" />
             <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn"></label>
             <div class="filename" id="pdfName" aria-hidden="true"></div>
           </div>
@@ -69,6 +70,8 @@
 
           <div class="ctl-actions">
             <button class="btn primary btn-s" id="btnGenerate"></button>
+            <!-- ✅ Stage 3: Mode B入口（默认隐藏） -->
+            <button class="btn secondary btn-s" id="btnManualRedact" style="display:none;"></button>
           </div>
         </div>
 
@@ -85,23 +88,22 @@
       </section>
 
       <!-- ================= MIDDLE FILTER ================= -->
-<div class="mid-filter" aria-hidden="true">
-  <div class="flow-line"></div>
+      <div class="mid-filter" aria-hidden="true">
+        <div class="flow-line"></div>
 
-  <div class="filter-badge filter-badge-plain">
-    <img
-      src="./assets/logo-filter-icon.png"
-      class="filter-icon-mid"
-      alt="Filter"
-      loading="eager"
-      decoding="async"
-    />
-  </div>
+        <div class="filter-badge filter-badge-plain">
+          <img
+            src="./assets/logo-filter-icon.png"
+            class="filter-icon-mid"
+            alt="Filter"
+            loading="eager"
+            decoding="async"
+          />
+        </div>
 
-  <div class="flow-line"></div>
-  <div class="mid-title" id="ui-mid-title">Filter</div>
-</div>
-
+        <div class="flow-line"></div>
+        <div class="mid-title" id="ui-mid-title">Filter</div>
+      </div>
 
       <!-- ================= RIGHT: OUTPUT ================= -->
       <section class="card card-col right" id="rightCard">
@@ -110,6 +112,10 @@
         <!-- ✅ 顶部卡：复制/清空靠右；复制缩小 -->
         <div class="barcard barcard-top">
           <div class="top-actions">
+            <!-- ✅ Stage 3: Mode A 导出按钮（默认隐藏） -->
+            <button class="btn secondary btn-s btn-mini" id="btnExportText" style="display:none;"></button>
+            <button class="btn primary btn-s btn-mini" id="btnExportRasterPdf" style="display:none;"></button>
+
             <button class="btn primary btn-s btn-mini" id="btnCopy"></button>
             <button class="btn secondary btn-s btn-mini" id="btnClear"></button>
           </div>
@@ -162,6 +168,11 @@
   <script src="./assets/catalog.js" defer></script>
   <script src="./assets/rules.js" defer></script>
   <script src="./assets/pdf.js" defer></script>
+
+  <!-- ✅ Stage 3: new (inserted between pdf.js and app.js) -->
+  <script src="./assets/raster-export.js" defer></script>
+  <script src="./assets/redact-ui.js" defer></script>
+
   <script src="./assets/app.js" defer></script>
   <script src="./assets/share.js" defer></script>
 </body>
