@@ -7,6 +7,8 @@ const I18N = {
     inputWatermark:
       "AI 系统可以解析文档中的隐藏文本结构。\n本工具仅在本地运行，不上传、不保存内容。",
 
+    btnUpload: "上传文件",
+
     moneyLabel: "金额：",
     moneyOff: "关闭",
     moneyM1: "M1",
@@ -20,7 +22,7 @@ const I18N = {
     riskTitle: "风险评分",
 
     shareTitle: "过滤成就",
-    shareSub: "不含原文，仅展示处理结果与隐私承诺",
+    shareSub: "不含原文；仅显示本地处理统计与隐私声明。",
     achvPlaceholder: "生成后显示预览",
 
     btnDownload: "下载",
@@ -31,7 +33,7 @@ const I18N = {
     privacy: "隐私原则",
     scope: "MVP 范围",
 
-    foot: "本工具仅提供风险提示，不构成法律建议。"
+    foot: "了解更多  隐私原则  MVP 范围"
   },
 
   en: {
@@ -41,6 +43,8 @@ const I18N = {
     placeholder: "e.g. resume, email, report summary…",
     inputWatermark:
       "AI systems can extract hidden text-layer data.\nAll processing runs locally. Nothing is stored or transmitted.",
+
+    btnUpload: "Upload file",
 
     moneyLabel: "Money:",
     moneyOff: "Off",
@@ -55,7 +59,7 @@ const I18N = {
     riskTitle: "Risk score",
 
     shareTitle: "Filter achievement",
-    shareSub: "No original text — stats & privacy pledge only",
+    shareSub: "No original text — local stats & privacy statement only.",
     achvPlaceholder: "Preview appears after filtering",
 
     btnDownload: "Download",
@@ -66,7 +70,7 @@ const I18N = {
     privacy: "Privacy",
     scope: "MVP Scope",
 
-    foot: "This tool provides risk hints only."
+    foot: "Learn More  Privacy  MVP Scope"
   },
 
   de: {
@@ -76,6 +80,8 @@ const I18N = {
     placeholder: "z.B. Lebenslauf, E-Mail, Bericht…",
     inputWatermark:
       "KI-Systeme lesen auch verborgene Textlayer-Daten.\nVerarbeitung erfolgt ausschließlich lokal. Keine Speicherung.",
+
+    btnUpload: "Datei hochladen",
 
     moneyLabel: "Betrag:",
     moneyOff: "Aus",
@@ -90,7 +96,7 @@ const I18N = {
     riskTitle: "Risikowert",
 
     shareTitle: "Filter-Ergebnis",
-    shareSub: "Kein Originaltext — nur Ergebnis & Versprechen",
+    shareSub: "Kein Originaltext — nur lokale Statistik & Datenschutzhinweis.",
     achvPlaceholder: "Vorschau nach dem Filtern",
 
     btnDownload: "Download",
@@ -101,7 +107,7 @@ const I18N = {
     privacy: "Datenschutz",
     scope: "MVP-Umfang",
 
-    foot: "Kein Ersatz für Rechtsberatung."
+    foot: "Mehr erfahren  Datenschutz  MVP-Umfang"
   }
 };
 
