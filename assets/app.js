@@ -586,7 +586,17 @@ async function handlePdf(file) {
     }
 
     updateInputWatermarkVisibility();
+
+    // 先跑规则（会更新 __safe_* 指标 + 风险卡）
     applyRules(text);
+
+    // ✅ 立刻渲染 PDF overlay（避免“点一下才消失/刷新”的重叠现象）
+    if (typeof renderInputOverlayForPdf === "function") {
+      renderInputOverlayForPdf(text);
+    }
+
+    // ✅ 触发成就卡刷新（share.js 监听）
+    window.dispatchEvent(new Event("safe:updated"));
 
   } catch (e) {}
 }
