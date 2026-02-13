@@ -203,70 +203,156 @@
     return matchers;
   }
 
-  function textItemsToRects(pdfjsLib, page, viewport, textContent, matchers) {
-    const rects = [];
-    const items = (textContent && textContent.items) ? textContent.items : [];
-    const Util = pdfjsLib.Util;
+function textItemsToRects(pdfjsLib, viewport, textContent, matchers) {
+  const Util = pdfjsLib.Util;
+  const rects = [];
+  const items = (textContent && textContent.items) ? textContent.items : [];
 
-    for (const it of items) {
-      const s = String(it.str || "");
-      if (!s) continue;
-
-      let hit = false;
-      for (const m of matchers) {
-        m.re.lastIndex = 0;
-        if (m.re.test(s)) { hit = true; break; }
-      }
-      if (!hit) continue;
-
-      // Conservative: cover whole text item box
-      // Based on common pdf.js mapping approach
-      const tx = Util.transform(viewport.transform, it.transform);
-      const x = tx[4];
-      const y = tx[5];
-
-      // Height estimate: vector length of [tx[2], tx[3]] or [tx[0], tx[1]]
-      const fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
-
-      // Width: use it.width * viewport.scale if width seems unscaled
-      // In many builds, it.width is already in viewport units; we clamp to safe.
-      let w = Number(it.width || 0);
-      if (!Number.isFinite(w) || w <= 0) w = s.length * fontH * 0.55;
-      // Heuristic: if w is too small, scale it
-      if (w < 2) w = s.length * fontH * 0.55;
-
-      // PDF coords: y is baseline; convert to canvas coords (top-left origin)
-      const canvasH = Math.floor(viewport.height);
-      const rect = {
-        x: clamp(x, 0, viewport.width),
-        y: clamp(canvasH - y - fontH, 0, viewport.height),
-        w: clamp(w, 1, viewport.width),
-        h: clamp(fontH * 1.15, 6, 120)
-      };
-      rects.push(rect);
+  function getAllMatchRanges(re, s) {
+    // returns [ [start,end), ... ] for global regex
+    const out = [];
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(s)) !== null) {
+      const a = m.index;
+      const b = a + String(m[0] || "").length;
+      if (b > a) out.push([a, b]);
+      // avoid infinite loop on zero-length
+      if (m[0] === "") re.lastIndex++;
     }
-
-    // Merge near-overlapping rects a bit (simple)
-    rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-    const merged = [];
-    for (const r of rects) {
-      const last = merged[merged.length - 1];
-      if (!last) { merged.push({ ...r }); continue; }
-      const yClose = Math.abs((last.y + last.h) - (r.y + r.h)) < 8 || Math.abs(last.y - r.y) < 8;
-      const overlapX = !(r.x > last.x + last.w + 6 || last.x > r.x + r.w + 6);
-      if (yClose && overlapX) {
-        const nx = Math.min(last.x, r.x);
-        const ny = Math.min(last.y, r.y);
-        const nr = Math.max(last.x + last.w, r.x + r.w);
-        const nb = Math.max(last.y + last.h, r.y + r.h);
-        last.x = nx; last.y = ny; last.w = nr - nx; last.h = nb - ny;
-      } else {
-        merged.push({ ...r });
-      }
-    }
-
-    return merged;
+    return out;
   }
+
+  function bboxForItem(it) {
+    // Combine viewport + item transform to get a matrix that maps text space -> canvas space
+    const m = Util.transform(viewport.transform, it.transform);
+
+    // item.width/height are in text space. height may be missing in some builds.
+    const w = Number(it.width || 0);
+    let h = Number(it.height || 0);
+
+    // Fallback height from transform if missing
+    if (!Number.isFinite(h) || h <= 0) {
+      // vertical scale magnitude
+      h = Math.hypot(m[2], m[3]) || Math.hypot(m[0], m[1]) || 10;
+      // Make it a “box height” not baseline-only
+      h = h * 1.15;
+    }
+
+    // If width is missing or 0, approximate by char count
+    let ww = w;
+    if (!Number.isFinite(ww) || ww <= 0) {
+      const s = String(it.str || "");
+      const approxCharW = (h * 0.55);
+      ww = Math.max(approxCharW * s.length, 6);
+    }
+
+    // Transform corners (0,0), (ww,0), (0,h), (ww,h)
+    function tp(x, y) {
+      // Apply matrix m to point (x,y)
+      return {
+        x: m[0] * x + m[2] * y + m[4],
+        y: m[1] * x + m[3] * y + m[5]
+      };
+    }
+
+    const p1 = tp(0, 0);
+    const p2 = tp(ww, 0);
+    const p3 = tp(0, h);
+    const p4 = tp(ww, h);
+
+    const xs = [p1.x, p2.x, p3.x, p4.x];
+    const ys = [p1.y, p2.y, p3.y, p4.y];
+
+    const minX = Math.min.apply(null, xs);
+    const maxX = Math.max.apply(null, xs);
+    const minY = Math.min.apply(null, ys);
+    const maxY = Math.max.apply(null, ys);
+
+    // Canvas coordinates are already in the same space as page.render(canvas, viewport)
+    return {
+      x: minX,
+      y: minY,
+      w: Math.max(1, maxX - minX),
+      h: Math.max(1, maxY - minY)
+    };
+  }
+
+  for (const it of items) {
+    const s = String(it.str || "");
+    if (!s) continue;
+
+    // Collect match ranges across all matchers (union)
+    const ranges = [];
+    for (const m of matchers) {
+      m.re.lastIndex = 0;
+      if (!m.re.test(s)) continue;
+      const rs = getAllMatchRanges(m.re, s);
+      for (const r of rs) ranges.push(r);
+    }
+    if (!ranges.length) continue;
+
+    // Merge overlapping/adjacent ranges
+    ranges.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const mergedRanges = [];
+    for (const r of ranges) {
+      const last = mergedRanges[mergedRanges.length - 1];
+      if (!last) { mergedRanges.push([r[0], r[1]]); continue; }
+      if (r[0] <= last[1] + 1) last[1] = Math.max(last[1], r[1]);
+      else mergedRanges.push([r[0], r[1]]);
+    }
+
+    // Compute precise bbox for the whole item, then slice horizontally by character proportion
+    const bb = bboxForItem(it);
+    const len = Math.max(1, s.length);
+
+    // Heuristic: treat whitespace as “width consuming” but less important;
+    // still keep proportional slicing to align with your overlay-style regex results.
+    for (const [a, b] of mergedRanges) {
+      const start = Math.max(0, Math.min(len, a));
+      const end = Math.max(0, Math.min(len, b));
+      if (end <= start) continue;
+
+      const x1 = bb.x + bb.w * (start / len);
+      const x2 = bb.x + bb.w * (end / len);
+
+      // Slight padding to be safer
+      const padX = Math.max(1, bb.w * 0.01);
+      const padY = Math.max(1, bb.h * 0.10);
+
+      rects.push({
+        x: x1 - padX,
+        y: bb.y - padY,
+        w: (x2 - x1) + padX * 2,
+        h: bb.h + padY * 2
+      });
+    }
+  }
+
+  // Clamp + merge nearby rects (reduce fragmentation)
+  rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  const out = [];
+  for (const r of rects) {
+    if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
+    const last = out[out.length - 1];
+    if (!last) { out.push({ ...r }); continue; }
+
+    const yClose = Math.abs(last.y - r.y) < 6 || Math.abs((last.y + last.h) - (r.y + r.h)) < 6;
+    const overlapX = !(r.x > last.x + last.w + 8 || last.x > r.x + r.w + 8);
+
+    if (yClose && overlapX) {
+      const nx = Math.min(last.x, r.x);
+      const ny = Math.min(last.y, r.y);
+      const nr = Math.max(last.x + last.w, r.x + r.w);
+      const nb = Math.max(last.y + last.h, r.y + r.h);
+      last.x = nx; last.y = ny; last.w = nr - nx; last.h = nb - ny;
+    } else {
+      out.push({ ...r });
+    }
+  }
+
+  return out;
+}
 
   async function autoRedactReadablePdf({ file, lang, enabledKeys, moneyMode, dpi }) {
     const pdfjsLib = await loadPdfJsIfNeeded();
