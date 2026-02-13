@@ -1,5 +1,5 @@
 // assets/share.js
-// Auto share card generator (NO original text). Generates preview only after filtering.
+// Achievement card generator (NO original text).
 // Trigger: window event "safe:updated" (dispatched by app.js after applyRules()).
 
 (function () {
@@ -13,8 +13,6 @@
     const lang = getLang();
     const dict = {
       zh: {
-        shareTitle: "过滤成就",
-        shareSub: "不含原文，仅展示处理结果与隐私承诺",
         badge: "本地生成 · 不上传 · 不保存",
         line1: "AI Input Filter",
         line2: "在 AI 读取之前，先通过 Filter。",
@@ -23,12 +21,9 @@
         statMoney: "金额保护",
         mOff: "关闭",
         m1: "精确",
-        m2: "区间",
-        placeholder: "生成后显示预览"
+        m2: "区间"
       },
       de: {
-        shareTitle: "Filter-Ergebnis",
-        shareSub: "Kein Originaltext — nur Ergebnis & Zusage",
         badge: "Lokal · kein Upload · keine Speicherung",
         line1: "AI Input Filter",
         line2: "Filter, bevor KI liest.",
@@ -37,12 +32,9 @@
         statMoney: "Betrag",
         mOff: "Aus",
         m1: "Genau",
-        m2: "Bereich",
-        placeholder: "Vorschau nach dem Filtern"
+        m2: "Bereich"
       },
       en: {
-        shareTitle: "Filter Result",
-        shareSub: "No original text — stats & privacy pledge only",
         badge: "Local · no upload · no storage",
         line1: "AI Input Filter",
         line2: "Filter before AI reads.",
@@ -51,8 +43,7 @@
         statMoney: "Money",
         mOff: "Off",
         m1: "Exact",
-        m2: "Range",
-        placeholder: "Preview appears after filtering"
+        m2: "Range"
       }
     };
     return dict[lang] || dict.zh;
@@ -134,7 +125,6 @@
     canvas.height = h;
     const ctx = canvas.getContext("2d");
 
-    // Background
     const g = ctx.createLinearGradient(0,0,w,h);
     g.addColorStop(0, "rgba(12,16,24,1)");
     g.addColorStop(0.5, "rgba(18,22,34,1)");
@@ -142,7 +132,6 @@
     ctx.fillStyle = g;
     ctx.fillRect(0,0,w,h);
 
-    // Soft blobs
     ctx.save();
     ctx.globalAlpha = 0.55;
     ctx.filter = "blur(40px)";
@@ -157,7 +146,6 @@
 
     const pad = 84;
 
-    // Main panel
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,.55)";
     ctx.shadowBlur = 40;
@@ -170,7 +158,6 @@
     ctx.stroke();
     ctx.restore();
 
-    // Top icon frame
     const iconSize = 112;
     const iconX = pad + 56;
     const iconY = pad + 56;
@@ -194,7 +181,6 @@
       ctx.restore();
     }
 
-    // Title + subtitle
     ctx.save();
     ctx.fillStyle = "rgba(255,255,255,.95)";
     ctx.font = "900 54px system-ui, -apple-system, Segoe UI, Roboto, Arial";
@@ -205,14 +191,12 @@
     ctx.fillText(L.line2, pad + 56 + iconSize + 26, pad + 160);
     ctx.restore();
 
-    // Badge
     const badgeText = L.badge;
     ctx.save();
     ctx.font = "650 30px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     const padX = 22;
     const bw = ctx.measureText(badgeText).width + padX*2;
     const bh = 54;
-
     ctx.shadowColor = "rgba(0,0,0,.35)";
     ctx.shadowBlur = 18;
     ctx.fillStyle = "rgba(255,255,255,.10)";
@@ -228,7 +212,6 @@
     ctx.fillText(badgeText, pad + 56 + padX, pad + 210 + bh/2);
     ctx.restore();
 
-    // Stats cards
     const statX = pad + 56;
     const statY = pad + 320;
     const gap = 18;
@@ -256,7 +239,6 @@
     statCard(statX, statY, `${L.statHits}`, `${hits} ${L.statUnit}`);
     statCard(statX + cardW + gap, statY, `${L.statMoney}`, formatMoneyMode(moneyMode));
 
-    // Watermark icon
     if (logoIcon) {
       const midSize = 280;
       const midX = w/2 - midSize/2;
@@ -267,7 +249,6 @@
       ctx.restore();
     }
 
-    // Bottom pledge
     const bottomY = h - pad - 70;
     ctx.save();
     ctx.fillStyle = "rgba(255,255,255,.60)";
@@ -283,7 +264,6 @@
     ctx.fillText("gavingao73.github.io/ai-input-safety", w - pad - 56, bottomY + 40);
     ctx.restore();
 
-    // Small full logo
     if (logoFull) {
       const fullW = 320, fullH = 86;
       const fx = w - pad - 56 - fullW;
@@ -313,54 +293,37 @@
   let lastDataUrl = "";
   let isBusy = false;
 
-  function setPanelTexts(){
-    const L = t();
-    if ($("ui-share-title")) $("ui-share-title").textContent = L.shareTitle;
-    if ($("ui-share-sub")) $("ui-share-sub").textContent = L.shareSub;
-    if ($("sharePlaceholder")) $("sharePlaceholder").textContent = L.placeholder;
-  }
-
-  function setPreviewState(hasImg){
+  function setPreview(dataUrl){
     const img = $("shareAutoImg");
-    const ph = $("sharePlaceholder");
-    if (img) {
-      if (hasImg) {
-        img.style.opacity = "1";
-        img.style.transform = "translateY(0)";
-      } else {
-        img.style.opacity = "0";
-        img.style.transform = "translateY(2px)";
+    const ph = $("ui-achv-placeholder");
+    if (img && dataUrl) {
+      img.src = dataUrl;
+      img.style.display = "block";
+      if (ph) ph.style.display = "none";
+    } else {
+      if (img) {
+        img.removeAttribute("src");
+        img.style.display = "none";
       }
+      if (ph) ph.style.display = "block";
     }
-    if (ph) ph.style.display = hasImg ? "none" : "flex";
   }
 
   async function refreshCard(){
     if (isBusy) return;
 
     const outText = String(($("outputText") && $("outputText").textContent) || "").trim();
-    const img = $("shareAutoImg");
-
-    // ✅ 没有输出：保持占位，不生成（但“过滤成就”仍可折叠存在）
     if (!outText) {
       lastDataUrl = "";
-      if (img) img.removeAttribute("src");
-      setPreviewState(false);
+      setPreview("");
       return;
     }
 
-    // ✅ 有输出：生成并展示
     isBusy = true;
     try{
       const canvas = await drawCard();
       lastDataUrl = canvasToPngDataUrl(canvas);
-      if (img) img.src = lastDataUrl;
-      setPreviewState(true);
-
-      // ✅ 确保同步生成时自动展开
-      const details = $("shareDetails");
-      if (details) details.open = true;
-
+      setPreview(lastDataUrl);
     } finally{
       isBusy = false;
     }
@@ -372,7 +335,7 @@
       btn.onclick = async () => {
         if (!lastDataUrl) await refreshCard();
         if (!lastDataUrl) return;
-        const file = `ai-input-filter_card_${nowStamp()}.png`;
+        const file = `ai-input-filter_achievement_${nowStamp()}.png`;
         downloadDataUrl(lastDataUrl, file);
       };
     }
@@ -382,14 +345,10 @@
     loadImg(LOGO_ICON_SRC);
     loadImg(LOGO_FULL_SRC);
 
-    setPanelTexts();
     bind();
-
-    // 初始：无图占位
-    setPreviewState(false);
+    setPreview("");
 
     window.addEventListener("safe:updated", () => {
-      setPanelTexts();
       refreshCard();
     });
   });
