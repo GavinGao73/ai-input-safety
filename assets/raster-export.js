@@ -160,293 +160,283 @@
     return { pdf, pages, dpi: dpi || DEFAULT_DPI };
   }
 
-  // --------- Rules -> matchers (STRICT: same as text mode) ----------
+  // --------- Rules -> matchers ----------
   function buildRuleMatchers(enabledKeys, moneyMode) {
-  // ✅ PDF 红删只允许真正敏感信息规则参与（避免表格黑墙）
-  const PDF_SAFE_KEYS = ["email", "phone", "bank", "account", "address_de_street", "money"];
+    // ✅ PDF 红删只允许真正敏感信息规则参与（避免表格黑墙）
+    const PDF_SAFE_KEYS = ["email", "phone", "bank", "account", "address_de_street", "money"];
 
-  const rules = window.RULES_BY_KEY || {};
-  const matchers = [];
+    const rules = window.RULES_BY_KEY || {};
+    const matchers = [];
 
-  // 兼容：RegExp | string | {source, flags} | {pattern, flags}
-  function normalizeToRegExp(pat) {
-    if (!pat) return null;
-    if (pat instanceof RegExp) return pat;
+    // 兼容：RegExp | string | {source, flags} | {pattern, flags}
+    function normalizeToRegExp(pat) {
+      if (!pat) return null;
+      if (pat instanceof RegExp) return pat;
 
-    if (typeof pat === "string") {
-      try { return new RegExp(pat, "g"); } catch (_) { return null; }
+      if (typeof pat === "string") {
+        try { return new RegExp(pat); } catch (_) { return null; }
+      }
+
+      if (typeof pat === "object") {
+        const src = (typeof pat.source === "string") ? pat.source
+                  : (typeof pat.pattern === "string") ? pat.pattern
+                  : null;
+        if (!src) return null;
+
+        const flags = (typeof pat.flags === "string") ? pat.flags : "";
+        try { return new RegExp(src, flags); } catch (_) { return null; }
+      }
+
+      return null;
     }
 
-    if (typeof pat === "object") {
-      const src = (typeof pat.source === "string") ? pat.source
-                : (typeof pat.pattern === "string") ? pat.pattern
+    function forceGlobal(re) {
+      if (!(re instanceof RegExp)) return null;
+      const flags = re.flags.includes("g") ? re.flags : (re.flags + "g");
+      try { return new RegExp(re.source, flags); } catch (_) { return null; }
+    }
+
+    for (const k of PDF_SAFE_KEYS) {
+      const r = rules[k];
+      if (!r) continue;
+
+      // money 仍受模式控制
+      if (k === "money" && (!moneyMode || moneyMode === "off")) continue;
+
+      const raw = (r.pattern != null) ? r.pattern
+                : (r.re != null) ? r.re
+                : (r.regex != null) ? r.regex
                 : null;
-      if (!src) return null;
 
-      const flags = (typeof pat.flags === "string") ? pat.flags : "";
-      try { return new RegExp(src, flags); } catch (_) { return null; }
+      const re0 = normalizeToRegExp(raw);
+      const re = forceGlobal(re0);
+      if (!re) continue;
+
+      matchers.push({ key: k, re });
     }
 
-    return null;
+    return matchers;
   }
 
-  function forceGlobal(re) {
-    if (!(re instanceof RegExp)) return null;
-    const flags = re.flags.includes("g") ? re.flags : (re.flags + "g");
-    try { return new RegExp(re.source, flags); } catch (_) { return null; }
-  }
+  // --------- Text items -> rects ----------
+  function textItemsToRects(pdfjsLib, viewport, textContent, matchers) {
+    const Util = pdfjsLib.Util;
+    const items = (textContent && textContent.items) ? textContent.items : [];
+    const rects = [];
 
-  for (const k of PDF_SAFE_KEYS) {
-    const r = rules[k];
-    if (!r) continue;
+    if (!items.length || !matchers || !matchers.length) return rects;
 
-    // money 仍受模式控制
-    if (k === "money" && (!moneyMode || moneyMode === "off")) continue;
-
-    const raw = (r.pattern != null) ? r.pattern
-              : (r.re != null) ? r.re
-              : (r.regex != null) ? r.regex
-              : null;
-
-    const re0 = normalizeToRegExp(raw);
-    const re = forceGlobal(re0);
-    if (!re) continue;
-
-    matchers.push({ key: k, re });
-  }
-
-  return matchers;
-}
-
-  // --------- Text items -> rects (FIXED offsets + conservative merge) ----------
-function textItemsToRects(pdfjsLib, viewport, textContent, matchers) {
-  const Util = pdfjsLib.Util;
-  const items = (textContent && textContent.items) ? textContent.items : [];
-  const rects = [];
-
-  if (!items.length || !matchers || !matchers.length) return rects;
-
-  function getAllMatchRanges(re, s) {
-    const out = [];
-    re.lastIndex = 0;
-    let m;
-    while ((m = re.exec(s)) !== null) {
-      const a = m.index;
-      const b = a + String(m[0] || "").length;
-      if (b > a) out.push([a, b]);
-      if (m[0] === "") re.lastIndex++;
-    }
-    return out;
-  }
-
-  function bboxForItem(it) {
-    const m = Util.transform(viewport.transform, it.transform);
-
-    const w0 = Number(it.width || 0);
-    let h0 = Number(it.height || 0);
-
-    if (!Number.isFinite(h0) || h0 <= 0) {
-      h0 = Math.hypot(m[2], m[3]) || Math.hypot(m[0], m[1]) || 10;
-      h0 = h0 * 1.15;
+    function getAllMatchRanges(re, s) {
+      const out = [];
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(s)) !== null) {
+        const a = m.index;
+        const b = a + String(m[0] || "").length;
+        if (b > a) out.push([a, b]);
+        if (m[0] === "") re.lastIndex++;
+      }
+      return out;
     }
 
-    let ww = w0;
-    if (!Number.isFinite(ww) || ww <= 0) {
-      const s = String(it.str || "");
-      const approxCharW = (h0 * 0.55);
-      ww = Math.max(approxCharW * s.length, 6);
-    }
+    function bboxForItem(it) {
+      const m = Util.transform(viewport.transform, it.transform);
 
-    function tp(x, y) {
+      const w0 = Number(it.width || 0);
+      let h0 = Number(it.height || 0);
+
+      if (!Number.isFinite(h0) || h0 <= 0) {
+        h0 = Math.hypot(m[2], m[3]) || Math.hypot(m[0], m[1]) || 10;
+        h0 = h0 * 1.15;
+      }
+
+      let ww = w0;
+      if (!Number.isFinite(ww) || ww <= 0) {
+        const s = String(it.str || "");
+        const approxCharW = (h0 * 0.55);
+        ww = Math.max(approxCharW * s.length, 6);
+      }
+
+      function tp(x, y) {
+        return {
+          x: m[0] * x + m[2] * y + m[4],
+          y: m[1] * x + m[3] * y + m[5]
+        };
+      }
+
+      const p1 = tp(0, 0);
+      const p2 = tp(ww, 0);
+      const p3 = tp(0, h0);
+      const p4 = tp(ww, h0);
+
+      const xs = [p1.x, p2.x, p3.x, p4.x];
+      const ys = [p1.y, p2.y, p3.y, p4.y];
+
+      let minX = Math.min.apply(null, xs);
+      let maxX = Math.max.apply(null, xs);
+      let minY = Math.min.apply(null, ys);
+      let maxY = Math.max.apply(null, ys);
+
+      // clamp into viewport to avoid crazy transforms generating walls
+      minX = clamp(minX, 0, viewport.width);
+      maxX = clamp(maxX, 0, viewport.width);
+      minY = clamp(minY, 0, viewport.height);
+      maxY = clamp(maxY, 0, viewport.height);
+
       return {
-        x: m[0] * x + m[2] * y + m[4],
-        y: m[1] * x + m[3] * y + m[5]
+        x: minX,
+        y: minY,
+        w: Math.max(1, maxX - minX),
+        h: Math.max(1, maxY - minY)
       };
     }
 
-    const p1 = tp(0, 0);
-    const p2 = tp(ww, 0);
-    const p3 = tp(0, h0);
-    const p4 = tp(ww, h0);
-
-    const xs = [p1.x, p2.x, p3.x, p4.x];
-    const ys = [p1.y, p2.y, p3.y, p4.y];
-
-    let minX = Math.min.apply(null, xs);
-    let maxX = Math.max.apply(null, xs);
-    let minY = Math.min.apply(null, ys);
-    let maxY = Math.max.apply(null, ys);
-
-    // clamp into viewport to avoid crazy transforms generating walls
-    minX = clamp(minX, 0, viewport.width);
-    maxX = clamp(maxX, 0, viewport.width);
-    minY = clamp(minY, 0, viewport.height);
-    maxY = clamp(maxY, 0, viewport.height);
-
-    return {
-      x: minX,
-      y: minY,
-      w: Math.max(1, maxX - minX),
-      h: Math.max(1, maxY - minY)
-    };
-  }
-
-  function isWs(ch) {
-    return ch === " " || ch === "\n" || ch === "\t" || ch === "\r";
-  }
-
-  function shouldInsertSpace(prevChar, nextChar) {
-    if (!prevChar || !nextChar) return false;
-    if (isWs(prevChar) || isWs(nextChar)) return false;
-    // very conservative: insert space between typical word/number/CJK blocks
-    return true;
-  }
-
-  // 1) Build pageText similar to probe.text (spaces/newlines), and track item ranges with offsets INCLUDED.
-  let pageText = "";
-  const itemRanges = []; // { idx, start, end, len }
-
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
-    const s = String(it.str || "");
-    if (!s) continue;
-
-    const prevChar = pageText.length ? pageText[pageText.length - 1] : "";
-    const nextChar = s[0];
-
-    // add a space between items if needed (to avoid “glued mega-token”)
-    if (pageText && shouldInsertSpace(prevChar, nextChar) && !it.hasEOL) {
-      pageText += " ";
+    function isWs(ch) {
+      return ch === " " || ch === "\n" || ch === "\t" || ch === "\r";
     }
 
-    const start = pageText.length;
-    pageText += s;
-    const end = pageText.length;
+    function shouldInsertSpace(prevChar, nextChar) {
+      if (!prevChar || !nextChar) return false;
+      if (isWs(prevChar) || isWs(nextChar)) return false;
+      // very conservative: insert space between items to avoid glued mega-token
+      return true;
+    }
 
-    itemRanges.push({ idx: i, start, end, len: Math.max(1, s.length) });
+    // 1) Build pageText similar to probe.text
+    let pageText = "";
+    const itemRanges = []; // { idx, start, end, len }
 
-    if (it && it.hasEOL) pageText += "\n";
-  }
-
-  // 2) Match spans on pageText
-  const spans = [];
-  for (const m of matchers) {
-    const re0 = m.re;
-    if (!(re0 instanceof RegExp)) continue;
-
-    const flags = re0.flags.includes("g") ? re0.flags : (re0.flags + "g");
-    let re;
-    try { re = new RegExp(re0.source, flags); } catch (_) { continue; }
-
-    const rs = getAllMatchRanges(re, pageText);
-    for (const r of rs) spans.push(r);
-  }
-  if (!spans.length) return rects;
-
-  // 3) Merge spans
-  spans.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  const mergedSpans = [];
-  for (const sp of spans) {
-    const last = mergedSpans[mergedSpans.length - 1];
-    if (!last) { mergedSpans.push([sp[0], sp[1]]); continue; }
-    if (sp[0] <= last[1] + 1) last[1] = Math.max(last[1], sp[1]);
-    else mergedSpans.push([sp[0], sp[1]]);
-  }
-
-  // 4) Map spans back to items, slice horizontally
-  for (const [A, B] of mergedSpans) {
-    for (const r of itemRanges) {
-      const a = Math.max(A, r.start);
-      const b = Math.min(B, r.end);
-      if (b <= a) continue;
-
-      const it = items[r.idx];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
       const s = String(it.str || "");
       if (!s) continue;
 
-      const localStart = a - r.start;
-      const localEnd = b - r.start;
+      const prevChar = pageText.length ? pageText[pageText.length - 1] : "";
+      const nextChar = s[0];
 
-      const bb = bboxForItem(it);
-      const len = Math.max(1, s.length);
+      if (pageText && shouldInsertSpace(prevChar, nextChar) && !it.hasEOL) {
+        pageText += " ";
+      }
 
-      const x1 = bb.x + bb.w * (localStart / len);
-      const x2 = bb.x + bb.w * (localEnd / len);
+      const start = pageText.length;
+      pageText += s;
+      const end = pageText.length;
 
-      const padX = Math.max(1, bb.w * 0.012);
-      const padY = Math.max(1, bb.h * 0.12);
+      itemRanges.push({ idx: i, start, end, len: Math.max(1, s.length) });
 
-      let rx = x1 - padX;
-      let ry = bb.y - padY;
-      let rw = (x2 - x1) + padX * 2;
-      let rh = bb.h + padY * 2;
-
-      rx = clamp(rx, 0, viewport.width);
-      ry = clamp(ry, 0, viewport.height);
-      rw = clamp(rw, 1, viewport.width - rx);
-      rh = clamp(rh, 6, viewport.height - ry);
-
-      // Drop absurd rectangles (prevents black-wall cases)
-      if (rw > viewport.width * 0.92) continue;
-      if (rh > viewport.height * 0.35) continue;
-      if (rw > viewport.width * 0.85 && rh > viewport.height * 0.20) continue;
-
-      rects.push({ x: rx, y: ry, w: rw, h: rh });
+      if (it && it.hasEOL) pageText += "\n";
     }
+
+    // 2) Match spans on pageText
+    const spans = [];
+    for (const m of matchers) {
+      const re0 = m.re;
+      if (!(re0 instanceof RegExp)) continue;
+
+      const flags = re0.flags.includes("g") ? re0.flags : (re0.flags + "g");
+      let re;
+      try { re = new RegExp(re0.source, flags); } catch (_) { continue; }
+
+      const rs = getAllMatchRanges(re, pageText);
+      for (const r of rs) spans.push(r);
+    }
+    if (!spans.length) return rects;
+
+    // 3) Merge spans
+    spans.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const mergedSpans = [];
+    for (const sp of spans) {
+      const last = mergedSpans[mergedSpans.length - 1];
+      if (!last) { mergedSpans.push([sp[0], sp[1]]); continue; }
+      if (sp[0] <= last[1] + 1) last[1] = Math.max(last[1], sp[1]);
+      else mergedSpans.push([sp[0], sp[1]]);
+    }
+
+    // 4) Map spans back to items
+    for (const [A, B] of mergedSpans) {
+      for (const r of itemRanges) {
+        const a = Math.max(A, r.start);
+        const b = Math.min(B, r.end);
+        if (b <= a) continue;
+
+        const it = items[r.idx];
+        const s = String(it.str || "");
+        if (!s) continue;
+
+        const localStart = a - r.start;
+        const localEnd = b - r.start;
+
+        const bb = bboxForItem(it);
+        const len = Math.max(1, s.length);
+
+        const x1 = bb.x + bb.w * (localStart / len);
+        const x2 = bb.x + bb.w * (localEnd / len);
+
+        const padX = Math.max(1, bb.w * 0.012);
+        const padY = Math.max(1, bb.h * 0.12);
+
+        let rx = x1 - padX;
+        let ry = bb.y - padY;
+        let rw = (x2 - x1) + padX * 2;
+        let rh = bb.h + padY * 2;
+
+        rx = clamp(rx, 0, viewport.width);
+        ry = clamp(ry, 0, viewport.height);
+        rw = clamp(rw, 1, viewport.width - rx);
+        rh = clamp(rh, 6, viewport.height - ry);
+
+        // Drop absurd rectangles (prevents black-wall cases)
+        if (rw > viewport.width * 0.92) continue;
+        if (rh > viewport.height * 0.35) continue;
+        if (rw > viewport.width * 0.85 && rh > viewport.height * 0.20) continue;
+
+        rects.push({ x: rx, y: ry, w: rw, h: rh });
+      }
+    }
+
+    // 5) Conservative merge: same line only
+    rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+
+    const out = [];
+    for (const r of rects) {
+      if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
+
+      const last = out[out.length - 1];
+      if (!last) { out.push({ ...r }); continue; }
+
+      const rTop = r.y;
+      const rBot = r.y + r.h;
+      const lTop = last.y;
+      const lBot = last.y + last.h;
+
+      const overlap = Math.max(0, Math.min(lBot, rBot) - Math.max(lTop, rTop));
+      const minH = Math.max(1, Math.min(last.h, r.h));
+
+      const sameLine = (overlap / minH) > 0.72;
+
+      const heightRatio = Math.min(last.h, r.h) / Math.max(last.h, r.h);
+      const similarHeight = heightRatio > 0.78;
+
+      const gap = r.x - (last.x + last.w);
+      const near = gap >= -4 && gap <= 8;
+
+      if (sameLine && similarHeight && near) {
+        const nx = Math.min(last.x, r.x);
+        const ny = Math.min(last.y, r.y);
+        const nr = Math.max(last.x + last.w, r.x + r.w);
+        const nb = Math.max(last.y + last.h, r.y + r.h);
+
+        last.x = nx;
+        last.y = ny;
+        last.w = nr - nx;
+        last.h = nb - ny;
+      } else {
+        out.push({ ...r });
+      }
+    }
+
+    return out;
   }
-
-  // 5) Conservative merge: same line only
-  rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-
-const out = [];
-
-for (const r of rects) {
-
-  if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
-
-  const last = out[out.length - 1];
-
-  if (!last) {
-    out.push({ ...r });
-    continue;
-  }
-
-  const rTop = r.y;
-  const rBot = r.y + r.h;
-  const lTop = last.y;
-  const lBot = last.y + last.h;
-
-  const overlap = Math.max(0, Math.min(lBot, rBot) - Math.max(lTop, rTop));
-  const minH = Math.max(1, Math.min(last.h, r.h));
-
-  const sameLine = (overlap / minH) > 0.72;
-
-  const heightRatio = Math.min(last.h, r.h) / Math.max(last.h, r.h);
-  const similarHeight = heightRatio > 0.78;
-
-  const gap = r.x - (last.x + last.w);
-  const near = gap >= -4 && gap <= 8;
-
-  if (sameLine && similarHeight && near) {
-
-    const nx = Math.min(last.x, r.x);
-    const ny = Math.min(last.y, r.y);
-    const nr = Math.max(last.x + last.w, r.x + r.w);
-    const nb = Math.max(last.y + last.h, r.y + r.h);
-
-    last.x = nx;
-    last.y = ny;
-    last.w = nr - nx;
-    last.h = nb - ny;
-
-  } else {
-
-    out.push({ ...r });
-
-  }
-}
-
-return out;
 
   async function autoRedactReadablePdf({ file, lang, enabledKeys, moneyMode, dpi }) {
     const pdfjsLib = await loadPdfJsIfNeeded();
