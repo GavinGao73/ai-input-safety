@@ -219,8 +219,10 @@
     for (const k of PRIORITY) {
       if (k === "money") {
         if (!moneyMode || moneyMode === "off") continue;
-      } else {
-        if (!enabledSet.has(k)) continue;
+           } else {
+        // ✅ always-on sensitive keys (even if caller forgets to enable)
+        const ALWAYS_ON = new Set(["phone", "account", "email", "bank"]);
+        if (!enabledSet.has(k) && !ALWAYS_ON.has(k)) continue;
       }
 
       const r = rules[k];
@@ -420,19 +422,24 @@
           return { offsetStart: pos, offsetEnd: pos + sub.length };
         }
 
-        if (key === "company") {
-          // rules.js v1.4: CN uses group2 as core; DE/EN uses group5 as core (alternation groups!)
+          if (key === "company") {
           const coreCN = m[2] && String(m[2]);
           const coreDE = m[5] && String(m[5]);
           const core = (coreCN && coreCN.length >= 2) ? coreCN : coreDE;
           const off = (core && core.length >= 2) ? findSubOffsets(core) : null;
           if (off) preferSub = off;
+
         } else if (key === "account") {
           const off = findSubOffsets(m[2]);
           if (off) preferSub = off;
+
         } else if (key === "phone") {
-          const off = findSubOffsets(m[2] || m[3]);
+          const candidates = [m[2], m[3], m[4]].filter(Boolean).map(String);
+          let best = "";
+          for (const c of candidates) if (c.length > best.length) best = c;
+          const off = findSubOffsets(best);
           if (off) preferSub = off;
+
         } else if (key === "money") {
           const off = findSubOffsets(m[2] || m[4] || m[5]);
           if (off) preferSub = off;
@@ -703,4 +710,3 @@
 
   window.RasterExport = RasterExport;
 })();
-
