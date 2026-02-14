@@ -167,43 +167,39 @@
     try { return new RegExp(re.source, flags); } catch (_) { return null; }
   }
 
-  function buildRuleMatchers(enabledKeys, moneyMode) {
-    const matchers = [];
-    const rules = window.RULES_BY_KEY || {};
+function buildRuleMatchers(enabledKeys, moneyMode) {
 
-    const PRIORITY = [
-      "email",
-      "bank",
-      "account",
-      "phone",
-      "money",
-      "address_de_street",
-      "handle",
-      "ref",
-      "title",
-      "number"
-    ];
+  const matchers = [];
+  const rules = window.RULES_BY_KEY || {};
 
-    const enabledSet = new Set(Array.isArray(enabledKeys) ? enabledKeys : []);
+  /* ⭐ 关键：PDF 红删只允许真正敏感信息规则参与 */
+  const PDF_SAFE_KEYS = [
+    "email",
+    "phone",
+    "bank",
+    "account",
+    "address_de_street",
+    "money"
+  ];
 
-    for (const k of PRIORITY) {
-      if (k === "money") {
-        if (!moneyMode || moneyMode === "off") continue;
-      } else {
-        if (!enabledSet.has(k)) continue;
-      }
+  for (const k of PDF_SAFE_KEYS) {
 
-      const r = rules[k];
-      if (!r || !r.pattern) continue;
+    const r = rules[k];
+    if (!r || !r.pattern) continue;
 
-      const re = forceGlobal(r.pattern);
-      if (!re) continue;
-
-      matchers.push({ key: k, re });
+    /* money 仍受模式控制 */
+    if (k === "money") {
+      if (!moneyMode || moneyMode === "off") continue;
     }
 
-    return matchers;
+    const re = forceGlobal(r.pattern);
+    if (!re) continue;
+
+    matchers.push({ key: k, re });
   }
+
+  return matchers;
+}
 
   // --------- Text items -> rects (FIXED offsets + conservative merge) ----------
 function textItemsToRects(pdfjsLib, viewport, textContent, matchers) {
