@@ -219,8 +219,10 @@
     for (const k of PRIORITY) {
       if (k === "money") {
         if (!moneyMode || moneyMode === "off") continue;
-      } else {
-        if (!enabledSet.has(k)) continue;
+           } else {
+        // ✅ always-on sensitive keys (even if caller forgets to enable)
+        const ALWAYS_ON = new Set(["phone", "account", "email", "bank"]);
+        if (!enabledSet.has(k) && !ALWAYS_ON.has(k)) continue;
       }
 
       const r = rules[k];
