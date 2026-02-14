@@ -362,8 +362,8 @@ function shouldInsertSpace(prevChar, nextChar) {
         const x1 = bb.x + bb.w * (localStart / len);
         const x2 = bb.x + bb.w * (localEnd / len);
 
-        const padX = Math.max(2, bb.w * 0.03);
-        const padY = Math.max(2, bb.h * 0.18);
+        const padX = Math.max(1.5, bb.w * 0.018);
+        const padY = Math.max(1.5, bb.h * 0.11);
 
         let rx = x1 - padX;
         let ry = bb.y - padY;
@@ -408,7 +408,7 @@ function shouldInsertSpace(prevChar, nextChar) {
       const similarHeight = heightRatio > 0.78;
 
       const gap = r.x - (last.x + last.w);
-      const near = gap >= -4 && gap <= 8;
+      const near = gap >= -2 && gap <= 5;
 
       if (sameLine && similarHeight && near) {
         const nx = Math.min(last.x, r.x);
