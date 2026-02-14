@@ -1,9 +1,10 @@
-// v1.4 — privacy rules tuned for "personal / readable" redaction
+// v1.5 — privacy rules tuned for "personal / readable" redaction
 //
 // Goals:
 // - Keep document readable for AI/humans (labels remain, values masked)
 // - No URL handling by design
 // - Company name: mask ONLY the core identifying word (brand/主体词), keep suffix + region/type
+// - Person name: mask full CN/EN personal names (best-effort, conservative)
 //
 // Notes:
 // - Money range masking may still be handled in app.js (M2 needs range computation).
@@ -18,12 +19,33 @@ const RULES_BY_KEY = {
     tag: "EMAIL"
   },
 
-  /* ===================== COMPANY (NEW) ===================== */
+  /* ===================== PERSON NAME (NEW) ===================== */
+  // ✅ Mask personal names (CN + EN), best-effort and conservative.
+  //
+  // CN: 2–4 Han chars, optionally with middle dot for minority names (e.g., 阿里·木合塔尔)
+  // EN: 2–3 words, each starting with letter, allow hyphen/apostrophe (e.g., John Smith, Anne-Marie O'Neil)
+  //
+  // NOTE: Names are inherently ambiguous; keep this rule relatively conservative to reduce false positives.
+  person_name: {
+    pattern: new RegExp(
+      [
+        // CN personal name (2–4 Han, allow ·)
+        String.raw`\b[\p{Script=Han}]{2,4}(?:·[\p{Script=Han}]{1,4})?\b`,
+        // EN personal name (First Last / First Middle Last)
+        String.raw`\b[A-Z][a-z]+(?:[-'][A-Za-z]+)?(?:\s+[A-Z][a-z]+(?:[-'][A-Za-z]+)?){1,2}\b`
+      ].join("|"),
+      "gu"
+    ),
+    tag: "PERSON",
+    mode: "person"
+  },
+
+  /* ===================== COMPANY ===================== */
   // ✅ Mask ONLY the "core identifying word" (brand/主体词) in company names.
   //
   // Design: capture groups are structured so downstream can keep labels/affixes:
-  // - CN:   (1 optional city/province prefix) (2 brand/core) (3 middle descriptor) (4 legal suffix)
-  // - DE/EN:(1 brand/core) (2 legal suffix)
+  // - CN:   (1 optional city/province prefix) (2 brand/core) (3 descriptor/region/type) (4 legal suffix)
+  // - DE/EN:(5 brand/core) (6 legal suffix)
   //
   // Examples expected:
   // - 嘉曜兴包装制品（东莞）有限公司 -> mask 嘉曜兴, keep 包装制品（东莞）有限公司
@@ -32,28 +54,19 @@ const RULES_BY_KEY = {
   // - Beide Tech GmbH            -> mask Beide, keep Tech GmbH
   company: {
     pattern: new RegExp(
-      [
+      String.raw`(?:` +
         // ----- CN company with legal suffix -----
-        // (optional leading city/province token) (brand) (rest) (suffix)
-        // City/province token: 2–3 Han chars (e.g., 上海/北京/广东)
-        // Brand: 2–12 chars (Han/Latin/digits/·&-)
-        // Rest: up to ~40 chars including brackets
-        String.raw`(?:` +
-          String.raw`((?:[\p{Script=Han}]{2,3})?)` + // (1) optional city/province prefix
-          String.raw`([\p{Script=Han}A-Za-z0-9·&\-]{2,12})` + // (2) brand/core (MASK THIS)
-          String.raw`([\p{Script=Han}A-Za-z0-9（）()·&\-\s]{0,40}?)` + // (3) descriptor/region/type
-          String.raw`(股份有限公司|有限责任公司|有限公司|集团有限公司|集团|公司)` + // (4) legal suffix
-        String.raw`)`,
-
-        // OR
-
+        String.raw`((?:[\p{Script=Han}]{2,3})?)` + // (1) optional city/province prefix
+        String.raw`([\p{Script=Han}A-Za-z0-9·&\-]{2,12})` + // (2) brand/core (MASK THIS)
+        String.raw`([\p{Script=Han}A-Za-z0-9（）()·&\-\s]{0,40}?)` + // (3) descriptor/region/type
+        String.raw`(股份有限公司|有限责任公司|有限公司|集团有限公司|集团|公司)` + // (4) legal suffix
+      String.raw`)` +
+      String.raw`|` +
+      String.raw`(?:` +
         // ----- DE/EN company legal forms -----
-        // (brand/core) (legal suffix)
-        String.raw`(?:` +
-          String.raw`\b([A-Za-z][A-Za-z0-9&.\-]{1,40}?)\b` + // (1) brand/core (MASK THIS)
-          String.raw`(\s+(?:GmbH(?:\s*&\s*Co\.\s*KG)?|AG|UG|KG|GbR|e\.K\.|Ltd\.?|Inc\.?|LLC|S\.?A\.?|S\.?r\.?l\.?|B\.?V\.?))\b` + // (2) legal suffix
-        String.raw`)`
-      ].join("|"),
+        String.raw`\b([A-Za-z][A-Za-z0-9&.\-]{1,40}?)\b` + // (5) brand/core (MASK THIS)
+        String.raw`(\s+(?:GmbH(?:\s*&\s*Co\.\s*KG)?|AG|UG|KG|GbR|e\.K\.|Ltd\.?|Inc\.?|LLC|S\.?A\.?|S\.?r\.?l\.?|B\.?V\.?))\b` + // (6) legal suffix
+      String.raw`)`,
       "giu"
     ),
     tag: "COMPANY",
