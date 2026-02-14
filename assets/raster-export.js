@@ -4,6 +4,10 @@
  * - PDF/image -> 600 DPI raster -> opaque redaction + placeholder (pixels)
  * - Export PDF as images only (no text layer)
  * - NO OCR / NO logs / NO storage
+ *
+ * ✅ ABSOLUTE CONSISTENCY MODE:
+ *   - PDF redaction uses the SAME enabledKeys + moneyMode as text mode
+ *   - i.e. "text hits what, PDF covers what"
  * ======================================================= */
 
 (function () {
@@ -160,21 +164,37 @@
     return { pdf, pages, dpi: dpi || DEFAULT_DPI };
   }
 
-  // --------- Rules -> matchers ----------
+  // --------- Rules -> matchers (ABSOLUTE CONSISTENCY) ----------
   function buildRuleMatchers(enabledKeys, moneyMode) {
-    // ✅ PDF 红删只允许真正敏感信息规则参与（避免表格黑墙）
-    const PDF_SAFE_KEYS = ["email", "phone", "bank", "account", "address_de_street", "money"];
+    // ✅ EXACTLY the same key priority as text mode (your app.js)
+    const PRIORITY = [
+      "email",
+      "bank",
+      "account",
+      "phone",
+      "money",
+      "address_de_street",
+      "handle",
+      "ref",
+      "title",
+      "number"
+    ];
 
     const rules = window.RULES_BY_KEY || {};
     const matchers = [];
 
-    // 兼容：RegExp | string | {source, flags} | {pattern, flags}
+    const enabledSet = new Set(Array.isArray(enabledKeys) ? enabledKeys : []);
+
+    // Accept RegExp | string | {source, flags} | {pattern, flags}
     function normalizeToRegExp(pat) {
       if (!pat) return null;
       if (pat instanceof RegExp) return pat;
 
       if (typeof pat === "string") {
-        try { return new RegExp(pat); } catch (_) { return null; }
+        // keep unicode-safe where possible
+        try { return new RegExp(pat, "u"); } catch (_) {
+          try { return new RegExp(pat); } catch (__) { return null; }
+        }
       }
 
       if (typeof pat === "object") {
@@ -196,12 +216,16 @@
       try { return new RegExp(re.source, flags); } catch (_) { return null; }
     }
 
-    for (const k of PDF_SAFE_KEYS) {
+    for (const k of PRIORITY) {
+      // money still gated by moneyMode, consistent with text mode
+      if (k === "money") {
+        if (!moneyMode || moneyMode === "off") continue;
+      } else {
+        if (!enabledSet.has(k)) continue;
+      }
+
       const r = rules[k];
       if (!r) continue;
-
-      // money 仍受模式控制
-      if (k === "money" && (!moneyMode || moneyMode === "off")) continue;
 
       const raw = (r.pattern != null) ? r.pattern
                 : (r.re != null) ? r.re
@@ -239,58 +263,78 @@
       return out;
     }
 
-function bboxForItem(it) {
-  // ✅ Safe bbox in viewport/canvas coordinates (avoid double-scaling walls)
-  const tx = Util.transform(viewport.transform, it.transform);
+    function bboxForItem(it) {
+      // ✅ Safer bbox in viewport/canvas coordinates (avoid double-scaling walls)
+      const m = Util.transform(viewport.transform, it.transform);
+      const s = String(it.str || "");
 
-  const x = tx[4];
-  const y = tx[5];
+      // scale magnitude
+      const scaleX = Math.hypot(m[0], m[1]) || 1;
+      const scaleY = Math.hypot(m[2], m[3]) || scaleX || 1;
 
-  // height estimate from transform
-  let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
-  fontH = clamp(fontH * 1.15, 6, 120);
+      let w0 = Number(it.width || 0);
+      let h0 = Number(it.height || 0);
 
-  // width: prefer it.width (often already viewport units in pdf.js)
-  let w = Number(it.width || 0);
-  if (!Number.isFinite(w) || w <= 0) {
-    const s = String(it.str || "");
-    w = Math.max(6, s.length * fontH * 0.55);
-  }
+      // Height
+      if (!Number.isFinite(h0) || h0 <= 0) {
+        h0 = (Math.hypot(m[2], m[3]) || Math.hypot(m[0], m[1]) || 10) / scaleY;
+      }
+      const fontH = clamp(h0 * scaleY * 1.05, 6, 90);
 
-  // ✅ hard cap: width should not exceed "reasonable text width" for this item
-  const s = String(it.str || "");
+      // Width: prefer it.width (can be already scaled depending on build)
+      if (!Number.isFinite(w0) || w0 <= 0) {
+        w0 = Math.max(6, s.length * fontH * 0.55);
+      }
 
-  // 估宽：更贴近实际（尤其中文/混排）
-  const est = Math.max(10, s.length * fontH * 0.95);
+      // Detect already-scaled width (avoid huge bars)
+      if ((w0 * scaleX) > viewport.width * 1.2) {
+        w0 = w0 / scaleX;
+      }
 
-  // 放宽上限：从 1.6 提到 3.2（避免小方块）
-  w = clamp(w, 1, Math.min(viewport.width * 0.75, est * 3.2));
+      // Cap per-item width to reduce "wide bars"
+      const widthPx = clamp(w0 * scaleX, 4, viewport.width * 0.65);
 
-  // 同时给一个下限：避免极端情况下太窄
-  w = Math.max(w, Math.min(est, viewport.width * 0.40));
+      function tp(x, y) {
+        return {
+          x: m[0] * x + m[2] * y + m[4],
+          y: m[1] * x + m[3] * y + m[5]
+        };
+      }
 
-  // top-left box
-  let rx = clamp(x, 0, viewport.width);
-  let ry = clamp(y - fontH, 0, viewport.height);
-  let rw = clamp(w, 1, viewport.width - rx);
-  let rh = clamp(fontH, 6, viewport.height - ry);
+      const p1 = tp(0, 0);
+      const p2 = tp(widthPx / scaleX, 0);
+      const p3 = tp(0, fontH / scaleY);
+      const p4 = tp(widthPx / scaleX, fontH / scaleY);
 
-  return { x: rx, y: ry, w: rw, h: rh };
-}
+      const xs = [p1.x, p2.x, p3.x, p4.x];
+      const ys = [p1.y, p2.y, p3.y, p4.y];
+
+      const minX = clamp(Math.min.apply(null, xs), 0, viewport.width);
+      const maxX = clamp(Math.max.apply(null, xs), 0, viewport.width);
+      const minY = clamp(Math.min.apply(null, ys), 0, viewport.height);
+      const maxY = clamp(Math.max.apply(null, ys), 0, viewport.height);
+
+      return {
+        x: minX,
+        y: minY,
+        w: Math.max(1, maxX - minX),
+        h: Math.max(6, maxY - minY)
+      };
+    }
 
     function isWs(ch) {
       return ch === " " || ch === "\n" || ch === "\t" || ch === "\r";
     }
 
-function shouldInsertSpace(prevChar, nextChar) {
-  if (!prevChar || !nextChar) return false;
-  if (isWs(prevChar) || isWs(nextChar)) return false;
+    function shouldInsertSpace(prevChar, nextChar) {
+      if (!prevChar || !nextChar) return false;
+      if (isWs(prevChar) || isWs(nextChar)) return false;
 
-  // only between ASCII word/digit blocks
-  const a = /[A-Za-z0-9]/.test(prevChar);
-  const b = /[A-Za-z0-9]/.test(nextChar);
-  return a && b;
-}
+      // only between ASCII word/digit blocks (avoid messing CJK)
+      const a = /[A-Za-z0-9]/.test(prevChar);
+      const b = /[A-Za-z0-9]/.test(nextChar);
+      return a && b;
+    }
 
     // 1) Build pageText similar to probe.text
     let pageText = "";
@@ -356,32 +400,24 @@ function shouldInsertSpace(prevChar, nextChar) {
         const localStart = a - r.start;
         const localEnd = b - r.start;
 
-        // ✅ Trim whitespace + weak punct around the matched slice
-        // Prevents over-wide bars caused by surrounding spaces/colon/brackets.
+        // Trim whitespace + weak punct around matched slice
         let ls = localStart;
         let le = localEnd;
 
         const weakTrim = (ch) => {
-        // whitespace
-        if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return true;
-        // common punct around sensitive fields
-        return ":：,，;；()（）[]【】<>《》\"'“”‘’".includes(ch);
-    };
+          if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return true;
+          return ":：,，;；()（）[]【】<>《》\"'“”‘’".includes(ch);
+        };
 
         while (ls < le && weakTrim(s[ls])) ls++;
         while (le > ls && weakTrim(s[le - 1])) le--;
-
-        if (le <= ls) continue; // all trimmed away -> skip
-
-        // use trimmed range
-        const localStart2 = ls;
-        const localEnd2 = le;
+        if (le <= ls) continue;
 
         const bb = bboxForItem(it);
         const len = Math.max(1, s.length);
 
-        const x1 = bb.x + bb.w * (localStart2 / len);
-        const x2 = bb.x + bb.w * (localEnd2 / len);
+        const x1 = bb.x + bb.w * (ls / len);
+        const x2 = bb.x + bb.w * (le / len);
 
         const padX = Math.max(0.8, bb.w * 0.010);
         const padY = Math.max(1.0, bb.h * 0.075);
@@ -545,6 +581,7 @@ function shouldInsertSpace(prevChar, nextChar) {
       await exportCanvasesToPdf(result.pages, dpi, name);
     },
 
+    // Utilities used by RedactUI (optional use)
     renderPdfToCanvases,
     renderImageToCanvas,
     drawRedactionsOnCanvas
@@ -552,3 +589,4 @@ function shouldInsertSpace(prevChar, nextChar) {
 
   window.RasterExport = RasterExport;
 })();
+
