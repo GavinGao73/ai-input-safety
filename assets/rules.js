@@ -89,11 +89,31 @@ const RULES_BY_KEY = {
     mode: "prefix"
   },
 
-  /* ===================== PHONE (label + value OR international) ===================== */
-  // Keep label when present; otherwise mask international +xxx...
+    /* ===================== PHONE (label + value OR international) ===================== */
+  // Keep label when present; otherwise mask international +xxx... / 00xxx... / common DE mobile
+  // Also handle suffix like "(WhatsApp)" AFTER the number (common in signatures)
   phone: {
-    pattern:
-      /((?:tel|telefon|phone|mobile|handy|kontakt|whatsapp|联系方式|联系电话|电话|手機|手机|联系人|聯繫方式)\s*[:：]?\s*)(\+?\d[\d\s().-]{3,}\d)|(\+\d[\d\s().-]{3,}\d)/gi,
+    pattern: new RegExp(
+      [
+        // (1 label)(2 number) — label first
+        String.raw`((?:tel|telefon|phone|mobile|handy|kontakt|whatsapp|wechat|telegram|` +
+          String.raw`联系方式|联系电话|电话|手機|手机|联系人|聯繫方式)\s*[:：]?\s*)` +
+        String.raw`((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})?[\d\s().-]{6,}\d)`,
+
+        // OR
+
+        // (3 international / national) — number first (with optional "(WhatsApp)" after)
+        String.raw`((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d)` +
+        String.raw`(?:\s*\((?:WhatsApp|WeChat|Telegram|Signal)\))?`,
+
+        // OR
+
+        // (4 DE mobile without country code, but long enough to be a phone (optional)
+        // e.g., 0151 2559 1809 (only if you want to catch these; safe-ish with length constraint)
+        String.raw`(\b0\d{2,4}[\d\s().-]{6,}\d\b)`
+      ].join("|"),
+      "giu"
+    ),
     tag: "PHONE",
     mode: "phone"
   },
