@@ -438,7 +438,6 @@
           for (const c of candidates) if (c.length > best.length) best = c;
           const off = findSubOffsets(best);
           if (off) preferSub = off;
-        }
         } else if (key === "money") {
           const off = findSubOffsets(m[2] || m[4] || m[5]);
           if (off) preferSub = off;
