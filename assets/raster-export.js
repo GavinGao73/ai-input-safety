@@ -433,8 +433,12 @@
           const off = findSubOffsets(m[2]);
           if (off) preferSub = off;
         } else if (key === "phone") {
-          const off = findSubOffsets(m[2] || m[3]);
+          const candidates = [m[2], m[3], m[4]].filter(Boolean).map(String);
+          let best = "";
+          for (const c of candidates) if (c.length > best.length) best = c;
+          const off = findSubOffsets(best);
           if (off) preferSub = off;
+        }
         } else if (key === "money") {
           const off = findSubOffsets(m[2] || m[4] || m[5]);
           if (off) preferSub = off;
