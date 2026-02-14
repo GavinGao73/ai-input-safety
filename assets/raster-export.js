@@ -100,44 +100,72 @@
     return c;
   }
 
-  function drawRedactionsOnCanvas(canvas, rects, opt) {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+function drawRedactionsOnCanvas(canvas, rects, opt) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
 
-    const placeholder = (opt && opt.placeholder) || "REDACTED";
-    const fontScale = (opt && opt.fontScale) || 1;
+  const placeholder = (opt && opt.placeholder) || "REDACTED";
+  const fontScale = (opt && opt.fontScale) || 1;
 
-    ctx.save();
-    ctx.textBaseline = "middle";
-    ctx.textAlign = "center";
+  const rs = Array.isArray(rects) ? rects.slice() : [];
+  if (!rs.length) return;
 
-    for (const r of (rects || [])) {
-      const x = clamp(r.x, 0, canvas.width);
-      const y = clamp(r.y, 0, canvas.height);
-      const w = clamp(r.w, 0, canvas.width - x);
-      const h = clamp(r.h, 0, canvas.height - y);
-      if (w <= 0 || h <= 0) continue;
+  // ✅ 阅读顺序：先按 y 再按 x，便于做“相邻不重复写字”
+  rs.sort((a, b) => (a.y - b.y) || (a.x - b.x));
 
-      ctx.fillStyle = "#000";
-      ctx.fillRect(x, y, w, h);
+  // ✅ 标签节流阈值：相邻两个块如果“很近”，后一个不写字
+  // 可调：越大越少字。你这个案例建议 28~40
+  const NEAR_PX = (opt && opt.nearPx) || 34;
 
-            // ✅ 更激进：只有“足够大”的遮罩才写“已遮盖”，否则只画黑条
-      // 经验阈值：短条(邮箱/账号/数字碎片)基本不写字，长条才写
-      const area = w * h;
-      const canLabel =
-        (w >= 180 && h >= 22) ||        // 长且不太矮
-        (area >= 9000 && h >= 18);      // 面积足够大
-
-      if (!canLabel) continue;
-
-      const fs = clamp(Math.min(h * 0.45, w * 0.12) * fontScale, 10, 64);
-      ctx.fillStyle = "#fff";
-      ctx.font = `700 ${fs}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-      ctx.fillText(placeholder, x + w / 2, y + h / 2);
-    }
-
-    ctx.restore();
+  // ✅ 只有足够大的遮罩才考虑写字（避免短条噪音）
+  function canLabel(w, h) {
+    const area = w * h;
+    return (w >= 180 && h >= 22) || (area >= 9000 && h >= 18);
   }
+
+  // ✅ 判断两个矩形是否“很近”（横向或纵向接近即可）
+  function isNear(prev, cur) {
+    // 计算两矩形的最短边缘距离（轴对齐）
+    const dx = Math.max(0, Math.max(prev.x - (cur.x + cur.w), cur.x - (prev.x + prev.w)));
+    const dy = Math.max(0, Math.max(prev.y - (cur.y + cur.h), cur.y - (prev.y + prev.h)));
+    // 同行/同列常见：dx 或 dy 很小就算近
+    return (dx <= NEAR_PX && dy <= NEAR_PX);
+  }
+
+  ctx.save();
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "center";
+
+  let lastLabeled = null; // 记录上一个“写过字”的遮罩块
+
+  for (const r0 of rs) {
+    // clamp + sanitize
+    const x = clamp(r0.x, 0, canvas.width);
+    const y = clamp(r0.y, 0, canvas.height);
+    const w = clamp(r0.w, 0, canvas.width - x);
+    const h = clamp(r0.h, 0, canvas.height - y);
+    if (w <= 0 || h <= 0) continue;
+
+    // 1) always cover
+    ctx.fillStyle = "#000";
+    ctx.fillRect(x, y, w, h);
+
+    // 2) label decision
+    if (!canLabel(w, h)) continue;
+
+    // 如果离上一个“已写字”的块太近：不再写字
+    if (lastLabeled && isNear(lastLabeled, { x, y, w, h })) continue;
+
+    const fs = clamp(Math.min(h * 0.45, w * 0.12) * fontScale, 10, 64);
+    ctx.fillStyle = "#fff";
+    ctx.font = `700 ${fs}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+    ctx.fillText(placeholder, x + w / 2, y + h / 2);
+
+    lastLabeled = { x, y, w, h };
+  }
+
+  ctx.restore();
+}
 
   async function canvasToPngBytes(canvas) {
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png", 1.0));
