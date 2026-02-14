@@ -161,38 +161,55 @@
   }
 
   // --------- Rules -> matchers (STRICT: same as text mode) ----------
+  function buildRuleMatchers(enabledKeys, moneyMode) {
+  // ✅ PDF 红删只允许真正敏感信息规则参与（避免表格黑墙）
+  const PDF_SAFE_KEYS = ["email", "phone", "bank", "account", "address_de_street", "money"];
+
+  const rules = window.RULES_BY_KEY || {};
+  const matchers = [];
+
+  // 兼容：RegExp | string | {source, flags} | {pattern, flags}
+  function normalizeToRegExp(pat) {
+    if (!pat) return null;
+    if (pat instanceof RegExp) return pat;
+
+    if (typeof pat === "string") {
+      try { return new RegExp(pat, "g"); } catch (_) { return null; }
+    }
+
+    if (typeof pat === "object") {
+      const src = (typeof pat.source === "string") ? pat.source
+                : (typeof pat.pattern === "string") ? pat.pattern
+                : null;
+      if (!src) return null;
+
+      const flags = (typeof pat.flags === "string") ? pat.flags : "";
+      try { return new RegExp(src, flags); } catch (_) { return null; }
+    }
+
+    return null;
+  }
+
   function forceGlobal(re) {
     if (!(re instanceof RegExp)) return null;
     const flags = re.flags.includes("g") ? re.flags : (re.flags + "g");
     try { return new RegExp(re.source, flags); } catch (_) { return null; }
   }
 
-function buildRuleMatchers(enabledKeys, moneyMode) {
-
-  const matchers = [];
-  const rules = window.RULES_BY_KEY || {};
-
-  /* ⭐ 关键：PDF 红删只允许真正敏感信息规则参与 */
-  const PDF_SAFE_KEYS = [
-    "email",
-    "phone",
-    "bank",
-    "account",
-    "address_de_street",
-    "money"
-  ];
-
   for (const k of PDF_SAFE_KEYS) {
-
     const r = rules[k];
-    if (!r || !r.pattern) continue;
+    if (!r) continue;
 
-    /* money 仍受模式控制 */
-    if (k === "money") {
-      if (!moneyMode || moneyMode === "off") continue;
-    }
+    // money 仍受模式控制
+    if (k === "money" && (!moneyMode || moneyMode === "off")) continue;
 
-    const re = forceGlobal(r.pattern);
+    const raw = (r.pattern != null) ? r.pattern
+              : (r.re != null) ? r.re
+              : (r.regex != null) ? r.regex
+              : null;
+
+    const re0 = normalizeToRegExp(raw);
+    const re = forceGlobal(re0);
     if (!re) continue;
 
     matchers.push({ key: k, re });
