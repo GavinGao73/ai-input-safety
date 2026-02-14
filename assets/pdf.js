@@ -45,13 +45,6 @@ async function probePdfTextLayer(file) {
 
     const items = content.items || [];
 
-    const pageText = items
-      .map(it => (it && it.str ? it.str : ""))
-      .filter(Boolean)
-      .join(" ")
-      .replace(/\s+/g, " ")
-      .trim();
-
     if (pageText) {
       pages.push(pageText);
       totalChars += pageText.length;
