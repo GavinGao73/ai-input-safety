@@ -862,29 +862,57 @@ function bind() {
 
   // Mode A: export raster secure PDF (auto-redact)
   const btnExportRasterPdf = $("btnExportRasterPdf");
-  if (btnExportRasterPdf) {
-    btnExportRasterPdf.onclick = async () => {
-      const f = lastUploadedFile;
-      if (!f || lastFileKind !== "pdf") return;
-      if (!lastProbe || !lastProbe.hasTextLayer) return;
-      if (!window.RasterExport || !window.RasterExport.exportRasterSecurePdfFromReadablePdf) return;
+if (btnExportRasterPdf) {
+  btnExportRasterPdf.onclick = async () => {
+    const rb = $("riskBox");
+    const rd = $("riskDetails");
+    if (rd) rd.open = true;
 
-      // ✅ Use snapshot to guarantee rule consistency with current text output
+    const say = (html) => {
+      if (rb) rb.innerHTML = `<div class="tiny" style="white-space:pre-wrap;line-height:1.6;">${html}</div>`;
+    };
+
+    // ✅ click heartbeat (always visible)
+    say(`Redact click ✅\n${Date.now()}`);
+
+    try {
+      const f = lastUploadedFile;
+
+      if (!f) { say(`<span style="color:#ffb4b4;">No file loaded</span>`); return; }
+      if (lastFileKind !== "pdf") { say(`<span style="color:#ffb4b4;">Not a PDF file</span>`); return; }
+      if (!lastProbe) { say(`<span style="color:#ffb4b4;">No PDF probe result (probePdfTextLayer missing or failed)</span>`); return; }
+      if (!lastProbe.hasTextLayer) { say(`<span style="color:#ffb4b4;">PDF not readable (Mode B). Use Manual.</span>`); return; }
+
+      if (!window.RasterExport) { say(`<span style="color:#ffb4b4;">RasterExport not loaded</span>`); return; }
+      if (!window.RasterExport.exportRasterSecurePdfFromReadablePdf) {
+        say(`<span style="color:#ffb4b4;">RasterExport API missing (exportRasterSecurePdfFromReadablePdf)</span>`);
+        return;
+      }
+
+      // ✅ snapshot (consistency with text output)
       const snap = window.__export_snapshot || {};
       const enabledKeys = Array.isArray(snap.enabledKeys) ? snap.enabledKeys : Array.from(enabled || []);
       const mm = (typeof snap.moneyMode === "string") ? snap.moneyMode : (typeof moneyMode === "string" ? moneyMode : "off");
       const lang = snap.lang || currentLang;
 
+      say(`Working…\nlang=${escapeHTML(lang)}\nmoneyMode=${escapeHTML(mm)}\nenabledKeys=${enabledKeys.length}`);
+
       await window.RasterExport.exportRasterSecurePdfFromReadablePdf({
         file: f,
-        lang: lang,
-        enabledKeys: enabledKeys,
+        lang,
+        enabledKeys,
         moneyMode: mm,
         dpi: 600,
         filename: `raster_secure_${Date.now()}.pdf`
       });
-    };
-  }
+
+      say(`Done ✅\nDownload should start.`);
+    } catch (e) {
+      const msg = (e && (e.message || String(e))) || "Unknown error";
+      say(`<span style="color:#ffb4b4;">Export failed:</span>\n${escapeHTML(msg)}`);
+    }
+  };
+}
 
   // Mode B: manual redact session -> export (UI includes export button)
   const btnManual = $("btnManualRedact");
