@@ -166,8 +166,9 @@
 
   // --------- Rules -> matchers ----------
   function buildRuleMatchers(enabledKeys, moneyMode) {
-    // ✅ include company if rules.js provides it
+    // ✅ include company/person_name/address_de_postal if rules.js provides them
     const PRIORITY = [
+      "person_name",
       "company",
       "email",
       "bank",
@@ -175,6 +176,7 @@
       "phone",
       "money",
       "address_de_street",
+      "address_de_postal",
       "handle",
       "ref",
       "title",
@@ -215,11 +217,9 @@
     }
 
     for (const k of PRIORITY) {
-      // money still gated by moneyMode
       if (k === "money") {
         if (!moneyMode || moneyMode === "off") continue;
       } else {
-        // keep company off unless user enabled it (same behavior as other keys)
         if (!enabledSet.has(k)) continue;
       }
 
@@ -266,17 +266,14 @@
       while ((m = re.exec(s)) !== null) {
         const text = String(m[0] || "");
         if (!text) { re.lastIndex++; continue; }
-        out.push({
-          index: m.index,
-          len: text.length,
-          m
-        });
+        out.push({ index: m.index, len: text.length, m });
       }
       return out;
     }
 
     // ✅ Safe bbox in viewport/canvas coordinates (NO double scaling)
-    function bboxForItem(it) {
+    // ✅ Key-aware caps (account/phone/email/bank need wider to avoid partial masking)
+    function bboxForItem(it, key) {
       const tx = Util.transform(viewport.transform, it.transform);
 
       const x = tx[4];
@@ -295,9 +292,34 @@
       // if pdf.js gives line-width-ish values, prefer est
       if (w > est * 3.0) w = est * 1.35;
 
-      // tighter caps
-      w = clamp(w, 1, Math.min(viewport.width * 0.30, est * 1.45));
-      w = Math.max(w, Math.min(est * 0.85, viewport.width * 0.20));
+      const isLongValueKey =
+        key === "account" || key === "phone" || key === "email" || key === "bank";
+
+      const isAddressKey =
+        key === "address_de_street" || key === "address_de_postal";
+
+      let maxByPage = viewport.width * 0.30;
+      let maxByEst = est * 1.45;
+
+      if (isLongValueKey) {
+        maxByPage = viewport.width * 0.55;
+        maxByEst = est * 2.20;
+        if (w > est * 2.8) w = est * 1.60;
+      } else if (isAddressKey) {
+        maxByPage = viewport.width * 0.60;
+        maxByEst = est * 2.10;
+        if (w > est * 3.2) w = est * 1.70;
+      } else if (key === "money") {
+        maxByPage = viewport.width * 0.35;
+        maxByEst = est * 1.80;
+      }
+
+      // caps
+      w = clamp(w, 1, Math.min(maxByPage, maxByEst));
+
+      // min width so digits don't become tiny squares
+      const minW = isLongValueKey ? (est * 0.95) : (est * 0.85);
+      w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.40 : 0.20)));
 
       let rx = clamp(x, 0, viewport.width);
       let ry = clamp(y - fontH, 0, viewport.height);
@@ -321,7 +343,7 @@
       } else if (key === "email") {
         const mm = sub.match(/^(邮箱|E-?mail)\s*[:：]?\s*/i);
         if (mm && mm[0]) ls += mm[0].length;
-      } else if (key === "address_de_street") {
+      } else if (key === "address_de_street" || key === "address_de_postal") {
         const mm = sub.match(/^(地址|Anschrift|Address)\s*[:：]?\s*/i);
         if (mm && mm[0]) ls += mm[0].length;
       } else if (key === "bank") {
@@ -368,7 +390,7 @@
     // newline-neutral for matching (length preserved)
     const matchText = pageText.replace(/\n/g, " ");
 
-    // ✅ Collect spans WITH key + group info (no early-merge that breaks label logic)
+    // ✅ Collect spans WITH key + subgroup preference
     // span = { a, b, key, preferSub?: {offsetStart, offsetEnd} }
     const spans = [];
     for (const mm of matchers) {
@@ -385,10 +407,6 @@
         const b = a + h.len;
         const key = mm.key;
 
-        // For some keys, we can mask only a subgroup inside the match:
-        // - company: mask brand/core only
-        // - account/phone: usually group(2) is the number
-        // - money: mask amount group only
         let preferSub = null;
 
         const m = h.m || [];
@@ -403,23 +421,19 @@
         }
 
         if (key === "company") {
-          // rules.js v1.4: CN uses group2 as core; DE/EN uses group1 as core
-          const g2 = m[2] && String(m[2]);
-          const g1 = m[1] && String(m[1]);
-          // choose longer non-empty core candidate
-          const core = (g2 && g2.length >= 2) ? g2 : g1;
-          const off = findSubOffsets(core);
+          // rules.js v1.4: CN uses group2 as core; DE/EN uses group5 as core (alternation groups!)
+          const coreCN = m[2] && String(m[2]);
+          const coreDE = m[5] && String(m[5]);
+          const core = (coreCN && coreCN.length >= 2) ? coreCN : coreDE;
+          const off = (core && core.length >= 2) ? findSubOffsets(core) : null;
           if (off) preferSub = off;
         } else if (key === "account") {
-          // rules.js: prefix in group1, digits in group2
           const off = findSubOffsets(m[2]);
           if (off) preferSub = off;
         } else if (key === "phone") {
-          // rules.js: (label)(number) OR (international)
           const off = findSubOffsets(m[2] || m[3]);
           if (off) preferSub = off;
         } else if (key === "money") {
-          // rules.js: currency code + amount OR sign + amount OR amount + unit
           const off = findSubOffsets(m[2] || m[4] || m[5]);
           if (off) preferSub = off;
         }
@@ -430,10 +444,17 @@
 
     if (!spans.length) return [];
 
-    // ✅ Merge spans only when they are same key and very close/overlap
+    // ✅ Merge spans only when same key and very close/overlap
     spans.sort((x, y) => (x.a - y.a) || (x.b - y.b));
     const merged = [];
-    const MERGE_GAP = 1; // keep tight to avoid "black wall"
+    const MERGE_GAP = 1; // tight to avoid "black wall"
+
+    function samePreferSub(p, q) {
+      if (!p && !q) return true;
+      if (!p || !q) return false;
+      return p.offsetStart === q.offsetStart && p.offsetEnd === q.offsetEnd;
+    }
+
     for (const sp of spans) {
       const last = merged[merged.length - 1];
       if (!last) { merged.push({ ...sp }); continue; }
@@ -441,15 +462,15 @@
       const sameKey = sp.key === last.key;
       const close = sp.a <= last.b + MERGE_GAP;
 
-      // Only merge if same key + close
       if (sameKey && close) {
         last.b = Math.max(last.b, sp.b);
 
         // merge preferSub conservatively:
-        // if both exist, keep the larger visible-coverage intersection (fallback to null if messy)
+        // - if identical, keep it
+        // - if one side missing, keep the existing
+        // - if different, drop (avoid wrong subrange)
         if (last.preferSub && sp.preferSub) {
-          // if sub ranges overlap in the same full match text, we can't reliably merge; drop preferSub
-          last.preferSub = null;
+          last.preferSub = samePreferSub(last.preferSub, sp.preferSub) ? last.preferSub : null;
         } else {
           last.preferSub = last.preferSub || sp.preferSub || null;
         }
@@ -478,9 +499,7 @@
         let le = b0 - r.start;
 
         // If span provides preferSub (sub-range inside match), narrow to that sub-range
-        // We can only apply when this item overlaps the full match AND subrange lies in this item slice.
         if (preferSub) {
-          // compute span-local offset inside [A,B]
           const fullLen = Math.max(0, B - A);
           if (fullLen > 0) {
             const subA = A + preferSub.offsetStart;
@@ -492,21 +511,18 @@
               ls = a1 - r.start;
               le = b1 - r.start;
             } else {
-              // no overlap with preferred subrange in this item
               continue;
             }
           }
         } else {
-          // otherwise, apply label-keeping heuristics inside this item slice
           const shr = shrinkByLabel(key, s, ls, le);
           ls = shr.ls; le = shr.le;
           if (le <= ls) continue;
         }
 
-        // final guard: ignore tiny slices that are mostly punctuation
         if (le - ls <= 0) continue;
 
-        const bb = bboxForItem(it);
+        const bb = bboxForItem(it, key);
         const len = Math.max(1, s.length);
 
         const x1 = bb.x + bb.w * (ls / len);
