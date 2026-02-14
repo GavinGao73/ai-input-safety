@@ -259,8 +259,15 @@ function bboxForItem(it) {
 
   // ✅ hard cap: width should not exceed "reasonable text width" for this item
   const s = String(it.str || "");
-  const est = Math.max(6, s.length * fontH * 0.70);
-  w = clamp(w, 1, est * 1.6); // allow some spacing but prevent huge walls
+
+  // 估宽：更贴近实际（尤其中文/混排）
+  const est = Math.max(10, s.length * fontH * 0.95);
+
+  // 放宽上限：从 1.6 提到 3.2（避免小方块）
+  w = clamp(w, 1, Math.min(viewport.width * 0.75, est * 3.2));
+
+  // 同时给一个下限：避免极端情况下太窄
+  w = Math.max(w, Math.min(est, viewport.width * 0.40));
 
   // top-left box
   let rx = clamp(x, 0, viewport.width);
@@ -355,8 +362,8 @@ function shouldInsertSpace(prevChar, nextChar) {
         const x1 = bb.x + bb.w * (localStart / len);
         const x2 = bb.x + bb.w * (localEnd / len);
 
-        const padX = Math.max(1, bb.w * 0.012);
-        const padY = Math.max(1, bb.h * 0.12);
+        const padX = Math.max(2, bb.w * 0.03);
+        const padY = Math.max(2, bb.h * 0.18);
 
         let rx = x1 - padX;
         let ry = bb.y - padY;
