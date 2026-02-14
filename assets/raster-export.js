@@ -103,12 +103,12 @@
   }
 
   // ✅ SOLID BLACK ONLY — NO TEXT
-  function drawRedactionsOnCanvas(canvas, rects, opt) {
+  function drawRedactionsOnCanvas(canvas, rects) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     ctx.save();
-    ctx.globalCompositeOperation = "source-over"; // hard ensure
+    ctx.globalCompositeOperation = "source-over";
 
     for (const r of (rects || [])) {
       const x = clamp(r.x, 0, canvas.width);
@@ -140,13 +140,16 @@
 
     const scale = (dpi || DEFAULT_DPI) / 72;
     const pages = [];
+
     for (let p = 1; p <= pdf.numPages; p++) {
       const page = await pdf.getPage(p);
       const viewport = page.getViewport({ scale });
+
       const canvas = createCanvas(viewport.width, viewport.height);
       const ctx = canvas.getContext("2d", { alpha: false });
 
       await page.render({ canvasContext: ctx, viewport }).promise;
+
       pages.push({
         pageNumber: p,
         canvas,
@@ -155,6 +158,7 @@
         viewport
       });
     }
+
     return { pdf, pages, dpi: dpi || DEFAULT_DPI };
   }
 
@@ -196,6 +200,7 @@
         const flags = (typeof pat.flags === "string") ? pat.flags : "";
         try { return new RegExp(src, flags); } catch (_) { return null; }
       }
+
       return null;
     }
 
@@ -251,64 +256,33 @@
       return out;
     }
 
-    function bboxForItem(it) {
     // ✅ Safe bbox in viewport/canvas coordinates (NO double scaling)
-    const tx = Util.transform(viewport.transform, it.transform);
+    function bboxForItem(it) {
+      const tx = Util.transform(viewport.transform, it.transform);
 
-    const x = tx[4];
-    const y = tx[5];
+      const x = tx[4];
+      const y = tx[5];
 
-    // height estimate from transform (viewport px)
-    let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
-    fontH = clamp(fontH * 1.15, 6, 120);
+      let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
+      fontH = clamp(fontH * 1.15, 6, 120);
 
-    // width: pdf.js it.width is often already in viewport px at current scale
-    let w = Number(it.width || 0);
-    const s = String(it.str || "");
+      let w = Number(it.width || 0);
+      const s = String(it.str || "");
 
-    // fallback width if missing
-    if (!Number.isFinite(w) || w <= 0) {
-    // mixed/CJK: a bit wider than latin heuristic
-    w = Math.max(8, s.length * fontH * 0.90);
-    }
+      if (!Number.isFinite(w) || w <= 0) {
+        w = Math.max(8, s.length * fontH * 0.90);
+      }
 
-    // ✅ hard cap by estimated text width (prevents "full-line" bars)
-    const est = Math.max(10, s.length * fontH * 0.92);
+      const est = Math.max(10, s.length * fontH * 0.92);
+      w = clamp(w, 1, Math.min(viewport.width * 0.55, est * 2.2));
+      w = Math.max(w, Math.min(est, viewport.width * 0.35));
 
-    // allow some slack but never go crazy
-    w = clamp(w, 1, Math.min(viewport.width * 0.55, est * 2.2));
+      let rx = clamp(x, 0, viewport.width);
+      let ry = clamp(y - fontH, 0, viewport.height);
+      let rw = clamp(w, 1, viewport.width - rx);
+      let rh = clamp(fontH, 6, viewport.height - ry);
 
-    // also ensure not too tiny
-    w = Math.max(w, Math.min(est, viewport.width * 0.35));
-
-    // bbox: top-left in viewport coordinates
-    let rx = clamp(x, 0, viewport.width);
-    let ry = clamp(y - fontH, 0, viewport.height);
-    let rw = clamp(w, 1, viewport.width - rx);
-    let rh = clamp(fontH, 6, viewport.height - ry);
-
-    return { x: rx, y: ry, w: rw, h: rh };
-    }
-
-      const p1 = tp(0, 0);
-      const p2 = tp(widthPx / scaleX, 0);
-      const p3 = tp(0, fontH / scaleY);
-      const p4 = tp(widthPx / scaleX, fontH / scaleY);
-
-      const xs = [p1.x, p2.x, p3.x, p4.x];
-      const ys = [p1.y, p2.y, p3.y, p4.y];
-
-      const minX = clamp(Math.min.apply(null, xs), 0, viewport.width);
-      const maxX = clamp(Math.max.apply(null, xs), 0, viewport.width);
-      const minY = clamp(Math.min.apply(null, ys), 0, viewport.height);
-      const maxY = clamp(Math.max.apply(null, ys), 0, viewport.height);
-
-      return {
-        x: minX,
-        y: minY,
-        w: Math.max(1, maxX - minX),
-        h: Math.max(6, maxY - minY)
-      };
+      return { x: rx, y: ry, w: rw, h: rh };
     }
 
     function isWs(ch) {
@@ -328,37 +302,31 @@
       if (le <= ls) return { ls, le };
       const sub = s.slice(ls, le);
 
-      // phone: keep “电话/Phone…” but cover the number
       if (key === "phone") {
         const m = sub.match(/^(电话|手机|联系电话|Tel\.?|Telefon|Phone|Mobile|Handy)\s*[:：]?\s*/i);
         if (m && m[0]) ls += m[0].length;
       }
 
-      // account: keep “银行账号/账号/卡号…” but cover the number
       if (key === "account") {
         const m = sub.match(/^(银行账号|账号|卡号|银行卡号|Konto|Account|IBAN)\s*[:：]?\s*/i);
         if (m && m[0]) ls += m[0].length;
       }
 
-      // email: keep “邮箱/E-Mail” but cover address
       if (key === "email") {
         const m = sub.match(/^(邮箱|E-?mail)\s*[:：]?\s*/i);
         if (m && m[0]) ls += m[0].length;
       }
 
-      // address: keep “地址/Anschrift” but cover value
       if (key === "address_de_street") {
         const m = sub.match(/^(地址|Anschrift|Address)\s*[:：]?\s*/i);
         if (m && m[0]) ls += m[0].length;
       }
 
-      // bank: keep “开户行/银行” label if present (bank name often ok to cover or not; here only strip label)
       if (key === "bank") {
         const m = sub.match(/^(开户行|开户银行|银行)\s*[:：]?\s*/i);
         if (m && m[0]) ls += m[0].length;
       }
 
-      // general: trim weak punct/space on both sides after label stripping
       const weakTrim = (ch) => {
         if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return true;
         return ":：,，;；()（）[]【】<>《》\"'“”‘’".includes(ch);
@@ -372,7 +340,7 @@
 
     // 1) Build pageText + item ranges
     let pageText = "";
-    const itemRanges = []; // { idx, start, end, len }
+    const itemRanges = [];
 
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
@@ -390,15 +358,15 @@
       pageText += s;
       const end = pageText.length;
 
-      itemRanges.push({ idx: i, start, end, len: Math.max(1, s.length) });
+      itemRanges.push({ idx: i, start, end });
 
       if (it && it.hasEOL) pageText += "\n";
     }
 
-    // ✅ Match on a newline-neutral text (length preserved by replacing with spaces)
+    // Match on newline-neutral text (length preserved)
     const matchText = pageText.replace(/\n/g, " ");
 
-    // 2) Match spans on matchText (keep key)
+    // 2) Match spans (keep key)
     const spans = [];
     for (const m of matchers) {
       const re0 = m.re;
@@ -411,9 +379,10 @@
       const rs = getAllMatchRanges(re, matchText);
       for (const r of rs) spans.push({ a: r[0], b: r[1], key: m.key });
     }
+
     if (!spans.length) return rects;
 
-    // 3) Merge spans (merge by overlap; keep the "first" key just for label trimming)
+    // 3) Merge spans
     spans.sort((x, y) => (x.a - y.a) || (x.b - y.b));
     const merged = [];
     for (const sp of spans) {
@@ -421,13 +390,12 @@
       if (!last) { merged.push({ ...sp }); continue; }
       if (sp.a <= last.b + 1) {
         last.b = Math.max(last.b, sp.b);
-        // keep last.key as-is (good enough for label stripping)
       } else {
         merged.push({ ...sp });
       }
     }
 
-    // 4) Map merged spans back to items, slice horizontally
+    // 4) Map merged spans back to items
     for (const sp of merged) {
       const A = sp.a, B = sp.b, key = sp.key;
 
@@ -443,7 +411,6 @@
         let ls = a - r.start;
         let le = b - r.start;
 
-        // ✅ Keep label, cover only value part
         const shr = shrinkByLabel(key, s, ls, le);
         ls = shr.ls;
         le = shr.le;
@@ -468,7 +435,7 @@
         rw = clamp(rw, 1, viewport.width - rx);
         rh = clamp(rh, 6, viewport.height - ry);
 
-        // Drop absurd rectangles (prevents black-wall cases)
+        // Drop absurd rectangles
         if (rw > viewport.width * 0.92) continue;
         if (rh > viewport.height * 0.35) continue;
         if (rw > viewport.width * 0.85 && rh > viewport.height * 0.20) continue;
@@ -526,13 +493,13 @@
     const { pdf, pages } = await renderPdfToCanvases(file, dpi || DEFAULT_DPI);
 
     const matchers = buildRuleMatchers(enabledKeys, moneyMode);
-    const placeholder = langPlaceholder(lang); // kept for compatibility (not drawn)
+    const _placeholder = langPlaceholder(lang); // kept for compatibility (not drawn)
 
     for (const p of pages) {
       const page = await pdf.getPage(p.pageNumber);
       const textContent = await page.getTextContent();
       const rects = textItemsToRects(pdfjsLib, p.viewport, textContent, matchers);
-      drawRedactionsOnCanvas(p.canvas, rects, { placeholder });
+      drawRedactionsOnCanvas(p.canvas, rects);
     }
 
     return pages;
@@ -586,6 +553,7 @@
     async exportRasterSecurePdfFromReadablePdf(opts) {
       const file = opts && opts.file;
       if (!file) return;
+
       const lang = (opts && opts.lang) || "zh";
       const dpi = (opts && opts.dpi) || DEFAULT_DPI;
 
@@ -603,14 +571,14 @@
 
     async exportRasterSecurePdfFromVisual(result) {
       if (!result || !result.pages || !result.pages.length) return;
-      const lang = result.lang || "zh";
+
       const dpi = result.dpi || DEFAULT_DPI;
-      const placeholder = langPlaceholder(lang); // kept for compatibility (not drawn)
+      const _placeholder = langPlaceholder(result.lang || "zh"); // kept for compatibility (not drawn)
 
       const rectsByPage = result.rectsByPage || {};
       for (const p of result.pages) {
         const rects = rectsByPage[p.pageNumber] || [];
-        drawRedactionsOnCanvas(p.canvas, rects, { placeholder });
+        drawRedactionsOnCanvas(p.canvas, rects);
       }
 
       const name = result.filename || `raster_secure_${Date.now()}.pdf`;
