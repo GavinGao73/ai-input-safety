@@ -1,13 +1,16 @@
 /* =========================================================
  * raster-export.js
  * Raster Secure PDF export pipeline (in-memory only)
- * - PDF/image -> 600 DPI raster -> opaque redaction + placeholder (pixels)
+ * - PDF/image -> 600 DPI raster -> opaque redaction (pixels)
  * - Export PDF as images only (no text layer)
  * - NO OCR / NO logs / NO storage
  *
  * ✅ ABSOLUTE CONSISTENCY MODE:
  *   - PDF redaction uses the SAME enabledKeys + moneyMode as text mode
  *   - i.e. "text hits what, PDF covers what"
+ *
+ * ✅ SIMPLIFIED UX MODE (CURRENT):
+ *   - No "已遮盖" text overlay, only solid black bars
  * ======================================================= */
 
 (function () {
@@ -100,72 +103,27 @@
     return c;
   }
 
-function drawRedactionsOnCanvas(canvas, rects, opt) {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+  // ✅ SIMPLIFIED: solid black only, no placeholder text
+  function drawRedactionsOnCanvas(canvas, rects, opt) {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-  const placeholder = (opt && opt.placeholder) || "REDACTED";
-  const fontScale = (opt && opt.fontScale) || 1;
+    ctx.save();
 
-  const rs = Array.isArray(rects) ? rects.slice() : [];
-  if (!rs.length) return;
+    for (const r of (rects || [])) {
+      const x = clamp(r.x, 0, canvas.width);
+      const y = clamp(r.y, 0, canvas.height);
+      const w = clamp(r.w, 0, canvas.width - x);
+      const h = clamp(r.h, 0, canvas.height - y);
+      if (w <= 0 || h <= 0) continue;
 
-  // ✅ 阅读顺序：先按 y 再按 x，便于做“相邻不重复写字”
-  rs.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+      // 100% opaque cover
+      ctx.fillStyle = "#000";
+      ctx.fillRect(x, y, w, h);
+    }
 
-  // ✅ 标签节流阈值：相邻两个块如果“很近”，后一个不写字
-  // 可调：越大越少字。你这个案例建议 28~40
-  const NEAR_PX = (opt && opt.nearPx) || 34;
-
-  // ✅ 只有足够大的遮罩才考虑写字（避免短条噪音）
-  function canLabel(w, h) {
-    const area = w * h;
-    return (w >= 180 && h >= 22) || (area >= 9000 && h >= 18);
+    ctx.restore();
   }
-
-  // ✅ 判断两个矩形是否“很近”（横向或纵向接近即可）
-  function isNear(prev, cur) {
-    // 计算两矩形的最短边缘距离（轴对齐）
-    const dx = Math.max(0, Math.max(prev.x - (cur.x + cur.w), cur.x - (prev.x + prev.w)));
-    const dy = Math.max(0, Math.max(prev.y - (cur.y + cur.h), cur.y - (prev.y + prev.h)));
-    // 同行/同列常见：dx 或 dy 很小就算近
-    return (dx <= NEAR_PX && dy <= NEAR_PX);
-  }
-
-  ctx.save();
-  ctx.textBaseline = "middle";
-  ctx.textAlign = "center";
-
-  let lastLabeled = null; // 记录上一个“写过字”的遮罩块
-
-  for (const r0 of rs) {
-    // clamp + sanitize
-    const x = clamp(r0.x, 0, canvas.width);
-    const y = clamp(r0.y, 0, canvas.height);
-    const w = clamp(r0.w, 0, canvas.width - x);
-    const h = clamp(r0.h, 0, canvas.height - y);
-    if (w <= 0 || h <= 0) continue;
-
-    // 1) always cover
-    ctx.fillStyle = "#000";
-    ctx.fillRect(x, y, w, h);
-
-    // 2) label decision
-    if (!canLabel(w, h)) continue;
-
-    // 如果离上一个“已写字”的块太近：不再写字
-    if (lastLabeled && isNear(lastLabeled, { x, y, w, h })) continue;
-
-    const fs = clamp(Math.min(h * 0.45, w * 0.12) * fontScale, 10, 64);
-    ctx.fillStyle = "#fff";
-    ctx.font = `700 ${fs}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-    ctx.fillText(placeholder, x + w / 2, y + h / 2);
-
-    lastLabeled = { x, y, w, h };
-  }
-
-  ctx.restore();
-}
 
   async function canvasToPngBytes(canvas) {
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png", 1.0));
@@ -203,6 +161,7 @@ function drawRedactionsOnCanvas(canvas, rects, opt) {
 
   // --------- Rules -> matchers (ABSOLUTE CONSISTENCY) ----------
   function buildRuleMatchers(enabledKeys, moneyMode) {
+    // ✅ EXACTLY the same key priority as text mode (your app.js)
     const PRIORITY = [
       "email",
       "bank",
@@ -227,6 +186,7 @@ function drawRedactionsOnCanvas(canvas, rects, opt) {
       if (pat instanceof RegExp) return pat;
 
       if (typeof pat === "string") {
+        // keep unicode-safe where possible
         try { return new RegExp(pat, "u"); } catch (_) {
           try { return new RegExp(pat); } catch (__) { return null; }
         }
@@ -252,6 +212,7 @@ function drawRedactionsOnCanvas(canvas, rects, opt) {
     }
 
     for (const k of PRIORITY) {
+      // money still gated by moneyMode, consistent with text mode
       if (k === "money") {
         if (!moneyMode || moneyMode === "off") continue;
       } else {
@@ -297,44 +258,64 @@ function drawRedactionsOnCanvas(canvas, rects, opt) {
       return out;
     }
 
-    // ✅ 核心修复：安全 bbox（避免 double-scaling 导致整行黑墙）
     function bboxForItem(it) {
-  const tx = Util.transform(viewport.transform, it.transform);
+      // ✅ Safer bbox in viewport/canvas coordinates (avoid double-scaling walls)
+      const m = Util.transform(viewport.transform, it.transform);
+      const s = String(it.str || "");
 
-  const x = tx[4];
-  const y = tx[5];
+      // scale magnitude
+      const scaleX = Math.hypot(m[0], m[1]) || 1;
+      const scaleY = Math.hypot(m[2], m[3]) || scaleX || 1;
 
-  // height estimate from transform
-  let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
-  fontH = clamp(fontH * 1.15, 6, 120);
+      let w0 = Number(it.width || 0);
+      let h0 = Number(it.height || 0);
 
-  // width: prefer it.width
-  let w = Number(it.width || 0);
-  if (!Number.isFinite(w) || w <= 0) {
-    const s0 = String(it.str || "");
-    w = Math.max(6, s0.length * fontH * 0.55);
-  }
+      // Height
+      if (!Number.isFinite(h0) || h0 <= 0) {
+        h0 = (Math.hypot(m[2], m[3]) || Math.hypot(m[0], m[1]) || 10) / scaleY;
+      }
+      const fontH = clamp(h0 * scaleY * 1.05, 6, 90);
 
-  const s = String(it.str || "");
+      // Width: prefer it.width (can be already scaled depending on build)
+      if (!Number.isFinite(w0) || w0 <= 0) {
+        w0 = Math.max(6, s.length * fontH * 0.55);
+      }
 
-  // 估宽：更贴近实际（中文/混排）
-  const est = Math.max(10, s.length * fontH * 0.95);
+      // Detect already-scaled width (avoid huge bars)
+      if ((w0 * scaleX) > viewport.width * 1.2) {
+        w0 = w0 / scaleX;
+      }
 
-  // ✅ 上限更紧：避免长黑条（从 0.75 -> 0.55；est*3.2 -> est*2.2）
-  w = clamp(w, 1, Math.min(viewport.width * 0.55, est * 2.2));
+      // Cap per-item width to reduce "wide bars"
+      const widthPx = clamp(w0 * scaleX, 4, viewport.width * 0.65);
 
-  // ✅ 关键：不要再用 viewport.width*0.40 当下限（这就是“过宽”的主要来源）
-  // 只给一个非常温和的下限，防止极端情况下太窄：
-  w = Math.max(w, Math.min(est * 0.95, 220));
+      function tp(x, y) {
+        return {
+          x: m[0] * x + m[2] * y + m[4],
+          y: m[1] * x + m[3] * y + m[5]
+        };
+      }
 
-  // top-left box
-  const rx = clamp(x, 0, viewport.width);
-  const ry = clamp(y - fontH, 0, viewport.height);
-  const rw = clamp(w, 1, viewport.width - rx);
-  const rh = clamp(fontH, 6, viewport.height - ry);
+      const p1 = tp(0, 0);
+      const p2 = tp(widthPx / scaleX, 0);
+      const p3 = tp(0, fontH / scaleY);
+      const p4 = tp(widthPx / scaleX, fontH / scaleY);
 
-  return { x: rx, y: ry, w: rw, h: rh };
-}
+      const xs = [p1.x, p2.x, p3.x, p4.x];
+      const ys = [p1.y, p2.y, p3.y, p4.y];
+
+      const minX = clamp(Math.min.apply(null, xs), 0, viewport.width);
+      const maxX = clamp(Math.max.apply(null, xs), 0, viewport.width);
+      const minY = clamp(Math.min.apply(null, ys), 0, viewport.height);
+      const maxY = clamp(Math.max.apply(null, ys), 0, viewport.height);
+
+      return {
+        x: minX,
+        y: minY,
+        w: Math.max(1, maxX - minX),
+        h: Math.max(6, maxY - minY)
+      };
+    }
 
     function isWs(ch) {
       return ch === " " || ch === "\n" || ch === "\t" || ch === "\r";
@@ -375,7 +356,7 @@ function drawRedactionsOnCanvas(canvas, rects, opt) {
       if (it && it.hasEOL) pageText += "\n";
     }
 
-    // 2) Match spans on pageText (keep key)
+    // 2) Match spans on pageText
     const spans = [];
     for (const m of matchers) {
       const re0 = m.re;
@@ -386,32 +367,22 @@ function drawRedactionsOnCanvas(canvas, rects, opt) {
       try { re = new RegExp(re0.source, flags); } catch (_) { continue; }
 
       const rs = getAllMatchRanges(re, pageText);
-      for (const [a, b] of rs) spans.push({ a, b, key: m.key });
+      for (const r of rs) spans.push(r);
     }
     if (!spans.length) return rects;
 
-    // 3) Merge spans (within same key)
-    spans.sort((x, y) =>
-      (x.key > y.key ? 1 : x.key < y.key ? -1 : (x.a - y.a) || (x.b - y.b))
-    );
-
+    // 3) Merge spans
+    spans.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
     const mergedSpans = [];
     for (const sp of spans) {
       const last = mergedSpans[mergedSpans.length - 1];
-      if (!last || last.key !== sp.key) {
-        mergedSpans.push({ ...sp });
-        continue;
-      }
-      if (sp.a <= last.b + 1) last.b = Math.max(last.b, sp.b);
-      else mergedSpans.push({ ...sp });
+      if (!last) { mergedSpans.push([sp[0], sp[1]]); continue; }
+      if (sp[0] <= last[1] + 1) last[1] = Math.max(last[1], sp[1]);
+      else mergedSpans.push([sp[0], sp[1]]);
     }
 
-    // 4) Map spans back to items (trim weak punct)
-    for (const sp of mergedSpans) {
-      const A = sp.a;
-      const B = sp.b;
-      const hitKey = sp.key;
-
+    // 4) Map spans back to items
+    for (const [A, B] of mergedSpans) {
       for (const r of itemRanges) {
         const a = Math.max(A, r.start);
         const b = Math.min(B, r.end);
@@ -424,6 +395,7 @@ function drawRedactionsOnCanvas(canvas, rects, opt) {
         const localStart = a - r.start;
         const localEnd = b - r.start;
 
+        // Trim whitespace + weak punct around matched slice
         let ls = localStart;
         let le = localEnd;
 
@@ -442,9 +414,8 @@ function drawRedactionsOnCanvas(canvas, rects, opt) {
         const x1 = bb.x + bb.w * (ls / len);
         const x2 = bb.x + bb.w * (le / len);
 
-        const tight = (hitKey === "email" || hitKey === "account");
-        const padX = tight ? Math.max(0.4, bb.w * 0.006) : Math.max(0.8, bb.w * 0.010);
-        const padY = tight ? Math.max(0.8, bb.h * 0.060) : Math.max(1.0, bb.h * 0.075);
+        const padX = Math.max(0.8, bb.w * 0.010);
+        const padY = Math.max(1.0, bb.h * 0.075);
 
         let rx = x1 - padX;
         let ry = bb.y - padY;
@@ -456,16 +427,16 @@ function drawRedactionsOnCanvas(canvas, rects, opt) {
         rw = clamp(rw, 1, viewport.width - rx);
         rh = clamp(rh, 6, viewport.height - ry);
 
-        // Drop absurd rectangles
+        // Drop absurd rectangles (prevents black-wall cases)
         if (rw > viewport.width * 0.92) continue;
         if (rh > viewport.height * 0.35) continue;
         if (rw > viewport.width * 0.85 && rh > viewport.height * 0.20) continue;
 
-        rects.push({ x: rx, y: ry, w: rw, h: rh, key: hitKey });
+        rects.push({ x: rx, y: ry, w: rw, h: rh });
       }
     }
 
-    // 5) Conservative merge: same line only (and same key)
+    // 5) Conservative merge: same line only
     rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
 
     const out = [];
@@ -474,11 +445,6 @@ function drawRedactionsOnCanvas(canvas, rects, opt) {
 
       const last = out[out.length - 1];
       if (!last) { out.push({ ...r }); continue; }
-
-      if ((last.key || "") !== (r.key || "")) {
-        out.push({ ...r });
-        continue;
-      }
 
       const rTop = r.y;
       const rBot = r.y + r.h;
@@ -519,7 +485,7 @@ function drawRedactionsOnCanvas(canvas, rects, opt) {
     const { pdf, pages } = await renderPdfToCanvases(file, dpi || DEFAULT_DPI);
 
     const matchers = buildRuleMatchers(enabledKeys, moneyMode);
-    const placeholder = langPlaceholder(lang);
+    const placeholder = langPlaceholder(lang); // kept for compatibility (not drawn)
 
     for (const p of pages) {
       const page = await pdf.getPage(p.pageNumber);
@@ -598,7 +564,7 @@ function drawRedactionsOnCanvas(canvas, rects, opt) {
       if (!result || !result.pages || !result.pages.length) return;
       const lang = result.lang || "zh";
       const dpi = result.dpi || DEFAULT_DPI;
-      const placeholder = langPlaceholder(lang);
+      const placeholder = langPlaceholder(lang); // kept for compatibility (not drawn)
 
       const rectsByPage = result.rectsByPage || {};
       for (const p of result.pages) {
