@@ -239,68 +239,51 @@
       return out;
     }
 
-    function bboxForItem(it) {
-      const m = Util.transform(viewport.transform, it.transform);
+function bboxForItem(it) {
+  // ✅ Safe bbox in viewport/canvas coordinates (avoid double-scaling walls)
+  const tx = Util.transform(viewport.transform, it.transform);
 
-      const w0 = Number(it.width || 0);
-      let h0 = Number(it.height || 0);
+  const x = tx[4];
+  const y = tx[5];
 
-      if (!Number.isFinite(h0) || h0 <= 0) {
-        h0 = Math.hypot(m[2], m[3]) || Math.hypot(m[0], m[1]) || 10;
-        h0 = h0 * 1.15;
-      }
+  // height estimate from transform
+  let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
+  fontH = clamp(fontH * 1.15, 6, 120);
 
-      let ww = w0;
-      if (!Number.isFinite(ww) || ww <= 0) {
-        const s = String(it.str || "");
-        const approxCharW = (h0 * 0.55);
-        ww = Math.max(approxCharW * s.length, 6);
-      }
+  // width: prefer it.width (often already viewport units in pdf.js)
+  let w = Number(it.width || 0);
+  if (!Number.isFinite(w) || w <= 0) {
+    const s = String(it.str || "");
+    w = Math.max(6, s.length * fontH * 0.55);
+  }
 
-      function tp(x, y) {
-        return {
-          x: m[0] * x + m[2] * y + m[4],
-          y: m[1] * x + m[3] * y + m[5]
-        };
-      }
+  // ✅ hard cap: width should not exceed "reasonable text width" for this item
+  const s = String(it.str || "");
+  const est = Math.max(6, s.length * fontH * 0.70);
+  w = clamp(w, 1, est * 1.6); // allow some spacing but prevent huge walls
 
-      const p1 = tp(0, 0);
-      const p2 = tp(ww, 0);
-      const p3 = tp(0, h0);
-      const p4 = tp(ww, h0);
+  // top-left box
+  let rx = clamp(x, 0, viewport.width);
+  let ry = clamp(y - fontH, 0, viewport.height);
+  let rw = clamp(w, 1, viewport.width - rx);
+  let rh = clamp(fontH, 6, viewport.height - ry);
 
-      const xs = [p1.x, p2.x, p3.x, p4.x];
-      const ys = [p1.y, p2.y, p3.y, p4.y];
-
-      let minX = Math.min.apply(null, xs);
-      let maxX = Math.max.apply(null, xs);
-      let minY = Math.min.apply(null, ys);
-      let maxY = Math.max.apply(null, ys);
-
-      // clamp into viewport to avoid crazy transforms generating walls
-      minX = clamp(minX, 0, viewport.width);
-      maxX = clamp(maxX, 0, viewport.width);
-      minY = clamp(minY, 0, viewport.height);
-      maxY = clamp(maxY, 0, viewport.height);
-
-      return {
-        x: minX,
-        y: minY,
-        w: Math.max(1, maxX - minX),
-        h: Math.max(1, maxY - minY)
-      };
-    }
+  return { x: rx, y: ry, w: rw, h: rh };
+}
 
     function isWs(ch) {
       return ch === " " || ch === "\n" || ch === "\t" || ch === "\r";
     }
 
-    function shouldInsertSpace(prevChar, nextChar) {
-      if (!prevChar || !nextChar) return false;
-      if (isWs(prevChar) || isWs(nextChar)) return false;
-      // very conservative: insert space between items to avoid glued mega-token
-      return true;
-    }
+function shouldInsertSpace(prevChar, nextChar) {
+  if (!prevChar || !nextChar) return false;
+  if (isWs(prevChar) || isWs(nextChar)) return false;
+
+  // only between ASCII word/digit blocks
+  const a = /[A-Za-z0-9]/.test(prevChar);
+  const b = /[A-Za-z0-9]/.test(nextChar);
+  return a && b;
+}
 
     // 1) Build pageText similar to probe.text
     let pageText = "";
