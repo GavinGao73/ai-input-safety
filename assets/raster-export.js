@@ -8,11 +8,6 @@
  * ✅ ABSOLUTE CONSISTENCY MODE:
  *   - PDF redaction uses the SAME enabledKeys + moneyMode as text mode
  *   - i.e. "text hits what, PDF covers what"
- *
- * ✅ QUIET RENDER MODE (visual polish, NO logic change):
- *   - Small rects do NOT draw "已遮盖" (reduces noise)
- *   - email/account rects are "silent" by default (still covered)
- *   - Rects preserve key so renderer can treat them differently
  * ======================================================= */
 
 (function () {
@@ -105,7 +100,6 @@
     return c;
   }
 
-  // ✅ Quiet render: small blocks do not show placeholder text; email/account default silent
   function drawRedactionsOnCanvas(canvas, rects, opt) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -127,17 +121,12 @@
       ctx.fillStyle = "#000";
       ctx.fillRect(x, y, w, h);
 
-      // ---- reduce noise ----
-      const key = r && r.key ? String(r.key) : "";
+      // 为了减少“已遮盖”噪音：太小的块不写字（但仍然遮盖）
       const area = w * h;
-
       const isTiny = (w < 90) || (h < 18) || (area < 2200);
-      const silentKey = (key === "email" || key === "account");
+      if (isTiny) continue;
 
-      // Small bars OR email/account -> no placeholder text (still fully covered)
-      if (isTiny || silentKey) continue;
-
-      const fs = clamp(Math.min(h * 0.42, w * 0.10) * fontScale, 10, 54);
+      const fs = clamp(Math.min(h * 0.45, w * 0.12) * fontScale, 10, 64);
       ctx.fillStyle = "#fff";
       ctx.font = `700 ${fs}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
       ctx.fillText(placeholder, x + w / 2, y + h / 2);
@@ -276,63 +265,39 @@
       return out;
     }
 
+    // ✅ 核心修复：安全 bbox（避免 double-scaling 导致整行黑墙）
     function bboxForItem(it) {
-      // ✅ Safer bbox in viewport/canvas coordinates (avoid double-scaling walls)
-      const m = Util.transform(viewport.transform, it.transform);
+      const tx = Util.transform(viewport.transform, it.transform);
+
+      const x = tx[4];
+      const y = tx[5];
+
+      // height estimate from transform
+      let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
+      fontH = clamp(fontH * 1.15, 6, 120);
+
+      // width: prefer it.width (often already viewport units in pdf.js)
+      let w = Number(it.width || 0);
+      if (!Number.isFinite(w) || w <= 0) {
+        const s = String(it.str || "");
+        w = Math.max(6, s.length * fontH * 0.55);
+      }
+
       const s = String(it.str || "");
+      const est = Math.max(10, s.length * fontH * 0.95);
 
-      // scale magnitude
-      const scaleX = Math.hypot(m[0], m[1]) || 1;
-      const scaleY = Math.hypot(m[2], m[3]) || scaleX || 1;
+      // 上限：允许更宽一点，避免“遮成小方块”；但禁止变成“整行条”
+      w = clamp(w, 1, Math.min(viewport.width * 0.75, est * 3.2));
+      // 下限：避免极端情况下太窄
+      w = Math.max(w, Math.min(est, viewport.width * 0.40));
 
-      let w0 = Number(it.width || 0);
-      let h0 = Number(it.height || 0);
+      // top-left box
+      const rx = clamp(x, 0, viewport.width);
+      const ry = clamp(y - fontH, 0, viewport.height);
+      const rw = clamp(w, 1, viewport.width - rx);
+      const rh = clamp(fontH, 6, viewport.height - ry);
 
-      // Height
-      if (!Number.isFinite(h0) || h0 <= 0) {
-        h0 = (Math.hypot(m[2], m[3]) || Math.hypot(m[0], m[1]) || 10) / scaleY;
-      }
-      const fontH = clamp(h0 * scaleY * 1.05, 6, 90);
-
-      // Width: prefer it.width (can be already scaled depending on build)
-      if (!Number.isFinite(w0) || w0 <= 0) {
-        w0 = Math.max(6, s.length * fontH * 0.55);
-      }
-
-      // Detect already-scaled width (avoid huge bars)
-      if ((w0 * scaleX) > viewport.width * 1.2) {
-        w0 = w0 / scaleX;
-      }
-
-      // Cap per-item width to reduce "wide bars"
-      const widthPx = clamp(w0 * scaleX, 4, viewport.width * 0.65);
-
-      function tp(x, y) {
-        return {
-          x: m[0] * x + m[2] * y + m[4],
-          y: m[1] * x + m[3] * y + m[5]
-        };
-      }
-
-      const p1 = tp(0, 0);
-      const p2 = tp(widthPx / scaleX, 0);
-      const p3 = tp(0, fontH / scaleY);
-      const p4 = tp(widthPx / scaleX, fontH / scaleY);
-
-      const xs = [p1.x, p2.x, p3.x, p4.x];
-      const ys = [p1.y, p2.y, p3.y, p4.y];
-
-      const minX = clamp(Math.min.apply(null, xs), 0, viewport.width);
-      const maxX = clamp(Math.max.apply(null, xs), 0, viewport.width);
-      const minY = clamp(Math.min.apply(null, ys), 0, viewport.height);
-      const maxY = clamp(Math.max.apply(null, ys), 0, viewport.height);
-
-      return {
-        x: minX,
-        y: minY,
-        w: Math.max(1, maxX - minX),
-        h: Math.max(6, maxY - minY)
-      };
+      return { x: rx, y: ry, w: rw, h: rh };
     }
 
     function isWs(ch) {
@@ -374,7 +339,7 @@
       if (it && it.hasEOL) pageText += "\n";
     }
 
-    // 2) Match spans on pageText (KEEP key)
+    // 2) Match spans on pageText (keep key)
     const spans = [];
     for (const m of matchers) {
       const re0 = m.re;
@@ -389,8 +354,10 @@
     }
     if (!spans.length) return rects;
 
-    // 3) Merge spans (ONLY within same key; prevents cross-type widening)
-    spans.sort((x, y) => (x.key > y.key ? 1 : x.key < y.key ? -1 : (x.a - y.a) || (x.b - y.b)));
+    // 3) Merge spans (within same key)
+    spans.sort((x, y) =>
+      (x.key > y.key ? 1 : x.key < y.key ? -1 : (x.a - y.a) || (x.b - y.b))
+    );
 
     const mergedSpans = [];
     for (const sp of spans) {
@@ -403,7 +370,7 @@
       else mergedSpans.push({ ...sp });
     }
 
-    // 4) Map spans back to items (carry hitKey, tighter pads for email/account)
+    // 4) Map spans back to items (trim weak punct)
     for (const sp of mergedSpans) {
       const A = sp.a;
       const B = sp.b;
@@ -421,7 +388,6 @@
         const localStart = a - r.start;
         const localEnd = b - r.start;
 
-        // Trim whitespace + weak punct around matched slice
         let ls = localStart;
         let le = localEnd;
 
@@ -454,7 +420,7 @@
         rw = clamp(rw, 1, viewport.width - rx);
         rh = clamp(rh, 6, viewport.height - ry);
 
-        // Drop absurd rectangles (prevents black-wall cases)
+        // Drop absurd rectangles
         if (rw > viewport.width * 0.92) continue;
         if (rh > viewport.height * 0.35) continue;
         if (rw > viewport.width * 0.85 && rh > viewport.height * 0.20) continue;
@@ -463,7 +429,7 @@
       }
     }
 
-    // 5) Conservative merge: same line only
+    // 5) Conservative merge: same line only (and same key)
     rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
 
     const out = [];
@@ -473,7 +439,6 @@
       const last = out[out.length - 1];
       if (!last) { out.push({ ...r }); continue; }
 
-      // ✅ Do NOT merge across different keys (keeps bars tighter)
       if ((last.key || "") !== (r.key || "")) {
         out.push({ ...r });
         continue;
@@ -617,5 +582,3 @@
 
   window.RasterExport = RasterExport;
 })();
-
-
