@@ -8,6 +8,11 @@
  * ✅ ABSOLUTE CONSISTENCY MODE:
  *   - PDF redaction uses the SAME enabledKeys + moneyMode as text mode
  *   - i.e. "text hits what, PDF covers what"
+ *
+ * ✅ QUIET RENDER MODE (visual polish, NO logic change):
+ *   - Small rects do NOT draw "已遮盖" (reduces noise)
+ *   - email/account rects are "silent" by default (still covered)
+ *   - Rects preserve key so renderer can treat them differently
  * ======================================================= */
 
 (function () {
@@ -100,6 +105,7 @@
     return c;
   }
 
+  // ✅ Quiet render: small blocks do not show placeholder text; email/account default silent
   function drawRedactionsOnCanvas(canvas, rects, opt) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -121,7 +127,17 @@
       ctx.fillStyle = "#000";
       ctx.fillRect(x, y, w, h);
 
-      const fs = clamp(Math.min(h * 0.45, w * 0.12) * fontScale, 10, 64);
+      // ---- reduce noise ----
+      const key = r && r.key ? String(r.key) : "";
+      const area = w * h;
+
+      const isTiny = (w < 90) || (h < 18) || (area < 2200);
+      const silentKey = (key === "email" || key === "account");
+
+      // Small bars OR email/account -> no placeholder text (still fully covered)
+      if (isTiny || silentKey) continue;
+
+      const fs = clamp(Math.min(h * 0.42, w * 0.10) * fontScale, 10, 54);
       ctx.fillStyle = "#fff";
       ctx.font = `700 ${fs}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
       ctx.fillText(placeholder, x + w / 2, y + h / 2);
@@ -166,7 +182,6 @@
 
   // --------- Rules -> matchers (ABSOLUTE CONSISTENCY) ----------
   function buildRuleMatchers(enabledKeys, moneyMode) {
-    // ✅ EXACTLY the same key priority as text mode (your app.js)
     const PRIORITY = [
       "email",
       "bank",
@@ -191,7 +206,6 @@
       if (pat instanceof RegExp) return pat;
 
       if (typeof pat === "string") {
-        // keep unicode-safe where possible
         try { return new RegExp(pat, "u"); } catch (_) {
           try { return new RegExp(pat); } catch (__) { return null; }
         }
@@ -217,7 +231,6 @@
     }
 
     for (const k of PRIORITY) {
-      // money still gated by moneyMode, consistent with text mode
       if (k === "money") {
         if (!moneyMode || moneyMode === "off") continue;
       } else {
@@ -361,7 +374,7 @@
       if (it && it.hasEOL) pageText += "\n";
     }
 
-    // 2) Match spans on pageText
+    // 2) Match spans on pageText (KEEP key)
     const spans = [];
     for (const m of matchers) {
       const re0 = m.re;
@@ -372,22 +385,30 @@
       try { re = new RegExp(re0.source, flags); } catch (_) { continue; }
 
       const rs = getAllMatchRanges(re, pageText);
-      for (const r of rs) spans.push(r);
+      for (const [a, b] of rs) spans.push({ a, b, key: m.key });
     }
     if (!spans.length) return rects;
 
-    // 3) Merge spans
-    spans.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    // 3) Merge spans (ONLY within same key; prevents cross-type widening)
+    spans.sort((x, y) => (x.key > y.key ? 1 : x.key < y.key ? -1 : (x.a - y.a) || (x.b - y.b)));
+
     const mergedSpans = [];
     for (const sp of spans) {
       const last = mergedSpans[mergedSpans.length - 1];
-      if (!last) { mergedSpans.push([sp[0], sp[1]]); continue; }
-      if (sp[0] <= last[1] + 1) last[1] = Math.max(last[1], sp[1]);
-      else mergedSpans.push([sp[0], sp[1]]);
+      if (!last || last.key !== sp.key) {
+        mergedSpans.push({ ...sp });
+        continue;
+      }
+      if (sp.a <= last.b + 1) last.b = Math.max(last.b, sp.b);
+      else mergedSpans.push({ ...sp });
     }
 
-    // 4) Map spans back to items
-    for (const [A, B] of mergedSpans) {
+    // 4) Map spans back to items (carry hitKey, tighter pads for email/account)
+    for (const sp of mergedSpans) {
+      const A = sp.a;
+      const B = sp.b;
+      const hitKey = sp.key;
+
       for (const r of itemRanges) {
         const a = Math.max(A, r.start);
         const b = Math.min(B, r.end);
@@ -419,8 +440,9 @@
         const x1 = bb.x + bb.w * (ls / len);
         const x2 = bb.x + bb.w * (le / len);
 
-        const padX = Math.max(0.8, bb.w * 0.010);
-        const padY = Math.max(1.0, bb.h * 0.075);
+        const tight = (hitKey === "email" || hitKey === "account");
+        const padX = tight ? Math.max(0.4, bb.w * 0.006) : Math.max(0.8, bb.w * 0.010);
+        const padY = tight ? Math.max(0.8, bb.h * 0.060) : Math.max(1.0, bb.h * 0.075);
 
         let rx = x1 - padX;
         let ry = bb.y - padY;
@@ -437,7 +459,7 @@
         if (rh > viewport.height * 0.35) continue;
         if (rw > viewport.width * 0.85 && rh > viewport.height * 0.20) continue;
 
-        rects.push({ x: rx, y: ry, w: rw, h: rh });
+        rects.push({ x: rx, y: ry, w: rw, h: rh, key: hitKey });
       }
     }
 
@@ -450,6 +472,12 @@
 
       const last = out[out.length - 1];
       if (!last) { out.push({ ...r }); continue; }
+
+      // ✅ Do NOT merge across different keys (keeps bars tighter)
+      if ((last.key || "") !== (r.key || "")) {
+        out.push({ ...r });
+        continue;
+      }
 
       const rTop = r.y;
       const rBot = r.y + r.h;
@@ -589,4 +617,5 @@
 
   window.RasterExport = RasterExport;
 })();
+
 
