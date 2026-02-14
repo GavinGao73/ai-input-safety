@@ -356,14 +356,35 @@ function shouldInsertSpace(prevChar, nextChar) {
         const localStart = a - r.start;
         const localEnd = b - r.start;
 
+        // ✅ Trim whitespace + weak punct around the matched slice
+        // Prevents over-wide bars caused by surrounding spaces/colon/brackets.
+        let ls = localStart;
+        let le = localEnd;
+
+        const weakTrim = (ch) => {
+        // whitespace
+        if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return true;
+        // common punct around sensitive fields
+        return ":：,，;；()（）[]【】<>《》\"'“”‘’".includes(ch);
+    };
+
+        while (ls < le && weakTrim(s[ls])) ls++;
+        while (le > ls && weakTrim(s[le - 1])) le--;
+
+        if (le <= ls) continue; // all trimmed away -> skip
+
+        // use trimmed range
+        const localStart2 = ls;
+        const localEnd2 = le;
+
         const bb = bboxForItem(it);
         const len = Math.max(1, s.length);
 
-        const x1 = bb.x + bb.w * (localStart / len);
-        const x2 = bb.x + bb.w * (localEnd / len);
+        const x1 = bb.x + bb.w * (localStart2 / len);
+        const x2 = bb.x + bb.w * (localEnd2 / len);
 
-        const padX = Math.max(1.5, bb.w * 0.018);
-        const padY = Math.max(1.5, bb.h * 0.11);
+        const padX = Math.max(0.8, bb.w * 0.010);
+        const padY = Math.max(1.0, bb.h * 0.075);
 
         let rx = x1 - padX;
         let ry = bb.y - padY;
@@ -402,13 +423,13 @@ function shouldInsertSpace(prevChar, nextChar) {
       const overlap = Math.max(0, Math.min(lBot, rBot) - Math.max(lTop, rTop));
       const minH = Math.max(1, Math.min(last.h, r.h));
 
-      const sameLine = (overlap / minH) > 0.72;
+      const sameLine = (overlap / minH) > 0.82;
 
       const heightRatio = Math.min(last.h, r.h) / Math.max(last.h, r.h);
       const similarHeight = heightRatio > 0.78;
 
       const gap = r.x - (last.x + last.w);
-      const near = gap >= -2 && gap <= 5;
+      const near = gap >= -2 && gap <= 4;
 
       if (sameLine && similarHeight && near) {
         const nx = Math.min(last.x, r.x);
