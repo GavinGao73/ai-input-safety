@@ -9,6 +9,8 @@
  *   - Keep document readable for AI / humans
  *   - Cover ONLY sensitive values, keep labels like “电话 / 银行账号”
  *   - No placeholder text (“已遮盖”) on black bars
+ *   - Company: mask core identifying word only (brand/主体词), keep suffix/region/type
+ *   - Money: mask digits only, keep currency sign/unit when possible
  * ======================================================= */
 
 (function () {
@@ -162,9 +164,11 @@
     return { pdf, pages, dpi: dpi || DEFAULT_DPI };
   }
 
-  // --------- Rules -> matchers (same enabledKeys + moneyMode as text mode) ----------
+  // --------- Rules -> matchers ----------
   function buildRuleMatchers(enabledKeys, moneyMode) {
+    // ✅ include company if rules.js provides it
     const PRIORITY = [
+      "company",
       "email",
       "bank",
       "account",
@@ -211,9 +215,11 @@
     }
 
     for (const k of PRIORITY) {
+      // money still gated by moneyMode
       if (k === "money") {
         if (!moneyMode || moneyMode === "off") continue;
       } else {
+        // keep company off unless user enabled it (same behavior as other keys)
         if (!enabledSet.has(k)) continue;
       }
 
@@ -229,7 +235,7 @@
       const re = forceGlobal(re0);
       if (!re) continue;
 
-      matchers.push({ key: k, re });
+      matchers.push({ key: k, re, mode: r.mode || "" });
     }
 
     return matchers;
@@ -239,59 +245,7 @@
   function textItemsToRects(pdfjsLib, viewport, textContent, matchers) {
     const Util = pdfjsLib.Util;
     const items = (textContent && textContent.items) ? textContent.items : [];
-    const rects = [];
-
-    if (!items.length || !matchers || !matchers.length) return rects;
-
-    function getAllMatchRanges(re, s) {
-      const out = [];
-      re.lastIndex = 0;
-      let m;
-      while ((m = re.exec(s)) !== null) {
-        const a = m.index;
-        const b = a + String(m[0] || "").length;
-        if (b > a) out.push([a, b]);
-        if (m[0] === "") re.lastIndex++;
-      }
-      return out;
-    }
-
-    // ✅ Safe bbox in viewport/canvas coordinates (NO double scaling)
-    function bboxForItem(it) {
-      const tx = Util.transform(viewport.transform, it.transform);
-
-      const x = tx[4];
-      const y = tx[5];
-
-      let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
-      fontH = clamp(fontH * 1.15, 6, 120);
-
-      const s = String(it.str || "");
-
-      // width from pdf.js
-      let w = Number(it.width || 0);
-      if (!Number.isFinite(w) || w <= 0) {
-        w = Math.max(8, s.length * fontH * 0.90);
-      }
-
-      const est = Math.max(10, s.length * fontH * 0.92);
-
-      // ✅ if pdf.js gives "line width" style values, prefer est
-      if (w > est * 3.0) w = est * 1.4;
-
-      // ✅ tighter caps to reduce long bars
-      w = clamp(w, 1, Math.min(viewport.width * 0.33, est * 1.6));
-
-      // ✅ small minimum so digits don't become tiny squares
-      w = Math.max(w, Math.min(est * 0.85, viewport.width * 0.22));
-
-      let rx = clamp(x, 0, viewport.width);
-      let ry = clamp(y - fontH, 0, viewport.height);
-      let rw = clamp(w, 1, viewport.width - rx);
-      let rh = clamp(fontH, 6, viewport.height - ry);
-
-      return { x: rx, y: ry, w: rw, h: rh };
-    }
+    if (!items.length || !matchers || !matchers.length) return [];
 
     function isWs(ch) {
       return ch === " " || ch === "\n" || ch === "\t" || ch === "\r";
@@ -305,38 +259,76 @@
       return a && b;
     }
 
-    // ✅ Key-aware label stripping within matched slice (keep semantics)
+    function getAllMatchesWithGroups(re, s) {
+      const out = [];
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(s)) !== null) {
+        const text = String(m[0] || "");
+        if (!text) { re.lastIndex++; continue; }
+        out.push({
+          index: m.index,
+          len: text.length,
+          m
+        });
+      }
+      return out;
+    }
+
+    // ✅ Safe bbox in viewport/canvas coordinates (NO double scaling)
+    function bboxForItem(it) {
+      const tx = Util.transform(viewport.transform, it.transform);
+
+      const x = tx[4];
+      const y = tx[5];
+
+      let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
+      fontH = clamp(fontH * 1.12, 6, 110);
+
+      const s = String(it.str || "");
+
+      let w = Number(it.width || 0);
+      if (!Number.isFinite(w) || w <= 0) w = Math.max(8, s.length * fontH * 0.88);
+
+      const est = Math.max(10, s.length * fontH * 0.90);
+
+      // if pdf.js gives line-width-ish values, prefer est
+      if (w > est * 3.0) w = est * 1.35;
+
+      // tighter caps
+      w = clamp(w, 1, Math.min(viewport.width * 0.30, est * 1.45));
+      w = Math.max(w, Math.min(est * 0.85, viewport.width * 0.20));
+
+      let rx = clamp(x, 0, viewport.width);
+      let ry = clamp(y - fontH, 0, viewport.height);
+      let rw = clamp(w, 1, viewport.width - rx);
+      let rh = clamp(fontH, 6, viewport.height - ry);
+
+      return { x: rx, y: ry, w: rw, h: rh };
+    }
+
+    // ✅ label stripping inside an item slice (keeps semantics)
     function shrinkByLabel(key, s, ls, le) {
       if (le <= ls) return { ls, le };
       const sub = s.slice(ls, le);
 
-      // 强制优先保留标签：账号/电话/邮箱（以及地址/银行可选）
       if (key === "phone") {
-        const m = sub.match(/^(电话|手机|联系电话|Tel\.?|Telefon|Phone|Mobile|Handy)\s*[:：]?\s*/i);
-        if (m && m[0]) ls += m[0].length;
+        const mm = sub.match(/^(电话|手机|联系电话|Tel\.?|Telefon|Phone|Mobile|Handy)\s*[:：]?\s*/i);
+        if (mm && mm[0]) ls += mm[0].length;
+      } else if (key === "account") {
+        const mm = sub.match(/^(银行账号|账号|卡号|银行卡号|Konto|Account|IBAN)\s*[:：]?\s*/i);
+        if (mm && mm[0]) ls += mm[0].length;
+      } else if (key === "email") {
+        const mm = sub.match(/^(邮箱|E-?mail)\s*[:：]?\s*/i);
+        if (mm && mm[0]) ls += mm[0].length;
+      } else if (key === "address_de_street") {
+        const mm = sub.match(/^(地址|Anschrift|Address)\s*[:：]?\s*/i);
+        if (mm && mm[0]) ls += mm[0].length;
+      } else if (key === "bank") {
+        const mm = sub.match(/^(开户行|开户银行|银行)\s*[:：]?\s*/i);
+        if (mm && mm[0]) ls += mm[0].length;
       }
 
-      if (key === "account") {
-        const m = sub.match(/^(银行账号|账号|卡号|银行卡号|Konto|Account|IBAN)\s*[:：]?\s*/i);
-        if (m && m[0]) ls += m[0].length;
-      }
-
-      if (key === "email") {
-        const m = sub.match(/^(邮箱|E-?mail)\s*[:：]?\s*/i);
-        if (m && m[0]) ls += m[0].length;
-      }
-
-      if (key === "address_de_street") {
-        const m = sub.match(/^(地址|Anschrift|Address)\s*[:：]?\s*/i);
-        if (m && m[0]) ls += m[0].length;
-      }
-
-      if (key === "bank") {
-        const m = sub.match(/^(开户行|开户银行|银行)\s*[:：]?\s*/i);
-        if (m && m[0]) ls += m[0].length;
-      }
-
-      // Trim weak punct/space
       const weakTrim = (ch) => {
         if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return true;
         return ":：,，;；()（）[]【】<>《》\"'“”‘’".includes(ch);
@@ -348,31 +340,9 @@
       return { ls, le };
     }
 
-    // ✅ Key ranking: ensure merged spans prefer account/phone/email for label-keeping
-    function keyRank(k) {
-      // smaller = higher priority
-      if (k === "account") return 0;
-      if (k === "phone") return 1;
-      if (k === "email") return 2;
-      if (k === "money") return 3;
-      if (k === "bank") return 4;
-      if (k === "address_de_street") return 5;
-      if (k === "handle") return 6;
-      if (k === "ref") return 7;
-      if (k === "title") return 8;
-      if (k === "number") return 9;
-      return 99;
-    }
-
-    function betterKey(a, b) {
-      if (!a) return b;
-      if (!b) return a;
-      return (keyRank(a) <= keyRank(b)) ? a : b;
-    }
-
-    // 1) Build pageText + item ranges
+    // ✅ Build pageText + item ranges
     let pageText = "";
-    const itemRanges = [];
+    const itemRanges = []; // { idx, start, end }
 
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
@@ -395,61 +365,146 @@
       if (it && it.hasEOL) pageText += "\n";
     }
 
-    // Match on newline-neutral text (length preserved)
+    // newline-neutral for matching (length preserved)
     const matchText = pageText.replace(/\n/g, " ");
 
-    // 2) Match spans (keep key)
+    // ✅ Collect spans WITH key + group info (no early-merge that breaks label logic)
+    // span = { a, b, key, preferSub?: {offsetStart, offsetEnd} }
     const spans = [];
-    for (const m of matchers) {
-      const re0 = m.re;
+    for (const mm of matchers) {
+      const re0 = mm.re;
       if (!(re0 instanceof RegExp)) continue;
 
       const flags = re0.flags.includes("g") ? re0.flags : (re0.flags + "g");
       let re;
       try { re = new RegExp(re0.source, flags); } catch (_) { continue; }
 
-      const rs = getAllMatchRanges(re, matchText);
-      for (const r of rs) spans.push({ a: r[0], b: r[1], key: m.key });
+      const hits = getAllMatchesWithGroups(re, matchText);
+      for (const h of hits) {
+        const a = h.index;
+        const b = a + h.len;
+        const key = mm.key;
+
+        // For some keys, we can mask only a subgroup inside the match:
+        // - company: mask brand/core only
+        // - account/phone: usually group(2) is the number
+        // - money: mask amount group only
+        let preferSub = null;
+
+        const m = h.m || [];
+        const full = String(m[0] || "");
+
+        function findSubOffsets(subStr) {
+          if (!subStr) return null;
+          const sub = String(subStr);
+          const pos = full.indexOf(sub);
+          if (pos < 0) return null;
+          return { offsetStart: pos, offsetEnd: pos + sub.length };
+        }
+
+        if (key === "company") {
+          // rules.js v1.4: CN uses group2 as core; DE/EN uses group1 as core
+          const g2 = m[2] && String(m[2]);
+          const g1 = m[1] && String(m[1]);
+          // choose longer non-empty core candidate
+          const core = (g2 && g2.length >= 2) ? g2 : g1;
+          const off = findSubOffsets(core);
+          if (off) preferSub = off;
+        } else if (key === "account") {
+          // rules.js: prefix in group1, digits in group2
+          const off = findSubOffsets(m[2]);
+          if (off) preferSub = off;
+        } else if (key === "phone") {
+          // rules.js: (label)(number) OR (international)
+          const off = findSubOffsets(m[2] || m[3]);
+          if (off) preferSub = off;
+        } else if (key === "money") {
+          // rules.js: currency code + amount OR sign + amount OR amount + unit
+          const off = findSubOffsets(m[2] || m[4] || m[5]);
+          if (off) preferSub = off;
+        }
+
+        spans.push({ a, b, key, preferSub });
+      }
     }
 
-    if (!spans.length) return rects;
+    if (!spans.length) return [];
 
-    // 3) Merge spans (merge by overlap; pick "best" key for label-keeping)
+    // ✅ Merge spans only when they are same key and very close/overlap
     spans.sort((x, y) => (x.a - y.a) || (x.b - y.b));
     const merged = [];
+    const MERGE_GAP = 1; // keep tight to avoid "black wall"
     for (const sp of spans) {
       const last = merged[merged.length - 1];
       if (!last) { merged.push({ ...sp }); continue; }
 
-      if (sp.a <= last.b + 1) {
+      const sameKey = sp.key === last.key;
+      const close = sp.a <= last.b + MERGE_GAP;
+
+      // Only merge if same key + close
+      if (sameKey && close) {
         last.b = Math.max(last.b, sp.b);
-        last.key = betterKey(last.key, sp.key); // ✅ critical: keep best key
+
+        // merge preferSub conservatively:
+        // if both exist, keep the larger visible-coverage intersection (fallback to null if messy)
+        if (last.preferSub && sp.preferSub) {
+          // if sub ranges overlap in the same full match text, we can't reliably merge; drop preferSub
+          last.preferSub = null;
+        } else {
+          last.preferSub = last.preferSub || sp.preferSub || null;
+        }
       } else {
         merged.push({ ...sp });
       }
     }
 
-    // 4) Map merged spans back to items
+    // ✅ Map merged spans back to items -> rects
+    const rects = [];
+
     for (const sp of merged) {
       const A = sp.a, B = sp.b, key = sp.key;
+      const preferSub = sp.preferSub;
 
       for (const r of itemRanges) {
-        const a = Math.max(A, r.start);
-        const b = Math.min(B, r.end);
-        if (b <= a) continue;
+        const a0 = Math.max(A, r.start);
+        const b0 = Math.min(B, r.end);
+        if (b0 <= a0) continue;
 
         const it = items[r.idx];
         const s = String(it.str || "");
         if (!s) continue;
 
-        let ls = a - r.start;
-        let le = b - r.start;
+        let ls = a0 - r.start;
+        let le = b0 - r.start;
 
-        // ✅ Keep label, cover only value part (account/phone/email forced by key merge)
-        const shr = shrinkByLabel(key, s, ls, le);
-        ls = shr.ls;
-        le = shr.le;
-        if (le <= ls) continue;
+        // If span provides preferSub (sub-range inside match), narrow to that sub-range
+        // We can only apply when this item overlaps the full match AND subrange lies in this item slice.
+        if (preferSub) {
+          // compute span-local offset inside [A,B]
+          const fullLen = Math.max(0, B - A);
+          if (fullLen > 0) {
+            const subA = A + preferSub.offsetStart;
+            const subB = A + preferSub.offsetEnd;
+
+            const a1 = Math.max(subA, r.start);
+            const b1 = Math.min(subB, r.end);
+            if (b1 > a1) {
+              ls = a1 - r.start;
+              le = b1 - r.start;
+            } else {
+              // no overlap with preferred subrange in this item
+              continue;
+            }
+          }
+        } else {
+          // otherwise, apply label-keeping heuristics inside this item slice
+          const shr = shrinkByLabel(key, s, ls, le);
+          ls = shr.ls; le = shr.le;
+          if (le <= ls) continue;
+        }
+
+        // final guard: ignore tiny slices that are mostly punctuation
+        if (le - ls <= 0) continue;
 
         const bb = bboxForItem(it);
         const len = Math.max(1, s.length);
@@ -457,9 +512,9 @@
         const x1 = bb.x + bb.w * (ls / len);
         const x2 = bb.x + bb.w * (le / len);
 
-        // ✅ tighter padding to reduce over-cover
-        const padX = Math.max(0.6, bb.w * 0.006);
-        const padY = Math.max(0.8, bb.h * 0.050);
+        // tighter padding to reduce over-cover
+        const padX = Math.max(0.55, bb.w * 0.005);
+        const padY = Math.max(0.75, bb.h * 0.045);
 
         let rx = x1 - padX;
         let ry = bb.y - padY;
@@ -476,19 +531,23 @@
         if (rh > viewport.height * 0.35) continue;
         if (rw > viewport.width * 0.85 && rh > viewport.height * 0.20) continue;
 
-        rects.push({ x: rx, y: ry, w: rw, h: rh });
+        rects.push({ x: rx, y: ry, w: rw, h: rh, key });
       }
     }
 
-    // 5) Conservative merge: same line only
-    rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+    if (!rects.length) return [];
 
+    // ✅ Conservative merge of rects on same line & same key only (prevents long bars)
+    rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
     const out = [];
+
     for (const r of rects) {
       if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
 
       const last = out[out.length - 1];
-      if (!last) { out.push({ ...r }); continue; }
+      if (!last) { out.push({ x: r.x, y: r.y, w: r.w, h: r.h, key: r.key }); continue; }
+
+      const sameKey = (r.key === last.key);
 
       const rTop = r.y;
       const rBot = r.y + r.h;
@@ -497,19 +556,15 @@
 
       const overlap = Math.max(0, Math.min(lBot, rBot) - Math.max(lTop, rTop));
       const minH = Math.max(1, Math.min(last.h, r.h));
-
-      // ✅ stricter line check to avoid cross-line merging
-      const sameLine = (overlap / minH) > 0.86;
+      const sameLine = (overlap / minH) > 0.88;
 
       const heightRatio = Math.min(last.h, r.h) / Math.max(last.h, r.h);
-      const similarHeight = heightRatio > 0.78;
+      const similarHeight = heightRatio > 0.80;
 
       const gap = r.x - (last.x + last.w);
-
-      // ✅ tighter gap to reduce long combined bars
       const near = gap >= -1 && gap <= 2;
 
-      if (sameLine && similarHeight && near) {
+      if (sameKey && sameLine && similarHeight && near) {
         const nx = Math.min(last.x, r.x);
         const ny = Math.min(last.y, r.y);
         const nr = Math.max(last.x + last.w, r.x + r.w);
@@ -520,11 +575,12 @@
         last.w = nr - nx;
         last.h = nb - ny;
       } else {
-        out.push({ ...r });
+        out.push({ x: r.x, y: r.y, w: r.w, h: r.h, key: r.key });
       }
     }
 
-    return out;
+    // strip key before return (drawing doesn't need it)
+    return out.map(({ x, y, w, h }) => ({ x, y, w, h }));
   }
 
   async function autoRedactReadablePdf({ file, lang, enabledKeys, moneyMode, dpi }) {
@@ -631,4 +687,3 @@
 
   window.RasterExport = RasterExport;
 })();
-
