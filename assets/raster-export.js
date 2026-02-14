@@ -5,12 +5,10 @@
  * - Export PDF as images only (no text layer)
  * - NO OCR / NO logs / NO storage
  *
- * ✅ ABSOLUTE CONSISTENCY MODE:
- *   - PDF redaction uses the SAME enabledKeys + moneyMode as text mode
- *   - i.e. "text hits what, PDF covers what"
- *
- * ✅ SIMPLIFIED UX MODE (CURRENT):
- *   - No "已遮盖" text overlay, only solid black bars
+ * ✅ CURRENT PRODUCT STRATEGY (Personal / Simple):
+ *   - Keep document readable for AI / humans
+ *   - Cover ONLY sensitive values, keep labels like “电话 / 银行账号”
+ *   - No placeholder text (“已遮盖”) on black bars
  * ======================================================= */
 
 (function () {
@@ -20,6 +18,7 @@
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
+  // kept for compatibility (not drawn anymore)
   function langPlaceholder(lang) {
     if (lang === "de") return "GESCHWÄRZT";
     if (lang === "en") return "REDACTED";
@@ -103,12 +102,13 @@
     return c;
   }
 
-  // ✅ SIMPLIFIED: solid black only, no placeholder text
+  // ✅ SOLID BLACK ONLY — NO TEXT
   function drawRedactionsOnCanvas(canvas, rects, opt) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     ctx.save();
+    ctx.globalCompositeOperation = "source-over"; // hard ensure
 
     for (const r of (rects || [])) {
       const x = clamp(r.x, 0, canvas.width);
@@ -117,7 +117,6 @@
       const h = clamp(r.h, 0, canvas.height - y);
       if (w <= 0 || h <= 0) continue;
 
-      // 100% opaque cover
       ctx.fillStyle = "#000";
       ctx.fillRect(x, y, w, h);
     }
@@ -159,9 +158,8 @@
     return { pdf, pages, dpi: dpi || DEFAULT_DPI };
   }
 
-  // --------- Rules -> matchers (ABSOLUTE CONSISTENCY) ----------
+  // --------- Rules -> matchers (same enabledKeys + moneyMode as text mode) ----------
   function buildRuleMatchers(enabledKeys, moneyMode) {
-    // ✅ EXACTLY the same key priority as text mode (your app.js)
     const PRIORITY = [
       "email",
       "bank",
@@ -177,16 +175,13 @@
 
     const rules = window.RULES_BY_KEY || {};
     const matchers = [];
-
     const enabledSet = new Set(Array.isArray(enabledKeys) ? enabledKeys : []);
 
-    // Accept RegExp | string | {source, flags} | {pattern, flags}
     function normalizeToRegExp(pat) {
       if (!pat) return null;
       if (pat instanceof RegExp) return pat;
 
       if (typeof pat === "string") {
-        // keep unicode-safe where possible
         try { return new RegExp(pat, "u"); } catch (_) {
           try { return new RegExp(pat); } catch (__) { return null; }
         }
@@ -201,7 +196,6 @@
         const flags = (typeof pat.flags === "string") ? pat.flags : "";
         try { return new RegExp(src, flags); } catch (_) { return null; }
       }
-
       return null;
     }
 
@@ -212,7 +206,6 @@
     }
 
     for (const k of PRIORITY) {
-      // money still gated by moneyMode, consistent with text mode
       if (k === "money") {
         if (!moneyMode || moneyMode === "off") continue;
       } else {
@@ -237,7 +230,7 @@
     return matchers;
   }
 
-  // --------- Text items -> rects ----------
+  // --------- Text items -> rects (value-first, keep labels) ----------
   function textItemsToRects(pdfjsLib, viewport, textContent, matchers) {
     const Util = pdfjsLib.Util;
     const items = (textContent && textContent.items) ? textContent.items : [];
@@ -259,34 +252,28 @@
     }
 
     function bboxForItem(it) {
-      // ✅ Safer bbox in viewport/canvas coordinates (avoid double-scaling walls)
       const m = Util.transform(viewport.transform, it.transform);
       const s = String(it.str || "");
 
-      // scale magnitude
       const scaleX = Math.hypot(m[0], m[1]) || 1;
       const scaleY = Math.hypot(m[2], m[3]) || scaleX || 1;
 
       let w0 = Number(it.width || 0);
       let h0 = Number(it.height || 0);
 
-      // Height
       if (!Number.isFinite(h0) || h0 <= 0) {
         h0 = (Math.hypot(m[2], m[3]) || Math.hypot(m[0], m[1]) || 10) / scaleY;
       }
       const fontH = clamp(h0 * scaleY * 1.05, 6, 90);
 
-      // Width: prefer it.width (can be already scaled depending on build)
       if (!Number.isFinite(w0) || w0 <= 0) {
         w0 = Math.max(6, s.length * fontH * 0.55);
       }
 
-      // Detect already-scaled width (avoid huge bars)
       if ((w0 * scaleX) > viewport.width * 1.2) {
         w0 = w0 / scaleX;
       }
 
-      // Cap per-item width to reduce "wide bars"
       const widthPx = clamp(w0 * scaleX, 4, viewport.width * 0.65);
 
       function tp(x, y) {
@@ -324,14 +311,59 @@
     function shouldInsertSpace(prevChar, nextChar) {
       if (!prevChar || !nextChar) return false;
       if (isWs(prevChar) || isWs(nextChar)) return false;
-
-      // only between ASCII word/digit blocks (avoid messing CJK)
       const a = /[A-Za-z0-9]/.test(prevChar);
       const b = /[A-Za-z0-9]/.test(nextChar);
       return a && b;
     }
 
-    // 1) Build pageText similar to probe.text
+    // ✅ Key-aware label stripping within matched slice (keep semantics)
+    function shrinkByLabel(key, s, ls, le) {
+      if (le <= ls) return { ls, le };
+      const sub = s.slice(ls, le);
+
+      // phone: keep “电话/Phone…” but cover the number
+      if (key === "phone") {
+        const m = sub.match(/^(电话|手机|联系电话|Tel\.?|Telefon|Phone|Mobile|Handy)\s*[:：]?\s*/i);
+        if (m && m[0]) ls += m[0].length;
+      }
+
+      // account: keep “银行账号/账号/卡号…” but cover the number
+      if (key === "account") {
+        const m = sub.match(/^(银行账号|账号|卡号|银行卡号|Konto|Account|IBAN)\s*[:：]?\s*/i);
+        if (m && m[0]) ls += m[0].length;
+      }
+
+      // email: keep “邮箱/E-Mail” but cover address
+      if (key === "email") {
+        const m = sub.match(/^(邮箱|E-?mail)\s*[:：]?\s*/i);
+        if (m && m[0]) ls += m[0].length;
+      }
+
+      // address: keep “地址/Anschrift” but cover value
+      if (key === "address_de_street") {
+        const m = sub.match(/^(地址|Anschrift|Address)\s*[:：]?\s*/i);
+        if (m && m[0]) ls += m[0].length;
+      }
+
+      // bank: keep “开户行/银行” label if present (bank name often ok to cover or not; here only strip label)
+      if (key === "bank") {
+        const m = sub.match(/^(开户行|开户银行|银行)\s*[:：]?\s*/i);
+        if (m && m[0]) ls += m[0].length;
+      }
+
+      // general: trim weak punct/space on both sides after label stripping
+      const weakTrim = (ch) => {
+        if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return true;
+        return ":：,，;；()（）[]【】<>《》\"'“”‘’".includes(ch);
+      };
+
+      while (ls < le && weakTrim(s[ls])) ls++;
+      while (le > ls && weakTrim(s[le - 1])) le--;
+
+      return { ls, le };
+    }
+
+    // 1) Build pageText + item ranges
     let pageText = "";
     const itemRanges = []; // { idx, start, end, len }
 
@@ -356,7 +388,10 @@
       if (it && it.hasEOL) pageText += "\n";
     }
 
-    // 2) Match spans on pageText
+    // ✅ Match on a newline-neutral text (length preserved by replacing with spaces)
+    const matchText = pageText.replace(/\n/g, " ");
+
+    // 2) Match spans on matchText (keep key)
     const spans = [];
     for (const m of matchers) {
       const re0 = m.re;
@@ -366,23 +401,29 @@
       let re;
       try { re = new RegExp(re0.source, flags); } catch (_) { continue; }
 
-      const rs = getAllMatchRanges(re, pageText);
-      for (const r of rs) spans.push(r);
+      const rs = getAllMatchRanges(re, matchText);
+      for (const r of rs) spans.push({ a: r[0], b: r[1], key: m.key });
     }
     if (!spans.length) return rects;
 
-    // 3) Merge spans
-    spans.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-    const mergedSpans = [];
+    // 3) Merge spans (merge by overlap; keep the "first" key just for label trimming)
+    spans.sort((x, y) => (x.a - y.a) || (x.b - y.b));
+    const merged = [];
     for (const sp of spans) {
-      const last = mergedSpans[mergedSpans.length - 1];
-      if (!last) { mergedSpans.push([sp[0], sp[1]]); continue; }
-      if (sp[0] <= last[1] + 1) last[1] = Math.max(last[1], sp[1]);
-      else mergedSpans.push([sp[0], sp[1]]);
+      const last = merged[merged.length - 1];
+      if (!last) { merged.push({ ...sp }); continue; }
+      if (sp.a <= last.b + 1) {
+        last.b = Math.max(last.b, sp.b);
+        // keep last.key as-is (good enough for label stripping)
+      } else {
+        merged.push({ ...sp });
+      }
     }
 
-    // 4) Map spans back to items
-    for (const [A, B] of mergedSpans) {
+    // 4) Map merged spans back to items, slice horizontally
+    for (const sp of merged) {
+      const A = sp.a, B = sp.b, key = sp.key;
+
       for (const r of itemRanges) {
         const a = Math.max(A, r.start);
         const b = Math.min(B, r.end);
@@ -392,20 +433,13 @@
         const s = String(it.str || "");
         if (!s) continue;
 
-        const localStart = a - r.start;
-        const localEnd = b - r.start;
+        let ls = a - r.start;
+        let le = b - r.start;
 
-        // Trim whitespace + weak punct around matched slice
-        let ls = localStart;
-        let le = localEnd;
-
-        const weakTrim = (ch) => {
-          if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return true;
-          return ":：,，;；()（）[]【】<>《》\"'“”‘’".includes(ch);
-        };
-
-        while (ls < le && weakTrim(s[ls])) ls++;
-        while (le > ls && weakTrim(s[le - 1])) le--;
+        // ✅ Keep label, cover only value part
+        const shr = shrinkByLabel(key, s, ls, le);
+        ls = shr.ls;
+        le = shr.le;
         if (le <= ls) continue;
 
         const bb = bboxForItem(it);
@@ -576,7 +610,6 @@
       await exportCanvasesToPdf(result.pages, dpi, name);
     },
 
-    // Utilities used by RedactUI (optional use)
     renderPdfToCanvases,
     renderImageToCanvas,
     drawRedactionsOnCanvas
