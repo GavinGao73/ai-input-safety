@@ -266,16 +266,24 @@
       let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
       fontH = clamp(fontH * 1.15, 6, 120);
 
-      let w = Number(it.width || 0);
       const s = String(it.str || "");
 
+      // width from pdf.js
+      let w = Number(it.width || 0);
       if (!Number.isFinite(w) || w <= 0) {
         w = Math.max(8, s.length * fontH * 0.90);
       }
 
       const est = Math.max(10, s.length * fontH * 0.92);
-      w = clamp(w, 1, Math.min(viewport.width * 0.55, est * 2.2));
-      w = Math.max(w, Math.min(est, viewport.width * 0.35));
+
+      // ✅ if pdf.js gives "line width" style values, prefer est
+      if (w > est * 3.0) w = est * 1.4;
+
+      // ✅ tighter caps to reduce long bars
+      w = clamp(w, 1, Math.min(viewport.width * 0.33, est * 1.6));
+
+      // ✅ small minimum so digits don't become tiny squares
+      w = Math.max(w, Math.min(est * 0.85, viewport.width * 0.22));
 
       let rx = clamp(x, 0, viewport.width);
       let ry = clamp(y - fontH, 0, viewport.height);
@@ -302,6 +310,7 @@
       if (le <= ls) return { ls, le };
       const sub = s.slice(ls, le);
 
+      // 强制优先保留标签：账号/电话/邮箱（以及地址/银行可选）
       if (key === "phone") {
         const m = sub.match(/^(电话|手机|联系电话|Tel\.?|Telefon|Phone|Mobile|Handy)\s*[:：]?\s*/i);
         if (m && m[0]) ls += m[0].length;
@@ -327,6 +336,7 @@
         if (m && m[0]) ls += m[0].length;
       }
 
+      // Trim weak punct/space
       const weakTrim = (ch) => {
         if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return true;
         return ":：,，;；()（）[]【】<>《》\"'“”‘’".includes(ch);
@@ -336,6 +346,28 @@
       while (le > ls && weakTrim(s[le - 1])) le--;
 
       return { ls, le };
+    }
+
+    // ✅ Key ranking: ensure merged spans prefer account/phone/email for label-keeping
+    function keyRank(k) {
+      // smaller = higher priority
+      if (k === "account") return 0;
+      if (k === "phone") return 1;
+      if (k === "email") return 2;
+      if (k === "money") return 3;
+      if (k === "bank") return 4;
+      if (k === "address_de_street") return 5;
+      if (k === "handle") return 6;
+      if (k === "ref") return 7;
+      if (k === "title") return 8;
+      if (k === "number") return 9;
+      return 99;
+    }
+
+    function betterKey(a, b) {
+      if (!a) return b;
+      if (!b) return a;
+      return (keyRank(a) <= keyRank(b)) ? a : b;
     }
 
     // 1) Build pageText + item ranges
@@ -382,14 +414,16 @@
 
     if (!spans.length) return rects;
 
-    // 3) Merge spans
+    // 3) Merge spans (merge by overlap; pick "best" key for label-keeping)
     spans.sort((x, y) => (x.a - y.a) || (x.b - y.b));
     const merged = [];
     for (const sp of spans) {
       const last = merged[merged.length - 1];
       if (!last) { merged.push({ ...sp }); continue; }
+
       if (sp.a <= last.b + 1) {
         last.b = Math.max(last.b, sp.b);
+        last.key = betterKey(last.key, sp.key); // ✅ critical: keep best key
       } else {
         merged.push({ ...sp });
       }
@@ -411,6 +445,7 @@
         let ls = a - r.start;
         let le = b - r.start;
 
+        // ✅ Keep label, cover only value part (account/phone/email forced by key merge)
         const shr = shrinkByLabel(key, s, ls, le);
         ls = shr.ls;
         le = shr.le;
@@ -422,8 +457,9 @@
         const x1 = bb.x + bb.w * (ls / len);
         const x2 = bb.x + bb.w * (le / len);
 
-        const padX = Math.max(0.8, bb.w * 0.010);
-        const padY = Math.max(1.0, bb.h * 0.075);
+        // ✅ tighter padding to reduce over-cover
+        const padX = Math.max(0.6, bb.w * 0.006);
+        const padY = Math.max(0.8, bb.h * 0.050);
 
         let rx = x1 - padX;
         let ry = bb.y - padY;
@@ -462,13 +498,16 @@
       const overlap = Math.max(0, Math.min(lBot, rBot) - Math.max(lTop, rTop));
       const minH = Math.max(1, Math.min(last.h, r.h));
 
-      const sameLine = (overlap / minH) > 0.82;
+      // ✅ stricter line check to avoid cross-line merging
+      const sameLine = (overlap / minH) > 0.86;
 
       const heightRatio = Math.min(last.h, r.h) / Math.max(last.h, r.h);
       const similarHeight = heightRatio > 0.78;
 
       const gap = r.x - (last.x + last.w);
-      const near = gap >= -2 && gap <= 4;
+
+      // ✅ tighter gap to reduce long combined bars
+      const near = gap >= -1 && gap <= 2;
 
       if (sameLine && similarHeight && near) {
         const nx = Math.min(last.x, r.x);
@@ -592,3 +631,4 @@
 
   window.RasterExport = RasterExport;
 })();
+
