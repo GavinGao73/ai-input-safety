@@ -252,36 +252,44 @@
     }
 
     function bboxForItem(it) {
-      const m = Util.transform(viewport.transform, it.transform);
-      const s = String(it.str || "");
+  // ✅ Safe bbox in viewport/canvas coordinates (NO double scaling)
+  const tx = Util.transform(viewport.transform, it.transform);
 
-      const scaleX = Math.hypot(m[0], m[1]) || 1;
-      const scaleY = Math.hypot(m[2], m[3]) || scaleX || 1;
+  const x = tx[4];
+  const y = tx[5];
 
-      let w0 = Number(it.width || 0);
-      let h0 = Number(it.height || 0);
+  // height estimate from transform (viewport px)
+  let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
+  fontH = clamp(fontH * 1.15, 6, 120);
 
-      if (!Number.isFinite(h0) || h0 <= 0) {
-        h0 = (Math.hypot(m[2], m[3]) || Math.hypot(m[0], m[1]) || 10) / scaleY;
-      }
-      const fontH = clamp(h0 * scaleY * 1.05, 6, 90);
+  // width: pdf.js it.width is often already in viewport px at current scale
+  let w = Number(it.width || 0);
+  const s = String(it.str || "");
 
-      if (!Number.isFinite(w0) || w0 <= 0) {
-        w0 = Math.max(6, s.length * fontH * 0.55);
-      }
+  // fallback width if missing
+  if (!Number.isFinite(w) || w <= 0) {
+    // mixed/CJK: a bit wider than latin heuristic
+    w = Math.max(8, s.length * fontH * 0.90);
+  }
 
-      if ((w0 * scaleX) > viewport.width * 1.2) {
-        w0 = w0 / scaleX;
-      }
+  // ✅ hard cap by estimated text width (prevents "full-line" bars)
+  const est = Math.max(10, s.length * fontH * 0.92);
 
-      const widthPx = clamp(w0 * scaleX, 4, viewport.width * 0.65);
+  // allow some slack but never go crazy
+  w = clamp(w, 1, Math.min(viewport.width * 0.55, est * 2.2));
 
-      function tp(x, y) {
-        return {
-          x: m[0] * x + m[2] * y + m[4],
-          y: m[1] * x + m[3] * y + m[5]
-        };
-      }
+  // also ensure not too tiny
+  w = Math.max(w, Math.min(est, viewport.width * 0.35));
+
+  // bbox: top-left in viewport coordinates
+  let rx = clamp(x, 0, viewport.width);
+  let ry = clamp(y - fontH, 0, viewport.height);
+  let rw = clamp(w, 1, viewport.width - rx);
+  let rh = clamp(fontH, 6, viewport.height - ry);
+
+  return { x: rx, y: ry, w: rw, h: rh };
+}
+
 
       const p1 = tp(0, 0);
       const p2 = tp(widthPx / scaleX, 0);
