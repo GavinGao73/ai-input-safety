@@ -252,44 +252,43 @@
     }
 
     function bboxForItem(it) {
-  // ✅ Safe bbox in viewport/canvas coordinates (NO double scaling)
-  const tx = Util.transform(viewport.transform, it.transform);
+    // ✅ Safe bbox in viewport/canvas coordinates (NO double scaling)
+    const tx = Util.transform(viewport.transform, it.transform);
 
-  const x = tx[4];
-  const y = tx[5];
+    const x = tx[4];
+    const y = tx[5];
 
-  // height estimate from transform (viewport px)
-  let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
-  fontH = clamp(fontH * 1.15, 6, 120);
+    // height estimate from transform (viewport px)
+    let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
+    fontH = clamp(fontH * 1.15, 6, 120);
 
-  // width: pdf.js it.width is often already in viewport px at current scale
-  let w = Number(it.width || 0);
-  const s = String(it.str || "");
+    // width: pdf.js it.width is often already in viewport px at current scale
+    let w = Number(it.width || 0);
+    const s = String(it.str || "");
 
-  // fallback width if missing
-  if (!Number.isFinite(w) || w <= 0) {
+    // fallback width if missing
+    if (!Number.isFinite(w) || w <= 0) {
     // mixed/CJK: a bit wider than latin heuristic
     w = Math.max(8, s.length * fontH * 0.90);
-  }
+    }
 
-  // ✅ hard cap by estimated text width (prevents "full-line" bars)
-  const est = Math.max(10, s.length * fontH * 0.92);
+    // ✅ hard cap by estimated text width (prevents "full-line" bars)
+    const est = Math.max(10, s.length * fontH * 0.92);
 
-  // allow some slack but never go crazy
-  w = clamp(w, 1, Math.min(viewport.width * 0.55, est * 2.2));
+    // allow some slack but never go crazy
+    w = clamp(w, 1, Math.min(viewport.width * 0.55, est * 2.2));
 
-  // also ensure not too tiny
-  w = Math.max(w, Math.min(est, viewport.width * 0.35));
+    // also ensure not too tiny
+    w = Math.max(w, Math.min(est, viewport.width * 0.35));
 
-  // bbox: top-left in viewport coordinates
-  let rx = clamp(x, 0, viewport.width);
-  let ry = clamp(y - fontH, 0, viewport.height);
-  let rw = clamp(w, 1, viewport.width - rx);
-  let rh = clamp(fontH, 6, viewport.height - ry);
+    // bbox: top-left in viewport coordinates
+    let rx = clamp(x, 0, viewport.width);
+    let ry = clamp(y - fontH, 0, viewport.height);
+    let rw = clamp(w, 1, viewport.width - rx);
+    let rh = clamp(fontH, 6, viewport.height - ry);
 
-  return { x: rx, y: ry, w: rw, h: rh };
-}
-
+    return { x: rx, y: ry, w: rw, h: rh };
+    }
 
       const p1 = tp(0, 0);
       const p2 = tp(widthPx / scaleX, 0);
