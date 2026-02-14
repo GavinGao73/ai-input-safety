@@ -121,10 +121,14 @@
       ctx.fillStyle = "#000";
       ctx.fillRect(x, y, w, h);
 
-      // 为了减少“已遮盖”噪音：太小的块不写字（但仍然遮盖）
+            // ✅ 更激进：只有“足够大”的遮罩才写“已遮盖”，否则只画黑条
+      // 经验阈值：短条(邮箱/账号/数字碎片)基本不写字，长条才写
       const area = w * h;
-      const isTiny = (w < 90) || (h < 18) || (area < 2200);
-      if (isTiny) continue;
+      const canLabel =
+        (w >= 180 && h >= 22) ||        // 长且不太矮
+        (area >= 9000 && h >= 18);      // 面积足够大
+
+      if (!canLabel) continue;
 
       const fs = clamp(Math.min(h * 0.45, w * 0.12) * fontScale, 10, 64);
       ctx.fillStyle = "#fff";
@@ -267,38 +271,42 @@
 
     // ✅ 核心修复：安全 bbox（避免 double-scaling 导致整行黑墙）
     function bboxForItem(it) {
-      const tx = Util.transform(viewport.transform, it.transform);
+  const tx = Util.transform(viewport.transform, it.transform);
 
-      const x = tx[4];
-      const y = tx[5];
+  const x = tx[4];
+  const y = tx[5];
 
-      // height estimate from transform
-      let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
-      fontH = clamp(fontH * 1.15, 6, 120);
+  // height estimate from transform
+  let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
+  fontH = clamp(fontH * 1.15, 6, 120);
 
-      // width: prefer it.width (often already viewport units in pdf.js)
-      let w = Number(it.width || 0);
-      if (!Number.isFinite(w) || w <= 0) {
-        const s = String(it.str || "");
-        w = Math.max(6, s.length * fontH * 0.55);
-      }
+  // width: prefer it.width
+  let w = Number(it.width || 0);
+  if (!Number.isFinite(w) || w <= 0) {
+    const s0 = String(it.str || "");
+    w = Math.max(6, s0.length * fontH * 0.55);
+  }
 
-      const s = String(it.str || "");
-      const est = Math.max(10, s.length * fontH * 0.95);
+  const s = String(it.str || "");
 
-      // 上限：允许更宽一点，避免“遮成小方块”；但禁止变成“整行条”
-      w = clamp(w, 1, Math.min(viewport.width * 0.75, est * 3.2));
-      // 下限：避免极端情况下太窄
-      w = Math.max(w, Math.min(est, viewport.width * 0.40));
+  // 估宽：更贴近实际（中文/混排）
+  const est = Math.max(10, s.length * fontH * 0.95);
 
-      // top-left box
-      const rx = clamp(x, 0, viewport.width);
-      const ry = clamp(y - fontH, 0, viewport.height);
-      const rw = clamp(w, 1, viewport.width - rx);
-      const rh = clamp(fontH, 6, viewport.height - ry);
+  // ✅ 上限更紧：避免长黑条（从 0.75 -> 0.55；est*3.2 -> est*2.2）
+  w = clamp(w, 1, Math.min(viewport.width * 0.55, est * 2.2));
 
-      return { x: rx, y: ry, w: rw, h: rh };
-    }
+  // ✅ 关键：不要再用 viewport.width*0.40 当下限（这就是“过宽”的主要来源）
+  // 只给一个非常温和的下限，防止极端情况下太窄：
+  w = Math.max(w, Math.min(est * 0.95, 220));
+
+  // top-left box
+  const rx = clamp(x, 0, viewport.width);
+  const ry = clamp(y - fontH, 0, viewport.height);
+  const rw = clamp(w, 1, viewport.width - rx);
+  const rh = clamp(fontH, 6, viewport.height - ry);
+
+  return { x: rx, y: ry, w: rw, h: rh };
+}
 
     function isWs(ch) {
       return ch === " " || ch === "\n" || ch === "\t" || ch === "\r";
