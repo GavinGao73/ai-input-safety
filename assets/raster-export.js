@@ -15,7 +15,7 @@
 
 (function () {
   "use strict";
-  
+
   const DEFAULT_DPI = 600;
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
@@ -166,7 +166,6 @@
 
   // --------- Rules -> matchers ----------
   function buildRuleMatchers(enabledKeys, moneyMode) {
-    // ✅ include company/person_name/address_de_postal if rules.js provides them
     const PRIORITY = [
       "person_name",
       "company",
@@ -219,8 +218,8 @@
     for (const k of PRIORITY) {
       if (k === "money") {
         if (!moneyMode || moneyMode === "off") continue;
-           } else {
-        // ✅ always-on sensitive keys (even if caller forgets to enable)
+      } else {
+        // always-on sensitive keys
         const ALWAYS_ON = new Set(["phone", "account", "email", "bank"]);
         if (!enabledSet.has(k) && !ALWAYS_ON.has(k)) continue;
       }
@@ -273,8 +272,6 @@
       return out;
     }
 
-    // ✅ Safe bbox in viewport/canvas coordinates (NO double scaling)
-    // ✅ Key-aware caps (account/phone/email/bank need wider to avoid partial masking)
     function bboxForItem(it, key) {
       const tx = Util.transform(viewport.transform, it.transform);
 
@@ -291,7 +288,6 @@
 
       const est = Math.max(10, s.length * fontH * 0.90);
 
-      // if pdf.js gives line-width-ish values, prefer est
       if (w > est * 2.2) w = est * 1.15;
 
       const isLongValueKey =
@@ -316,10 +312,8 @@
         maxByEst = est * 1.80;
       }
 
-      // caps
       w = clamp(w, 1, Math.min(maxByPage, maxByEst));
 
-      // min width so digits don't become tiny squares
       const minW = isLongValueKey ? (est * 0.95) : (est * 0.85);
       w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.40 : 0.20)));
 
@@ -331,7 +325,6 @@
       return { x: rx, y: ry, w: rw, h: rh };
     }
 
-    // ✅ label stripping inside an item slice (keeps semantics)
     function shrinkByLabel(key, s, ls, le) {
       if (le <= ls) return { ls, le };
       const sub = s.slice(ls, le);
@@ -364,9 +357,8 @@
       return { ls, le };
     }
 
-    // ✅ Build pageText + item ranges
     let pageText = "";
-    const itemRanges = []; // { idx, start, end }
+    const itemRanges = [];
 
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
@@ -389,11 +381,8 @@
       if (it && it.hasEOL) pageText += "\n";
     }
 
-    // newline-neutral for matching (length preserved)
     const matchText = pageText.replace(/\n/g, " ");
 
-    // ✅ Collect spans WITH key + subgroup preference
-    // span = { a, b, key, preferSub?: {offsetStart, offsetEnd} }
     const spans = [];
     for (const mm of matchers) {
       const re0 = mm.re;
@@ -422,20 +411,16 @@
           return { offsetStart: pos, offsetEnd: pos + sub.length };
         }
 
-          if (key === "company") {
+        if (key === "company") {
           const coreCN = m[2] && String(m[2]);
           const coreDE = m[5] && String(m[5]);
           const core = (coreCN && coreCN.length >= 2) ? coreCN : coreDE;
           const off = (core && core.length >= 2) ? findSubOffsets(core) : null;
           if (off) preferSub = off;
-
         } else if (key === "account") {
           const off = findSubOffsets(m[2]);
           if (off) preferSub = off;
-
         } else if (key === "phone") {
-          // ✅ phone: prefer number groups (avoid masking labels like "Tel:" / "电话:")
-          // and include suffix like "(WhatsApp)" right after number if present.
           const candidates = [m[2], m[3], m[4]]
             .filter(Boolean)
             .map(String);
@@ -448,7 +433,6 @@
             if (pos >= 0) {
               let end = pos + best.length;
 
-              // include "(WhatsApp)" / "(WeChat)" / "(Telegram)" / "(Signal)" if right after the number
               const tail = full.slice(end);
               const tailHit = tail.match(/^\s*\((?:WhatsApp|WeChat|Telegram|Signal)\)/i);
               if (tailHit && tailHit[0]) end += tailHit[0].length;
@@ -456,12 +440,10 @@
               preferSub = { offsetStart: pos, offsetEnd: end };
             }
           }
-
         } else if (key === "money") {
           const off = findSubOffsets(m[2] || m[4] || m[5]);
           if (off) preferSub = off;
         }
-
 
         spans.push({ a, b, key, preferSub });
       }
@@ -469,10 +451,9 @@
 
     if (!spans.length) return [];
 
-    // ✅ Merge spans only when same key and very close/overlap
     spans.sort((x, y) => (x.a - y.a) || (x.b - y.b));
     const merged = [];
-    const MERGE_GAP = 1; // tight to avoid "black wall"
+    const MERGE_GAP = 1;
 
     function samePreferSub(p, q) {
       if (!p && !q) return true;
@@ -490,10 +471,6 @@
       if (sameKey && close) {
         last.b = Math.max(last.b, sp.b);
 
-        // merge preferSub conservatively:
-        // - if identical, keep it
-        // - if one side missing, keep the existing
-        // - if different, drop (avoid wrong subrange)
         if (last.preferSub && sp.preferSub) {
           last.preferSub = samePreferSub(last.preferSub, sp.preferSub) ? last.preferSub : null;
         } else {
@@ -504,7 +481,6 @@
       }
     }
 
-    // ✅ Map merged spans back to items -> rects
     const rects = [];
 
     for (const sp of merged) {
@@ -523,7 +499,6 @@
         let ls = a0 - r.start;
         let le = b0 - r.start;
 
-        // If span provides preferSub (sub-range inside match), narrow to that sub-range
         if (preferSub) {
           const fullLen = Math.max(0, B - A);
           if (fullLen > 0) {
@@ -553,7 +528,6 @@
         const x1 = bb.x + bb.w * (ls / len);
         const x2 = bb.x + bb.w * (le / len);
 
-        // tighter padding to reduce over-cover
         const padX = Math.max(0.55, bb.w * 0.005);
         const padY = Math.max(0.75, bb.h * 0.045);
 
@@ -567,7 +541,6 @@
         rw = clamp(rw, 1, viewport.width - rx);
         rh = clamp(rh, 6, viewport.height - ry);
 
-        // Drop absurd rectangles
         if (rw > viewport.width * 0.92) continue;
         if (rh > viewport.height * 0.35) continue;
         if (rw > viewport.width * 0.85 && rh > viewport.height * 0.20) continue;
@@ -578,7 +551,6 @@
 
     if (!rects.length) return [];
 
-    // ✅ Conservative merge of rects on same line & same key only (prevents long bars)
     rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
     const out = [];
 
@@ -620,7 +592,6 @@
       }
     }
 
-    // strip key before return (drawing doesn't need it)
     return out.map(({ x, y, w, h }) => ({ x, y, w, h }));
   }
 
@@ -629,7 +600,20 @@
     const { pdf, pages } = await renderPdfToCanvases(file, dpi || DEFAULT_DPI);
 
     const matchers = buildRuleMatchers(enabledKeys, moneyMode);
-    const _placeholder = langPlaceholder(lang); // kept for compatibility (not drawn)
+    const _placeholder = langPlaceholder(lang);
+
+    // ---- status snapshot (no logs) ----
+    try {
+      window.__RasterExportLast = {
+        when: Date.now(),
+        phase: "autoRedactReadablePdf",
+        hasRules: !!(window.RULES_BY_KEY && typeof window.RULES_BY_KEY === "object"),
+        enabledKeys: Array.isArray(enabledKeys) ? enabledKeys.slice() : [],
+        moneyMode: moneyMode || "off",
+        matcherKeys: (matchers || []).map(m => m.key),
+        pages: (pages || []).length
+      };
+    } catch (_) {}
 
     for (const p of pages) {
       const page = await pdf.getPage(p.pageNumber);
@@ -641,7 +625,6 @@
     return pages;
   }
 
-  // --------- Image -> single canvas ----------
   async function renderImageToCanvas(file, dpi) {
     const dataUrl = await readFileAsDataURL(file);
     const img = await new Promise((resolve) => {
@@ -659,7 +642,6 @@
     return [{ pageNumber: 1, canvas: c, width: c.width, height: c.height, dpi: dpi || DEFAULT_DPI }];
   }
 
-  // --------- Export canvases to image-only PDF ----------
   async function exportCanvasesToPdf(pages, dpi, filename) {
     const PDFLib = await loadPdfLibIfNeeded();
     const { PDFDocument } = PDFLib;
@@ -693,6 +675,19 @@
       const lang = (opts && opts.lang) || "zh";
       const dpi = (opts && opts.dpi) || DEFAULT_DPI;
 
+      // ---- status snapshot before work ----
+      try {
+        window.__RasterExportLast = {
+          when: Date.now(),
+          phase: "exportRasterSecurePdfFromReadablePdf:begin",
+          hasRules: !!(window.RULES_BY_KEY && typeof window.RULES_BY_KEY === "object"),
+          enabledKeys: Array.isArray(opts && opts.enabledKeys) ? (opts.enabledKeys || []).slice() : [],
+          moneyMode: (opts && opts.moneyMode) || "off",
+          lang,
+          dpi
+        };
+      } catch (_) {}
+
       const pages = await autoRedactReadablePdf({
         file,
         lang,
@@ -702,6 +697,18 @@
       });
 
       const name = (opts && opts.filename) || `raster_secure_${Date.now()}.pdf`;
+
+      // ---- status snapshot before export ----
+      try {
+        const last = window.__RasterExportLast || {};
+        window.__RasterExportLast = Object.assign({}, last, {
+          when2: Date.now(),
+          phase2: "exportRasterSecurePdfFromReadablePdf:export",
+          pages: (pages || []).length,
+          filename: name
+        });
+      } catch (_) {}
+
       await exportCanvasesToPdf(pages, dpi, name);
     },
 
@@ -709,7 +716,19 @@
       if (!result || !result.pages || !result.pages.length) return;
 
       const dpi = result.dpi || DEFAULT_DPI;
-      const _placeholder = langPlaceholder(result.lang || "zh"); // kept for compatibility (not drawn)
+      const _placeholder = langPlaceholder(result.lang || "zh");
+
+      // ---- status snapshot ----
+      try {
+        window.__RasterExportLast = {
+          when: Date.now(),
+          phase: "exportRasterSecurePdfFromVisual",
+          pages: (result.pages || []).length,
+          hasRectPages: !!result.rectsByPage,
+          lang: result.lang || "zh",
+          dpi
+        };
+      } catch (_) {}
 
       const rectsByPage = result.rectsByPage || {};
       for (const p of result.pages) {
@@ -726,5 +745,15 @@
     drawRedactionsOnCanvas
   };
 
+  // ---- minimal status beacon (no logs, in-memory only) ----
+  try {
+    window.__RasterExportStatus = {
+      loaded: true,
+      hasRules: !!(window.RULES_BY_KEY && typeof window.RULES_BY_KEY === "object"),
+      time: Date.now()
+    };
+  } catch (_) {}
+
   window.RasterExport = RasterExport;
 })();
+
