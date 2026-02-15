@@ -434,9 +434,11 @@
           if (off) preferSub = off;
 
         } else if (key === "phone") {
-          // ✅ phone: prefer the NUMBER groups (avoid masking labels like "Tel:" / "电话:")
-          // and optionally include suffix like "(WhatsApp)" after the number.
-          const candidates = [m[2], m[3], m[4]].filter(Boolean).map(String);
+          // ✅ phone: prefer number groups (avoid masking labels like "Tel:" / "电话:")
+          // and include suffix like "(WhatsApp)" right after number if present.
+          const candidates = [m[2], m[3], m[4]]
+            .filter(Boolean)
+            .map(String);
 
           let best = "";
           for (const c of candidates) if (c.length > best.length) best = c;
@@ -446,6 +448,7 @@
             if (pos >= 0) {
               let end = pos + best.length;
 
+              // include "(WhatsApp)" / "(WeChat)" / "(Telegram)" / "(Signal)" if right after the number
               const tail = full.slice(end);
               const tailHit = tail.match(/^\s*\((?:WhatsApp|WeChat|Telegram|Signal)\)/i);
               if (tailHit && tailHit[0]) end += tailHit[0].length;
@@ -454,11 +457,11 @@
             }
           }
 
-
         } else if (key === "money") {
           const off = findSubOffsets(m[2] || m[4] || m[5]);
           if (off) preferSub = off;
         }
+
 
         spans.push({ a, b, key, preferSub });
       }
