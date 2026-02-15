@@ -417,9 +417,19 @@
           const core = (coreCN && coreCN.length >= 2) ? coreCN : coreDE;
           const off = (core && core.length >= 2) ? findSubOffsets(core) : null;
           if (off) preferSub = off;
+
+        } else if (key === "person_name") {
+          // ✅ person_name: prefer captured name group so we DON'T mask label text
+          // rules.js pattern captures the name value in group(1) for labeled case,
+          // and group(2) for EN full name case.
+          const nameCandidate = (m[1] != null && String(m[1])) || (m[2] != null && String(m[2])) || "";
+          const off = findSubOffsets(nameCandidate);
+          if (off) preferSub = off;
+
         } else if (key === "account") {
           const off = findSubOffsets(m[2]);
           if (off) preferSub = off;
+
         } else if (key === "phone") {
           const candidates = [m[2], m[3], m[4]]
             .filter(Boolean)
@@ -440,6 +450,7 @@
               preferSub = { offsetStart: pos, offsetEnd: end };
             }
           }
+
         } else if (key === "money") {
           const off = findSubOffsets(m[2] || m[4] || m[5]);
           if (off) preferSub = off;
