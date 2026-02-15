@@ -1,3 +1,4 @@
+// assets/pdf.js
 // PDF text-layer probe (NOT a content export tool)
 
 let __pdfjsPromise = null;
@@ -29,7 +30,7 @@ async function probePdfTextLayer(file) {
   const doc = await pdfjsLib.getDocument({
     data: buf,
     disableFontFace: true,
-    useSystemFonts: true,
+    useSystemFonts: true
   }).promise;
 
   let totalChars = 0;
@@ -40,10 +41,18 @@ async function probePdfTextLayer(file) {
 
     const content = await page.getTextContent({
       normalizeWhitespace: true,
-      disableCombineTextItems: false,
+      disableCombineTextItems: false
     });
 
     const items = content.items || [];
+
+    // ✅ FIX: define pageText from items
+    const pageText = items
+      .map(it => (it && it.str ? String(it.str) : ""))
+      .filter(Boolean)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
 
     if (pageText) {
       pages.push(pageText);
@@ -51,6 +60,7 @@ async function probePdfTextLayer(file) {
     }
   }
 
+  // Very short => treat as no readable text layer
   if (totalChars < 20) {
     return { hasTextLayer: false, text: "" };
   }
@@ -59,3 +69,4 @@ async function probePdfTextLayer(file) {
 }
 
 window.probePdfTextLayer = probePdfTextLayer;
+
