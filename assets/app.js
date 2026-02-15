@@ -1,9 +1,8 @@
 // assets/app.js
-// NOTE: Full file output (with the fixes applied):
-// ✅ FIX (this round, single goal):
-// - Never crash when rules.js loads late or fails.
-// - Always read rules from window.RULES_BY_KEY (no bare RULES_BY_KEY reference).
-// - If rules missing: do not throw, keep UI consistent, allow export snapshot to exist.
+// ✅ This round (single goal):
+// - Ensure RasterExport enabledKeys includes company + person_name,
+//   so company/person rules actually participate in PDF redaction.
+// - Keep everything else the same (no UI rewiring).
 
 let currentLang = "zh";
 window.currentLang = currentLang;
@@ -46,10 +45,19 @@ function escapeHTML(s){
 }
 
 /* ================= RULES SAFE ACCESS (CRITICAL) ================= */
-// Always read rules from window to avoid ReferenceError if rules.js loads late.
 function getRulesSafe() {
   const r = window.RULES_BY_KEY;
   return (r && typeof r === "object") ? r : null;
+}
+
+/* ================= ENABLED KEYS FOR EXPORT (THIS ROUND) ================= */
+// Make export reflect product strategy: include company/person_name.
+// (Even if the UI forgets to enable them.)
+function effectiveEnabledKeys() {
+  const MUST_INCLUDE = ["company", "person_name"];
+  const base = new Set(Array.from(enabled || []));
+  for (const k of MUST_INCLUDE) base.add(k);
+  return Array.from(base);
 }
 
 /* ================= placeholders ================= */
@@ -135,10 +143,8 @@ function renderInputOverlayForPdf(originalText){
   const marked = markHitsInOriginal(originalText);
   overlay.innerHTML = marked;
 
-  // ✅ 开启 PDF overlay 模式（CSS 会让 textarea 文字透明，避免重叠）
   wrap.classList.add("pdf-overlay-on");
 
-  // sync scroll (both directions)
   overlay.scrollTop = ta.scrollTop;
   overlay.scrollLeft = ta.scrollLeft;
 }
@@ -147,7 +153,6 @@ function renderInputOverlayForPdf(originalText){
 function markHitsInOriginal(text){
   let s = String(text || "");
 
-  // we use sentinel tokens, then escape, then convert to spans
   const S1 = "⟦HIT⟧";
   const S2 = "⟦/HIT⟧";
 
@@ -167,10 +172,7 @@ function markHitsInOriginal(text){
   ];
 
   const rules = getRulesSafe();
-  if (!rules) {
-    // Rules not loaded yet: do not crash; just return escaped original (no hits)
-    return escapeHTML(s);
-  }
+  if (!rules) return escapeHTML(s);
 
   for (const key of PRIORITY) {
     if (key !== "money" && !enabled.has(key)) continue;
@@ -283,8 +285,6 @@ const RISK_WEIGHTS = {
   title: 4,
   number: 2,
   money: 0,
-
-  // ✅ new keys (conservative weights)
   company: 8,
   person_name: 10
 };
@@ -434,7 +434,6 @@ function renderRiskBox(report, meta) {
     report.level === "mid" ? t.adviceMid :
     t.adviceLow;
 
-  // ✅ 去掉内部重复标题“风险评分”，避免与 summary 重复
   box.innerHTML = `
     <div class="riskhead">
       <div class="riskleft">
@@ -461,23 +460,10 @@ function renderRiskBox(report, meta) {
 
 /* ================= Stage 3 UI texts (fallback-safe) ================= */
 function stage3Text(key){
-  // If i18n.js later provides these keys, it can override by t.btnExportText etc.
   const map = {
-    zh: {
-      btnExportText: "导出文本",
-      btnExportPdf: "红删PDF",
-      btnManual: "人工处理"
-    },
-    de: {
-      btnExportText: "Text",
-      btnExportPdf: "Raster-PDF",
-      btnManual: "Manuell"
-    },
-    en: {
-      btnExportText: "Export text",
-      btnExportPdf: "Raster PDF",
-      btnManual: "Manual"
-    }
+    zh: { btnExportText: "导出文本", btnExportPdf: "红删PDF", btnManual: "人工处理" },
+    de: { btnExportText: "Text", btnExportPdf: "Raster-PDF", btnManual: "Manuell" },
+    en: { btnExportText: "Export text", btnExportPdf: "Raster PDF", btnManual: "Manual" }
   };
   const m = map[currentLang] || map.zh;
   return m[key] || "";
@@ -538,7 +524,6 @@ function setText() {
 
   if ($("ui-foot")) $("ui-foot").textContent = t.foot;
 
-  // ✅ language switch should refresh Stage 3 button labels without changing mode
   setStage3Ui(lastStage3Mode);
 }
 
@@ -570,7 +555,6 @@ function applyRules(text) {
 
   const rules = getRulesSafe();
   if (!rules) {
-    // Rules not loaded yet: keep UI stable, do not crash.
     lastRunMeta.inputLen = out.length;
     lastRunMeta.enabledCount = enabled.size;
     lastRunMeta.moneyMode = moneyMode;
@@ -596,8 +580,9 @@ function applyRules(text) {
     const ta = $("inputText");
     if (ta) renderInputOverlayForPdf(ta.value || "");
 
+    // IMPORTANT: snapshot for export
     window.__export_snapshot = {
-      enabledKeys: Array.from(enabled || []),
+      enabledKeys: effectiveEnabledKeys(),
       moneyMode: (typeof moneyMode === "string" ? moneyMode : "off"),
       lang: currentLang,
       fromPdf: !!lastRunMeta.fromPdf
@@ -640,7 +625,6 @@ function applyRules(text) {
     });
   }
 
-  // meta
   lastRunMeta.inputLen = (String(text || "")).length;
   lastRunMeta.enabledCount = enabled.size;
   lastRunMeta.moneyMode = moneyMode;
@@ -678,24 +662,20 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
-  // auto expand
   const hasOut = String(out || "").trim().length > 0;
   const rd = $("riskDetails");
   const ad = $("achvDetails");
   if (rd) rd.open = hasOut;
   if (ad) ad.open = hasOut;
 
-  // watermark hide
   updateInputWatermarkVisibility();
 
-  // input overlay for PDF only
   const ta = $("inputText");
   if (ta) renderInputOverlayForPdf(ta.value || "");
 
-  // ✅ Stage 3 export snapshot (CRITICAL for trust):
-  // Ensure Text export & Raster-PDF export use exactly the same rule state.
+  // IMPORTANT: snapshot for export
   window.__export_snapshot = {
-    enabledKeys: Array.from(enabled || []),
+    enabledKeys: effectiveEnabledKeys(),
     moneyMode: (typeof moneyMode === "string" ? moneyMode : "off"),
     lang: currentLang,
     fromPdf: !!lastRunMeta.fromPdf
@@ -714,17 +694,14 @@ async function handleFile(file) {
   lastPdfOriginalText = "";
   lastFileKind = (file.type === "application/pdf") ? "pdf" : (file.type && file.type.startsWith("image/") ? "image" : "");
 
-  // Default: hide Stage 3 buttons until mode determined
   setStage3Ui("none");
 
-  // ---------- Image: always Mode B ----------
   if (lastFileKind === "image") {
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
     return;
   }
 
-  // ---------- PDF ----------
   if (lastFileKind !== "pdf") return;
 
   try {
@@ -738,14 +715,12 @@ async function handleFile(file) {
     const probe = await window.probePdfTextLayer(file);
     lastProbe = probe || null;
 
-    // hasTextLayer=false => Mode B
     if (!probe || !probe.hasTextLayer) {
       lastRunMeta.fromPdf = false;
       setStage3Ui("B");
       return;
     }
 
-    // hasTextLayer=true => Mode A
     lastRunMeta.fromPdf = true;
     setStage3Ui("A");
 
@@ -757,21 +732,17 @@ async function handleFile(file) {
     const ta = $("inputText");
     if (ta) {
       ta.value = text;
-      ta.readOnly = false; // keep editable
+      ta.readOnly = false;
     }
 
     updateInputWatermarkVisibility();
 
-    // Run rules and update cards
     applyRules(text);
-
-    // Draw overlay immediately
     renderInputOverlayForPdf(text);
 
     window.dispatchEvent(new Event("safe:updated"));
   } catch (e) {
     console.error("[handleFile] ERROR:", e);
-    // ✅ fallback: never leave user with "no reaction"
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
   }
@@ -785,7 +756,6 @@ function bindPdfUI() {
     const f = e.target.files && e.target.files[0];
     if (f && $("pdfName")) $("pdfName").textContent = f.name || "";
     handleFile(f);
-    // allow re-upload same file
     e.target.value = "";
   });
 }
@@ -804,14 +774,12 @@ function bind() {
       const ta = $("inputText");
       const inTxt = (ta && ta.value) ? String(ta.value).trim() : "";
 
-      // ✅ 不再强制 lastRunMeta.fromPdf=false（这是“标记不稳定”的根因）
       if (inTxt) {
         applyRules(inTxt);
       } else {
         window.dispatchEvent(new Event("safe:updated"));
       }
 
-      // ✅ 语言切换后，如果仍是 PDF 模式，立刻重画 overlay（避免切换后消失）
       if (ta) renderInputOverlayForPdf(ta.value || "");
     };
   });
@@ -827,7 +795,6 @@ function bind() {
         window.__safe_moneyMode = moneyMode;
         window.dispatchEvent(new Event("safe:updated"));
       }
-      // ✅ money 改变后，PDF overlay 也要同步（命中颜色稳定）
       renderInputOverlayForPdf($("inputText").value || "");
     });
 
@@ -836,12 +803,10 @@ function bind() {
   }
 
   $("btnGenerate").onclick = () => {
-    // ✅ 手动过滤：视为非 PDF 模式，关闭 overlay
     lastRunMeta.fromPdf = false;
     const wrap = $("inputWrap");
     if (wrap) wrap.classList.remove("pdf-overlay-on");
     if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
-
     applyRules($("inputText").value || "");
   };
 
@@ -867,7 +832,6 @@ function bind() {
 
     if ($("pdfName")) $("pdfName").textContent = "";
 
-    // reset overlay + watermark
     const wrap = $("inputWrap");
     if (wrap) {
       wrap.classList.remove("pdf-overlay-on");
@@ -875,7 +839,6 @@ function bind() {
     }
     if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
 
-    // ✅ Stage 3 state reset
     lastUploadedFile = null;
     lastFileKind = "";
     lastProbe = null;
@@ -911,7 +874,6 @@ function bind() {
     $("downCount").textContent = String(n);
   };
 
-  // watermark toggle on typing
   const ta = $("inputText");
   if (ta) {
     ta.addEventListener("input", () => {
@@ -919,7 +881,6 @@ function bind() {
       if (lastRunMeta.fromPdf) renderInputOverlayForPdf(ta.value || "");
     });
 
-    // sync overlay scrolling
     ta.addEventListener("scroll", () => {
       const overlay = $("inputOverlay");
       if (overlay) {
@@ -929,9 +890,6 @@ function bind() {
     });
   }
 
-  // ================= Stage 3 buttons =================
-
-  // Mode A: export filtered text
   const btnExportText = $("btnExportText");
   if (btnExportText) {
     btnExportText.onclick = () => {
@@ -949,7 +907,6 @@ function bind() {
     };
   }
 
-  // Mode A: export raster secure PDF (auto-redact)
   const btnExportRasterPdf = $("btnExportRasterPdf");
   if (btnExportRasterPdf) {
     btnExportRasterPdf.onclick = async () => {
@@ -961,7 +918,6 @@ function bind() {
         if (rb) rb.innerHTML = `<div class="tiny" style="white-space:pre-wrap;line-height:1.6;">${html}</div>`;
       };
 
-      // ✅ click heartbeat (always visible)
       say(`Redact click ✅\n${Date.now()}`);
 
       try {
@@ -978,9 +934,8 @@ function bind() {
           return;
         }
 
-        // ✅ snapshot (consistency with text output)
         const snap = window.__export_snapshot || {};
-        const enabledKeys = Array.isArray(snap.enabledKeys) ? snap.enabledKeys : Array.from(enabled || []);
+        const enabledKeys = Array.isArray(snap.enabledKeys) ? snap.enabledKeys : effectiveEnabledKeys();
         const mm = (typeof snap.moneyMode === "string") ? snap.moneyMode : (typeof moneyMode === "string" ? moneyMode : "off");
         const lang = snap.lang || currentLang;
 
@@ -1003,7 +958,6 @@ function bind() {
     };
   }
 
-  // Mode B: manual redact session -> export (UI includes export button)
   const btnManual = $("btnManualRedact");
   if (btnManual) {
     btnManual.onclick = async () => {
@@ -1013,7 +967,7 @@ function bind() {
 
       await window.RedactUI.start({
         file: f,
-        fileKind: lastFileKind,  // "pdf" | "image"
+        fileKind: lastFileKind,
         lang: currentLang
       });
     };
@@ -1027,3 +981,4 @@ initEnabled();
 setText();
 bind();
 updateInputWatermarkVisibility();
+
