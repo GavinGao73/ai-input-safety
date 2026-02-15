@@ -292,7 +292,7 @@
       const est = Math.max(10, s.length * fontH * 0.90);
 
       // if pdf.js gives line-width-ish values, prefer est
-      if (w > est * 3.0) w = est * 1.35;
+      if (w > est * 2.2) w = est * 1.15;
 
       const isLongValueKey =
         key === "account" || key === "phone" || key === "email" || key === "bank";
@@ -433,11 +433,30 @@
           const off = findSubOffsets(m[2]);
           if (off) preferSub = off;
 
-       } else if (key === "phone") {
-         // ✅ phone: prioritize full match to avoid leaking tail like "(WhatsApp)"
-         // This is safer for redaction stability; label-keeping is handled elsewhere (shrinkByLabel)
-         const off = findSubOffsets(m[0]);
-         if (off) preferSub = off;
+        } else if (key === "phone") {
+          // ✅ phone: prefer the NUMBER groups (avoid masking labels like "Tel:" / "电话:")
+          // and optionally include suffix like "(WhatsApp)" after the number.
+          const candidates = [m[2], m[3], m[4]]
+          .filter(Boolean)
+          .map(String);
+
+          let best = "";
+          for (const c of candidates) if (c.length > best.length) best = c;
+
+          if (best) {
+          const pos = full.indexOf(best);
+          if (pos >= 0) {
+          let end = pos + best.length;
+
+          // include "(WhatsApp)" / "(WeChat)" / "(Telegram)" / "(Signal)" if right after the number
+          const tail = full.slice(end);
+          const tailHit = tail.match(/^\s*\((?:WhatsApp|WeChat|Telegram|Signal)\)/i);
+          if (tailHit && tailHit[0]) end += tailHit[0].length;
+
+          preferSub = { offsetStart: pos, offsetEnd: end };
+        }
+      }
+    }
 
         } else if (key === "money") {
           const off = findSubOffsets(m[2] || m[4] || m[5]);
