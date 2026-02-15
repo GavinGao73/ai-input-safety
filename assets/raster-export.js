@@ -438,7 +438,6 @@
          // This is safer for redaction stability; label-keeping is handled elsewhere (shrinkByLabel)
          const off = findSubOffsets(m[0]);
          if (off) preferSub = off;
-       }
 
         } else if (key === "money") {
           const off = findSubOffsets(m[2] || m[4] || m[5]);
