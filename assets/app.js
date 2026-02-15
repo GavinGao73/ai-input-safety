@@ -1,9 +1,9 @@
 // assets/app.js
 // NOTE: Full file output (with the fixes applied):
-// 1) handleFile: do NOT swallow errors; fallback to Mode B on failure
-// 2) handleFile: if probePdfTextLayer missing -> fallback to Mode B
-// 3) PRIORITY lists updated to include person_name + company
-// 4) placeholder + labelForKey + risk weights updated for PERSON/COMPANY (conservative)
+// ✅ FIX (this round, single goal):
+// - Never crash when rules.js loads late or fails.
+// - Always read rules from window.RULES_BY_KEY (no bare RULES_BY_KEY reference).
+// - If rules missing: do not throw, keep UI consistent, allow export snapshot to exist.
 
 let currentLang = "zh";
 window.currentLang = currentLang;
@@ -43,6 +43,13 @@ function escapeHTML(s){
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+/* ================= RULES SAFE ACCESS (CRITICAL) ================= */
+// Always read rules from window to avoid ReferenceError if rules.js loads late.
+function getRulesSafe() {
+  const r = window.RULES_BY_KEY;
+  return (r && typeof r === "object") ? r : null;
 }
 
 /* ================= placeholders ================= */
@@ -159,9 +166,15 @@ function markHitsInOriginal(text){
     "number"
   ];
 
+  const rules = getRulesSafe();
+  if (!rules) {
+    // Rules not loaded yet: do not crash; just return escaped original (no hits)
+    return escapeHTML(s);
+  }
+
   for (const key of PRIORITY) {
     if (key !== "money" && !enabled.has(key)) continue;
-    const r = RULES_BY_KEY[key];
+    const r = rules[key];
     if (!r || !r.pattern) continue;
 
     if (key === "money") {
@@ -555,10 +568,49 @@ function applyRules(text) {
     hitsByKey[key] = (hitsByKey[key] || 0) + 1;
   }
 
+  const rules = getRulesSafe();
+  if (!rules) {
+    // Rules not loaded yet: keep UI stable, do not crash.
+    lastRunMeta.inputLen = out.length;
+    lastRunMeta.enabledCount = enabled.size;
+    lastRunMeta.moneyMode = moneyMode;
+    lastRunMeta.lang = currentLang;
+
+    renderOutput(out);
+    const report = computeRiskReport({}, {
+      hits: 0,
+      enabledCount: enabled.size,
+      moneyMode,
+      fromPdf: lastRunMeta.fromPdf,
+      inputLen: out.length
+    });
+    renderRiskBox(report, {
+      hits: 0,
+      enabledCount: enabled.size,
+      moneyMode,
+      fromPdf: lastRunMeta.fromPdf,
+      inputLen: out.length
+    });
+
+    updateInputWatermarkVisibility();
+    const ta = $("inputText");
+    if (ta) renderInputOverlayForPdf(ta.value || "");
+
+    window.__export_snapshot = {
+      enabledKeys: Array.from(enabled || []),
+      moneyMode: (typeof moneyMode === "string" ? moneyMode : "off"),
+      lang: currentLang,
+      fromPdf: !!lastRunMeta.fromPdf
+    };
+
+    window.dispatchEvent(new Event("safe:updated"));
+    return out;
+  }
+
   for (const key of PRIORITY) {
     if (key !== "money" && !enabled.has(key)) continue;
 
-    const r = RULES_BY_KEY[key];
+    const r = rules[key];
     if (!r || !r.pattern) continue;
 
     if (key === "money") {
