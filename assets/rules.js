@@ -1,4 +1,4 @@
-// v1.5 — privacy rules tuned for "personal / readable" redaction
+// v1.6 — privacy rules tuned for "personal / readable" redaction
 //
 // Goals:
 // - Keep document readable for AI/humans (labels remain, values masked)
@@ -14,24 +14,39 @@
 const RULES_BY_KEY = {
   /* ===================== EMAIL ===================== */
   email: {
-    // allow spaces around @ and dot (PDF extraction artifacts)
     pattern: /\b[A-Z0-9._%+-]+\s*@\s*[A-Z0-9.-]+\s*\.\s*[A-Z]{2,}\b/gi,
     tag: "EMAIL"
   },
 
-  /* ===================== PERSON NAME (NEW) ===================== */
-  // ✅ Mask personal names (CN + EN), best-effort and conservative.
-  //
-  // CN: 2–4 Han chars, optionally with middle dot for minority names (e.g., 阿里·木合塔尔)
-  // EN: 2–3 words, each starting with letter, allow hyphen/apostrophe (e.g., John Smith, Anne-Marie O'Neil)
-  //
-  // NOTE: Names are inherently ambiguous; keep this rule relatively conservative to reduce false positives.
+  /* ===================== PERSON NAME (FIXED) ===================== */
+  // ✅ Fixes:
+  // 1) CN names: DO NOT use \b (word boundary doesn't work well for Han)
+  //    Use Han-lookarounds to avoid matching inside long Han strings.
+  // 2) Allow single-word EN name when preceded by label (联系人/Name/Contact/Attn...)
+  // 3) Keep EN multi-word name support.
   person_name: {
     pattern: new RegExp(
       [
-        // CN personal name (2–4 Han, allow ·)
-        String.raw`\b[\p{Script=Han}]{2,4}(?:·[\p{Script=Han}]{1,4})?\b`,
-        // EN personal name (First Last / First Middle Last)
+        // (A) Label + Name (CN or EN single word)
+        String.raw`(?:` +
+          String.raw`(?:联系人|收件人|负责人|经办人|姓名|Name|Contact|Attn\.?|Ansprechpartner)\s*[:：]?\s*` +
+          String.raw`(?:` +
+            // CN name after label
+            String.raw`(?<![\p{Script=Han}])[\p{Script=Han}]{2,4}(?:·[\p{Script=Han}]{1,4})?(?![\p{Script=Han}])` +
+            String.raw`|` +
+            // EN single-word name after label (e.g., Kathy)
+            String.raw`[A-Z][A-Za-z]{1,30}(?:[-'][A-Za-z]{1,30})?` +
+          String.raw`)` +
+        String.raw`)`,
+
+        // OR
+
+        // (B) Standalone CN name (2–4 Han, optional ·), bounded by Han-lookaround
+        String.raw`(?<![\p{Script=Han}])[\p{Script=Han}]{2,4}(?:·[\p{Script=Han}]{1,4})?(?![\p{Script=Han}])`,
+
+        // OR
+
+        // (C) Standalone EN full name (First Last / First Middle Last)
         String.raw`\b[A-Z][a-z]+(?:[-'][A-Za-z]+)?(?:\s+[A-Z][a-z]+(?:[-'][A-Za-z]+)?){1,2}\b`
       ].join("|"),
       "gu"
@@ -41,31 +56,18 @@ const RULES_BY_KEY = {
   },
 
   /* ===================== COMPANY ===================== */
-  // ✅ Mask ONLY the "core identifying word" (brand/主体词) in company names.
-  //
-  // Design: capture groups are structured so downstream can keep labels/affixes:
-  // - CN:   (1 optional city/province prefix) (2 brand/core) (3 descriptor/region/type) (4 legal suffix)
-  // - DE/EN:(5 brand/core) (6 legal suffix)
-  //
-  // Examples expected:
-  // - 嘉曜兴包装制品（东莞）有限公司 -> mask 嘉曜兴, keep 包装制品（东莞）有限公司
-  // - 律商（上海）文化发展有限公司 -> mask 律商, keep （上海）文化发展有限公司
-  // - 上海律商文化发展有限公司     -> mask 律商, keep 文化发展有限公司
-  // - Beide Tech GmbH            -> mask Beide, keep Tech GmbH
   company: {
     pattern: new RegExp(
       String.raw`(?:` +
-        // ----- CN company with legal suffix -----
-        String.raw`((?:[\p{Script=Han}]{2,3})?)` + // (1) optional city/province prefix
-        String.raw`([\p{Script=Han}A-Za-z0-9·&\-]{2,12})` + // (2) brand/core (MASK THIS)
-        String.raw`([\p{Script=Han}A-Za-z0-9（）()·&\-\s]{0,40}?)` + // (3) descriptor/region/type
-        String.raw`(股份有限公司|有限责任公司|有限公司|集团有限公司|集团|公司)` + // (4) legal suffix
+        String.raw`((?:[\p{Script=Han}]{2,3})?)` +
+        String.raw`([\p{Script=Han}A-Za-z0-9·&\-]{2,12})` +
+        String.raw`([\p{Script=Han}A-Za-z0-9（）()·&\-\s]{0,40}?)` +
+        String.raw`(股份有限公司|有限责任公司|有限公司|集团有限公司|集团|公司)` +
       String.raw`)` +
       String.raw`|` +
       String.raw`(?:` +
-        // ----- DE/EN company legal forms -----
-        String.raw`\b([A-Za-z][A-Za-z0-9&.\-]{1,40}?)\b` + // (5) brand/core (MASK THIS)
-        String.raw`(\s+(?:GmbH(?:\s*&\s*Co\.\s*KG)?|AG|UG|KG|GbR|e\.K\.|Ltd\.?|Inc\.?|LLC|S\.?A\.?|S\.?r\.?l\.?|B\.?V\.?))\b` + // (6) legal suffix
+        String.raw`\b([A-Za-z][A-Za-z0-9&.\-]{1,40}?)\b` +
+        String.raw`(\s+(?:GmbH(?:\s*&\s*Co\.\s*KG)?|AG|UG|KG|GbR|e\.K\.|Ltd\.?|Inc\.?|LLC|S\.?A\.?|S\.?r\.?l\.?|B\.?V\.?))\b` +
       String.raw`)`,
       "giu"
     ),
@@ -74,14 +76,12 @@ const RULES_BY_KEY = {
   },
 
   /* ===================== BANK / IBAN ===================== */
-  // IBAN itself (no label needed) — fully sensitive
   bank: {
     pattern: /\b[A-Z]{2}\d{2}(?:\s?\d{4}){3,7}\b/g,
     tag: "ACCOUNT"
   },
 
   /* ===================== ACCOUNT (label + value) ===================== */
-  // Keep label, mask the number group (2)
   account: {
     pattern:
       /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|Kontonummer|Account(?:\s*No\.)?|IBAN)\s*[:：]?\s*)(\d[\d\s-]{10,30}\d)/gi,
@@ -89,27 +89,17 @@ const RULES_BY_KEY = {
     mode: "prefix"
   },
 
-    /* ===================== PHONE (label + value OR international) ===================== */
-  // Keep label when present; otherwise mask international +xxx... / 00xxx... / common DE mobile
-  // Also handle suffix like "(WhatsApp)" AFTER the number (common in signatures)
+  /* ===================== PHONE ===================== */
   phone: {
     pattern: new RegExp(
       [
-        // (1 label)(2 number) — label first
         String.raw`((?:tel|telefon|phone|mobile|handy|kontakt|whatsapp|wechat|telegram|` +
           String.raw`联系方式|联系电话|电话|手機|手机|联系人|聯繫方式)\s*[:：]?\s*)` +
         String.raw`((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})?[\d\s().-]{6,}\d)`,
 
-        // OR
-
-        // (3 international / national) — number first (with optional "(WhatsApp)" after)
         String.raw`((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d)` +
         String.raw`(?:\s*\((?:WhatsApp|WeChat|Telegram|Signal)\))?`,
 
-        // OR
-
-        // (4 DE mobile without country code, but long enough to be a phone (optional)
-        // e.g., 0151 2559 1809 (only if you want to catch these; safe-ish with length constraint)
         String.raw`(\b0\d{2,4}[\d\s().-]{6,}\d\b)`
       ].join("|"),
       "giu"
@@ -119,10 +109,6 @@ const RULES_BY_KEY = {
   },
 
   /* ===================== MONEY ===================== */
-  // Goal: keep currency token/sign/unit, mask digits range in app.js (or downstream)
-  // - (1 currency code)(2 amount)
-  // - (3 currency sign)(4 amount)
-  // - (5 amount)(6 unit)
   money: {
     pattern:
       /(\b(?:EUR|RMB|CNY|USD|HKD|GBP|CHF)\b)\s*([\d][\d\s.,]*\d)|([€$¥])\s*([\d][\d\s.,]*\d)|([\d][\d\s.,]*\d)\s*(元|人民币|欧元|美元|英镑|瑞郎)/gi,
@@ -130,8 +116,7 @@ const RULES_BY_KEY = {
     mode: "money"
   },
 
-  /* ===================== ADDRESS (DE street + house no.) ===================== */
-  // Value-only street pattern (label handling is done in raster-export shrinkByLabel)
+  /* ===================== ADDRESS ===================== */
   address_de_street: {
     pattern:
       /\b[\p{L}ÄÖÜäöüß.\- ]{2,60}\b(?:str\.?|straße|weg|platz|allee|gasse)\s*\d{1,4}\w?\b/giu,
