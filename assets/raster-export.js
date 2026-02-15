@@ -242,7 +242,7 @@
     return matchers;
   }
 
-  // --------- Text items -> rects (value-first, keep labels) ----------
+    // --------- Text items -> rects (value-first, keep labels) ----------
   function textItemsToRects(pdfjsLib, viewport, textContent, matchers) {
     const Util = pdfjsLib.Util;
     const items = (textContent && textContent.items) ? textContent.items : [];
@@ -272,7 +272,6 @@
       return out;
     }
 
-    // ✅ Safe bbox in viewport/canvas coordinates (NO double scaling)
     function bboxForItem(it, key) {
       const tx = Util.transform(viewport.transform, it.transform);
 
@@ -313,10 +312,8 @@
         maxByEst = est * 1.80;
       }
 
-      // caps
       w = clamp(w, 1, Math.min(maxByPage, maxByEst));
 
-      // min width so digits don't become tiny squares
       const minW = isLongValueKey ? (est * 0.95) : (est * 0.85);
       w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.40 : 0.20)));
 
@@ -328,7 +325,6 @@
       return { x: rx, y: ry, w: rw, h: rh };
     }
 
-    // ✅ label stripping inside an item slice (keeps semantics)
     function shrinkByLabel(key, s, ls, le) {
       if (le <= ls) return { ls, le };
       const sub = s.slice(ls, le);
@@ -361,9 +357,9 @@
       return { ls, le };
     }
 
-    // ✅ Build pageText + item ranges
+    // Build pageText + item ranges
     let pageText = "";
-    const itemRanges = []; // { idx, start, end }
+    const itemRanges = [];
 
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
@@ -386,10 +382,9 @@
       if (it && it.hasEOL) pageText += "\n";
     }
 
-    // newline-neutral for matching (length preserved)
     const matchText = pageText.replace(/\n/g, " ");
 
-    // ✅ Collect spans WITH key + subgroup preference
+    // spans = {a,b,key,preferSub?}
     const spans = [];
     for (const mm of matchers) {
       const re0 = mm.re;
@@ -406,7 +401,6 @@
         const key = mm.key;
 
         let preferSub = null;
-
         const m = h.m || [];
         const full = String(m[0] || "");
 
@@ -426,9 +420,11 @@
           if (off) preferSub = off;
 
         } else if (key === "person_name") {
-          // ✅ person_name: prefer captured name group so we DON'T mask label text
-          const nameCandidate = (m[1] != null && String(m[1])) || (m[2] != null && String(m[2])) || "";
-          const off = findSubOffsets(nameCandidate);
+          // If rules provide capture groups, prefer them; otherwise prefer the full match itself
+          const cand1 = (m[1] != null) ? String(m[1]) : "";
+          const cand2 = (m[2] != null) ? String(m[2]) : "";
+          const best = (cand1 && cand1.length >= 2) ? cand1 : (cand2 && cand2.length >= 2) ? cand2 : full;
+          const off = findSubOffsets(best);
           if (off) preferSub = off;
 
         } else if (key === "account") {
@@ -436,11 +432,7 @@
           if (off) preferSub = off;
 
         } else if (key === "phone") {
-          // ✅ phone: prefer number groups
-          const candidates = [m[2], m[3], m[4]]
-            .filter(Boolean)
-            .map(String);
-
+          const candidates = [m[2], m[3], m[4]].filter(Boolean).map(String);
           let best = "";
           for (const c of candidates) if (c.length > best.length) best = c;
 
@@ -448,11 +440,9 @@
             const pos = full.indexOf(best);
             if (pos >= 0) {
               let end = pos + best.length;
-
               const tail = full.slice(end);
-              const tailHit = tail.match(/^\s*\((?:WhatsApp|WeChat|Telegram|Signal)\)/i);
+              const tailHit = tail.match(/^\s*(?:\(|（)(?:WhatsApp|WeChat|Telegram|Signal)(?:\)|）)/i);
               if (tailHit && tailHit[0]) end += tailHit[0].length;
-
               preferSub = { offsetStart: pos, offsetEnd: end };
             }
           }
@@ -468,10 +458,10 @@
 
     if (!spans.length) return [];
 
-    // ✅ Merge spans only when same key and very close/overlap
+    // Merge spans (same key + overlap/close)
     spans.sort((x, y) => (x.a - y.a) || (x.b - y.b));
     const merged = [];
-    const MERGE_GAP = 1; // tight to avoid "black wall"
+    const MERGE_GAP = 1;
 
     function samePreferSub(p, q) {
       if (!p && !q) return true;
@@ -488,7 +478,6 @@
 
       if (sameKey && close) {
         last.b = Math.max(last.b, sp.b);
-
         if (last.preferSub && sp.preferSub) {
           last.preferSub = samePreferSub(last.preferSub, sp.preferSub) ? last.preferSub : null;
         } else {
@@ -499,7 +488,7 @@
       }
     }
 
-    // ✅ Map merged spans back to items -> rects
+    // Map spans -> rects
     const rects = [];
 
     for (const sp of merged) {
@@ -518,7 +507,6 @@
         let ls = a0 - r.start;
         let le = b0 - r.start;
 
-        // If span provides preferSub (sub-range inside match), narrow to that sub-range
         if (preferSub) {
           const fullLen = Math.max(0, B - A);
           if (fullLen > 0) {
@@ -548,7 +536,7 @@
         const x1 = bb.x + bb.w * (ls / len);
         const x2 = bb.x + bb.w * (le / len);
 
-        // ✅ Key-aware padding (person_name tighter)
+        // Key-aware padding (person_name tighter)
         let padX, padY;
         if (key === "person_name") {
           padX = Math.max(0.25, bb.w * 0.002);
@@ -568,13 +556,12 @@
         rw = clamp(rw, 1, viewport.width - rx);
         rh = clamp(rh, 6, viewport.height - ry);
 
-        // ✅ Extra guard for person_name width
+        // Extra guard for person_name width
         if (key === "person_name") {
           const maxW = Math.min(viewport.width * 0.22, bb.w * 0.55);
           if (rw > maxW) continue;
         }
 
-        // Drop absurd rectangles
         if (rw > viewport.width * 0.92) continue;
         if (rh > viewport.height * 0.35) continue;
         if (rw > viewport.width * 0.85 && rh > viewport.height * 0.20) continue;
@@ -585,7 +572,7 @@
 
     if (!rects.length) return [];
 
-    // ✅ Conservative merge of rects on same line & same key only
+    // Conservative merge of rects on same line & same key only
     rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
     const out = [];
 
@@ -627,7 +614,6 @@
       }
     }
 
-    // strip key before return
     return out.map(({ x, y, w, h }) => ({ x, y, w, h }));
   }
 
