@@ -15,6 +15,8 @@
 
 (function () {
   "use strict";
+  alert("raster-export.js loaded");
+
 
 (function installSafeErrorOverlay(){
   const box = document.createElement("div");
