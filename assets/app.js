@@ -1,3 +1,10 @@
+// assets/app.js
+// NOTE: Full file output (with the fixes applied):
+// 1) handleFile: do NOT swallow errors; fallback to Mode B on failure
+// 2) handleFile: if probePdfTextLayer missing -> fallback to Mode B
+// 3) PRIORITY lists updated to include person_name + company
+// 4) placeholder + labelForKey + risk weights updated for PERSON/COMPANY (conservative)
+
 let currentLang = "zh";
 window.currentLang = currentLang;
 
@@ -50,7 +57,9 @@ function placeholder(key) {
       REF: "【编号】",
       TITLE: "【称谓】",
       NUMBER: "【数字】",
-      MONEY: "【金额】"
+      MONEY: "【金额】",
+      COMPANY: "【公司】",
+      PERSON: "【姓名】"
     },
     de: {
       PHONE: "[Telefon]",
@@ -61,7 +70,9 @@ function placeholder(key) {
       REF: "[Referenz]",
       TITLE: "[Anrede]",
       NUMBER: "[Zahl]",
-      MONEY: "[Betrag]"
+      MONEY: "[Betrag]",
+      COMPANY: "[Firma]",
+      PERSON: "[Name]"
     },
     en: {
       PHONE: "[Phone]",
@@ -72,7 +83,9 @@ function placeholder(key) {
       REF: "[Ref]",
       TITLE: "[Title]",
       NUMBER: "[Number]",
-      MONEY: "[Amount]"
+      MONEY: "[Amount]",
+      COMPANY: "[Company]",
+      PERSON: "[Name]"
     }
   };
   return (map[currentLang] && map[currentLang][key]) || `[${key}]`;
@@ -132,6 +145,8 @@ function markHitsInOriginal(text){
   const S2 = "⟦/HIT⟧";
 
   const PRIORITY = [
+    "person_name",
+    "company",
     "email",
     "bank",
     "account",
@@ -254,7 +269,11 @@ const RISK_WEIGHTS = {
   ref: 6,
   title: 4,
   number: 2,
-  money: 0
+  money: 0,
+
+  // ✅ new keys (conservative weights)
+  company: 8,
+  person_name: 10
 };
 
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
@@ -308,7 +327,9 @@ function labelForKey(k) {
       ref: "编号/引用",
       title: "称谓",
       number: "数字",
-      money: "金额"
+      money: "金额",
+      company: "公司",
+      person_name: "姓名"
     },
     de: {
       bank: "Bank/Payment",
@@ -320,7 +341,9 @@ function labelForKey(k) {
       ref: "Referenz",
       title: "Anrede",
       number: "Zahl",
-      money: "Betrag"
+      money: "Betrag",
+      company: "Firma",
+      person_name: "Name"
     },
     en: {
       bank: "Bank/Payment",
@@ -332,7 +355,9 @@ function labelForKey(k) {
       ref: "Reference",
       title: "Title",
       number: "Numbers",
-      money: "Money"
+      money: "Money",
+      company: "Company",
+      person_name: "Name"
     }
   };
   const m = map[currentLang] || map.zh;
@@ -511,6 +536,8 @@ function applyRules(text) {
   const hitsByKey = {};
 
   const PRIORITY = [
+    "person_name",
+    "company",
     "email",
     "bank",
     "account",
@@ -649,7 +676,12 @@ async function handleFile(file) {
   if (lastFileKind !== "pdf") return;
 
   try {
-    if (!window.probePdfTextLayer) return;
+    if (!window.probePdfTextLayer) {
+      console.error("[handleFile] probePdfTextLayer missing");
+      lastRunMeta.fromPdf = false;
+      setStage3Ui("B");
+      return;
+    }
 
     const probe = await window.probePdfTextLayer(file);
     lastProbe = probe || null;
@@ -685,7 +717,12 @@ async function handleFile(file) {
     renderInputOverlayForPdf(text);
 
     window.dispatchEvent(new Event("safe:updated"));
-  } catch (e) {}
+  } catch (e) {
+    console.error("[handleFile] ERROR:", e);
+    // ✅ fallback: never leave user with "no reaction"
+    lastRunMeta.fromPdf = false;
+    setStage3Ui("B");
+  }
 }
 
 function bindPdfUI() {
@@ -862,57 +899,57 @@ function bind() {
 
   // Mode A: export raster secure PDF (auto-redact)
   const btnExportRasterPdf = $("btnExportRasterPdf");
-if (btnExportRasterPdf) {
-  btnExportRasterPdf.onclick = async () => {
-    const rb = $("riskBox");
-    const rd = $("riskDetails");
-    if (rd) rd.open = true;
+  if (btnExportRasterPdf) {
+    btnExportRasterPdf.onclick = async () => {
+      const rb = $("riskBox");
+      const rd = $("riskDetails");
+      if (rd) rd.open = true;
 
-    const say = (html) => {
-      if (rb) rb.innerHTML = `<div class="tiny" style="white-space:pre-wrap;line-height:1.6;">${html}</div>`;
-    };
+      const say = (html) => {
+        if (rb) rb.innerHTML = `<div class="tiny" style="white-space:pre-wrap;line-height:1.6;">${html}</div>`;
+      };
 
-    // ✅ click heartbeat (always visible)
-    say(`Redact click ✅\n${Date.now()}`);
+      // ✅ click heartbeat (always visible)
+      say(`Redact click ✅\n${Date.now()}`);
 
-    try {
-      const f = lastUploadedFile;
+      try {
+        const f = lastUploadedFile;
 
-      if (!f) { say(`<span style="color:#ffb4b4;">No file loaded</span>`); return; }
-      if (lastFileKind !== "pdf") { say(`<span style="color:#ffb4b4;">Not a PDF file</span>`); return; }
-      if (!lastProbe) { say(`<span style="color:#ffb4b4;">No PDF probe result (probePdfTextLayer missing or failed)</span>`); return; }
-      if (!lastProbe.hasTextLayer) { say(`<span style="color:#ffb4b4;">PDF not readable (Mode B). Use Manual.</span>`); return; }
+        if (!f) { say(`<span style="color:#ffb4b4;">No file loaded</span>`); return; }
+        if (lastFileKind !== "pdf") { say(`<span style="color:#ffb4b4;">Not a PDF file</span>`); return; }
+        if (!lastProbe) { say(`<span style="color:#ffb4b4;">No PDF probe result (probePdfTextLayer missing or failed)</span>`); return; }
+        if (!lastProbe.hasTextLayer) { say(`<span style="color:#ffb4b4;">PDF not readable (Mode B). Use Manual.</span>`); return; }
 
-      if (!window.RasterExport) { say(`<span style="color:#ffb4b4;">RasterExport not loaded</span>`); return; }
-      if (!window.RasterExport.exportRasterSecurePdfFromReadablePdf) {
-        say(`<span style="color:#ffb4b4;">RasterExport API missing (exportRasterSecurePdfFromReadablePdf)</span>`);
-        return;
+        if (!window.RasterExport) { say(`<span style="color:#ffb4b4;">RasterExport not loaded</span>`); return; }
+        if (!window.RasterExport.exportRasterSecurePdfFromReadablePdf) {
+          say(`<span style="color:#ffb4b4;">RasterExport API missing (exportRasterSecurePdfFromReadablePdf)</span>`);
+          return;
+        }
+
+        // ✅ snapshot (consistency with text output)
+        const snap = window.__export_snapshot || {};
+        const enabledKeys = Array.isArray(snap.enabledKeys) ? snap.enabledKeys : Array.from(enabled || []);
+        const mm = (typeof snap.moneyMode === "string") ? snap.moneyMode : (typeof moneyMode === "string" ? moneyMode : "off");
+        const lang = snap.lang || currentLang;
+
+        say(`Working…\nlang=${escapeHTML(lang)}\nmoneyMode=${escapeHTML(mm)}\nenabledKeys=${enabledKeys.length}`);
+
+        await window.RasterExport.exportRasterSecurePdfFromReadablePdf({
+          file: f,
+          lang,
+          enabledKeys,
+          moneyMode: mm,
+          dpi: 600,
+          filename: `raster_secure_${Date.now()}.pdf`
+        });
+
+        say(`Done ✅\nDownload should start.`);
+      } catch (e) {
+        const msg = (e && (e.message || String(e))) || "Unknown error";
+        say(`<span style="color:#ffb4b4;">Export failed:</span>\n${escapeHTML(msg)}`);
       }
-
-      // ✅ snapshot (consistency with text output)
-      const snap = window.__export_snapshot || {};
-      const enabledKeys = Array.isArray(snap.enabledKeys) ? snap.enabledKeys : Array.from(enabled || []);
-      const mm = (typeof snap.moneyMode === "string") ? snap.moneyMode : (typeof moneyMode === "string" ? moneyMode : "off");
-      const lang = snap.lang || currentLang;
-
-      say(`Working…\nlang=${escapeHTML(lang)}\nmoneyMode=${escapeHTML(mm)}\nenabledKeys=${enabledKeys.length}`);
-
-      await window.RasterExport.exportRasterSecurePdfFromReadablePdf({
-        file: f,
-        lang,
-        enabledKeys,
-        moneyMode: mm,
-        dpi: 600,
-        filename: `raster_secure_${Date.now()}.pdf`
-      });
-
-      say(`Done ✅\nDownload should start.`);
-    } catch (e) {
-      const msg = (e && (e.message || String(e))) || "Unknown error";
-      say(`<span style="color:#ffb4b4;">Export failed:</span>\n${escapeHTML(msg)}`);
-    }
-  };
-}
+    };
+  }
 
   // Mode B: manual redact session -> export (UI includes export button)
   const btnManual = $("btnManualRedact");
