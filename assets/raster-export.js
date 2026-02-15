@@ -272,6 +272,7 @@
       return out;
     }
 
+    // ✅ Safe bbox in viewport/canvas coordinates (NO double scaling)
     function bboxForItem(it, key) {
       const tx = Util.transform(viewport.transform, it.transform);
 
@@ -312,8 +313,10 @@
         maxByEst = est * 1.80;
       }
 
+      // caps
       w = clamp(w, 1, Math.min(maxByPage, maxByEst));
 
+      // min width so digits don't become tiny squares
       const minW = isLongValueKey ? (est * 0.95) : (est * 0.85);
       w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.40 : 0.20)));
 
@@ -325,6 +328,7 @@
       return { x: rx, y: ry, w: rw, h: rh };
     }
 
+    // ✅ label stripping inside an item slice (keeps semantics)
     function shrinkByLabel(key, s, ls, le) {
       if (le <= ls) return { ls, le };
       const sub = s.slice(ls, le);
@@ -357,8 +361,9 @@
       return { ls, le };
     }
 
+    // ✅ Build pageText + item ranges
     let pageText = "";
-    const itemRanges = [];
+    const itemRanges = []; // { idx, start, end }
 
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
@@ -381,8 +386,10 @@
       if (it && it.hasEOL) pageText += "\n";
     }
 
+    // newline-neutral for matching (length preserved)
     const matchText = pageText.replace(/\n/g, " ");
 
+    // ✅ Collect spans WITH key + subgroup preference
     const spans = [];
     for (const mm of matchers) {
       const re0 = mm.re;
@@ -420,8 +427,6 @@
 
         } else if (key === "person_name") {
           // ✅ person_name: prefer captured name group so we DON'T mask label text
-          // rules.js pattern captures the name value in group(1) for labeled case,
-          // and group(2) for EN full name case.
           const nameCandidate = (m[1] != null && String(m[1])) || (m[2] != null && String(m[2])) || "";
           const off = findSubOffsets(nameCandidate);
           if (off) preferSub = off;
@@ -431,6 +436,7 @@
           if (off) preferSub = off;
 
         } else if (key === "phone") {
+          // ✅ phone: prefer number groups
           const candidates = [m[2], m[3], m[4]]
             .filter(Boolean)
             .map(String);
@@ -462,9 +468,10 @@
 
     if (!spans.length) return [];
 
+    // ✅ Merge spans only when same key and very close/overlap
     spans.sort((x, y) => (x.a - y.a) || (x.b - y.b));
     const merged = [];
-    const MERGE_GAP = 1;
+    const MERGE_GAP = 1; // tight to avoid "black wall"
 
     function samePreferSub(p, q) {
       if (!p && !q) return true;
@@ -492,6 +499,7 @@
       }
     }
 
+    // ✅ Map merged spans back to items -> rects
     const rects = [];
 
     for (const sp of merged) {
@@ -510,6 +518,7 @@
         let ls = a0 - r.start;
         let le = b0 - r.start;
 
+        // If span provides preferSub (sub-range inside match), narrow to that sub-range
         if (preferSub) {
           const fullLen = Math.max(0, B - A);
           if (fullLen > 0) {
@@ -533,19 +542,15 @@
 
         if (le - ls <= 0) continue;
 
-               const bb = bboxForItem(it, key);
+        const bb = bboxForItem(it, key);
         const len = Math.max(1, s.length);
 
         const x1 = bb.x + bb.w * (ls / len);
         const x2 = bb.x + bb.w * (le / len);
 
-        // ✅ Key-aware padding:
-        // - person_name: keep padding VERY small to avoid swallowing neighbor CJK chars in same text item
-        // - others: keep existing defaults
+        // ✅ Key-aware padding (person_name tighter)
         let padX, padY;
-
         if (key === "person_name") {
-          // tight box: just cover the matched letters
           padX = Math.max(0.25, bb.w * 0.002);
           padY = Math.max(0.55, bb.h * 0.030);
         } else {
@@ -563,7 +568,7 @@
         rw = clamp(rw, 1, viewport.width - rx);
         rh = clamp(rh, 6, viewport.height - ry);
 
-        // ✅ Extra guard for person_name: don't allow overly wide bars
+        // ✅ Extra guard for person_name width
         if (key === "person_name") {
           const maxW = Math.min(viewport.width * 0.22, bb.w * 0.55);
           if (rw > maxW) continue;
@@ -575,10 +580,12 @@
         if (rw > viewport.width * 0.85 && rh > viewport.height * 0.20) continue;
 
         rects.push({ x: rx, y: ry, w: rw, h: rh, key });
-
+      }
+    }
 
     if (!rects.length) return [];
 
+    // ✅ Conservative merge of rects on same line & same key only
     rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
     const out = [];
 
@@ -620,6 +627,7 @@
       }
     }
 
+    // strip key before return
     return out.map(({ x, y, w, h }) => ({ x, y, w, h }));
   }
 
