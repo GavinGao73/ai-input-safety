@@ -30,7 +30,8 @@ async function probePdfTextLayer(file) {
   const doc = await pdfjsLib.getDocument({
     data: buf,
     disableFontFace: true,
-    useSystemFonts: true
+    useSystemFonts: false
+
   }).promise;
 
   let totalChars = 0;
