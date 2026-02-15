@@ -533,14 +533,25 @@
 
         if (le - ls <= 0) continue;
 
-        const bb = bboxForItem(it, key);
+               const bb = bboxForItem(it, key);
         const len = Math.max(1, s.length);
 
         const x1 = bb.x + bb.w * (ls / len);
         const x2 = bb.x + bb.w * (le / len);
 
-        const padX = Math.max(0.55, bb.w * 0.005);
-        const padY = Math.max(0.75, bb.h * 0.045);
+        // ✅ Key-aware padding:
+        // - person_name: keep padding VERY small to avoid swallowing neighbor CJK chars in same text item
+        // - others: keep existing defaults
+        let padX, padY;
+
+        if (key === "person_name") {
+          // tight box: just cover the matched letters
+          padX = Math.max(0.25, bb.w * 0.002);
+          padY = Math.max(0.55, bb.h * 0.030);
+        } else {
+          padX = Math.max(0.55, bb.w * 0.005);
+          padY = Math.max(0.75, bb.h * 0.045);
+        }
 
         let rx = x1 - padX;
         let ry = bb.y - padY;
@@ -552,13 +563,19 @@
         rw = clamp(rw, 1, viewport.width - rx);
         rh = clamp(rh, 6, viewport.height - ry);
 
+        // ✅ Extra guard for person_name: don't allow overly wide bars
+        if (key === "person_name") {
+          const maxW = Math.min(viewport.width * 0.22, bb.w * 0.55);
+          if (rw > maxW) continue;
+        }
+
+        // Drop absurd rectangles
         if (rw > viewport.width * 0.92) continue;
         if (rh > viewport.height * 0.35) continue;
         if (rw > viewport.width * 0.85 && rh > viewport.height * 0.20) continue;
 
         rects.push({ x: rx, y: ry, w: rw, h: rh, key });
-      }
-    }
+
 
     if (!rects.length) return [];
 
