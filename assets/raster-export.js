@@ -16,27 +16,6 @@
 (function () {
   "use strict";
   alert("raster-export.js loaded");
-
-
-(function installSafeErrorOverlay(){
-  const box = document.createElement("div");
-  box.style.cssText = "position:fixed;left:12px;bottom:12px;z-index:99999;max-width:70vw;padding:10px 12px;background:#111;color:#fff;font:12px/1.4 system-ui;border-radius:8px;display:none;white-space:pre-wrap;";
-  document.body.appendChild(box);
-
-  function show(msg){
-    box.textContent = msg;
-    box.style.display = "block";
-  }
-
-  window.addEventListener("error", (e) => {
-    show("JS error:\n" + (e && e.message ? e.message : String(e)));
-  });
-
-  window.addEventListener("unhandledrejection", (e) => {
-    const r = e && e.reason;
-    show("Unhandled rejection:\n" + (r && r.message ? r.message : String(r)));
-  });
-})();
   
   const DEFAULT_DPI = 600;
 
