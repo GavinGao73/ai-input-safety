@@ -4,12 +4,7 @@
 // - Keep document readable for AI/humans (labels remain, values masked)
 // - No URL handling by design
 // - Company name: mask ONLY the core identifying word (brand/主体词), keep suffix + region/type
-// - Person name: mask full CN/EN personal names (best-effort, conservative)
-//
-// Notes:
-// - Money range masking may still be handled in app.js (M2 needs range computation).
-// - This file provides robust detection patterns and capture groups for value-first masking.
-// - NUMBER is optional fallback (default OFF).
+// - Person name: mask names with strong context to avoid false positives
 
 const RULES_BY_KEY = {
   /* ===================== EMAIL ===================== */
@@ -18,35 +13,50 @@ const RULES_BY_KEY = {
     tag: "EMAIL"
   },
 
-  /* ===================== PERSON NAME (FIXED) ===================== */
-  // ✅ Fixes:
-  // 1) CN names: DO NOT use \b (word boundary doesn't work well for Han)
-  //    Use Han-lookarounds to avoid matching inside long Han strings.
-  // 2) Allow single-word EN name when preceded by label (联系人/Name/Contact/Attn...)
-  // 3) Keep EN multi-word name support.
+  /* ===================== PERSON NAME (SAFE / CONTEXT-BOUND) ===================== */
+  // ✅ Only match names when context strongly indicates it's a person name:
+  // 1) After explicit labels: 联系人/姓名/收件人/负责人/经办人/Name/Contact/Attn/Ansprechpartner
+  // 2) A short CN name right BEFORE a phone/email token (signature block), e.g. "高志平 +49..."
+  //
+  // This avoids masking common 2–4 Han words in正文/表格.
   person_name: {
     pattern: new RegExp(
       [
-        // (A) Label + Name (CN or EN single word)
+        // (1) Label + name (CN 2-4 or EN single token)
         String.raw`(?:` +
           String.raw`(?:联系人|收件人|负责人|经办人|姓名|Name|Contact|Attn\.?|Ansprechpartner)\s*[:：]?\s*` +
           String.raw`(?:` +
-            // CN name after label
-            String.raw`(?<![\p{Script=Han}])[\p{Script=Han}]{2,4}(?:·[\p{Script=Han}]{1,4})?(?![\p{Script=Han}])` +
+            String.raw`[\p{Script=Han}]{2,4}(?:·[\p{Script=Han}]{1,4})?` + // CN
             String.raw`|` +
-            // EN single-word name after label (e.g., Kathy)
-            String.raw`[A-Z][A-Za-z]{1,30}(?:[-'][A-Za-z]{1,30})?` +
+            String.raw`[A-Z][A-Za-z]{1,30}(?:[-'][A-Za-z]{1,30})?` +         // EN single word (Kathy)
           String.raw`)` +
         String.raw`)`,
 
         // OR
 
-        // (B) Standalone CN name (2–4 Han, optional ·), bounded by Han-lookaround
-        String.raw`(?<![\p{Script=Han}])[\p{Script=Han}]{2,4}(?:·[\p{Script=Han}]{1,4})?(?![\p{Script=Han}])`,
+        // (2) CN name right before phone/email (signature-like)
+        // "高志平 +86..." / "高志平 zhipinggao@..."
+        String.raw`(?:` +
+          String.raw`(?<![\p{Script=Han}A-Za-z0-9])` +
+          String.raw`[\p{Script=Han}]{2,4}(?:·[\p{Script=Han}]{1,4})?` +
+          String.raw`(?=` +
+            String.raw`[\s:：,，;；()（）【】\[\]<>《》"“”'‘’]{0,12}` +
+            String.raw`(?:` +
+              // email next
+              String.raw`[A-Z0-9._%+-]+\s*@\s*[A-Z0-9.-]+\s*\.\s*[A-Z]{2,}` +
+              String.raw`|` +
+              // phone next
+              String.raw`(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d` +
+              String.raw`|` +
+              // DE-style 0xxx...
+              String.raw`\b0\d{2,4}[\d\s().-]{6,}\d\b` +
+            String.raw`)` +
+          String.raw`)` +
+        String.raw`)`,
 
         // OR
 
-        // (C) Standalone EN full name (First Last / First Middle Last)
+        // (3) EN full name (First Last / First Middle Last) — keep, relatively safe
         String.raw`\b[A-Z][a-z]+(?:[-'][A-Za-z]+)?(?:\s+[A-Z][a-z]+(?:[-'][A-Za-z]+)?){1,2}\b`
       ].join("|"),
       "gu"
