@@ -15,7 +15,6 @@
 
 (function () {
   "use strict";
-  alert("raster-export.js loaded");
   
   const DEFAULT_DPI = 600;
 
@@ -434,12 +433,12 @@
           const off = findSubOffsets(m[2]);
           if (off) preferSub = off;
 
-        } else if (key === "phone") {
-          const candidates = [m[2], m[3], m[4]].filter(Boolean).map(String);
-          let best = "";
-          for (const c of candidates) if (c.length > best.length) best = c;
-          const off = findSubOffsets(best);
-          if (off) preferSub = off;
+       } else if (key === "phone") {
+         // ✅ phone: prioritize full match to avoid leaking tail like "(WhatsApp)"
+         // This is safer for redaction stability; label-keeping is handled elsewhere (shrinkByLabel)
+         const off = findSubOffsets(m[0]);
+         if (off) preferSub = off;
+       }
 
         } else if (key === "money") {
           const off = findSubOffsets(m[2] || m[4] || m[5]);
