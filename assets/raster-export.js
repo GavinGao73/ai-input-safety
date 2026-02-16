@@ -638,11 +638,27 @@
     } catch (_) {}
 
     for (const p of pages) {
-      const page = await pdf.getPage(p.pageNumber);
-      const textContent = await page.getTextContent();
-      const rects = textItemsToRects(pdfjsLib, p.viewport, textContent, matchers);
-      drawRedactionsOnCanvas(p.canvas, rects);
-    }
+  const page = await pdf.getPage(p.pageNumber);
+  const textContent = await page.getTextContent();
+  const rects = textItemsToRects(pdfjsLib, p.viewport, textContent, matchers);
+
+  // ✅ Observability: record per-page rect counts (in-memory only)
+  try {
+    const last = window.__RasterExportLast || {};
+    const per = Array.isArray(last.perPage) ? last.perPage : [];
+    per.push({
+      pageNumber: p.pageNumber,
+      items: (textContent && textContent.items) ? textContent.items.length : 0,
+      rects: Array.isArray(rects) ? rects.length : 0
+    });
+    window.__RasterExportLast = Object.assign({}, last, {
+      perPage: per,
+      rectsTotal: per.reduce((sum, x) => sum + (x.rects || 0), 0)
+    });
+  } catch (_) {}
+
+  drawRedactionsOnCanvas(p.canvas, rects);
+}
 
     return pages;
   }
