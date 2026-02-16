@@ -14,55 +14,23 @@ const RULES_BY_KEY = {
   },
 
     /* ===================== PERSON NAME (REAL-WORLD SAFE) ===================== */
-  // Strategy:
-  // - CN: 姓+名（避免任意2–4字误伤）
-  // - EN: 允许单个首字母大写名字（商业文档高频）
-  // - 优先降低漏检，而不是学术上的“姓名正确性”
-
-   /* ===================== PERSON NAME (REAL-WORLD SAFE) ===================== */
-  // Strategy:
-  // - CN: 姓+名（避免任意2–4字误伤）
-  // - EN: 允许单个首字母大写名字（商业文档高频）
-  // - 优先降低漏检，而不是学术上的“姓名正确性”
-
   person_name: {
-    pattern: new RegExp(
-      [
-        // 中文姓名：常见姓氏 + 1–2字名
-        String.raw`\b(?:赵|钱|孙|李|周|吴|郑|王|冯|陈|刘|杨|黄|张|朱|林|何|高|郭|马|罗|梁|宋|郑|谢|韩|唐|许|邓|冯|曹|彭|曾|肖|田)[\p{Script=Han}]{1,2}\b`,
-
-        // 英文单名（核心修复点）
-        // Kathy / Michael / David / Anna / Lucas
-        String.raw`\b[A-Z][a-z]{2,20}\b`,
-
-        // 英文完整姓名（保留）
-        String.raw`\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2}\b`
-      ].join("|"),
-      "gu"
-    ),
-    tag: "PERSON",
-    mode: "person"
-  },
+  tag: "PERSON",
+  // 更保守：只有两种情况才算“姓名”
+  // A) 明确标签引导：姓名/联系人/Ansprechpartner/Name/Contact 等后面的值
+  // B) 英文/德文“至少两段”的人名（First Last），避免 Hinweise/Deutschland 这类单词误伤
+  pattern: /(?:^|[^\p{L}])(?:姓名|联系人|联\s*系\s*人|Ansprechpartner(?:in)?|Kontakt(?:person)?|Name|Contact)\s*[:：]?\s*([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}){1,2})|([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}\s+[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30})/gu
+},
 
   /* ===================== COMPANY ===================== */
   company: {
-    pattern: new RegExp(
-      String.raw`(?:` +
-        String.raw`((?:[\p{Script=Han}]{2,3})?)` +
-        String.raw`([\p{Script=Han}A-Za-z0-9·&\-]{2,12})` +
-        String.raw`([\p{Script=Han}A-Za-z0-9（）()·&\-\s]{0,40}?)` +
-        String.raw`(股份有限公司|有限责任公司|有限公司|集团有限公司|集团|公司)` +
-      String.raw`)` +
-      String.raw`|` +
-      String.raw`(?:` +
-        String.raw`\b([A-Za-z][A-Za-z0-9&.\-]{1,40}?)\b` +
-        String.raw`(\s+(?:GmbH(?:\s*&\s*Co\.\s*KG)?|AG|UG|KG|GbR|e\.K\.|Ltd\.?|Inc\.?|LLC|S\.?A\.?|S\.?r\.?l\.?|B\.?V\.?))\b` +
-      String.raw`)`,
-      "giu"
-    ),
-    tag: "COMPANY",
-    mode: "company"
-  },
+  tag: "COMPANY",
+  // 更保守：只命中“像公司名的东西”
+  // 1) 带明确公司后缀：GmbH/UG/AG/Ltd/Inc/LLC/股份有限公司/有限公司/公司 等
+  // 2) 或“公司/单位/Firma/Company”标签后的值（长度限制，防止整句吞掉）
+  // 同时排除“贵公司/本公司/该公司”这种泛称
+  pattern: /(?:^|[^\p{L}\p{N}])(?:公司|单位|Firma|Company)\s*[:：]?\s*(?!贵公司|本公司|该公司)([^\n\r,，;；]{2,48}?(?:GmbH|UG\s*\(haftungsbeschränkt\)|AG|KG|OHG|e\.V\.|Ltd\.?|Limited|Inc\.?|Incorporated|LLC|Co\.?,?\s*Ltd\.?|股份有限公司|有限责任公司|有限公司|公司))|(?<!贵公司)(?<!本公司)(?<!该公司)([^\n\r,，;；]{2,48}?(?:GmbH|UG\s*\(haftungsbeschränkt\)|AG|KG|OHG|e\.V\.|Ltd\.?|Limited|Inc\.?|Incorporated|LLC|Co\.?,?\s*Ltd\.?|股份有限公司|有限责任公司|有限公司|公司))/gu
+},
 
   /* ===================== BANK / IBAN ===================== */
   bank: {
