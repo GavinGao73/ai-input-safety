@@ -564,23 +564,31 @@ function applyRules(text) {
   }
 
   const rules = getRulesSafe();
+
+  // ✅ SINGLE SOURCE OF TRUTH:
+  // output / overlay / raster export all follow the same enabled keys set
+  const enabledKeysArr = effectiveEnabledKeys(); // includes company + person_name
+  const enabledSet = new Set(enabledKeysArr);
+
   if (!rules) {
     lastRunMeta.inputLen = out.length;
-    lastRunMeta.enabledCount = enabled.size;
+    lastRunMeta.enabledCount = enabledSet.size;
     lastRunMeta.moneyMode = moneyMode;
     lastRunMeta.lang = currentLang;
 
     renderOutput(out);
+
     const report = computeRiskReport({}, {
       hits: 0,
-      enabledCount: enabled.size,
+      enabledCount: enabledSet.size,
       moneyMode,
       fromPdf: lastRunMeta.fromPdf,
       inputLen: out.length
     });
+
     renderRiskBox(report, {
       hits: 0,
-      enabledCount: enabled.size,
+      enabledCount: enabledSet.size,
       moneyMode,
       fromPdf: lastRunMeta.fromPdf,
       inputLen: out.length
@@ -590,9 +598,9 @@ function applyRules(text) {
     const ta = $("inputText");
     if (ta) renderInputOverlayForPdf(ta.value || "");
 
-    // IMPORTANT: snapshot for export
+    // ✅ export snapshot (always consistent)
     window.__export_snapshot = {
-      enabledKeys: effectiveEnabledKeys(),
+      enabledKeys: enabledKeysArr,
       moneyMode: (typeof moneyMode === "string" ? moneyMode : "off"),
       lang: currentLang,
       fromPdf: !!lastRunMeta.fromPdf
@@ -602,15 +610,9 @@ function applyRules(text) {
     return out;
   }
 
-    // ✅ OUTPUT uses the same enabled set as overlay + raster export
-  const snap2 = window.__export_snapshot || null;
-  const enabledKeysArr2 = (snap2 && Array.isArray(snap2.enabledKeys))
-    ? snap2.enabledKeys
-    : effectiveEnabledKeys();
-  const enabledSet2 = new Set(enabledKeysArr2);
-
   for (const key of PRIORITY) {
-    if (key !== "money" && !enabledSet2.has(key)) continue;
+    // ✅ money uses moneyMode; others use enabledSet (NOT the UI checkbox Set)
+    if (key !== "money" && !enabledSet.has(key)) continue;
 
     const r = rules[key];
     if (!r || !r.pattern) continue;
@@ -642,14 +644,15 @@ function applyRules(text) {
     });
   }
 
+  // meta
   lastRunMeta.inputLen = (String(text || "")).length;
-  lastRunMeta.enabledCount = enabled.size;
+  lastRunMeta.enabledCount = enabledSet.size;
   lastRunMeta.moneyMode = moneyMode;
   lastRunMeta.lang = currentLang;
 
   const report = computeRiskReport(hitsByKey, {
     hits,
-    enabledCount: lastRunMeta.enabledCount,
+    enabledCount: enabledSet.size,
     moneyMode: lastRunMeta.moneyMode,
     fromPdf: lastRunMeta.fromPdf,
     inputLen: lastRunMeta.inputLen
@@ -666,33 +669,34 @@ function applyRules(text) {
     score: report.score,
     level: report.level,
     moneyMode,
-    enabledCount: enabled.size,
+    enabledCount: enabledSet.size,
     fromPdf: lastRunMeta.fromPdf
   };
 
   renderOutput(out);
   renderRiskBox(report, {
     hits,
-    enabledCount: enabled.size,
+    enabledCount: enabledSet.size,
     moneyMode,
     fromPdf: lastRunMeta.fromPdf,
     inputLen: lastRunMeta.inputLen
   });
 
+  // auto expand
   const hasOut = String(out || "").trim().length > 0;
   const rd = $("riskDetails");
   const ad = $("achvDetails");
   if (rd) rd.open = hasOut;
   if (ad) ad.open = hasOut;
 
+  // watermark + overlay
   updateInputWatermarkVisibility();
-
   const ta = $("inputText");
   if (ta) renderInputOverlayForPdf(ta.value || "");
 
-  // IMPORTANT: snapshot for export
+  // ✅ export snapshot (always consistent)
   window.__export_snapshot = {
-    enabledKeys: effectiveEnabledKeys(),
+    enabledKeys: enabledKeysArr,
     moneyMode: (typeof moneyMode === "string" ? moneyMode : "off"),
     lang: currentLang,
     fromPdf: !!lastRunMeta.fromPdf
