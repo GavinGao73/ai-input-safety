@@ -642,22 +642,26 @@
   const textContent = await page.getTextContent();
   const rects = textItemsToRects(pdfjsLib, p.viewport, textContent, matchers);
 
-  // ✅ Observability: record per-page rect counts (in-memory only)
-  try {
-    const last = window.__RasterExportLast || {};
-    const per = Array.isArray(last.perPage) ? last.perPage : [];
-    per.push({
-    pageNumber: p.pageNumber,
-    items: (textContent && textContent.items) ? textContent.items.length : 0,
-    rectCount: Array.isArray(rects) ? rects.length : 0,
-    rects: Array.isArray(rects) ? rects.slice(0, 5) : []
-  });
+  // ---- per-page debug snapshot (safe, in-memory only) ----
+try {
+  const last = window.__RasterExportLast || {};
+  const prevPerPage = Array.isArray(last.perPage) ? last.perPage : [];
 
-    window.__RasterExportLast = Object.assign({}, last, {
-      perPage: per,
-      rectsTotal: per.reduce((sum, x) => sum + (x.rects || 0), 0)
-    });
-  } catch (_) {}
+  // ✅ rects is an Array -> count must be rects.length (number)
+  const rectCount = Array.isArray(rects) ? rects.length : 0;
+
+  window.__RasterExportLast = Object.assign({}, last, {
+    perPage: prevPerPage.concat([{
+      pageNumber: p.pageNumber,
+      items: (textContent && textContent.items) ? textContent.items.length : 0,
+      rectCount,
+      // keep only a small sample to avoid memory blow-up
+      rects: (Array.isArray(rects) ? rects.slice(0, 5) : [])
+    }]),
+    // ✅ total is numeric sum
+    rectsTotal: (Number(last.rectsTotal) || 0) + rectCount
+  });
+} catch (_) {}
 
   drawRedactionsOnCanvas(p.canvas, rects);
 }
