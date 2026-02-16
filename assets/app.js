@@ -153,8 +153,18 @@ function renderInputOverlayForPdf(originalText){
 function markHitsInOriginal(text){
   let s = String(text || "");
 
+  // we use sentinel tokens, then escape, then convert to spans
   const S1 = "⟦HIT⟧";
   const S2 = "⟦/HIT⟧";
+
+  // ✅ SINGLE SOURCE OF TRUTH for enabled keys (auto-link with raster export)
+  // Prefer snapshot created by applyRules(); fallback to current enabled Set.
+  const snap = window.__export_snapshot || null;
+  const enabledKeysArr = (snap && Array.isArray(snap.enabledKeys))
+    ? snap.enabledKeys
+    : Array.from(enabled || []);
+
+  const enabledSet = new Set(enabledKeysArr);
 
   const PRIORITY = [
     "person_name",
@@ -171,12 +181,11 @@ function markHitsInOriginal(text){
     "number"
   ];
 
-  const rules = getRulesSafe();
-  if (!rules) return escapeHTML(s);
-
   for (const key of PRIORITY) {
-    if (key !== "money" && !enabled.has(key)) continue;
-    const r = rules[key];
+    // money is controlled by moneyMode, others by enabledSet
+    if (key !== "money" && !enabledSet.has(key)) continue;
+
+    const r = RULES_BY_KEY[key];
     if (!r || !r.pattern) continue;
 
     if (key === "money") {
@@ -193,6 +202,7 @@ function markHitsInOriginal(text){
     .replaceAll(S1, `<span class="hit">`)
     .replaceAll(S2, `</span>`);
 }
+
 
 /* ================= Money M2 ================= */
 function normalizeAmountToNumber(raw) {
