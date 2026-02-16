@@ -647,10 +647,12 @@
     const last = window.__RasterExportLast || {};
     const per = Array.isArray(last.perPage) ? last.perPage : [];
     per.push({
-      pageNumber: p.pageNumber,
-      items: (textContent && textContent.items) ? textContent.items.length : 0,
-      rects: Array.isArray(rects) ? rects.length : 0
-    });
+    pageNumber: p.pageNumber,
+    items: (textContent && textContent.items) ? textContent.items.length : 0,
+    rectCount: Array.isArray(rects) ? rects.length : 0,
+    rects: Array.isArray(rects) ? rects.slice(0, 5) : []
+  });
+
     window.__RasterExportLast = Object.assign({}, last, {
       perPage: per,
       rectsTotal: per.reduce((sum, x) => sum + (x.rects || 0), 0)
