@@ -22,25 +22,27 @@ person_name: {
   pattern: /(?:^|[^\p{L}])(?:姓名|联系人|联\s*系\s*人|Ansprechpartner(?:in)?|Kontakt(?:person)?|Name|Contact)\s*[:：]?\s*([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}){1,2})|([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}\s+[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30})/gu
 },
 
- /* ===================== COMPANY (CONSERVATIVE) ===================== */
+ /* ===================== COMPANY (SAFER) ===================== */
 company: {
-  tag: "COMPANY",
-  // 必须满足：出现明确的公司后缀/法律形态
-  // 并限制主体长度，避免把整段描述文字当“公司名”
   pattern: new RegExp(
-    [
-      // 中文公司：主体 2–24 字（含中英数字/·&-），必须带后缀
-      String.raw`(?:^|[^\p{Script=Han}A-Za-z0-9])` +
-        String.raw`([\p{Script=Han}A-Za-z0-9·&\-]{2,24})` +
-        String.raw`(?:\s*)` +
-        String.raw`(股份有限公司|有限责任公司|有限公司|集团有限公司|集团|公司)`,
-
-      // 德/英公司：主体 2–40（允许 . & -），必须带法律形态
-      String.raw`\b([A-Za-z][A-Za-z0-9&.\-]{1,40})\b` +
-        String.raw`(\s+(?:GmbH(?:\s*&\s*Co\.\s*KG)?|AG|UG|KG|GbR|e\.K\.|Ltd\.?|Inc\.?|LLC|S\.?A\.?|S\.?r\.?l\.?|B\.?V\.?))\b`
-    ].join("|"),
+    String.raw`(?:` +
+      // CN company: optional 2–3 Han prefix + core(2–12, MUST contain Han/Letter) + tail + legal suffix
+      String.raw`((?:[\p{Script=Han}]{2,3})?)` +
+      // ✅ core must contain at least one Han OR letter (blocks pure numbers / garbage)
+      String.raw`((?=[\p{Script=Han}A-Za-z])[\p{Script=Han}A-Za-z0-9·&\-]{2,12})` +
+      // tail: keep short, avoid swallowing whole sentences
+      String.raw`([\p{Script=Han}A-Za-z0-9（）()·&\-\s]{0,24}?)` +
+      String.raw`(股份有限公司|有限责任公司|有限公司|集团有限公司|集团|公司)` +
+    String.raw`)` +
+    String.raw`|` +
+    // DE/EN company: name + legal form
+    String.raw`(?:` +
+      String.raw`\b([A-Za-z][A-Za-z0-9&.\-]{1,40}?)\b` +
+      String.raw`(\s+(?:GmbH(?:\s*&\s*Co\.\s*KG)?|AG|UG|KG|GbR|e\.K\.|Ltd\.?|Inc\.?|LLC|S\.?A\.?|S\.?r\.?l\.?|B\.?V\.?))\b` +
+    String.raw`)`,
     "giu"
   ),
+  tag: "COMPANY",
   mode: "company"
 },
 
