@@ -13,13 +13,37 @@ const RULES_BY_KEY = {
     tag: "EMAIL"
   },
 
-    /* ===================== PERSON NAME (REAL-WORLD SAFE) ===================== */
-  person_name: {
+/* ===================== PERSON NAME (REAL-WORLD SAFE) ===================== */
+person_name: {
   tag: "PERSON",
-  // 更保守：只有两种情况才算“姓名”
-  // A) 明确标签引导：姓名/联系人/Ansprechpartner/Name/Contact 等后面的值
-  // B) 英文/德文“至少两段”的人名（First Last），避免 Hinweise/Deutschland 这类单词误伤
-  pattern: /(?:^|[^\p{L}])(?:姓名|联系人|联\s*系\s*人|Ansprechpartner(?:in)?|Kontakt(?:person)?|Name|Contact)\s*[:：]?\s*([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}){1,2})|([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}\s+[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30})/gu
+  // 更保守：只认“标签引导值”或“至少两段且像人名”的英文/德文姓名
+  // 额外防误伤：不吃域名/邮箱/公司后缀（GmbH/AG/...）
+  pattern: new RegExp(
+    [
+      // A) 标签引导：姓名/联系人/... 后面跟的值（支持中文 2–4 字 或 拉丁字母姓名）
+      String.raw`(?:^|[^\p{L}\p{N}@.])(?:姓名|联系人|联\s*系\s*人|Ansprechpartner(?:in)?|Kontakt(?:person)?|Name|Contact)\s*[:：]?\s*` +
+      String.raw`(` +
+        // 中文名：2–4 个汉字（只在“标签引导”后允许）
+        String.raw`[\p{Script=Han}]{2,4}` +
+        String.raw`|` +
+        // 拉丁字母：至少两段（First Last / First Middle Last）
+        String.raw`[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}(?:\s+[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}){1,2}` +
+      String.raw`)`,
+
+      // B) 非标签：至少两段、每段首字母大写；并排除公司后缀/域名/邮箱
+      String.raw`(?:^|[^\p{L}\p{N}@.])` +
+      String.raw`(` +
+        String.raw`[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}\s+` +
+        String.raw`[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}` +
+      String.raw`)` +
+      // 右侧不是域名/邮箱继续部分
+      String.raw`(?!\s*@)(?!\.[A-Za-z]{2,6})` +
+      // 第二段不是公司后缀
+      String.raw`(?!\s+(?:GmbH|AG|UG|KG|GbR|e\.K\.|Ltd\.?|Inc\.?|LLC|S\.?A\.?|S\.?r\.?l\.?|B\.?V\.?)\b)`
+    ].join("|"),
+    "gu"
+  ),
+  mode: "person"
 },
 
   /* ===================== COMPANY ===================== */
