@@ -602,8 +602,15 @@ function applyRules(text) {
     return out;
   }
 
+    // ✅ OUTPUT uses the same enabled set as overlay + raster export
+  const snap2 = window.__export_snapshot || null;
+  const enabledKeysArr2 = (snap2 && Array.isArray(snap2.enabledKeys))
+    ? snap2.enabledKeys
+    : effectiveEnabledKeys();
+  const enabledSet2 = new Set(enabledKeysArr2);
+
   for (const key of PRIORITY) {
-    if (key !== "money" && !enabled.has(key)) continue;
+    if (key !== "money" && !enabledSet2.has(key)) continue;
 
     const r = rules[key];
     if (!r || !r.pattern) continue;
