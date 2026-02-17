@@ -178,22 +178,20 @@
     const pdfjsLib = await loadPdfJsIfNeeded();
     const ab = await readFileAsArrayBuffer(file);
 
-    // ✅ FIX: provide SAME-ORIGIN CMap + standard fonts base URLs (needed for correct text rendering)
-    // (Directory listing may 404 on GitHub Pages — that's OK; individual files must be accessible.)
+    // ✅ SAME-ORIGIN asset base (repo-aware)
     const BASE = pdfjsBaseUrl();
 
     const loadingTask = pdfjsLib.getDocument({
       data: ab,
 
-      // ✅ keep consistent with probe (important for CJK / special fonts)
+      // ✅ keep consistent with your probe (important for CJK / special fonts)
       disableFontFace: true,
       useSystemFonts: false,
 
-      // CMaps (font character maps)
+      // ✅ MUST: CMaps + standard fonts for correct rendering
+      // (Folder listing may 404 on GitHub Pages; that's OK. Individual files must be reachable.)
       cMapUrl: BASE + "cmaps/",
       cMapPacked: true,
-
-      // Standard font data (LiberationSans, etc.)
       standardFontDataUrl: BASE + "standard_fonts/"
     });
 
@@ -257,8 +255,8 @@
 
       if (typeof pat === "object") {
         const src = (typeof pat.source === "string") ? pat.source
-                  : (typeof pat.pattern === "string") ? pat.pattern
-                  : null;
+          : (typeof pat.pattern === "string") ? pat.pattern
+            : null;
         if (!src) return null;
 
         const flags = (typeof pat.flags === "string") ? pat.flags : "";
@@ -287,9 +285,9 @@
       if (!r) continue;
 
       const raw = (r.pattern != null) ? r.pattern
-                : (r.re != null) ? r.re
-                : (r.regex != null) ? r.regex
-                : null;
+        : (r.re != null) ? r.re
+          : (r.regex != null) ? r.regex
+            : null;
 
       const re0 = normalizeToRegExp(raw);
       const re = forceGlobal(re0);
@@ -706,7 +704,7 @@
         matcherKeys: (matchers || []).map(m => m.key),
         pages: (pages || []).length
       };
-    } catch (_) {}
+    } catch (_) { }
 
     for (const p of pages) {
       const page = await pdf.getPage(p.pageNumber);
@@ -729,7 +727,7 @@
           }]),
           rectsTotal: (Number(last.rectsTotal) || 0) + rectCount
         });
-      } catch (_) {}
+      } catch (_) { }
 
       drawRedactionsOnCanvas(p.canvas, rects);
     }
@@ -798,7 +796,7 @@
           lang,
           dpi
         };
-      } catch (_) {}
+      } catch (_) { }
 
       const pages = await autoRedactReadablePdf({
         file,
@@ -819,7 +817,7 @@
           pages: (pages || []).length,
           filename: name
         });
-      } catch (_) {}
+      } catch (_) { }
 
       await exportCanvasesToPdf(pages, dpi, name);
     },
@@ -840,7 +838,7 @@
           lang: result.lang || "zh",
           dpi
         };
-      } catch (_) {}
+      } catch (_) { }
 
       const rectsByPage = result.rectsByPage || {};
       for (const p of result.pages) {
@@ -864,7 +862,7 @@
       hasRules: !!(window.RULES_BY_KEY && typeof window.RULES_BY_KEY === "object"),
       time: Date.now()
     };
-  } catch (_) {}
+  } catch (_) { }
 
   window.RasterExport = RasterExport;
 })();
