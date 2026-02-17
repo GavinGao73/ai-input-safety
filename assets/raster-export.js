@@ -133,36 +133,50 @@
     return new Uint8Array(ab);
   }
 
-  // --------- PDF render ----------
-  async function renderPdfToCanvases(file, dpi) {
-    const pdfjsLib = await loadPdfJsIfNeeded();
-    const ab = await readFileAsArrayBuffer(file);
-    const loadingTask = pdfjsLib.getDocument({ data: ab });
-    const pdf = await loadingTask.promise;
+// --------- PDF render ----------
+async function renderPdfToCanvases(file, dpi) {
+  const pdfjsLib = await loadPdfJsIfNeeded();
+  const ab = await readFileAsArrayBuffer(file);
 
-    const scale = Math.min(4, (dpi || DEFAULT_DPI) / 72);
-    const pages = [];
+  // ✅ FIX: provide CMap + standard fonts base URLs (needed for correct text rendering)
+  const CDN_BASE = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
 
-    for (let p = 1; p <= pdf.numPages; p++) {
-      const page = await pdf.getPage(p);
-      const viewport = page.getViewport({ scale });
+  const loadingTask = pdfjsLib.getDocument({
+    data: ab,
 
-      const canvas = createCanvas(viewport.width, viewport.height);
-      const ctx = canvas.getContext("2d", { alpha: false });
+    // CMaps (font character maps)
+    cMapUrl: CDN_BASE + "cmaps/",
+    cMapPacked: true,
 
-      await page.render({ canvasContext: ctx, viewport }).promise;
+    // Standard font data (LiberationSans, etc.)
+    standardFontDataUrl: CDN_BASE + "standard_fonts/"
+  });
 
-      pages.push({
-        pageNumber: p,
-        canvas,
-        width: canvas.width,
-        height: canvas.height,
-        viewport
-      });
-    }
+  const pdf = await loadingTask.promise;
 
-    return { pdf, pages, dpi: dpi || DEFAULT_DPI };
+  const scale = (dpi || DEFAULT_DPI) / 72;
+  const pages = [];
+
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const viewport = page.getViewport({ scale });
+
+    const canvas = createCanvas(viewport.width, viewport.height);
+    const ctx = canvas.getContext("2d", { alpha: false });
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    pages.push({
+      pageNumber: p,
+      canvas,
+      width: canvas.width,
+      height: canvas.height,
+      viewport
+    });
   }
+
+  return { pdf, pages, dpi: dpi || DEFAULT_DPI };
+}
 
   // --------- Rules -> matchers ----------
   function buildRuleMatchers(enabledKeys, moneyMode) {
