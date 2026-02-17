@@ -18,6 +18,9 @@
 
   const DEFAULT_DPI = 600;
 
+  // ✅ keep version centralized
+  const PDFJS_VERSION = "3.11.174";
+
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
   // kept for compatibility (not drawn anymore)
@@ -27,26 +30,63 @@
     return "已遮盖";
   }
 
+  // ✅ Base URL that auto-includes repo name on GitHub Pages project sites
+  // Example page: https://gavingao73.github.io/ai-input-safety/
+  // Result base:  https://gavingao73.github.io/ai-input-safety/pdfjs/3.11.174/
+  function pdfjsBaseUrl() {
+    return new URL(`./pdfjs/${PDFJS_VERSION}/`, window.location.href).toString();
+  }
+
   // --------- Safe dynamic loaders (no logs) ----------
   async function loadPdfJsIfNeeded() {
     if (window.pdfjsLib && window.pdfjsLib.getDocument) return window.pdfjsLib;
 
-    const url = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-    await new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = url;
-      s.async = true;
-      s.onload = resolve;
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
+    const base = pdfjsBaseUrl();
 
+    // ✅ Prefer same-origin pdf.min.js (fixes CORS issues with fonts/CMaps in practice)
+    // Fallback to cdnjs only if same-origin is not deployed.
+    const candidates = [
+      base + "pdf.min.js",
+      `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.min.js`
+    ];
+
+    let loaded = false;
+    let lastErr = null;
+
+    for (const url of candidates) {
+      try {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = url;
+          s.async = true;
+          s.onload = resolve;
+          s.onerror = () => reject(new Error("Failed to load PDF.js: " + url));
+          document.head.appendChild(s);
+        });
+        loaded = true;
+        break;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+
+    if (!loaded || !window.pdfjsLib) {
+      throw (lastErr || new Error("pdfjsLib not available"));
+    }
+
+    // ✅ Prefer same-origin worker (critical: no fake worker / no CORS)
     try {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = base + "pdf.worker.min.js";
     } catch (_) {}
 
-    if (!window.pdfjsLib) throw new Error("pdfjsLib not available");
+    // Fallback worker (only if above fails at runtime)
+    try {
+      if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`;
+      }
+    } catch (_) {}
+
     return window.pdfjsLib;
   }
 
@@ -133,50 +173,55 @@
     return new Uint8Array(ab);
   }
 
-// --------- PDF render ----------
-async function renderPdfToCanvases(file, dpi) {
-  const pdfjsLib = await loadPdfJsIfNeeded();
-  const ab = await readFileAsArrayBuffer(file);
+  // --------- PDF render ----------
+  async function renderPdfToCanvases(file, dpi) {
+    const pdfjsLib = await loadPdfJsIfNeeded();
+    const ab = await readFileAsArrayBuffer(file);
 
-  // ✅ FIX: provide CMap + standard fonts base URLs (needed for correct text rendering)
-  const CDN_BASE = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+    // ✅ FIX: provide SAME-ORIGIN CMap + standard fonts base URLs (needed for correct text rendering)
+    // (Directory listing may 404 on GitHub Pages — that's OK; individual files must be accessible.)
+    const BASE = pdfjsBaseUrl();
 
-  const loadingTask = pdfjsLib.getDocument({
-    data: ab,
+    const loadingTask = pdfjsLib.getDocument({
+      data: ab,
 
-    // CMaps (font character maps)
-    cMapUrl: CDN_BASE + "cmaps/",
-    cMapPacked: true,
+      // ✅ keep consistent with probe (important for CJK / special fonts)
+      disableFontFace: true,
+      useSystemFonts: false,
 
-    // Standard font data (LiberationSans, etc.)
-    standardFontDataUrl: CDN_BASE + "standard_fonts/"
-  });
+      // CMaps (font character maps)
+      cMapUrl: BASE + "cmaps/",
+      cMapPacked: true,
 
-  const pdf = await loadingTask.promise;
-
-  const scale = (dpi || DEFAULT_DPI) / 72;
-  const pages = [];
-
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p);
-    const viewport = page.getViewport({ scale });
-
-    const canvas = createCanvas(viewport.width, viewport.height);
-    const ctx = canvas.getContext("2d", { alpha: false });
-
-    await page.render({ canvasContext: ctx, viewport }).promise;
-
-    pages.push({
-      pageNumber: p,
-      canvas,
-      width: canvas.width,
-      height: canvas.height,
-      viewport
+      // Standard font data (LiberationSans, etc.)
+      standardFontDataUrl: BASE + "standard_fonts/"
     });
-  }
 
-  return { pdf, pages, dpi: dpi || DEFAULT_DPI };
-}
+    const pdf = await loadingTask.promise;
+
+    const scale = (dpi || DEFAULT_DPI) / 72;
+    const pages = [];
+
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const viewport = page.getViewport({ scale });
+
+      const canvas = createCanvas(viewport.width, viewport.height);
+      const ctx = canvas.getContext("2d", { alpha: false });
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      pages.push({
+        pageNumber: p,
+        canvas,
+        width: canvas.width,
+        height: canvas.height,
+        viewport
+      });
+    }
+
+    return { pdf, pages, dpi: dpi || DEFAULT_DPI };
+  }
 
   // --------- Rules -> matchers ----------
   function buildRuleMatchers(enabledKeys, moneyMode) {
@@ -256,7 +301,7 @@ async function renderPdfToCanvases(file, dpi) {
     return matchers;
   }
 
-    // --------- Text items -> rects (value-first, keep labels) ----------
+  // --------- Text items -> rects (value-first, keep labels) ----------
   function textItemsToRects(pdfjsLib, viewport, textContent, matchers) {
     const Util = pdfjsLib.Util;
     const items = (textContent && textContent.items) ? textContent.items : [];
@@ -434,7 +479,6 @@ async function renderPdfToCanvases(file, dpi) {
           if (off) preferSub = off;
 
         } else if (key === "person_name") {
-          // If rules provide capture groups, prefer them; otherwise prefer the full match itself
           const cand1 = (m[1] != null) ? String(m[1]) : "";
           const cand2 = (m[2] != null) ? String(m[2]) : "";
           const best = (cand1 && cand1.length >= 2) ? cand1 : (cand2 && cand2.length >= 2) ? cand2 : full;
@@ -550,18 +594,17 @@ async function renderPdfToCanvases(file, dpi) {
         const x1 = bb.x + bb.w * (ls / len);
         const x2 = bb.x + bb.w * (le / len);
 
-                // ✅ Key-aware padding
+        // ✅ Key-aware padding
         let padX, padY;
 
         if (key === "person_name") {
           padX = Math.max(0.25, bb.w * 0.002);
           padY = Math.max(0.55, bb.h * 0.030);
 
-       } else if (key === "company") {
+        } else if (key === "company") {
           // 公司名称：略微加大横向 padding，抵消 PDF text item 宽度估算误差（中文更常见）
           padX = Math.max(0.55, bb.w * 0.0045);
           padY = Math.max(0.60, bb.h * 0.032);
-
 
         } else {
           padX = Math.max(0.55, bb.w * 0.005);
@@ -666,33 +709,30 @@ async function renderPdfToCanvases(file, dpi) {
     } catch (_) {}
 
     for (const p of pages) {
-  const page = await pdf.getPage(p.pageNumber);
-  const textContent = await page.getTextContent();
-  const rects = textItemsToRects(pdfjsLib, p.viewport, textContent, matchers);
+      const page = await pdf.getPage(p.pageNumber);
+      const textContent = await page.getTextContent();
+      const rects = textItemsToRects(pdfjsLib, p.viewport, textContent, matchers);
 
-  // ---- per-page debug snapshot (safe, in-memory only) ----
-try {
-  const last = window.__RasterExportLast || {};
-  const prevPerPage = Array.isArray(last.perPage) ? last.perPage : [];
+      // ---- per-page debug snapshot (safe, in-memory only) ----
+      try {
+        const last = window.__RasterExportLast || {};
+        const prevPerPage = Array.isArray(last.perPage) ? last.perPage : [];
 
-  // ✅ rects is an Array -> count must be rects.length (number)
-  const rectCount = Array.isArray(rects) ? rects.length : 0;
+        const rectCount = Array.isArray(rects) ? rects.length : 0;
 
-  window.__RasterExportLast = Object.assign({}, last, {
-    perPage: prevPerPage.concat([{
-      pageNumber: p.pageNumber,
-      items: (textContent && textContent.items) ? textContent.items.length : 0,
-      rectCount,
-      // keep only a small sample to avoid memory blow-up
-      rects: (Array.isArray(rects) ? rects.slice(0, 5) : [])
-    }]),
-    // ✅ total is numeric sum
-    rectsTotal: (Number(last.rectsTotal) || 0) + rectCount
-  });
-} catch (_) {}
+        window.__RasterExportLast = Object.assign({}, last, {
+          perPage: prevPerPage.concat([{
+            pageNumber: p.pageNumber,
+            items: (textContent && textContent.items) ? textContent.items.length : 0,
+            rectCount,
+            rects: (Array.isArray(rects) ? rects.slice(0, 5) : [])
+          }]),
+          rectsTotal: (Number(last.rectsTotal) || 0) + rectCount
+        });
+      } catch (_) {}
 
-  drawRedactionsOnCanvas(p.canvas, rects);
-}
+      drawRedactionsOnCanvas(p.canvas, rects);
+    }
 
     return pages;
   }
@@ -828,4 +868,3 @@ try {
 
   window.RasterExport = RasterExport;
 })();
-
