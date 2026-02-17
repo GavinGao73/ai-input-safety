@@ -338,27 +338,27 @@ function bboxForItem(it, key) {
   const x = tx[4];
   const y = tx[5];
 
-  // ✅ derive scales from the composed matrix (viewport space)
+  // ✅ 更稳：分别取 X/Y 缩放（适配旋转/斜切/字体替换）
   const scaleX = Math.hypot(tx[0], tx[1]) || 1;
   const scaleY = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
 
-  // height in viewport units
-  let fontH = clamp(scaleY * 1.12, 6, 110);
+  let fontH = scaleY;
+  fontH = clamp(fontH * 1.12, 6, 110);
 
   const s = String(it.str || "");
 
-  // ✅ width in viewport units (critical fix for tables / CJK)
+  // ✅ 关键修复：it.width 需要乘以 scaleX 才是 viewport 像素宽度
   let w = Number(it.width || 0);
-  if (!Number.isFinite(w) || w <= 0) {
-    // fallback: estimate in "chars * fontH"
-    w = Math.max(8, s.length * fontH * 0.88);
+  if (Number.isFinite(w) && w > 0) {
+    w = w * scaleX;
   } else {
-    w = w * scaleX; // convert to viewport width
+    w = 0;
   }
+
+  if (!Number.isFinite(w) || w <= 0) w = Math.max(8, s.length * fontH * 0.88);
 
   const est = Math.max(10, s.length * fontH * 0.90);
 
-  // keep your existing clamps/guards (same behavior, but w is now correct unit)
   if (w > est * 2.2) w = est * 1.15;
 
   const isLongValueKey =
