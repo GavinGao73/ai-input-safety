@@ -10,7 +10,7 @@ let __pdfjsPromise = null;
 // /pdfjs/3.11.174/cmaps/
 // /pdfjs/3.11.174/standard_fonts/
 const PDFJS_VERSION = "3.11.174";
-const PDFJS_ASSET_BASE = `/pdfjs/${PDFJS_VERSION}/`;
+const PDFJS_ASSET_BASE = `/ai-input-safety/pdfjs/${PDFJS_VERSION}/`;
 
 async function loadPdfJs() {
   if (window.pdfjsLib) return window.pdfjsLib;
