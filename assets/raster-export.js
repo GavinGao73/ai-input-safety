@@ -543,10 +543,11 @@
           padX = Math.max(0.25, bb.w * 0.002);
           padY = Math.max(0.55, bb.h * 0.030);
 
-        } else if (key === "company") {
-          // 公司名称必须更紧，否则核心词会吃掉后缀
-          padX = Math.max(0.30, bb.w * 0.0025);
+       } else if (key === "company") {
+          // 公司名称：略微加大横向 padding，抵消 PDF text item 宽度估算误差（中文更常见）
+          padX = Math.max(0.55, bb.w * 0.0045);
           padY = Math.max(0.60, bb.h * 0.032);
+
 
         } else {
           padX = Math.max(0.55, bb.w * 0.005);
