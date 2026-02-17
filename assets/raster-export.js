@@ -140,7 +140,7 @@
     const loadingTask = pdfjsLib.getDocument({ data: ab });
     const pdf = await loadingTask.promise;
 
-    const scale = (dpi || DEFAULT_DPI) / 72;
+    const scale = Math.min(4, (dpi || DEFAULT_DPI) / 72);
     const pages = [];
 
     for (let p = 1; p <= pdf.numPages; p++) {
