@@ -332,58 +332,69 @@
       return out;
     }
 
-    function bboxForItem(it, key) {
-      const tx = Util.transform(viewport.transform, it.transform);
+function bboxForItem(it, key) {
+  const tx = Util.transform(viewport.transform, it.transform);
 
-      const x = tx[4];
-      const y = tx[5];
+  const x = tx[4];
+  const y = tx[5];
 
-      let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
-      fontH = clamp(fontH * 1.12, 6, 110);
+  // ✅ derive scales from the composed matrix (viewport space)
+  const scaleX = Math.hypot(tx[0], tx[1]) || 1;
+  const scaleY = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
 
-      const s = String(it.str || "");
+  // height in viewport units
+  let fontH = clamp(scaleY * 1.12, 6, 110);
 
-      let w = Number(it.width || 0);
-      if (!Number.isFinite(w) || w <= 0) w = Math.max(8, s.length * fontH * 0.88);
+  const s = String(it.str || "");
 
-      const est = Math.max(10, s.length * fontH * 0.90);
+  // ✅ width in viewport units (critical fix for tables / CJK)
+  let w = Number(it.width || 0);
+  if (!Number.isFinite(w) || w <= 0) {
+    // fallback: estimate in "chars * fontH"
+    w = Math.max(8, s.length * fontH * 0.88);
+  } else {
+    w = w * scaleX; // convert to viewport width
+  }
 
-      if (w > est * 2.2) w = est * 1.15;
+  const est = Math.max(10, s.length * fontH * 0.90);
 
-      const isLongValueKey =
-        key === "account" || key === "phone" || key === "email" || key === "bank";
+  // keep your existing clamps/guards (same behavior, but w is now correct unit)
+  if (w > est * 2.2) w = est * 1.15;
 
-      const isAddressKey =
-        key === "address_de_street" || key === "address_de_postal";
+  const isLongValueKey =
+    key === "account" || key === "phone" || key === "email" || key === "bank";
 
-      let maxByPage = viewport.width * 0.30;
-      let maxByEst = est * 1.45;
+  const isAddressKey =
+    key === "address_de_street" || key === "address_de_postal";
 
-      if (isLongValueKey) {
-        maxByPage = viewport.width * 0.55;
-        maxByEst = est * 2.20;
-        if (w > est * 2.8) w = est * 1.60;
-      } else if (isAddressKey) {
-        maxByPage = viewport.width * 0.60;
-        maxByEst = est * 2.10;
-        if (w > est * 3.2) w = est * 1.70;
-      } else if (key === "money") {
-        maxByPage = viewport.width * 0.35;
-        maxByEst = est * 1.80;
-      }
+  let maxByPage = viewport.width * 0.30;
+  let maxByEst = est * 1.45;
 
-      w = clamp(w, 1, Math.min(maxByPage, maxByEst));
+  if (isLongValueKey) {
+    maxByPage = viewport.width * 0.55;
+    maxByEst = est * 2.20;
+    if (w > est * 2.8) w = est * 1.60;
+  } else if (isAddressKey) {
+    maxByPage = viewport.width * 0.60;
+    maxByEst = est * 2.10;
+    if (w > est * 3.2) w = est * 1.70;
+  } else if (key === "money") {
+    maxByPage = viewport.width * 0.35;
+    maxByEst = est * 1.80;
+  }
 
-      const minW = isLongValueKey ? (est * 0.95) : (est * 0.85);
-      w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.40 : 0.20)));
+  w = clamp(w, 1, Math.min(maxByPage, maxByEst));
 
-      let rx = clamp(x, 0, viewport.width);
-      let ry = clamp(y - fontH, 0, viewport.height);
-      let rw = clamp(w, 1, viewport.width - rx);
-      let rh = clamp(fontH, 6, viewport.height - ry);
+  const minW = isLongValueKey ? (est * 0.95) : (est * 0.85);
+  w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.40 : 0.20)));
 
-      return { x: rx, y: ry, w: rw, h: rh };
-    }
+  let rx = clamp(x, 0, viewport.width);
+  let ry = clamp(y - fontH, 0, viewport.height);
+  let rw = clamp(w, 1, viewport.width - rx);
+  let rh = clamp(fontH, 6, viewport.height - ry);
+
+  return { x: rx, y: ry, w: rw, h: rh };
+}
 
     function shrinkByLabel(key, s, ls, le) {
       if (le <= ls) return { ls, le };
