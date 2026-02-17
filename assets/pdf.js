@@ -27,15 +27,16 @@ async function loadPdfJs() {
 
     s.async = true;
     s.onload = () => resolve(window.pdfjsLib);
-    s.onerror = () => reject(new Error("Failed to load PDF.js"));
+    s.onerror = () => reject(new Error("Failed to load PDF.js: " + s.src));
     document.head.appendChild(s);
   });
 
   const lib = await __pdfjsPromise;
+  if (!lib || !lib.getDocument) throw new Error("pdfjsLib not available");
 
   // ✅ Same-origin worker (no CORS)
   try {
-    lib.GlobalWorkerOptions.workerSrc = pdfjsBaseUrl() + "pdf.worker.min.js";
+    lib.GlobalWorkerOptions.workerSrc = base + "pdf.worker.min.js";
   } catch (_) {}
 
   return lib;
@@ -49,7 +50,7 @@ async function probePdfTextLayer(file) {
   const doc = await pdfjsLib.getDocument({
     data: buf,
 
-    // keep your original safe settings
+    // keep your original safe settings (do not change here yet)
     disableFontFace: true,
     useSystemFonts: false,
 
