@@ -34,7 +34,7 @@
   // Example page: https://gavingao73.github.io/ai-input-safety/
   // Result base:  https://gavingao73.github.io/ai-input-safety/pdfjs/3.11.174/
   function pdfjsBaseUrl() {
-    return new URL(`./pdfjs/${PDFJS_VERSION}/`, window.location.href).toString();
+    return new URL(`./pdfjs/${PDFJS_VERSION}/`, document.baseURI || window.location.href).toString();
   }
 
   // --------- Safe dynamic loaders (no logs) ----------
@@ -178,20 +178,23 @@
     const pdfjsLib = await loadPdfJsIfNeeded();
     const ab = await readFileAsArrayBuffer(file);
 
-    // ✅ SAME-ORIGIN asset base (repo-aware)
+    // ✅ SAME-ORIGIN CMap + standard fonts base URLs
+    // (Directory listing may 404 on GitHub Pages — that's OK; individual files must be accessible.)
     const BASE = pdfjsBaseUrl();
 
     const loadingTask = pdfjsLib.getDocument({
       data: ab,
 
-      // ✅ keep consistent with your probe (important for CJK / special fonts)
-      disableFontFace: true,
-      useSystemFonts: false,
+      // ✅ IMPORTANT for CJK/table text rendering on canvas:
+      // allow pdf.js to use embedded fonts / @font-face when needed
+      disableFontFace: false,
+      useSystemFonts: true,
 
-      // ✅ MUST: CMaps + standard fonts for correct rendering
-      // (Folder listing may 404 on GitHub Pages; that's OK. Individual files must be reachable.)
+      // CMaps (font character maps)
       cMapUrl: BASE + "cmaps/",
       cMapPacked: true,
+
+      // Standard font data (LiberationSans, etc.)
       standardFontDataUrl: BASE + "standard_fonts/"
     });
 
@@ -255,8 +258,8 @@
 
       if (typeof pat === "object") {
         const src = (typeof pat.source === "string") ? pat.source
-          : (typeof pat.pattern === "string") ? pat.pattern
-            : null;
+                  : (typeof pat.pattern === "string") ? pat.pattern
+                  : null;
         if (!src) return null;
 
         const flags = (typeof pat.flags === "string") ? pat.flags : "";
@@ -285,9 +288,9 @@
       if (!r) continue;
 
       const raw = (r.pattern != null) ? r.pattern
-        : (r.re != null) ? r.re
-          : (r.regex != null) ? r.regex
-            : null;
+                : (r.re != null) ? r.re
+                : (r.regex != null) ? r.regex
+                : null;
 
       const re0 = normalizeToRegExp(raw);
       const re = forceGlobal(re0);
@@ -704,7 +707,7 @@
         matcherKeys: (matchers || []).map(m => m.key),
         pages: (pages || []).length
       };
-    } catch (_) { }
+    } catch (_) {}
 
     for (const p of pages) {
       const page = await pdf.getPage(p.pageNumber);
@@ -727,7 +730,7 @@
           }]),
           rectsTotal: (Number(last.rectsTotal) || 0) + rectCount
         });
-      } catch (_) { }
+      } catch (_) {}
 
       drawRedactionsOnCanvas(p.canvas, rects);
     }
@@ -796,7 +799,7 @@
           lang,
           dpi
         };
-      } catch (_) { }
+      } catch (_) {}
 
       const pages = await autoRedactReadablePdf({
         file,
@@ -817,7 +820,7 @@
           pages: (pages || []).length,
           filename: name
         });
-      } catch (_) { }
+      } catch (_) {}
 
       await exportCanvasesToPdf(pages, dpi, name);
     },
@@ -838,7 +841,7 @@
           lang: result.lang || "zh",
           dpi
         };
-      } catch (_) { }
+      } catch (_) {}
 
       const rectsByPage = result.rectsByPage || {};
       for (const p of result.pages) {
@@ -862,7 +865,7 @@
       hasRules: !!(window.RULES_BY_KEY && typeof window.RULES_BY_KEY === "object"),
       time: Date.now()
     };
-  } catch (_) { }
+  } catch (_) {}
 
   window.RasterExport = RasterExport;
 })();
