@@ -536,11 +536,18 @@
         const x1 = bb.x + bb.w * (ls / len);
         const x2 = bb.x + bb.w * (le / len);
 
-        // Key-aware padding (person_name tighter)
+                // ✅ Key-aware padding
         let padX, padY;
+
         if (key === "person_name") {
           padX = Math.max(0.25, bb.w * 0.002);
           padY = Math.max(0.55, bb.h * 0.030);
+
+        } else if (key === "company") {
+          // 公司名称必须更紧，否则核心词会吃掉后缀
+          padX = Math.max(0.30, bb.w * 0.0025);
+          padY = Math.max(0.60, bb.h * 0.032);
+
         } else {
           padX = Math.max(0.55, bb.w * 0.005);
           padY = Math.max(0.75, bb.h * 0.045);
@@ -556,9 +563,15 @@
         rw = clamp(rw, 1, viewport.width - rx);
         rh = clamp(rh, 6, viewport.height - ry);
 
-        // Extra guard for person_name width
+        // ✅ 人名宽度护栏
         if (key === "person_name") {
           const maxW = Math.min(viewport.width * 0.22, bb.w * 0.55);
+          if (rw > maxW) continue;
+        }
+
+        // ✅ 公司核心词宽度护栏（关键修复）
+        if (key === "company") {
+          const maxW = Math.min(viewport.width * 0.18, bb.w * 0.45);
           if (rw > maxW) continue;
         }
 
