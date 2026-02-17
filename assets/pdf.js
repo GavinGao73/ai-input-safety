@@ -8,9 +8,8 @@ const PDFJS_VERSION = "3.11.174";
 // ✅ Base that auto-includes repo name (e.g. /ai-input-safety/)
 // Works on both local file server and GitHub Pages project site.
 function pdfjsBaseUrl() {
-  // current page: https://gavingao73.github.io/ai-input-safety/...
-  // we want:       https://gavingao73.github.io/ai-input-safety/pdfjs/3.11.174/
-  return new URL(`./pdfjs/${PDFJS_VERSION}/`, window.location.href).toString();
+  // Use baseURI so it works even if location contains query/hash or nested routes
+  return new URL(`./pdfjs/${PDFJS_VERSION}/`, document.baseURI || window.location.href).toString();
 }
 
 async function loadPdfJs() {
@@ -27,12 +26,11 @@ async function loadPdfJs() {
 
     s.async = true;
     s.onload = () => resolve(window.pdfjsLib);
-    s.onerror = () => reject(new Error("Failed to load PDF.js: " + s.src));
+    s.onerror = () => reject(new Error("Failed to load PDF.js"));
     document.head.appendChild(s);
   });
 
   const lib = await __pdfjsPromise;
-  if (!lib || !lib.getDocument) throw new Error("pdfjsLib not available");
 
   // ✅ Same-origin worker (no CORS)
   try {
@@ -50,7 +48,7 @@ async function probePdfTextLayer(file) {
   const doc = await pdfjsLib.getDocument({
     data: buf,
 
-    // keep your original safe settings (do not change here yet)
+    // keep your original safe settings
     disableFontFace: true,
     useSystemFonts: false,
 
