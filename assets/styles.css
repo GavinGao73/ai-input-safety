@@ -1,5 +1,5 @@
 /* =========================
-   assets/styles.css (FULL, optimized / no behavior change)
+   assets/styles.css (FULL, reduced / no visual or functional change)
    ========================= */
 
 :root{
@@ -114,7 +114,7 @@ header{
   min-height: 680px;
 }
 
-/* titles: add slight accent tone */
+/* titles */
 h3{
   margin:6px 0 10px;
   font-size:14px;
@@ -130,11 +130,9 @@ h3{
   background:rgba(255,255,255,.02);
   padding:10px;
 }
-.barcard-top{
-  margin-bottom:10px;
-}
+.barcard-top{ margin-bottom:10px; }
 
-/* filebar: SINGLE layer, no dashed */
+/* filebar */
 .filebar{
   display:flex;
   gap:10px;
@@ -146,7 +144,6 @@ h3{
   background:transparent;
 }
 .filebar input[type="file"]{
-  /* keep input accessible but visually hidden */
   position:absolute;
   width:1px;
   height:1px;
@@ -179,14 +176,12 @@ h3{
   color:#07111b;
   border:0;
 }
-.btn.secondary{
-  background:rgba(255,255,255,.05);
-}
+.btn.secondary{ background:rgba(255,255,255,.05); }
 .btn-s{ padding:8px 12px; border-radius:12px; }
 .btn-mini{ width:88px; min-width:88px; text-align:center; }
 .btn-fixed{ width:88px; min-width:88px; text-align:center; }
 
-/* top actions: right aligned */
+/* top actions */
 .top-actions{
   display:flex;
   gap:10px;
@@ -194,10 +189,9 @@ h3{
   align-items:center;
 }
 
-/* input / output boxes fixed height */
 .outbox{ width:100%; }
 
-/* ✅ 输入/输出：统一字号、行高、字体族（确保“看起来一致”） */
+/* input/output font baseline */
 textarea,
 .output,
 .input-overlay{
@@ -228,7 +222,6 @@ textarea{
   white-space:pre-wrap;
   overflow:auto;
 }
-.output-scroll{ overflow:auto; }
 
 /* output highlight */
 .hl{
@@ -272,16 +265,14 @@ textarea{
   font-size:12px;
 }
 
-/* feedback right aligned */
+/* feedback */
 .feedback{
   display:flex;
   gap:8px;
   align-items:center;
   width:100%;
 }
-.feedback-right{
-  justify-content:flex-end;
-}
+.feedback-right{ justify-content:flex-end; }
 .feedback-inline .fbq{
   color:var(--muted);
   font-size:12px;
@@ -297,7 +288,7 @@ textarea{
   cursor:pointer;
 }
 
-/* fold cards */
+/* fold */
 .fold{
   margin-top:10px;
   border:1px solid rgba(255,255,255,.08);
@@ -317,21 +308,16 @@ textarea{
   align-items:center;
   justify-content:space-between;
 }
-.fold summary::-webkit-details-marker { display:none; }
+.fold summary::-webkit-details-marker{ display:none; }
 
-/* ✅ 给 fold-body 更安全的 padding，避免“分数卡被吃掉”视觉问题 */
 .fold-body{
   padding:14px 12px 12px;
   max-height: 260px;
   overflow:auto;
 }
 
-/* risk inner */
-.risk{
-  padding:0;
-  border:0;
-  background:transparent;
-}
+/* risk */
+.risk{ padding:0; border:0; background:transparent; }
 .riskhead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
 .riskmeta{ margin-top:2px; color:var(--muted); font-size:12px; }
 
@@ -399,7 +385,6 @@ textarea{
   padding:12px;
 }
 
-/* ✅ 右侧按钮/说明列：再加宽一点，德语更稳 */
 .achv-right{
   flex:0 0 132px;
   display:flex;
@@ -408,18 +393,15 @@ textarea{
   gap:8px;
 }
 
-/* ✅ 关键修复：让 I18N 的 \n 真换行；同时德语可 hyphen；右对齐 */
 .achv-sub{
   font-size:12px;
   color:rgba(255,255,255,.48);
   text-align:right;
   line-height:1.35;
-
   white-space: pre-line;
   overflow-wrap: break-word;
   word-break: normal;
   hyphens: auto;
-
   max-width: 180px;
 }
 
@@ -430,9 +412,7 @@ textarea{
 }
 
 /* footnote color = links */
-.accent-link{
-  color: rgba(120,255,240,.80);
-}
+.accent-link{ color: rgba(120,255,240,.80); }
 
 /* links */
 .links{
@@ -446,7 +426,7 @@ textarea{
 }
 .links a:hover{ text-decoration:underline; }
 
-/* ===== input watermark (hide after content) ===== */
+/* input watermark */
 .textarea-wrap{ position:relative; }
 
 .input-watermark{
@@ -458,21 +438,15 @@ textarea{
   border-radius:12px;
   background:linear-gradient(180deg, rgba(10,14,20,0), rgba(10,14,20,.55));
   color:rgba(255,255,255,.28);
-
-  /* ✅ 统一为正文基准（你要求 12px） */
   font-size:var(--fs-body);
   line-height:1.45;
-
   white-space:pre-line;
   pointer-events:none;
   user-select:none;
 }
+#inputWrap.has-content .input-watermark{ display:none; }
 
-#inputWrap.has-content .input-watermark{
-  display:none;
-}
-
-/* ===== PDF overlay marking ===== */
+/* PDF overlay marking */
 .input-overlay{
   display:none;
   position:absolute;
@@ -483,19 +457,11 @@ textarea{
   white-space:pre-wrap;
   pointer-events:none;
 }
-
-/* overlay 打开 */
-#inputWrap.pdf-overlay-on .input-overlay{
-  display:block;
-}
-
-/* ✅ overlay 打开时：textarea 文本透明，避免“重叠” */
+#inputWrap.pdf-overlay-on .input-overlay{ display:block; }
 #inputWrap.pdf-overlay-on textarea{
   color: transparent;
   caret-color: rgba(255,255,255,.88);
 }
-
-/* overlay 命中文本 */
 .hit{
   background: rgba(255, 92, 92, 0.12);
   border: 1px solid rgba(255, 92, 92, 0.28);
@@ -503,7 +469,7 @@ textarea{
   padding: 0 4px;
 }
 
-/* ===== Middle Filter ===== */
+/* Middle Filter */
 .mid-filter{
   width: 150px;
   display:flex;
@@ -549,7 +515,6 @@ textarea{
   text-shadow: 0 0 22px rgba(43,144,255,.14);
 }
 
-/* ✅ footnote：按你要求跟“了解更多”同字号（12px） */
 #ui-foot{
   font-size:12px;
   line-height:1.45;
@@ -559,32 +524,26 @@ textarea{
    Mobile (<=560px) — merged
    ========================= */
 
-/* desktop default: hide mobile action bar */
+/* desktop: hide mobile action bar */
 .mobile-actions{ display:none; }
 
 @media (max-width: 560px){
-
-  /* show mobile action bar on small screens */
   .mobile-actions{ display:block; }
   .mobile-hidden{ display:none !important; }
 
-  /* ---- overall spacing ---- */
   .wrap{ padding:14px 12px 20px; }
   header{ margin-bottom:12px; align-items:center; }
 
-  /* ---- header: reduce height ---- */
   .logo{ gap:10px; }
   .logo-top-icon{ height:34px; }
   .brand-name{ font-size:16px; line-height:1.15; }
   .lang{ margin-top:0; gap:6px; }
   .lang button{ padding:6px 9px; font-size:12px; }
 
-  /* ---- cards: remove desktop min-height ---- */
   .card{ padding:12px; }
   .card-col{ min-height:auto; }
   h3{ font-size:13px; margin:4px 0 8px; }
 
-  /* ---- input/output: make them breathe on mobile ---- */
   textarea{
     height:44vh;
     max-height:none;
@@ -598,7 +557,6 @@ textarea{
     padding:12px;
   }
 
-  /* ---- controlbar: stack to avoid competition ---- */
   .controlbar{
     flex-direction:column;
     align-items:stretch;
@@ -611,7 +569,6 @@ textarea{
   }
   .moneyctl select{ width:140px; }
 
-  /* ---- make PRIMARY action dominate (Generate) ---- */
   #leftControlBar .ctl-actions{
     width:100%;
     display:flex;
@@ -623,7 +580,6 @@ textarea{
   }
   #btnGenerate{ padding:12px 14px; border-radius:14px; }
 
-  /* ---- right top buttons: wrap to two rows ---- */
   .top-actions{
     flex-wrap:wrap;
     gap:10px;
@@ -638,11 +594,9 @@ textarea{
     min-width:0;
   }
 
-  /* ---- folds: reduce visual weight, keep readable ---- */
   .fold-sum{ font-size:13px; padding:12px; }
   .fold-body{ padding:12px; max-height: 220px; }
 
-  /* ---- achievement: stack vertically ---- */
   .achv-preview{
     flex-direction:column;
     gap:10px;
@@ -658,28 +612,22 @@ textarea{
     max-width:none;
   }
 
-  /* ---- bottom links: same line, wrap if needed ---- */
   .links{
     flex-wrap:wrap;
     gap:10px 14px;
   }
 
-  /* ---- watermark: reduce distraction ---- */
   .input-watermark{
     color:rgba(255,255,255,.22);
   }
 
-  /* =========================
-     Mobile sticky action bar
-     ========================= */
+  /* sticky action bar */
   .mobile-actions{
     position: sticky;
     bottom: 0;
     z-index: 60;
-
     margin-top: 14px;
     padding: 10px 12px;
-
     border-radius: 16px;
     border: 1px solid rgba(255,255,255,.10);
     background: rgba(10,10,10,.92);
@@ -708,18 +656,14 @@ textarea{
     min-width: calc(50% - 6px);
   }
 
-  /* details summary: add open/close hint (CSS only) */
   details > summary.fold-sum::after{
     content: "点击打开";
     font-size: 12px;
     opacity: .55;
     margin-left: 10px;
   }
-  details[open] > summary.fold-sum::after{
-    content: "点击折叠";
-  }
+  details[open] > summary.fold-sum::after{ content: "点击折叠"; }
 
-  /* prevent sticky bar from hiding scroll end */
   .wrap{ padding-bottom: 90px; }
 }
 
