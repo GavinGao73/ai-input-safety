@@ -872,3 +872,125 @@ textarea{
   /* Hide text-export on mobile: keep Copy as primary */
   #btnExportText{ display:none !important; }
 }
+
+/* =========================
+   Mobile layout polish (append-only)
+   ========================= */
+@media (max-width: 560px){
+
+  /* 0) make page fill viewport consistently (WeChat/Browser) */
+  .wrap-mobile{
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+  @supports not (height: 1dvh){
+    .wrap-mobile{ min-height: 100vh; }
+  }
+
+  /* Tabs stay on top, content fills, bottom panels stick to bottom */
+  .io-tabs{ flex: 0 0 auto; }
+  .grid-mobile-one{ flex: 1 1 auto; display: flex; flex-direction: column; }
+  .card-panels{ margin-top: auto; }
+
+  /* 1) cards + typography slightly tighter (prettier) */
+  .card{ padding: 10px; border-radius: 14px; }
+  .barcard{ padding: 8px; }
+  h3{ font-size: 12px; margin: 4px 0 6px; }
+
+  /* 2) INPUT header row: Upload left, filename middle, Clear right */
+  .filebar{ gap: 8px; align-items: center; }
+  .filename{
+    text-align: left;           /* so it doesn't look awkward on mobile */
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 11px;
+    opacity: .72;
+  }
+  /* push Clear button to right */
+  #btnClear{ margin-left: auto; }
+
+  /* 3) money + filter same row: select close to label, filter button on right */
+  #leftControlBar.controlbar{
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px;
+  }
+  #leftControlBar .moneyctl{
+    flex: 0 0 auto;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+  #leftControlBar .moneyctl select{
+    width: 128px;              /* compact */
+  }
+  #leftControlBar .ctl-actions{
+    flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  /* 4) Make the active panel fill the remaining height */
+  .io-panel{ flex: 1 1 auto; }
+  .io-panel.card-col{ min-height: 0; }     /* critical to avoid blank space */
+  .outbox{ flex: 1 1 auto; min-height: 0; }
+  .textarea-wrap{ height: 100%; }
+
+  /* textarea/output become flex-fill instead of fixed vh */
+  #leftCard .outbox .textarea-wrap{
+    display: flex;
+    flex-direction: column;
+  }
+  textarea{
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 220px;
+    max-height: none;
+    padding: 10px;
+  }
+  #rightCard .outbox{
+    display: flex;
+    flex-direction: column;
+  }
+  .output{
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 220px;
+    max-height: none;
+    padding: 10px;
+  }
+
+  /* 5) Buttons smaller but touch-safe */
+  .btn{ padding: 8px 10px; border-radius: 12px; }
+  .btn-slim{ padding: 7px 10px; }
+  .btn-mini.btn-slim{ width: 78px; min-width: 78px; }
+  .iconbtn{ padding: 6px 10px; }
+
+  /* 6) Move disclaimer & links to bottom, keep at bottom always */
+  .mobile-footer{
+    margin-top: 10px;
+    padding-top: 8px;
+  }
+  .mobile-footer .links{
+    margin-top: 6px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* 7) Hide "export text" on mobile (keep Copy as main) */
+  #btnExportText{ display:none !important; }
+
+  /* 8) Prevent any horizontal runaway */
+  .grid, .card, .filebar, .top-actions{ min-width: 0; }
+  textarea, .output{
+    width: 100%;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
