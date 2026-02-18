@@ -727,3 +727,88 @@ textarea{
     min-width: 82px;
   }
 }
+
+/* =========================
+   m.html — Scheme B Tabs + adaptive (append-only)
+   ========================= */
+
+@media (max-width: 560px){
+
+  /* Make grid single column in m.html */
+  .grid-mobile-one{
+    display:block;
+  }
+
+  /* Tabs */
+  .io-tabs{
+    display:flex;
+    gap:10px;
+    margin: 10px 0 12px;
+  }
+  .io-tabs .btn{
+    flex:1 1 auto;
+    min-height: 40px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  /* Panels: only show one */
+  .io-panel{ display:none; }
+  #tab-in:checked ~ .grid .io-in,
+  #tab-in:checked ~ .grid-mobile-one .io-in{ display:flex; }
+  #tab-out:checked ~ .grid .io-out,
+  #tab-out:checked ~ .grid-mobile-one .io-out{ display:flex; }
+
+  /* Visual active state for tabs (no JS) */
+  #tab-in:checked ~ .io-tabs label[for="tab-in"],
+  #tab-out:checked ~ .io-tabs label[for="tab-out"]{
+    background: rgba(43,144,255,.20);
+    border-color: rgba(43,144,255,.35);
+    color: rgba(255,255,255,.92);
+  }
+
+  /* Prevent horizontal runaway (WeChat is sensitive) */
+  .grid,
+  .card,
+  .card-col,
+  .filebar,
+  .top-actions,
+  .filename{
+    min-width:0;
+  }
+  textarea,
+  .output{
+    width:100%;
+    max-width:100%;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+  }
+
+  /* Adaptive heights: prefer dvh if supported (WeChat address bar), fallback to vh */
+  textarea{
+    height: 36dvh;
+    min-height: 200px;
+  }
+  .output{
+    height: 30dvh;
+    min-height: 180px;
+  }
+  @supports not (height: 1dvh){
+    textarea{ height: 36vh; }
+    .output{ height: 30vh; }
+  }
+
+  /* Slightly compact buttons (touch-safe) */
+  .btn-slim{ padding: 7px 10px; }
+  .iconbtn{ padding: 6px 10px; }
+
+  /* Safe-area padding for iOS / WeChat */
+  .wrap-mobile{
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Risk/Achv mutual exclusive (already used by m.html radios) */
+#panel-risk:checked ~ .card-panels #riskDetails{ display:block; }
+#panel-achv:checked ~ .card-panels #achvDetails{ display:block; }
