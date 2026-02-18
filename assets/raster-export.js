@@ -34,7 +34,7 @@
   // Example page: https://gavingao73.github.io/ai-input-safety/
   // Result base:  https://gavingao73.github.io/ai-input-safety/pdfjs/3.11.174/
   function pdfjsBaseUrl() {
-    return new URL(`./pdfjs/${PDFJS_VERSION}/`, document.baseURI || window.location.href).toString();
+    return new URL(`./pdfjs/${PDFJS_VERSION}/`, window.location.href).toString();
   }
 
   // --------- Safe dynamic loaders (no logs) ----------
@@ -178,17 +178,16 @@
     const pdfjsLib = await loadPdfJsIfNeeded();
     const ab = await readFileAsArrayBuffer(file);
 
-    // ✅ SAME-ORIGIN CMap + standard fonts base URLs
+    // ✅ FIX: provide SAME-ORIGIN CMap + standard fonts base URLs (needed for correct text rendering)
     // (Directory listing may 404 on GitHub Pages — that's OK; individual files must be accessible.)
     const BASE = pdfjsBaseUrl();
 
     const loadingTask = pdfjsLib.getDocument({
       data: ab,
 
-      // ✅ IMPORTANT for CJK/table text rendering on canvas:
-      // allow pdf.js to use embedded fonts / @font-face when needed
-      disableFontFace: false,
-      useSystemFonts: true,
+      // ✅ keep consistent with probe (important for CJK / special fonts)
+      disableFontFace: true,
+      useSystemFonts: false,
 
       // CMaps (font character maps)
       cMapUrl: BASE + "cmaps/",
@@ -332,69 +331,69 @@
       return out;
     }
 
-function bboxForItem(it, key) {
-  const tx = Util.transform(viewport.transform, it.transform);
+    function bboxForItem(it, key) {
+      const tx = Util.transform(viewport.transform, it.transform);
 
-  const x = tx[4];
-  const y = tx[5];
+      const x = tx[4];
+      const y = tx[5];
 
-  // ✅ 更稳：分别取 X/Y 缩放（适配旋转/斜切/字体替换）
-  const scaleX = Math.hypot(tx[0], tx[1]) || 1;
-  const scaleY = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
+      let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
+      fontH = clamp(fontH * 1.12, 6, 110);
 
-  let fontH = scaleY;
-  fontH = clamp(fontH * 1.12, 6, 110);
+      const s = String(it.str || "");
 
-  const s = String(it.str || "");
+      // ✅ FIX (stabilize table/CJK): derive width from transform scale instead of trusting it.width
+      const scaleX = Math.hypot(tx[0], tx[1]) || 1;
+      let w = 0;
 
-  // ✅ 关键修复：it.width 需要乘以 scaleX 才是 viewport 像素宽度
-  let w = Number(it.width || 0);
-  if (Number.isFinite(w) && w > 0) {
-    w = w * scaleX;
-  } else {
-    w = 0;
-  }
+      // it.width is text-space; convert into viewport-space using scaleX
+      if (Number.isFinite(it.width) && it.width > 0) {
+        w = it.width * scaleX;
+      }
 
-  if (!Number.isFinite(w) || w <= 0) w = Math.max(8, s.length * fontH * 0.88);
+      // fallback estimate if width missing/bad
+      if (!Number.isFinite(w) || w <= 0) {
+        w = Math.max(8, s.length * fontH * 0.88);
+      }
 
-  const est = Math.max(10, s.length * fontH * 0.90);
+      const est = Math.max(10, s.length * fontH * 0.90);
 
-  if (w > est * 2.2) w = est * 1.15;
+      if (w > est * 2.2) w = est * 1.15;
 
-  const isLongValueKey =
-    key === "account" || key === "phone" || key === "email" || key === "bank";
+      const isLongValueKey =
+        key === "account" || key === "phone" || key === "email" || key === "bank";
 
-  const isAddressKey =
-    key === "address_de_street" || key === "address_de_postal";
+      const isAddressKey =
+        key === "address_de_street" || key === "address_de_postal";
 
-  let maxByPage = viewport.width * 0.30;
-  let maxByEst = est * 1.45;
+      let maxByPage = viewport.width * 0.30;
+      let maxByEst = est * 1.45;
 
-  if (isLongValueKey) {
-    maxByPage = viewport.width * 0.55;
-    maxByEst = est * 2.20;
-    if (w > est * 2.8) w = est * 1.60;
-  } else if (isAddressKey) {
-    maxByPage = viewport.width * 0.60;
-    maxByEst = est * 2.10;
-    if (w > est * 3.2) w = est * 1.70;
-  } else if (key === "money") {
-    maxByPage = viewport.width * 0.35;
-    maxByEst = est * 1.80;
-  }
+      if (isLongValueKey) {
+        maxByPage = viewport.width * 0.55;
+        maxByEst = est * 2.20;
+        if (w > est * 2.8) w = est * 1.60;
+      } else if (isAddressKey) {
+        maxByPage = viewport.width * 0.60;
+        maxByEst = est * 2.10;
+        if (w > est * 3.2) w = est * 1.70;
+      } else if (key === "money") {
+        maxByPage = viewport.width * 0.35;
+        maxByEst = est * 1.80;
+      }
 
-  w = clamp(w, 1, Math.min(maxByPage, maxByEst));
+      w = clamp(w, 1, Math.min(maxByPage, maxByEst));
 
-  const minW = isLongValueKey ? (est * 0.95) : (est * 0.85);
-  w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.40 : 0.20)));
+      const minW = isLongValueKey ? (est * 0.95) : (est * 0.85);
+      w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.40 : 0.20)));
 
-  let rx = clamp(x, 0, viewport.width);
-  let ry = clamp(y - fontH, 0, viewport.height);
-  let rw = clamp(w, 1, viewport.width - rx);
-  let rh = clamp(fontH, 6, viewport.height - ry);
+      let rx = clamp(x, 0, viewport.width);
+      let ry = clamp(y - fontH, 0, viewport.height);
+      let rw = clamp(w, 1, viewport.width - rx);
+      let rh = clamp(fontH, 6, viewport.height - ry);
 
-  return { x: rx, y: ry, w: rw, h: rh };
-}
+      return { x: rx, y: ry, w: rw, h: rh };
+    }
 
     function shrinkByLabel(key, s, ls, le) {
       if (le <= ls) return { ls, le };
@@ -722,7 +721,13 @@ function bboxForItem(it, key) {
 
     for (const p of pages) {
       const page = await pdf.getPage(p.pageNumber);
-      const textContent = await page.getTextContent();
+
+      // ✅ FIX: keep consistent with probe; reduces item split variance (esp. tables/CJK)
+      const textContent = await page.getTextContent({
+        normalizeWhitespace: true,
+        disableCombineTextItems: false
+      });
+
       const rects = textItemsToRects(pdfjsLib, p.viewport, textContent, matchers);
 
       // ---- per-page debug snapshot (safe, in-memory only) ----
@@ -880,3 +885,4 @@ function bboxForItem(it, key) {
 
   window.RasterExport = RasterExport;
 })();
+
