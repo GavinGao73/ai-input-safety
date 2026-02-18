@@ -32,6 +32,49 @@ Filter 不是对话平台。
 
 仅生成“更安全的副本”。
 
+D2.1：MVP 阶段边界（v1）
+
+状态：Accepted / Locked（产品演进约束）
+
+v1 包含的能力
+
+第一阶段产品仅实现最小可行安全模型：
+
+• 单页 Web 应用（PWA-ready）
+• 粘贴文本输入
+• 生成更安全版本
+• 高亮显示变更
+• 复制安全文本
+
+可选文档安全模式
+
+在不引入服务器与存储的前提下，支持基础文档处理能力：
+
+• 本地 PDF 输入（local only）
+• 自动检测可解析文本层（machine-readable）
+• Raster Secure Export（高 DPI 光栅化导出）
+
+v1 明确排除的能力
+
+为避免安全语义混乱与工程复杂度膨胀，以下能力在 v1 被硬性排除：
+
+• 云端处理（Cloud processing）
+• 持久化存储（Persistent storage）
+• 用户账户体系（User accounts）
+• 历史记录（History）
+• 服务器端分析（Server-side analysis）
+• OCR 重建 / OCR-based reconstruction
+
+决策理由
+
+MVP 的核心目标是验证：
+
+✔ 本地优先安全模型是否可用
+✔ 用户是否理解“先过滤再上传”的交互逻辑
+✔ Raster Secure 导出是否满足真实隐私需求
+
+而非构建完整平台或文档管理系统。
+
 ---
 
 ## D3 无存储原则（SECURITY INVARIANT）
