@@ -1,174 +1,142 @@
 # Filter
 
----
-
-## 🇬🇧 English
-
-Filter is a lightweight, privacy-first safety layer designed to reduce unintended sensitive data exposure before text or documents are submitted to AI systems, translators, or online platforms.
-
-### Purpose
-
-Help users generate a safer version of content without altering its meaning or readability.
-
-### Core Guarantees
-
-- No login required  
-- No data storage  
-- No content tracking  
-- All processing happens locally in the browser  
-- Refreshing or closing the page clears all data  
-
-### Design Philosophy
-
-- Preserve human and AI readability  
-- Only mitigate genuinely sensitive elements  
-- Avoid unnecessary annotations or markers  
-- Prioritize privacy and predictability  
-
-### Security Model
-
-Filter primarily targets **machine / automated extraction risks**, not human visual inspection.
-
-When handling documents, the system prioritizes:
-
-**Security > Editability > File Size**
-
-### PDF Safety Strategy
-
-Documents are processed using a Raster Secure Model:
-
-Document page → High-DPI rasterization → Opaque redaction → Rebuilt PDF
-
-Exported files:
-
-- Contain no extractable text layer  
-- Preserve no hidden strings or PDF text objects  
-- Do not rely on viewer-side masking  
-- Use fully opaque redaction  
-
-### Privacy Principles
-
-Filter does NOT:
-
-- Store user input or output  
-- Upload content to servers  
-- Maintain history or accounts  
-- Modify original files  
-
-All processing is ephemeral and in-memory only.
+Filter is a lightweight, privacy-first safety layer designed to help reduce unintended
+sensitive data exposure before content is shared with AI systems, translators,
+or online platforms.
 
 ---
 
-## 🇨🇳 中文说明
+## Purpose
 
-Filter 是一个轻量级、隐私优先的安全过滤层，用于在文本或文档被提交给 AI 系统、翻译工具或在线平台之前，降低无意的敏感信息暴露风险。
+Filter aims to help users generate safer representations of text and documents
+without altering their human readability.
 
-### 产品目标
-
-在 **不影响内容可读性与语义** 的前提下，帮助用户生成更安全的输入版本。
-
-### 核心保证
-
-- 无需登录  
-- 不存储数据  
-- 不跟踪内容  
-- 所有处理均在浏览器本地完成  
-- 关闭或刷新页面即清除全部数据  
-
-### 设计理念
-
-- 保持内容对人类与 AI 可理解  
-- 仅处理真正的敏感信息  
-- 不引入多余标记或提示文本  
-- 完全本地运行  
-
-### 安全模型
-
-Filter 主要关注：
-
-✔ 防止机器 / AI / 自动化系统提取敏感信息  
-
-而不是：
-
-- 人类视觉匿名化  
-- 文档编辑或恢复  
-- 文件大小优化  
-
-在文档处理场景中，优先级为：
-
-**安全性 > 可编辑性 > 文件大小**
-
-### PDF 安全处理策略
-
-文档采用 Raster Secure Model：
-
-页面 → 高 DPI 光栅化 → 不透明覆盖 → 重建 PDF
-
-导出文件：
-
-- 不包含可提取文本层  
-- 不保留隐藏文本对象  
-- 不依赖阅读器遮盖机制  
-- 遮盖区域为完全不透明像素  
-
-### 隐私原则
-
-Filter 不会：
-
-- 存储输入或输出内容  
-- 上传用户文件  
-- 建立用户身份关联  
-- 修改原始文档  
-
-所有处理均为浏览器内存级临时操作。
+The project focuses on minimizing machine-readable sensitive signals while
+keeping workflows simple and local.
 
 ---
 
-## 🇩🇪 Deutsch
+## Core Principles
 
-Filter ist eine leichtgewichtige, datenschutzorientierte Sicherheits-Zwischenschicht, die unbeabsichtigte Offenlegung sensibler Informationen reduziert, bevor Inhalte an KI-Systeme, Übersetzer oder Online-Plattformen übermittelt werden.
+- No login
+- No persistent storage
+- No content tracking
+- No background uploads
 
-### Zielsetzung
+All processing happens locally in the browser.
+Closing or refreshing the page clears all session data.
 
-Erstellung einer sichereren Inhaltsversion ohne Veränderung von Bedeutung oder Lesbarkeit.
+---
 
-### Grundgarantien
+## Scope Boundaries
 
-- Keine Anmeldung erforderlich  
-- Keine Datenspeicherung  
-- Kein Content-Tracking  
-- Vollständig lokale Verarbeitung im Browser  
-- Schließen oder Neuladen löscht alle Daten  
+Filter is intentionally minimal.
 
-### Entwurfsprinzipien
+It does **not**:
 
-- Verständlichkeit für Menschen und KI bewahren  
-- Nur tatsächlich sensible Elemente behandeln  
-- Keine unnötigen Markierungen einführen  
-- Vorhersagbares Verhalten sicherstellen  
+- Store user content
+- Act as an AI intermediary
+- Modify original files
+- Perform cloud-based analysis
 
-### Sicherheitsmodell
+---
 
-Der Fokus liegt auf der Reduktion von Risiken durch **maschinelle / automatisierte Extraktion**, nicht auf visueller Anonymisierung.
+## Security Orientation
 
-Prioritäten bei Dokumenten:
+Filter primarily targets risks associated with automated or machine-based
+data extraction rather than human visual inspection.
 
-**Sicherheit > Bearbeitbarkeit > Dateigröße**
+When exporting documents, the system prioritizes recoverability resistance
+over editability or file size.
 
-### PDF-Sicherheitsstrategie
+---
 
-Dokumente werden als Raster Secure PDF exportiert:
+---
 
-Seite → Hochauflösende Rasterung → Opake Schwärzung → Neues PDF
+# 中文说明
 
-Exportierte Dateien:
+Filter 是一个轻量级、隐私优先的安全过滤层，用于在文本或文档被提交至
+AI 系统、翻译工具或在线平台之前，降低无意的敏感信息暴露风险。
 
-- Enthalten keine extrahierbaren Textobjekte  
-- Bewahren keine versteckten Zeichenketten  
-- Verwenden keine transparenten Masken  
-- Sind strukturell nicht rekonstruierbar  
+---
 
-### Datenschutzprinzipien
+## 产品目标
 
-Filter speichert keine Inhalte, lädt nichts hoch und verändert keine Originaldateien.  
-Alle Operationen erfolgen flüchtig im Arbeitsspeicher des Browsers.
+Filter 旨在帮助用户生成更安全的文本或文档版本，同时保持内容的可读性与自然性。
+
+系统重点在于减少机器可解析的敏感信号，而不是改变内容本身。
+
+---
+
+## 核心原则
+
+- 无需登录
+- 不进行持久化存储
+- 不跟踪内容
+- 不进行后台上传
+
+所有处理均在浏览器本地完成。
+关闭或刷新页面即清除全部会话数据。
+
+---
+
+## 功能边界
+
+Filter 被刻意设计为简化工具。
+
+系统 **不会**：
+
+- 存储用户内容
+- 作为 AI 中介平台
+- 修改原始文件
+- 执行云端分析
+
+---
+
+## 安全取向
+
+Filter 主要针对自动化 / 机器提取带来的风险，而非人类视觉观察。
+
+在文档导出场景中，系统优先考虑信息不可恢复性，而非文件大小或可编辑性。
+
+---
+
+---
+
+# Deutsch
+
+Filter ist eine leichtgewichtige, datenschutzorientierte Sicherheits-Schicht,
+die entwickelt wurde, um unbeabsichtigte Offenlegung sensibler Daten zu reduzieren,
+bevor Inhalte an KI-Systeme oder Online-Plattformen übermittelt werden.
+
+---
+
+## Zweck
+
+Filter unterstützt Nutzer dabei, sicherere Darstellungen von Texten und Dokumenten
+zu erzeugen, ohne deren menschliche Lesbarkeit zu beeinträchtigen.
+
+---
+
+## Grundprinzipien
+
+- Keine Anmeldung
+- Keine dauerhafte Speicherung
+- Kein Content-Tracking
+- Keine Hintergrundübertragungen
+
+Die gesamte Verarbeitung erfolgt lokal im Browser.
+
+---
+
+## Funktionsgrenzen
+
+Filter speichert keine Inhalte, agiert nicht als KI-Vermittler und führt
+keine Cloud-Analyse durch.
+
+---
+
+## Sicherheitsfokus
+
+Der Schwerpunkt liegt auf der Reduzierung maschinenlesbarer sensibler Signale,
+nicht auf visueller Verschleierung für menschliche Betrachter.
