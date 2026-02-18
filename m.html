@@ -2,14 +2,14 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Ai input safety Filter</title>
   <meta name="robots" content="noindex" />
   <link rel="stylesheet" href="./assets/styles.css" />
 </head>
 
 <body>
-  <div class="wrap">
+  <div class="wrap wrap-mobile">
     <header>
       <div class="brand">
         <div class="logo">
@@ -31,19 +31,25 @@
       </div>
     </header>
 
-    <div class="grid">
-      <!-- ================= INPUT (TOP) ================= -->
-      <section class="card card-col" id="leftCard">
+    <!-- ===== IO Tabs (pure CSS) ===== -->
+    <input class="panel-radio" type="radio" name="io" id="tab-in" checked />
+    <input class="panel-radio" type="radio" name="io" id="tab-out" />
+
+    <div class="io-tabs" role="tablist" aria-label="Input Output Tabs">
+      <label class="btn secondary btn-s btn-slim" for="tab-in" role="tab">输入</label>
+      <label class="btn secondary btn-s btn-slim" for="tab-out" role="tab">输出</label>
+    </div>
+
+    <div class="grid grid-mobile-one">
+      <!-- ================= INPUT PANEL ================= -->
+      <section class="card card-col io-panel io-in" id="leftCard">
         <h3 id="ui-in-title"></h3>
 
-        <!-- file bar (IDs preserved) -->
         <div class="barcard barcard-top">
           <div class="filebar filebar-flat">
-            <!-- Mobile: PDF only to avoid camera behavior -->
             <input id="pdfFile" type="file" accept="application/pdf" capture="none" />
             <label class="btn primary btn-s btn-slim" for="pdfFile" id="ui-upload-btn"></label>
 
-            <!-- ✅ Move Clear here (single ID, no duplicates) -->
             <button class="btn secondary btn-s btn-slim" id="btnClear"></button>
 
             <div class="filename" id="pdfName" aria-hidden="true"></div>
@@ -77,8 +83,8 @@
         <div class="bottom-fixed tiny footnote accent-link" id="ui-foot"></div>
       </section>
 
-      <!-- ================= OUTPUT (BOTTOM) ================= -->
-      <section class="card card-col right" id="rightCard">
+      <!-- ================= OUTPUT PANEL ================= -->
+      <section class="card card-col right io-panel io-out" id="rightCard">
         <h3 id="ui-out-title"></h3>
 
         <div class="barcard barcard-top">
@@ -111,7 +117,6 @@
     </div>
 
     <!-- ================= Mutual-exclusive panels (Risk / Achievement) ================= -->
-    <!-- ✅ Pure HTML/CSS: radio group ensures only one panel visible -->
     <input class="panel-radio" type="radio" name="panel" id="panel-none" checked />
     <input class="panel-radio" type="radio" name="panel" id="panel-risk" />
     <input class="panel-radio" type="radio" name="panel" id="panel-achv" />
@@ -123,7 +128,6 @@
         <label class="btn secondary btn-s btn-slim" for="panel-none">关闭</label>
       </div>
 
-      <!-- Risk panel (IDs preserved) -->
       <details class="fold fold-eq panel-body" id="riskDetails">
         <summary class="fold-sum" style="display:none;"></summary>
         <div class="fold-body">
@@ -131,7 +135,6 @@
         </div>
       </details>
 
-      <!-- Achievement panel (IDs preserved) -->
       <details class="fold fold-eq panel-body" id="achvDetails">
         <summary class="fold-sum" style="display:none;"></summary>
         <div class="fold-body">
@@ -157,10 +160,8 @@
   <script src="./assets/catalog.js" defer></script>
   <script src="./assets/rules.js" defer></script>
   <script src="./assets/pdf.js" defer></script>
-
   <script src="./assets/raster-export.js" defer></script>
   <script src="./assets/redact-ui.js" defer></script>
-
   <script src="./assets/app.js" defer></script>
   <script src="./assets/share.js" defer></script>
 </body>
