@@ -1,5 +1,8 @@
 /* =========================
-   assets/styles.css (FULL, reduced step2 / no visual or functional change)
+   assets/styles.css (FULL, consolidated)
+   - de-duplicated
+   - mobile: input/output fill panel + inner scroll
+   - bottom 3 buttons equal width
    ========================= */
 
 :root{
@@ -18,20 +21,23 @@
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
 
-  /* ✅ 统一字号基准（全站正文） */
+  /* Typography baseline */
   --fs-body: 12px;
   --lh-body: 1.55;
 
-  /* ✅ Step2: 高频复用（只抽 6 个，真减行） */
-  --panel-bg: rgba(255,255,255,.02);   /* barcard/controlbar/fold */
+  /* Shared tokens */
+  --panel-bg: rgba(255,255,255,.02);
   --panel-bd: rgba(255,255,255,.08);
-  --box-bg: rgba(10,14,20,.55);        /* textarea/output/select */
+  --box-bg: rgba(10,14,20,.55);
   --box-bd: rgba(255,255,255,.10);
-  --soft-text: rgba(255,255,255,.55);  /* filename 等 */
-  --hint-text: rgba(255,255,255,.28);  /* watermark 等 */
+
+  --soft-text: rgba(255,255,255,.55);
+  --hint-text: rgba(255,255,255,.28);
 }
 
 *{box-sizing:border-box}
+
+html, body{ height:100%; }
 
 body{
   margin:0;
@@ -41,6 +47,10 @@ body{
               var(--bg);
   color:var(--text);
 }
+
+/* =========================
+   Layout (desktop default)
+   ========================= */
 
 .wrap{
   max-width:var(--max);
@@ -75,7 +85,7 @@ header{
   color: rgba(255,255,255,.94);
 }
 
-/* lang aligned */
+/* language switch */
 .lang{
   display:flex;
   gap:6px;
@@ -113,13 +123,14 @@ header{
   border-radius:var(--radius);
   box-shadow:var(--shadow);
   padding:12px 14px 14px;
+  min-width:0;
 }
 
-/* columns */
 .card-col{
   display:flex;
   flex-direction:column;
   min-height: 680px;
+  min-width:0;
 }
 
 /* titles */
@@ -131,7 +142,10 @@ h3{
   text-shadow: 0 0 18px rgba(43,144,255,.10);
 }
 
-/* barcard */
+/* =========================
+   Bars / Buttons
+   ========================= */
+
 .barcard{
   border:1px solid var(--panel-bd);
   border-radius:14px;
@@ -140,11 +154,11 @@ h3{
 }
 .barcard-top{ margin-bottom:10px; }
 
-/* filebar */
 .filebar{
   display:flex;
   gap:10px;
   align-items:center;
+  min-width:0;
 }
 .filebar-flat{
   padding:0;
@@ -165,11 +179,11 @@ h3{
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
-  flex:1;
+  flex:1 1 auto;
+  min-width:0;
   text-align:right;
 }
 
-/* buttons */
 .btn{
   border:1px solid var(--line);
   background:transparent;
@@ -184,22 +198,27 @@ h3{
   color:#07111b;
   border:0;
 }
-.btn.secondary{ background:rgba(255,255,255,.05); }
+.btn.secondary{
+  background:rgba(255,255,255,.05);
+}
 .btn-s{ padding:8px 12px; border-radius:12px; }
 .btn-mini{ width:88px; min-width:88px; text-align:center; }
 .btn-fixed{ width:88px; min-width:88px; text-align:center; }
 
-/* top actions */
 .top-actions{
   display:flex;
   gap:10px;
   justify-content:flex-end;
   align-items:center;
+  min-width:0;
 }
 
-.outbox{ width:100%; }
+/* =========================
+   Input / Output
+   ========================= */
 
-/* input/output font baseline */
+.outbox{ width:100%; min-width:0; }
+
 textarea,
 .output,
 .input-overlay{
@@ -218,6 +237,7 @@ textarea{
   color:rgba(255,255,255,.92);
   padding:12px;
   overflow:auto;
+  min-width:0;
 }
 
 .output{
@@ -229,9 +249,10 @@ textarea{
   padding:12px;
   white-space:pre-wrap;
   overflow:auto;
+  min-width:0;
 }
 
-/* output highlight */
+/* highlights */
 .hl{
   background: rgba(255, 92, 92, 0.14);
   border: 1px solid rgba(255, 92, 92, 0.35);
@@ -240,7 +261,10 @@ textarea{
   border-radius: 999px;
 }
 
-/* controlbars */
+/* =========================
+   Controlbar / Money / Feedback
+   ========================= */
+
 .controlbar{
   display:flex;
   align-items:center;
@@ -251,6 +275,7 @@ textarea{
   border:1px solid var(--panel-bd);
   border-radius:14px;
   background:var(--panel-bg);
+  min-width:0;
 }
 .controlbar-eq{ min-height:56px; }
 
@@ -258,11 +283,13 @@ textarea{
   display:flex;
   align-items:center;
   gap:10px;
+  min-width:0;
 }
 .moneyctl label{
   color:var(--muted);
   font-size:12px;
   font-weight:800;
+  white-space:nowrap;
 }
 .moneyctl select{
   background:var(--box-bg);
@@ -273,12 +300,12 @@ textarea{
   font-size:12px;
 }
 
-/* feedback */
 .feedback{
   display:flex;
   gap:8px;
   align-items:center;
   width:100%;
+  min-width:0;
 }
 .feedback-right{ justify-content:flex-end; }
 .feedback-inline .fbq{
@@ -296,7 +323,10 @@ textarea{
   cursor:pointer;
 }
 
-/* fold */
+/* =========================
+   Fold blocks
+   ========================= */
+
 .fold{
   margin-top:10px;
   border:1px solid var(--panel-bd);
@@ -317,7 +347,6 @@ textarea{
   justify-content:space-between;
 }
 .fold summary::-webkit-details-marker{ display:none; }
-
 .fold-body{
   padding:14px 12px 12px;
   max-height: 260px;
@@ -328,7 +357,6 @@ textarea{
 .risk{ padding:0; border:0; background:transparent; }
 .riskhead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
 .riskmeta{ margin-top:2px; color:var(--muted); font-size:12px; }
-
 .riskscore{
   min-width:96px;
   text-align:center;
@@ -339,7 +367,6 @@ textarea{
 }
 .riskscore .n{ font-size:26px; font-weight:900; line-height:1; }
 .riskscore .l{ font-size:12px; opacity:.9; margin-top:4px; color:rgba(255,255,255,.86); }
-
 .risksec{ margin-top:10px; }
 .risklabel{ font-size:12px; color:var(--muted); margin-bottom:6px; }
 .risklist{ display:flex; flex-direction:column; gap:6px; }
@@ -392,7 +419,6 @@ textarea{
   text-align:center;
   padding:12px;
 }
-
 .achv-right{
   flex:0 0 132px;
   display:flex;
@@ -400,7 +426,6 @@ textarea{
   align-items:flex-end;
   gap:8px;
 }
-
 .achv-sub{
   font-size:12px;
   color:rgba(255,255,255,.48);
@@ -413,16 +438,13 @@ textarea{
   max-width: 180px;
 }
 
-/* bottom fixed */
+/* footer */
 .bottom-fixed{
   margin-top:auto;
   padding-top:12px;
 }
-
-/* footnote color = links */
 .accent-link{ color: rgba(120,255,240,.80); }
 
-/* links */
 .links{
   display:flex;
   gap:12px;
@@ -434,8 +456,16 @@ textarea{
 }
 .links a:hover{ text-decoration:underline; }
 
-/* input watermark */
-.textarea-wrap{ position:relative; }
+#ui-foot{
+  font-size:12px;
+  line-height:1.45;
+}
+
+/* =========================
+   Watermark / Overlay
+   ========================= */
+
+.textarea-wrap{ position:relative; min-width:0; }
 
 .input-watermark{
   position:absolute;
@@ -454,7 +484,6 @@ textarea{
 }
 #inputWrap.has-content .input-watermark{ display:none; }
 
-/* PDF overlay marking */
 .input-overlay{
   display:none;
   position:absolute;
@@ -477,7 +506,10 @@ textarea{
   padding: 0 4px;
 }
 
-/* Middle Filter */
+/* =========================
+   Middle filter (desktop)
+   ========================= */
+
 .mid-filter{
   width: 150px;
   display:flex;
@@ -523,244 +555,68 @@ textarea{
   text-shadow: 0 0 22px rgba(43,144,255,.14);
 }
 
-#ui-foot{
-  font-size:12px;
-  line-height:1.45;
-}
-
 /* =========================
-   Mobile (<=560px) — merged
+   Mobile: m.html Scheme B
+   - Tabs show one panel only
+   - Panel fills screen, textarea/output scroll inside
    ========================= */
 
-/* desktop: hide mobile action bar */
-.mobile-actions{ display:none; }
+.panel-radio{
+  position:absolute;
+  left:-9999px;
+  width:1px;
+  height:1px;
+  opacity:0;
+}
+
+/* desktop: do not show IO tabs special layout */
+.io-tabs{ display:none; }
 
 @media (max-width: 560px){
-  .mobile-actions{ display:block; }
-  .mobile-hidden{ display:none !important; }
 
-  .wrap{ padding:14px 12px 20px; }
-  header{ margin-bottom:12px; align-items:center; }
+  /* --- global density --- */
+  .wrap{ padding:12px 10px 14px; }
 
+  header{ margin-bottom:10px; align-items:center; }
   .logo{ gap:10px; }
   .logo-top-icon{ height:34px; }
   .brand-name{ font-size:16px; line-height:1.15; }
   .lang{ margin-top:0; gap:6px; }
   .lang button{ padding:6px 9px; font-size:12px; }
 
-  .card{ padding:12px; }
-  .card-col{ min-height:auto; }
-  h3{ font-size:13px; margin:4px 0 8px; }
+  .card{ padding:10px; border-radius:14px; }
+  .barcard{ padding:8px; border-radius:14px; }
+  .controlbar{ padding:8px; gap:8px; border-radius:14px; }
 
-  textarea{
-    height:44vh;
-    max-height:none;
-    min-height:280px;
-    padding:12px;
-  }
-  .output{
-    height:36vh;
-    max-height:none;
-    min-height:220px;
-    padding:12px;
-  }
+  h3{ font-size:12px; margin:4px 0 6px; }
 
-  .controlbar{
+  /* --- wrap-mobile: stable full screen (WeChat + browser) --- */
+  .wrap-mobile{
+    min-height: 100dvh;
+    display:flex;
     flex-direction:column;
-    align-items:stretch;
-    gap:10px;
-    padding:10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
   }
-  .moneyctl{
-    width:100%;
-    justify-content:space-between;
-  }
-  .moneyctl select{ width:140px; }
-
-  #leftControlBar .ctl-actions{
-    width:100%;
-    display:flex;
-    gap:10px;
-  }
-  #leftControlBar .ctl-actions .btn{
-    flex:1;
-    width:100%;
-  }
-  #btnGenerate{ padding:12px 14px; border-radius:14px; }
-
-  .top-actions{
-    flex-wrap:wrap;
-    gap:10px;
-  }
-  .top-actions .btn{
-    flex:1 1 calc(50% - 6px);
-    min-width:0;
-  }
-  .btn-mini,
-  .btn-fixed{
-    width:auto;
-    min-width:0;
+  @supports not (height: 1dvh){
+    .wrap-mobile{ min-height: 100vh; }
   }
 
-  .fold-sum{ font-size:13px; padding:12px; }
-  .fold-body{ padding:12px; max-height: 220px; }
-
-  .achv-preview{
-    flex-direction:column;
-    gap:10px;
-  }
-  .achv-right{
-    flex:0 0 auto;
-    width:100%;
-    align-items:stretch;
-  }
-  .achv-right .btn{ width:100%; }
-  .achv-sub{
-    text-align:left;
-    max-width:none;
-  }
-
-  .links{
-    flex-wrap:wrap;
-    gap:10px 14px;
-  }
-
-  .input-watermark{
-    color:rgba(255,255,255,.22);
-  }
-
-  /* sticky action bar */
-  .mobile-actions{
-    position: sticky;
-    bottom: 0;
-    z-index: 60;
-    margin-top: 14px;
-    padding: 10px 12px;
-    border-radius: 16px;
-    border: 1px solid var(--box-bd);
-    background: rgba(10,10,10,.92);
-    backdrop-filter: blur(10px);
-  }
-
-  .mobile-actions .row{
-    display:flex;
-    gap:10px;
-    align-items:center;
-    flex-wrap: wrap;
-  }
-
-  .mobile-actions .row > .btn,
-  .mobile-actions .row > button,
-  .mobile-actions .row > label.btn{
-    flex: 1 1 auto;
-    min-height: 44px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding: 10px 12px;
-  }
-
-  .mobile-actions .row > *{
-    min-width: calc(50% - 6px);
-  }
-
-  details > summary.fold-sum::after{
-    content: "点击打开";
-    font-size: 12px;
-    opacity: .55;
-    margin-left: 10px;
-  }
-  details[open] > summary.fold-sum::after{ content: "点击折叠"; }
-
-  .wrap{ padding-bottom: 90px; }
-}
-
-/* =========================
-   m.html fixes (append-only)
-   ========================= */
-
-/* 4) Prevent horizontal expansion / layout runaway */
-.grid,
-.card,
-.card-col,
-.filebar,
-.top-actions,
-.filename{
-  min-width: 0;
-}
-
-.output,
-textarea{
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-/* 3) Mutual-exclusive panels (radio-driven, no JS split) */
-.panel-radio{ position:absolute; left:-9999px; width:1px; height:1px; opacity:0; }
-
-.card-panels{
-  margin-top: 14px;
-  padding: 12px;
-}
-
-.panel-actions{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  align-items:center;
-}
-
-.panel-body{ display:none; margin-top:10px; }
-
-/* show exactly one */
-#panel-risk:checked ~ .card-panels #riskDetails{ display:block; }
-#panel-achv:checked ~ .card-panels #achvDetails{ display:block; }
-
-/* 5) Slightly smaller buttons on mobile (compact, no behavior change) */
-@media (max-width: 560px){
-  .btn-slim{
-    padding: 7px 10px;
-    border-radius: 12px;
-  }
-  .btn-mini.btn-slim{
-    width: 82px;
-    min-width: 82px;
-  }
-}
-
-/* =========================
-   m.html — Scheme B Tabs + adaptive (append-only)
-   ========================= */
-
-@media (max-width: 560px){
-
-  /* Make grid single column in m.html */
-  .grid-mobile-one{
-    display:block;
-  }
-
-  /* Tabs */
+  /* --- IO Tabs --- */
   .io-tabs{
     display:flex;
-    gap:10px;
-    margin: 10px 0 12px;
+    gap:8px;
+    margin: 8px 0 10px;
+    flex: 0 0 auto;
   }
   .io-tabs .btn{
-    flex:1 1 auto;
-    min-height: 40px;
+    flex:1 1 0;
+    min-height:38px;
     display:flex;
     align-items:center;
     justify-content:center;
   }
 
-  /* Panels: only show one */
-  .io-panel{ display:none; }
-  #tab-in:checked ~ .grid .io-in,
-  #tab-in:checked ~ .grid-mobile-one .io-in{ display:flex; }
-  #tab-out:checked ~ .grid .io-out,
-  #tab-out:checked ~ .grid-mobile-one .io-out{ display:flex; }
-
-  /* Visual active state for tabs (no JS) */
+  /* active tab style */
   #tab-in:checked ~ .io-tabs label[for="tab-in"],
   #tab-out:checked ~ .io-tabs label[for="tab-out"]{
     background: rgba(43,144,255,.20);
@@ -768,363 +624,159 @@ textarea{
     color: rgba(255,255,255,.92);
   }
 
-  /* Prevent horizontal runaway (WeChat is sensitive) */
-  .grid,
-  .card,
-  .card-col,
-  .filebar,
-  .top-actions,
-  .filename{
-    min-width:0;
-  }
-  textarea,
-  .output{
-    width:100%;
-    max-width:100%;
-    overflow-wrap:anywhere;
-    word-break:break-word;
+  /* --- Mobile main container (single column) --- */
+  .grid-mobile-one{
+    flex: 1 1 auto;
+    display:flex;
+    flex-direction:column;
+    min-height:0; /* KEY */
   }
 
-  /* Adaptive heights: prefer dvh if supported (WeChat address bar), fallback to vh */
-  textarea{
-    height: 36dvh;
-    min-height: 200px;
+  /* show exactly one panel */
+  .io-panel{ display:none; }
+  #tab-in:checked ~ .grid-mobile-one .io-in{ display:flex; }
+  #tab-out:checked ~ .grid-mobile-one .io-out{ display:flex; }
+
+  /* --- Panel as vertical layout that fills remaining height --- */
+  .io-panel{
+    flex: 1 1 auto;
+    flex-direction:column;
+    min-height:0; /* KEY */
   }
-  .output{
-    height: 30dvh;
-    min-height: 180px;
+  .io-panel.card-col{ min-height:0 !important; }
+
+  /* outbox takes remaining space, textarea/output scroll inside */
+  .io-panel .outbox{
+    flex:1 1 auto;
+    min-height:0; /* KEY */
+    display:flex;
+    flex-direction:column;
   }
-  @supports not (height: 1dvh){
-    textarea{ height: 36vh; }
-    .output{ height: 30vh; }
+  .io-panel .textarea-wrap{
+    flex:1 1 auto;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
   }
 
-  /* Slightly compact buttons (touch-safe) */
-  .btn-slim{ padding: 7px 10px; }
-  .iconbtn{ padding: 6px 10px; }
-
-  /* Safe-area padding for iOS / WeChat */
-  .wrap-mobile{
-    padding-bottom: calc(20px + env(safe-area-inset-bottom));
-  }
-}
-
-/* Risk/Achv mutual exclusive (already used by m.html radios) */
-#panel-risk:checked ~ .card-panels #riskDetails{ display:block; }
-#panel-achv:checked ~ .card-panels #achvDetails{ display:block; }
-
-@media (max-width: 560px){
-  /* Keep Copy as primary; hide text export to avoid redundancy */
-  #btnExportText{ display:none !important; }
-}
-
-/* =========================
-   Mobile polish (append-only)
-   ========================= */
-@media (max-width: 560px){
-
-  /* overall spacing tighter */
-  .wrap{ padding:12px 10px 18px; }
-  .card{ padding:10px; border-radius:14px; }
-  .barcard{ padding:8px; border-radius:14px; }
-  .controlbar{ padding:8px; gap:8px; border-radius:14px; }
-
-  /* titles slightly smaller */
-  h3{ font-size:12px; margin:4px 0 6px; }
-
-  /* tabs: more compact */
-  .io-tabs{ gap:8px; margin:8px 0 10px; }
-  .io-tabs .btn{ min-height:38px; }
-
-  /* buttons: compact but touch-safe */
-  .btn{ padding:8px 10px; border-radius:12px; }
-  .btn-slim{ padding:7px 10px; }
-  .btn-mini.btn-slim{ width:78px; min-width:78px; }
-
-  .iconbtn{ padding:6px 10px; border-radius:12px; }
-
-  /* input/output height more balanced */
-  textarea{
-    height: 34dvh;
-    min-height: 190px;
+  /* textarea fills outbox; internal scroll */
+  .io-panel textarea{
+    flex:1 1 auto;
+    height:auto !important;
+    max-height:none !important;
+    min-height:0 !important;
+    overflow:auto !important;
     padding:10px;
   }
-  .output{
-    height: 28dvh;
-    min-height: 170px;
+
+  /* output fills outbox; internal scroll */
+  .io-panel .output{
+    flex:1 1 auto;
+    height:auto !important;
+    max-height:none !important;
+    min-height:0 !important;
+    overflow:auto !important;
     padding:10px;
   }
-  @supports not (height: 1dvh){
-    textarea{ height: 34vh; }
-    .output{ height: 28vh; }
-  }
 
-  /* filebar layout tighter */
-  .filebar{ gap:8px; }
-  .filename{ font-size:11px; }
-
-  /* primary text slightly smaller for density */
+  /* tighten font slightly for density (doesn't change style) */
   textarea, .output, .input-overlay{
     font-size: 11.5px;
     line-height: 1.5;
   }
 
-  /* Hide text-export on mobile: keep Copy as primary */
-  #btnExportText{ display:none !important; }
-}
-
-/* =========================
-   Mobile layout polish (append-only)
-   ========================= */
-@media (max-width: 560px){
-
-  /* 0) make page fill viewport consistently (WeChat/Browser) */
-  .wrap-mobile{
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  /* --- filebar: Upload left, filename middle, Clear right --- */
+  .filebar{ gap:8px; }
+  #pdfName.filename{
+    text-align:center;
+    flex:1 1 auto;
+    min-width:0;
+    font-size:11px;
+    opacity:.75;
+    padding:0 6px;
   }
-  @supports not (height: 1dvh){
-    .wrap-mobile{ min-height: 100vh; }
-  }
+  #btnClear{ margin-left:auto; }
 
-  /* Tabs stay on top, content fills, bottom panels stick to bottom */
-  .io-tabs{ flex: 0 0 auto; }
-  .grid-mobile-one{ flex: 1 1 auto; display: flex; flex-direction: column; }
-  .card-panels{ margin-top: auto; }
-
-  /* 1) cards + typography slightly tighter (prettier) */
-  .card{ padding: 10px; border-radius: 14px; }
-  .barcard{ padding: 8px; }
-  h3{ font-size: 12px; margin: 4px 0 6px; }
-
-  /* 2) INPUT header row: Upload left, filename middle, Clear right */
-  .filebar{ gap: 8px; align-items: center; }
-  .filename{
-    text-align: left;           /* so it doesn't look awkward on mobile */
-    flex: 1 1 auto;
-    min-width: 0;
-    font-size: 11px;
-    opacity: .72;
-  }
-  /* push Clear button to right */
-  #btnClear{ margin-left: auto; }
-
-  /* 3) money + filter same row: select close to label, filter button on right */
+  /* --- money row: keep select compact + Filter stays inside right --- */
   #leftControlBar.controlbar{
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 8px;
-  }
-  #leftControlBar .moneyctl{
-    flex: 0 0 auto;
-    gap: 8px;
-    justify-content: flex-start;
-  }
-  #leftControlBar .moneyctl select{
-    width: 128px;              /* compact */
-  }
-  #leftControlBar .ctl-actions{
-    flex: 0 0 auto;
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-  }
-
-  /* 4) Make the active panel fill the remaining height */
-  .io-panel{ flex: 1 1 auto; }
-  .io-panel.card-col{ min-height: 0; }     /* critical to avoid blank space */
-  .outbox{ flex: 1 1 auto; min-height: 0; }
-  .textarea-wrap{ height: 100%; }
-
-  /* textarea/output become flex-fill instead of fixed vh */
-  #leftCard .outbox .textarea-wrap{
-    display: flex;
-    flex-direction: column;
-  }
-  textarea{
-    flex: 1 1 auto;
-    height: auto;
-    min-height: 220px;
-    max-height: none;
-    padding: 10px;
-  }
-  #rightCard .outbox{
-    display: flex;
-    flex-direction: column;
-  }
-  .output{
-    flex: 1 1 auto;
-    height: auto;
-    min-height: 220px;
-    max-height: none;
-    padding: 10px;
-  }
-
-  /* 5) Buttons smaller but touch-safe */
-  .btn{ padding: 8px 10px; border-radius: 12px; }
-  .btn-slim{ padding: 7px 10px; }
-  .btn-mini.btn-slim{ width: 78px; min-width: 78px; }
-  .iconbtn{ padding: 6px 10px; }
-
-  /* 6) Move disclaimer & links to bottom, keep at bottom always */
-  .mobile-footer{
-    margin-top: 10px;
-    padding-top: 8px;
-  }
-  .mobile-footer .links{
-    margin-top: 6px;
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-
-  /* 7) Hide "export text" on mobile (keep Copy as main) */
-  #btnExportText{ display:none !important; }
-
-  /* 8) Prevent any horizontal runaway */
-  .grid, .card, .filebar, .top-actions{ min-width: 0; }
-  textarea, .output{
-    width: 100%;
-    max-width: 100%;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-}
-/* =========================
-   Mobile fixes v2 (append-only)
-   Target: align filebar, keep money row in-card, remove big blank gaps,
-           prevent output overflow.
-   ========================= */
-@media (max-width: 560px){
-
-  /* ---- 1) filebar: Clear at far right, filename centered ---- */
-  .filebar{
-    display:flex;
+    flex-direction:row;
     align-items:center;
+    justify-content:space-between;
+    flex-wrap:nowrap;
     gap:10px;
   }
-  /* filename in the middle, shrinkable */
-  #pdfName.filename{
-    flex: 1 1 auto;
-    min-width: 0;
-    text-align: center;           /* center between buttons */
-    font-size: 11px;
-    opacity: .75;
-    padding: 0 6px;
-  }
-  /* Clear pinned to right */
-  #btnClear{
-    margin-left: 0 !important;
-  }
-  /* Make sure filebar can wrap rather than push out */
-  .filebar > *{ min-width: 0; }
-
-  /* ---- 2) money row: keep select short + filter button stays inside card ---- */
-  #leftControlBar.controlbar{
-    flex-direction: row !important;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 8px;
-    flex-wrap: nowrap;            /* keep single line */
-  }
-
-  /* left cluster: label + select */
-  #leftControlBar .moneyctl{
-    flex: 0 1 auto;
-    min-width: 0;
-    gap: 8px;
-  }
-  #leftControlBar .moneyctl label{
-    white-space: nowrap;
-  }
+  #leftControlBar .moneyctl{ flex:0 1 auto; min-width:0; gap:8px; }
   #leftControlBar .moneyctl select{
-    width: 108px;                 /* ✅ shorter than before */
-    max-width: 108px;
-    padding: 7px 10px;
+    width:108px;
+    max-width:108px;
+    padding:7px 10px;
   }
-
-  /* right cluster: Filter button */
   #leftControlBar .ctl-actions{
-    flex: 0 0 auto;
+    flex:0 0 auto;
     display:flex;
-    justify-content:flex-end;
     gap:8px;
+    justify-content:flex-end;
   }
   #btnGenerate{
-    width: 120px;                 /* keep inside card */
-    max-width: 120px;
-    white-space: nowrap;
+    width:120px;
+    max-width:120px;
+    white-space:nowrap;
   }
 
-  /* ---- 3) Remove the big blank gap between textarea and money row ----
-     Root cause: panel/card doesn't allocate height; textarea got flex,
-     but parent chain not flex/min-height=0; also some fixed heights remain.
-  */
-  .wrap-mobile{
-    min-height: 100dvh;
-    display:flex;
-    flex-direction:column;
+  /* --- output top actions: two buttons share row (if two) --- */
+  .top-actions{
+    gap:10px;
   }
-  .grid-mobile-one{
-    flex: 1 1 auto;
-    display:flex;
-    flex-direction:column;
-    min-height: 0;                /* critical */
+  .top-actions .btn{
+    flex:1 1 0;
+    min-width:0;
   }
 
-  /* active panel should fill remaining height */
-  .io-panel{
-    flex: 1 1 auto;
-    display:flex;
-    flex-direction:column;
-    min-height: 0;                /* critical */
-  }
-  .io-panel.card-col{
-    min-height: 0 !important;
-  }
+  /* --- hide text export on mobile (keep Copy as main) --- */
+  #btnExportText{ display:none !important; }
 
-  /* textarea/output container participates in flex */
-  #leftCard .outbox,
-  #rightCard .outbox{
-    flex: 1 1 auto;
-    min-height: 0;
-    display:flex;
-    flex-direction:column;
-  }
-
-  /* Make textarea/output flex-fill, remove any leftover fixed sizing */
-  textarea{
-    flex: 1 1 auto;
-    height: auto !important;
-    min-height: 240px;
-    max-height: none !important;
-  }
-  .output{
-    flex: 1 1 auto;
-    height: auto !important;
-    min-height: 220px;
-    max-height: none !important;
-  }
-
-  /* ---- 4) Prevent output page bottom overflow (too tall box) ----
-     Make bottom panels + footer take only intrinsic space.
-  */
+  /* --- Mutual exclusive bottom panels + equal width buttons --- */
   .card-panels{
-    flex: 0 0 auto;
-    margin-top: 10px;
-  }
-  .mobile-footer{
-    flex: 0 0 auto;
-    margin-top: 8px;
+    margin-top:10px;
+    padding:10px;
+    flex:0 0 auto;
   }
 
-  /* Safety: no horizontal runaway (buttons pushed out) */
-  .card, .controlbar, .filebar{ overflow: hidden; }
+  .panel-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:nowrap;
+    align-items:center;
+  }
+
+  /* ✅ bottom 3 buttons: same size, evenly distributed */
+  .panel-actions .btn{
+    flex:1 1 0;
+    min-width:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .panel-body{ display:none; margin-top:10px; }
+  #panel-risk:checked ~ .card-panels #riskDetails{ display:block; }
+  #panel-achv:checked ~ .card-panels #achvDetails{ display:block; }
+
+  /* footer stays under the bottom buttons */
+  .mobile-footer{
+    margin-top:10px;
+    padding-top:8px;
+    flex:0 0 auto;
+  }
+  .mobile-footer .links{
+    margin-top:6px;
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+
+  /* --- prevent any horizontal runaway --- */
+  .grid, .card, .card-col, .filebar, .top-actions, .controlbar, .filename{ min-width:0; }
   textarea, .output{
     width:100%;
     max-width:100%;
@@ -1132,73 +784,12 @@ textarea{
     word-break:break-word;
   }
 }
+
 /* =========================
-   MOBILE: IO panels fill screen + inner scroll
-   (append-only)
+   Mutual-exclusive panels (desktop too)
    ========================= */
-
-@media (max-width: 560px){
-
-  /* 1) 让整页有稳定的“满屏高度”基准（兼容微信内置浏览器） */
-  html, body{
-    height: 100%;
-  }
-  body{
-    min-height: 100dvh;
-  }
-
-  /* 2) wrap-mobile 变成纵向布局：header + tabs + panel(撑满) + bottom panels */
-  .wrap-mobile{
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* 3) 让“输入/输出”卡片区成为可撑满的主容器 */
-  .grid-mobile-one{
-    flex: 1 1 auto;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;              /* ✅关键：允许子元素内部滚动，而不是撑开父层 */
-  }
-
-  /* 4) 单个 panel 卡片自身要能撑满并允许内部滚动布局 */
-  .io-panel{
-    flex: 1 1 auto;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;              /* ✅关键 */
-  }
-
-  /* 5) outbox 作为“文本区域”的壳：占据剩余空间 */
-  .io-panel .outbox{
-    flex: 1 1 auto;
-    min-height: 0;              /* ✅关键 */
-  }
-
-  /* 6) 输入框：不要再用固定 vh/px，高度改为“填满 outbox”，多内容内部滚动 */
-  .io-panel textarea{
-    height: 100% !important;
-    max-height: none !important;
-    min-height: 0 !important;
-    overflow: auto !important;
-  }
-
-  /* 7) 输出框：同样填满 outbox，多内容内部滚动，不要把页面撑长 */
-  .io-panel .output{
-    height: 100% !important;
-    max-height: none !important;
-    min-height: 0 !important;
-    overflow: auto !important;
-  }
-
-  /* 8) overlay 同步填满 textarea 容器（避免输入后 overlay 撑开） */
-  .io-panel .input-overlay{
-    max-height: none !important;
-  }
-
-  /* 9) 防止某些浏览器把 flex 子项默认 min-height:auto 导致撑高 */
-  .io-panel .textarea-wrap{
-    min-height: 0;
-  }
-}
+.card-panels{ margin-top:14px; padding:12px; }
+.panel-actions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.panel-body{ display:none; margin-top:10px; }
+#panel-risk:checked ~ .card-panels #riskDetails{ display:block; }
+#panel-achv:checked ~ .card-panels #achvDetails{ display:block; }
