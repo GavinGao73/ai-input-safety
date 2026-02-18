@@ -7,6 +7,22 @@
   <title>Ai input safety Filter</title>
   <meta name="robots" content="noindex" />
   <link rel="stylesheet" href="./assets/styles.css" />
+
+  <!-- ✅ Mobile auto-route: keep same URL entry, redirect early to avoid layout flash -->
+  <script>
+  (function () {
+    try {
+      var isSmallScreen = window.matchMedia && window.matchMedia("(max-width: 560px)").matches;
+
+      // Only redirect from index -> m.html (avoid loops)
+      if (isSmallScreen && !/m\.html(?:$|\?)/.test(location.pathname + location.search)) {
+        location.replace("m.html");
+      }
+    } catch (e) {
+      // fail-open: if anything goes wrong, stay on index.html
+    }
+  })();
+  </script>
 </head>
 
 <body>
