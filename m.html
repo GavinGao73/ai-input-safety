@@ -1,1 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ai input safety Filter</title>
+  <meta name="robots" content="noindex" />
+  <link rel="stylesheet" href="./assets/styles.css" />
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo">
+          <img
+            src="./assets/logo-filter-icon.png"
+            class="logo-top-icon"
+            alt="Filter"
+            loading="eager"
+            decoding="async"
+          />
+          <span class="brand-name">Ai input safety Filter</span>
+        </div>
+      </div>
+
+      <div class="lang">
+        <button data-lang="de">DE</button>
+        <button data-lang="en">EN</button>
+        <button data-lang="zh" class="active">中文</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- ================= INPUT (TOP) ================= -->
+      <section class="card card-col" id="leftCard">
+        <h3 id="ui-in-title"></h3>
+
+        <!-- file bar (keep ids) -->
+        <div class="barcard barcard-top">
+          <div class="filebar filebar-flat">
+            <!-- ✅ Mobile: avoid camera. PDF only. -->
+            <input id="pdfFile" type="file" accept="application/pdf" capture="none" />
+            <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn"></label>
+            <div class="filename" id="pdfName" aria-hidden="true"></div>
+          </div>
+        </div>
+
+        <div class="outbox outbox-input">
+          <div class="textarea-wrap" id="inputWrap">
+            <textarea id="inputText" spellcheck="false"></textarea>
+
+            <div class="input-overlay" id="inputOverlay" aria-hidden="true"></div>
+            <div class="input-watermark" id="ui-input-watermark" aria-hidden="true"></div>
+          </div>
+        </div>
+
+        <!-- keep money selector here (less frequent, ok in scroll area) -->
+        <div class="controlbar controlbar-eq" id="leftControlBar">
+          <div class="moneyctl">
+            <label id="ui-money-label" for="moneyMode"></label>
+            <select id="moneyMode">
+              <option value="off">关闭</option>
+              <option value="m1">M1</option>
+              <option value="m2">M2</option>
+            </select>
+          </div>
+
+          <!-- ✅ buttons moved to bottom bar -->
+          <div class="ctl-actions mobile-hidden">
+            <span class="tiny muted"> </span>
+          </div>
+        </div>
+
+        <details class="fold fold-eq" id="riskDetails">
+          <summary class="fold-sum" id="ui-risk-title"></summary>
+          <div class="fold-body">
+            <div class="risk" id="riskBox"></div>
+          </div>
+        </details>
+
+        <div class="bottom-fixed tiny footnote accent-link" id="ui-foot"></div>
+      </section>
+
+      <!-- ================= OUTPUT (SECOND) ================= -->
+      <section class="card card-col right" id="rightCard">
+        <h3 id="ui-out-title"></h3>
+
+        <!-- ✅ top actions moved to bottom bar -->
+        <div class="barcard barcard-top mobile-hidden">
+          <div class="top-actions"></div>
+        </div>
+
+        <div class="outbox">
+          <div class="output output-scroll" id="outputText"></div>
+        </div>
+
+        <div class="controlbar controlbar-eq" id="rightFeedbackBar">
+          <div class="feedback feedback-inline feedback-right">
+            <div class="fbq" id="ui-fb-q"></div>
+            <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
+            <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
+          </div>
+        </div>
+
+        <details class="fold fold-eq" id="achvDetails">
+          <summary class="fold-sum" id="ui-share-title"></summary>
+          <div class="fold-body">
+            <div class="achv-preview">
+              <div class="achv-previewbox">
+                <img id="shareAutoImg" alt="achievement preview" />
+                <div class="achv-placeholder" id="ui-achv-placeholder"></div>
+              </div>
+
+              <div class="achv-right">
+                <button class="btn primary btn-fixed btn-s" id="btnShareDownload"></button>
+                <div class="achv-sub" id="ui-share-sub"></div>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <div class="bottom-fixed links">
+          <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
+          <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
+          <a id="linkScope" href="./docs/mvp-scope.md" target="_blank"></a>
+        </div>
+      </section>
+    </div>
+
+    <!-- ================= Sticky Bottom Action Bar (mobile) ================= -->
+    <div class="mobile-actions" role="navigation" aria-label="Actions">
+      <div class="row">
+        <button class="btn primary btn-s" id="btnGenerate"></button>
+        <button class="btn primary btn-s" id="btnCopy"></button>
+        <button class="btn secondary btn-s" id="btnClear"></button>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <!-- upload label already styled as button -->
+        <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn-mobile"></label>
+
+        <!-- Stage 3 buttons (Mode A / Mode B) -->
+        <button class="btn secondary btn-s" id="btnExportText" style="display:none;"></button>
+        <button class="btn primary btn-s" id="btnExportRasterPdf" style="display:none;"></button>
+        <button class="btn secondary btn-s" id="btnManualRedact" style="display:none;"></button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JS（顺序非常重要，不要改） -->
+  <script src="./assets/i18n.js" defer></script>
+  <script src="./assets/catalog.js" defer></script>
+  <script src="./assets/rules.js" defer></script>
+  <script src="./assets/pdf.js" defer></script>
+
+  <script src="./assets/raster-export.js" defer></script>
+  <script src="./assets/redact-ui.js" defer></script>
+
+  <script src="./assets/app.js" defer></script>
+  <script src="./assets/share.js" defer></script>
+
+  <!-- tiny bridge: keep same text for upload button without changing app.js -->
+  <script>
+    // Copy upload label text from original #ui-upload-btn into mobile bar label
+    // No functional changes; just mirrors the label text.
+    document.addEventListener("DOMContentLoaded", () => {
+      const src = document.getElementById("ui-upload-btn");
+      const dst = document.getElementById("ui-upload-btn-mobile");
+      if (src && dst) dst.textContent = src.textContent || "";
+    });
+  </script>
+</body>
+</html>
 
