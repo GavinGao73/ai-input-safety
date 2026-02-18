@@ -554,3 +554,113 @@ textarea{
   font-size:12px;
   line-height:1.45;
 }
+
+/* =========================
+   MOBILE VISUAL HIERARCHY
+   (append-only overrides)
+   ========================= */
+
+@media (max-width: 560px){
+
+  /* ---- overall spacing ---- */
+  .wrap{ padding:14px 12px 20px; }
+  header{ margin-bottom:12px; align-items:center; }
+
+  /* ---- header: reduce height ---- */
+  .logo{ gap:10px; }
+  .logo-top-icon{ height:34px; }
+  .brand-name{ font-size:16px; line-height:1.15; }
+  .lang{ margin-top:0; gap:6px; }
+  .lang button{ padding:6px 9px; font-size:12px; }
+
+  /* ---- cards: remove desktop min-height ---- */
+  .card{ padding:12px; }
+  .card-col{ min-height:auto; }
+  h3{ font-size:13px; margin:4px 0 8px; }
+
+  /* ---- input/output: make them breathe on mobile ---- */
+  textarea{
+    height:44vh;
+    max-height:none;
+    min-height:280px;
+    padding:12px;
+  }
+  .output{
+    height:36vh;
+    max-height:none;
+    min-height:220px;
+    padding:12px;
+  }
+
+  /* ---- controlbar: stack to avoid competition ---- */
+  .controlbar{
+    flex-direction:column;
+    align-items:stretch;
+    gap:10px;
+    padding:10px;
+  }
+  .moneyctl{
+    width:100%;
+    justify-content:space-between;
+  }
+  .moneyctl select{ width:140px; }
+
+  /* ---- make PRIMARY action dominate (Generate) ---- */
+  #leftControlBar .ctl-actions{
+    width:100%;
+    display:flex;
+    gap:10px;
+  }
+  #leftControlBar .ctl-actions .btn{
+    flex:1;
+    width:100%;
+  }
+  /* optional: make Generate visually stronger */
+  #btnGenerate{ padding:12px 14px; border-radius:14px; }
+
+  /* ---- right top buttons: wrap to two rows ---- */
+  .top-actions{
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .top-actions .btn{
+    flex:1 1 calc(50% - 6px);
+    min-width:0;
+  }
+  .btn-mini,
+  .btn-fixed{
+    width:auto;
+    min-width:0;
+  }
+
+  /* ---- folds: reduce visual weight, keep readable ---- */
+  .fold-sum{ font-size:13px; padding:12px; }
+  .fold-body{ padding:12px; max-height: 220px; }
+
+  /* ---- achievement: stack vertically ---- */
+  .achv-preview{
+    flex-direction:column;
+    gap:10px;
+  }
+  .achv-right{
+    flex:0 0 auto;
+    width:100%;
+    align-items:stretch;
+  }
+  .achv-right .btn{ width:100%; }
+  .achv-sub{
+    text-align:left;
+    max-width:none;
+  }
+
+  /* ---- bottom links: same line, wrap if needed ---- */
+  .links{
+    flex-wrap:wrap;
+    gap:10px 14px;
+  }
+
+  /* ---- watermark: reduce distraction ---- */
+  .input-watermark{
+    color:rgba(255,255,255,.22);
+  }
+}
