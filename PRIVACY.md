@@ -1,74 +1,88 @@
-# PRIVACY / 隐私说明 / DATENSCHUTZ
-
-## EN
-
-Filter is designed around a local-processing privacy model.
-
-### Data handling
-
-- No accounts
-- No server-side processing of user content
-- No persistent storage by default
-- No content logging by default
-
-User data exists only in browser memory during the active session.
-Closing or refreshing the page clears session data.
-
-### Network behavior
-
-Filter does not intentionally transmit user content to external servers.
-Network requests (if any) should be limited to static assets required to run the app.
-
-### User responsibility
-
-Users remain responsible for deciding what to share and for reviewing exported outputs before sending them to third parties.
+# Privacy Model / 隐私模型 / Datenschutzmodell
 
 ---
 
-## 中文
+## 🇬🇧 English
 
-Filter 采用“本地处理优先”的隐私模型。
+Filter follows a strict local-first privacy architecture.
 
-### 数据处理
+### No Data Collection
 
-- 不需要账号
-- 不在服务器端处理用户内容
-- 默认不做持久化存储
-- 默认不记录内容日志
+Filter does NOT collect, transmit, or persist user content.
 
-用户数据仅存在于当前浏览器会话的内存中。
-关闭或刷新页面将清除会话数据。
+Specifically:
 
-### 网络行为
+- No server uploads  
+- No remote processing  
+- No user profiling  
+- No persistent storage of content  
 
-Filter 不会主动把用户内容上传到外部服务器。
-如存在网络请求，应仅用于加载运行所需的静态资源。
+All processing occurs entirely within the browser runtime.
 
-### 用户责任
+### Data Lifecycle
 
-用户应自行决定分享内容范围，并在向第三方发送前检查导出结果是否符合预期。
+User data exists only in memory and is discarded when:
+
+✔ The page is refreshed  
+✔ The tab is closed  
+
+### Documents & Files
+
+Uploaded files are processed locally and never leave the device.
+
+Raster Secure Export generates a new file without preserving recoverable
+text-layer structures.
+
+### Privacy Boundary
+
+Filter improves resistance to automated extraction but cannot protect against:
+
+- Malware on the client device  
+- Compromised browsers/extensions  
+- Screen capture  
 
 ---
 
-## DE
+## 🇨🇳 中文说明
 
-Filter folgt einem „Local-First“-Datenschutzmodell.
+Filter 采用严格的本地优先隐私架构。
 
-### Datenverarbeitung
+### 不收集数据
 
-- Keine Accounts
-- Keine serverseitige Verarbeitung von Nutzerinhalten
-- Standardmäßig keine dauerhafte Speicherung
-- Standardmäßig kein Content-Logging
+Filter 不收集、不上传、不存储任何用户内容。
 
-Daten existieren nur im Browser-Arbeitsspeicher der aktuellen Sitzung.
-Schließen oder Neuladen der Seite löscht die Sitzungsdaten.
+包括：
 
-### Netzwerkverhalten
+- 无服务器上传  
+- 无远程处理  
+- 无用户画像  
+- 无持久化存储  
 
-Filter überträgt Nutzerinhalte nicht absichtlich an externe Server.
-Etwaige Requests dienen ausschließlich dem Laden statischer App-Assets.
+### 数据生命周期
 
-### Verantwortung der Nutzer
+所有数据仅存在于浏览器内存中，
+刷新或关闭页面即清除。
 
-Nutzer entscheiden selbst, was geteilt wird, und sollten Exporte vor Weitergabe prüfen.
+### 文档与文件
+
+上传文件仅在本地处理，不会离开设备。
+
+Raster Secure 导出不会保留可提取文本层结构。
+
+### 隐私边界
+
+Filter 可降低自动化提取风险，但不防护：
+
+- 设备被入侵  
+- 浏览器被劫持  
+- 屏幕捕获  
+
+---
+
+## 🇩🇪 Deutsch
+
+Filter verwendet eine konsequent lokale Datenschutzarchitektur.
+
+Es erfolgt keine Datenspeicherung oder Übertragung.
+
+Daten existieren nur temporär im Browser-Arbeitsspeicher.
