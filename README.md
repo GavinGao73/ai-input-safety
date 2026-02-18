@@ -1,24 +1,29 @@
-# ai-input-safety
+# Filter
 
-A lightweight, privacy-first safety layer designed to reduce unintended sensitive data exposure 
-before content is submitted to AI systems, translators, or online platforms.
+Filter 是一个轻量级、隐私优先的安全过滤层，用于在文本或文档被提交给 AI 系统、翻译工具或在线平台之前，降低无意的敏感信息暴露风险。
 
-## Purpose
+## 产品目标
 
-Help users generate a safer version of text or documents before providing them to 
-AI or automated processing systems.
+在不改变内容可读性的前提下，帮助用户生成更安全的输入版本。
 
-## Core Guarantees
+Filter 的设计理念是：
 
-No login
-No storage
-No content tracking
-All processing happens locally in the browser
-Closing or refreshing clears all data
+- 保持内容对人类与 AI 可理解
+- 仅处理真正的敏感信息
+- 不引入多余标记或提示文本
+- 完全本地运行
 
-## This repository contains
+## 核心保证
 
-Product principles
-Design decisions
-Implementation notes
+无需登录  
+不存储数据  
+不跟踪内容  
+所有处理均在浏览器本地完成  
+关闭或刷新页面即清除全部数据
 
+## 本仓库包含
+
+产品原则（Product Principles）  
+设计决策（Design Decisions）  
+实现说明（Implementation Notes）  
+PDF 安全处理策略  
