@@ -49,8 +49,8 @@ async function probePdfTextLayer(file) {
     data: buf,
 
     // keep your original safe settings
-    disableFontFace: true,
-    useSystemFonts: false,
+    disableFontFace: false,
+    useSystemFonts: true,
 
     // ✅ MUST: prevent missing glyphs / CMap errors
     cMapUrl: base + "cmaps/",
