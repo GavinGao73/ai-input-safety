@@ -793,3 +793,53 @@ textarea{
 .panel-body{ display:none; margin-top:10px; }
 #panel-risk:checked ~ .card-panels #riskDetails{ display:block; }
 #panel-achv:checked ~ .card-panels #achvDetails{ display:block; }
+
+/* =========================
+   FORCE: m.html output never grows (no media query, wrap-mobile scoped)
+   ========================= */
+
+/* 1) 固定 m.html 的主容器高度，让子区域必须在内部滚动而不是撑页面 */
+.wrap-mobile{
+  height: 100dvh;
+  overflow: hidden;
+}
+@supports not (height: 1dvh){
+  .wrap-mobile{ height: 100vh; }
+}
+
+/* 2) 主内容区可伸缩，但允许内部滚动（关键：min-height:0） */
+.wrap-mobile .grid-mobile-one{
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* 3) IO 面板链路全部允许“被压缩” */
+.wrap-mobile .io-panel{
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.wrap-mobile .io-panel .outbox{
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 4) ✅ 输出框：永远在 outbox 内部滚动，不再撑高卡片 */
+.wrap-mobile .io-panel .output{
+  flex: 1 1 auto;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: auto !important;
+}
+
+/* 同理：输入框 */
+.wrap-mobile .io-panel textarea{
+  flex: 1 1 auto;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: auto !important;
+}
+
