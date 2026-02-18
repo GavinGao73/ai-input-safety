@@ -664,3 +664,65 @@ textarea{
     color:rgba(255,255,255,.22);
   }
 }
+
+/* =========================
+   MOBILE STICKY ACTION BAR
+   (append-only)
+   ========================= */
+
+@media (max-width: 560px){
+  .mobile-hidden{ display:none !important; }
+
+  .mobile-actions{
+    position: sticky;
+    bottom: 0;
+    z-index: 60;
+
+    margin-top: 14px;
+    padding: 10px 12px;
+
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(10,10,10,.92);
+    backdrop-filter: blur(10px);
+  }
+
+  .mobile-actions .row{
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+
+  .mobile-actions .row > .btn,
+  .mobile-actions .row > button,
+  .mobile-actions .row > label.btn{
+    flex: 1 1 auto;
+    min-height: 44px;           /* touch target */
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 10px 12px;
+  }
+
+  /* ensure Stage3 row can wrap if 3 buttons show */
+  .mobile-actions .row{
+    flex-wrap: wrap;
+  }
+  .mobile-actions .row > *{
+    min-width: calc(50% - 6px);
+  }
+
+  /* details summary: add open/close hint (CSS only) */
+  details > summary.fold-sum::after{
+    content: "点击打开";
+    font-size: 12px;
+    opacity: .55;
+    margin-left: 10px;
+  }
+  details[open] > summary.fold-sum::after{
+    content: "点击折叠";
+  }
+
+  /* prevent sticky bar from hiding scroll end */
+  .wrap{ padding-bottom: 90px; }
+}
