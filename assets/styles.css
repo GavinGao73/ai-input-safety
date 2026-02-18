@@ -1,5 +1,5 @@
 /* =========================
-   assets/styles.css (FULL, reduced / no visual or functional change)
+   assets/styles.css (FULL, reduced step2 / no visual or functional change)
    ========================= */
 
 :root{
@@ -21,6 +21,14 @@
   /* ✅ 统一字号基准（全站正文） */
   --fs-body: 12px;
   --lh-body: 1.55;
+
+  /* ✅ Step2: 高频复用（只抽 6 个，真减行） */
+  --panel-bg: rgba(255,255,255,.02);   /* barcard/controlbar/fold */
+  --panel-bd: rgba(255,255,255,.08);
+  --box-bg: rgba(10,14,20,.55);        /* textarea/output/select */
+  --box-bd: rgba(255,255,255,.10);
+  --soft-text: rgba(255,255,255,.55);  /* filename 等 */
+  --hint-text: rgba(255,255,255,.28);  /* watermark 等 */
 }
 
 *{box-sizing:border-box}
@@ -101,7 +109,7 @@ header{
 
 .card{
   background:rgba(255,255,255,.04);
-  border:1px solid rgba(255,255,255,.08);
+  border:1px solid var(--panel-bd);
   border-radius:var(--radius);
   box-shadow:var(--shadow);
   padding:12px 14px 14px;
@@ -125,9 +133,9 @@ h3{
 
 /* barcard */
 .barcard{
-  border:1px solid rgba(255,255,255,.08);
+  border:1px solid var(--panel-bd);
   border-radius:14px;
-  background:rgba(255,255,255,.02);
+  background:var(--panel-bg);
   padding:10px;
 }
 .barcard-top{ margin-bottom:10px; }
@@ -152,7 +160,7 @@ h3{
 }
 
 .filename{
-  color:rgba(255,255,255,.55);
+  color:var(--soft-text);
   font-size:12px;
   white-space:nowrap;
   overflow:hidden;
@@ -204,8 +212,8 @@ textarea{
   width:100%;
   height:320px;
   max-height:320px;
-  background:rgba(10,14,20,.55);
-  border:1px solid rgba(255,255,255,.10);
+  background:var(--box-bg);
+  border:1px solid var(--box-bd);
   border-radius:12px;
   color:rgba(255,255,255,.92);
   padding:12px;
@@ -215,8 +223,8 @@ textarea{
 .output{
   height:320px;
   max-height:320px;
-  background:rgba(10,14,20,.55);
-  border:1px solid rgba(255,255,255,.10);
+  background:var(--box-bg);
+  border:1px solid var(--box-bd);
   border-radius:12px;
   padding:12px;
   white-space:pre-wrap;
@@ -240,9 +248,9 @@ textarea{
   gap:12px;
   margin-top:10px;
   padding:10px 10px;
-  border:1px solid rgba(255,255,255,.08);
+  border:1px solid var(--panel-bd);
   border-radius:14px;
-  background:rgba(255,255,255,.02);
+  background:var(--panel-bg);
 }
 .controlbar-eq{ min-height:56px; }
 
@@ -257,7 +265,7 @@ textarea{
   font-weight:800;
 }
 .moneyctl select{
-  background:rgba(10,14,20,.55);
+  background:var(--box-bg);
   color:var(--text);
   border:1px solid rgba(255,255,255,.12);
   border-radius:12px;
@@ -291,9 +299,9 @@ textarea{
 /* fold */
 .fold{
   margin-top:10px;
-  border:1px solid rgba(255,255,255,.08);
+  border:1px solid var(--panel-bd);
   border-radius:14px;
-  background:rgba(255,255,255,.02);
+  background:var(--panel-bg);
   overflow:hidden;
 }
 .fold-eq{ min-height:56px; }
@@ -358,7 +366,7 @@ textarea{
   flex:1;
   border-radius:16px;
   background:rgba(255,255,255,.03);
-  border:1px dashed rgba(255,255,255,.10);
+  border:1px dashed var(--box-bd);
   height: 220px;
   position:relative;
   overflow:hidden;
@@ -379,7 +387,7 @@ textarea{
   display:flex;
   align-items:center;
   justify-content:center;
-  color:rgba(255,255,255,.28);
+  color:var(--hint-text);
   font-size:12px;
   text-align:center;
   padding:12px;
@@ -436,8 +444,8 @@ textarea{
   bottom:12px;
   padding:10px 10px 8px;
   border-radius:12px;
-  background:linear-gradient(180deg, rgba(10,14,20,0), rgba(10,14,20,.55));
-  color:rgba(255,255,255,.28);
+  background:linear-gradient(180deg, rgba(10,14,20,0), var(--box-bg));
+  color:var(--hint-text);
   font-size:var(--fs-body);
   line-height:1.45;
   white-space:pre-line;
@@ -629,7 +637,7 @@ textarea{
     margin-top: 14px;
     padding: 10px 12px;
     border-radius: 16px;
-    border: 1px solid rgba(255,255,255,.10);
+    border: 1px solid var(--box-bd);
     background: rgba(10,10,10,.92);
     backdrop-filter: blur(10px);
   }
