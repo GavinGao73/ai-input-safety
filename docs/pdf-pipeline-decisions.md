@@ -1,13 +1,3 @@
-下面是**可直接粘贴进仓库**的完整版文档（UTF-8）。
-建议路径：
-
-```
-/docs/pdf-pipeline-decisions.md
-```
-
-内容如下：
-
-````md
 # PDF Pipeline Decisions (DO NOT MODIFY LIGHTLY)
 
 This document records **non-obvious architectural constraints** of the PDF processing / redaction pipeline.
