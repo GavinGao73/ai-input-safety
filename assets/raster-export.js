@@ -185,8 +185,8 @@
       data: ab,
 
       // ✅ keep consistent with probe
-      disableFontFace: true,
-      useSystemFonts: false,
+      disableFontFace: false,
+      useSystemFonts: true,
 
       // CMaps (font character maps)
       cMapUrl: BASE + "cmaps/",
