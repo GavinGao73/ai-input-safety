@@ -1,3 +1,4 @@
+<!-- m.html (FULL, cleaned, no duplicate IDs, stable for app.js binding) -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -36,10 +37,9 @@
       <section class="card card-col" id="leftCard">
         <h3 id="ui-in-title"></h3>
 
-        <!-- file bar (keep ids) -->
         <div class="barcard barcard-top">
           <div class="filebar filebar-flat">
-            <!-- ✅ Mobile: avoid camera. PDF only. -->
+            <!-- Mobile: avoid camera. PDF only. -->
             <input id="pdfFile" type="file" accept="application/pdf" capture="none" />
             <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn"></label>
             <div class="filename" id="pdfName" aria-hidden="true"></div>
@@ -55,7 +55,6 @@
           </div>
         </div>
 
-        <!-- keep money selector here (less frequent, ok in scroll area) -->
         <div class="controlbar controlbar-eq" id="leftControlBar">
           <div class="moneyctl">
             <label id="ui-money-label" for="moneyMode"></label>
@@ -66,9 +65,9 @@
             </select>
           </div>
 
-          <!-- ✅ buttons moved to bottom bar -->
+          <!-- Buttons are in bottom bar on mobile; keep layout stable -->
           <div class="ctl-actions mobile-hidden">
-            <span class="tiny muted"> </span>
+            <span class="tiny muted"></span>
           </div>
         </div>
 
@@ -86,7 +85,7 @@
       <section class="card card-col right" id="rightCard">
         <h3 id="ui-out-title"></h3>
 
-        <!-- ✅ top actions moved to bottom bar -->
+        <!-- top actions are in bottom bar on mobile -->
         <div class="barcard barcard-top mobile-hidden">
           <div class="top-actions"></div>
         </div>
@@ -137,7 +136,6 @@
       </div>
 
       <div class="row" style="margin-top:10px;">
-        <!-- upload label already styled as button -->
         <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn-mobile"></label>
 
         <!-- Stage 3 buttons (Mode A / Mode B) -->
@@ -161,16 +159,20 @@
   <script src="./assets/app.js" defer></script>
   <script src="./assets/share.js" defer></script>
 
-  <!-- tiny bridge: keep same text for upload button without changing app.js -->
+  <!-- UI-only bridge: keep upload button text synced across language switches -->
   <script>
-    // Copy upload label text from original #ui-upload-btn into mobile bar label
-    // No functional changes; just mirrors the label text.
-    document.addEventListener("DOMContentLoaded", () => {
+    function syncUploadText(){
       const src = document.getElementById("ui-upload-btn");
       const dst = document.getElementById("ui-upload-btn-mobile");
       if (src && dst) dst.textContent = src.textContent || "";
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      syncUploadText();
+      document.querySelectorAll(".lang button").forEach(b=>{
+        b.addEventListener("click", ()=> setTimeout(syncUploadText, 0));
+      });
     });
   </script>
 </body>
 </html>
-
