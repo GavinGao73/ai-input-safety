@@ -1,80 +1,108 @@
-# SECURITY / 安全说明 / SICHERHEIT
-
-## EN
-
-Filter is a privacy-oriented, client-side utility.
-
-Security goal: reduce risks associated with automated or machine-based extraction of sensitive data before users share content with AI systems or online platforms.
-
-This project does **not** claim to eliminate all threats or guarantee compliance.
-
-### Design priorities
-
-- Local-only processing (in browser)
-- No persistent storage by default
-- No content logging by default
-- Deterministic document export behavior where possible
-
-### Important limitations
-
-- Output safety depends on the input document, fonts, rendering behavior, and user selections.
-- Filter cannot guarantee that all sensitive information is removed in all cases.
-- Users remain responsible for validating whether outputs meet their legal, regulatory, or organizational requirements.
-
-### Reporting security issues
-
-If you discover a reproducible security issue or an unintended exposure scenario, please report it responsibly via the repository issue tracker (avoid posting real sensitive data).
+# Security Policy / 安全策略 / Sicherheitsrichtlinie
 
 ---
 
-## 中文
+## 🇬🇧 English
 
-Filter 是一个隐私优先的本地工具（浏览器内运行）。
+Filter is a local-first, browser-only application.
 
-安全目标：在用户把内容提交给 AI / 翻译工具 / 在线平台之前，降低敏感信息被自动化或机器化提取的风险。
+No user content is transmitted to servers, stored remotely, or processed
+outside the client environment.
 
-本项目**不**承诺“绝对安全”，也**不**保证满足任何合规要求。
+### Reporting Security Issues
 
-### 设计优先级
+If you believe you have discovered a security-related issue, please report it responsibly.
 
-- 全流程本地处理（浏览器内）
-- 默认不做持久化存储
-- 默认不记录内容日志
-- 尽量保持导出行为可预期、可复现
+Preferred channels:
 
-### 重要限制
+- GitHub Issues (for non-sensitive reports)
+- Email: <your-contact-email>
 
-- 输出安全性受输入文档、字体、渲染差异、用户选择区域等影响。
-- Filter 无法保证在所有情况下都能去除全部敏感信息。
-- 用户需自行评估输出是否满足法律、监管或组织内部要求。
+Avoid publicly disclosing details that could expose users to risk.
 
-### 漏洞/问题反馈
+### Security Scope
 
-如发现可复现的安全问题或意外暴露场景，请通过仓库 Issue 进行负责任披露（避免上传真实敏感数据）。
+Filter’s security considerations focus on:
+
+- Preventing unintended machine-readable data exposure  
+- Reducing recoverable document text-layer risks  
+- Maintaining deterministic client-side processing behavior  
+
+Filter does NOT claim to provide:
+
+- Network security  
+- Endpoint/device security  
+- Protection against compromised browsers or malware  
+
+### Threat Model Clarification
+
+Filter primarily addresses risks from:
+
+✔ Automated extraction  
+✔ Machine-readable data recovery  
+✔ AI/system-level parsing  
+
+It does not defend against visual capture or hostile client environments.
 
 ---
 
-## DE
+## 🇨🇳 中文说明
 
-Filter ist ein datenschutzorientiertes Client-Side-Tool (lokal im Browser).
+Filter 是一个完全本地运行的浏览器工具。
 
-Sicherheitsziel: Reduzierung der Risiken automatisierter bzw. maschineller Extraktion sensibler Daten, bevor Inhalte an KI-Systeme oder Online-Plattformen übermittelt werden.
+用户内容不会被上传、存储或在服务器端处理。
 
-Dieses Projekt erhebt **keinen** Anspruch auf vollständige Bedrohungsabdeckung oder Compliance-Garantien.
+### 安全问题报告
 
-### Design-Prioritäten
+如发现潜在安全问题，建议通过以下方式报告：
 
-- Lokale Verarbeitung im Browser
-- Standardmäßig keine dauerhafte Speicherung
-- Standardmäßig kein Content-Logging
-- Möglichst deterministisches Export-Verhalten
+- GitHub Issues（非敏感问题）
+- 邮件：<your-contact-email>
 
-### Wichtige Einschränkungen
+请避免在公开渠道披露可能引发风险的细节。
 
-- Die Sicherheit des Outputs hängt u. a. von Dokument, Fonts, Rendering und Nutzer-Auswahl ab.
-- Filter kann nicht garantieren, dass alle sensiblen Daten in jedem Fall entfernt werden.
-- Nutzer sind verantwortlich für die Prüfung rechtlicher/regulatorischer Anforderungen.
+### 安全范围
 
-### Sicherheitsmeldungen
+Filter 主要关注：
 
-Bitte melde reproduzierbare Sicherheitsprobleme verantwortungsvoll über den Issue-Tracker (keine echten sensiblen Daten posten).
+- 机器可读信息暴露风险  
+- 文档可恢复文本层风险  
+- 本地处理行为的可预测性  
+
+Filter 不声明提供：
+
+- 网络安全  
+- 终端安全  
+- 恶意环境防护  
+
+### 威胁模型
+
+Filter 的目标是降低自动化 / 机器提取风险，
+而非防御设备层攻击或视觉捕获行为。
+
+---
+
+## 🇩🇪 Deutsch
+
+Filter ist eine rein lokal im Browser ausgeführte Anwendung.
+
+Es erfolgt keine Übertragung oder Speicherung von Nutzerinhalten.
+
+### Meldung von Sicherheitslücken
+
+Sicherheitsrelevante Probleme können gemeldet werden über:
+
+- GitHub Issues (nicht sensible Inhalte)
+- E-Mail: <your-contact-email>
+
+Bitte keine risikorelevanten Details öffentlich posten.
+
+### Sicherheitsumfang
+
+Der Fokus liegt auf:
+
+- Reduktion maschinenlesbarer Datenrisiken  
+- Vermeidung rekonstruierbarer Textebenen  
+- Vorhersagbare lokale Verarbeitung  
+
+Kein Anspruch besteht auf Netzwerk- oder Endgerätesicherheit.
