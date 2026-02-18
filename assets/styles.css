@@ -1132,3 +1132,73 @@ textarea{
     word-break:break-word;
   }
 }
+/* =========================
+   MOBILE: IO panels fill screen + inner scroll
+   (append-only)
+   ========================= */
+
+@media (max-width: 560px){
+
+  /* 1) 让整页有稳定的“满屏高度”基准（兼容微信内置浏览器） */
+  html, body{
+    height: 100%;
+  }
+  body{
+    min-height: 100dvh;
+  }
+
+  /* 2) wrap-mobile 变成纵向布局：header + tabs + panel(撑满) + bottom panels */
+  .wrap-mobile{
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 3) 让“输入/输出”卡片区成为可撑满的主容器 */
+  .grid-mobile-one{
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;              /* ✅关键：允许子元素内部滚动，而不是撑开父层 */
+  }
+
+  /* 4) 单个 panel 卡片自身要能撑满并允许内部滚动布局 */
+  .io-panel{
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;              /* ✅关键 */
+  }
+
+  /* 5) outbox 作为“文本区域”的壳：占据剩余空间 */
+  .io-panel .outbox{
+    flex: 1 1 auto;
+    min-height: 0;              /* ✅关键 */
+  }
+
+  /* 6) 输入框：不要再用固定 vh/px，高度改为“填满 outbox”，多内容内部滚动 */
+  .io-panel textarea{
+    height: 100% !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: auto !important;
+  }
+
+  /* 7) 输出框：同样填满 outbox，多内容内部滚动，不要把页面撑长 */
+  .io-panel .output{
+    height: 100% !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: auto !important;
+  }
+
+  /* 8) overlay 同步填满 textarea 容器（避免输入后 overlay 撑开） */
+  .io-panel .input-overlay{
+    max-height: none !important;
+  }
+
+  /* 9) 防止某些浏览器把 flex 子项默认 min-height:auto 导致撑高 */
+  .io-panel .textarea-wrap{
+    min-height: 0;
+  }
+}
