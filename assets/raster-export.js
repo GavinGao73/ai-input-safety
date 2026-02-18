@@ -178,14 +178,13 @@
     const pdfjsLib = await loadPdfJsIfNeeded();
     const ab = await readFileAsArrayBuffer(file);
 
-    // ✅ FIX: provide SAME-ORIGIN CMap + standard fonts base URLs (needed for correct text rendering)
-    // (Directory listing may 404 on GitHub Pages — that's OK; individual files must be accessible.)
+    // ✅ SAME-ORIGIN CMap + standard fonts base URLs (needed for correct text rendering)
     const BASE = pdfjsBaseUrl();
 
     const loadingTask = pdfjsLib.getDocument({
       data: ab,
 
-      // ✅ keep consistent with probe (important for CJK / special fonts)
+      // ✅ keep consistent with probe
       disableFontFace: true,
       useSystemFonts: false,
 
@@ -307,6 +306,23 @@
     const items = (textContent && textContent.items) ? textContent.items : [];
     if (!items.length || !matchers || !matchers.length) return [];
 
+    // ✅ hard guard: avoid over-redacting if a rule accidentally matches huge spans
+    const MAX_MATCH_LEN = {
+      person_name: 40,
+      company: 60,
+      email: 80,
+      phone: 50,
+      account: 80,
+      bank: 120,
+      address_de_street: 140,
+      address_de_postal: 140,
+      handle: 80,
+      ref: 80,
+      title: 80,
+      money: 60,
+      number: 60
+    };
+
     function isWs(ch) {
       return ch === " " || ch === "\n" || ch === "\t" || ch === "\r";
     }
@@ -342,19 +358,8 @@
 
       const s = String(it.str || "");
 
-      // ✅ FIX (stabilize table/CJK): derive width from transform scale instead of trusting it.width
-      const scaleX = Math.hypot(tx[0], tx[1]) || 1;
-      let w = 0;
-
-      // it.width is text-space; convert into viewport-space using scaleX
-      if (Number.isFinite(it.width) && it.width > 0) {
-        w = it.width * scaleX;
-      }
-
-      // fallback estimate if width missing/bad
-      if (!Number.isFinite(w) || w <= 0) {
-        w = Math.max(8, s.length * fontH * 0.88);
-      }
+      let w = Number(it.width || 0);
+      if (!Number.isFinite(w) || w <= 0) w = Math.max(8, s.length * fontH * 0.88);
 
       const est = Math.max(10, s.length * fontH * 0.90);
 
@@ -452,7 +457,10 @@
       if (it && it.hasEOL) pageText += "\n";
     }
 
-    const matchText = pageText.replace(/\n/g, " ");
+    // ✅ CRITICAL FIX:
+    // Do NOT convert '\n' to spaces (it enables cross-line greedy matches).
+    // Use a sentinel char that typical rules won't match (\u0000).
+    const matchText = pageText.replace(/\n/g, "\u0000");
 
     // spans = {a,b,key,preferSub?}
     const spans = [];
@@ -470,9 +478,16 @@
         const b = a + h.len;
         const key = mm.key;
 
+        // ✅ length guard (avoid catastrophic over-redaction)
+        const maxLen = MAX_MATCH_LEN[key] || 120;
+        if ((b - a) > maxLen) continue;
+
         let preferSub = null;
         const m = h.m || [];
         const full = String(m[0] || "");
+
+        // if match contains sentinel, skip (means it crossed line boundary in some way)
+        if (full.indexOf("\u0000") >= 0) continue;
 
         function findSubOffsets(subStr) {
           if (!subStr) return null;
@@ -530,7 +545,7 @@
     // Merge spans (same key + overlap/close)
     spans.sort((x, y) => (x.a - y.a) || (x.b - y.b));
     const merged = [];
-    const MERGE_GAP = 1;
+    const MERGE_GAP = 0; // ✅ tighter: reduce accidental glueing
 
     function samePreferSub(p, q) {
       if (!p && !q) return true;
@@ -613,7 +628,6 @@
           padY = Math.max(0.55, bb.h * 0.030);
 
         } else if (key === "company") {
-          // 公司名称：略微加大横向 padding，抵消 PDF text item 宽度估算误差（中文更常见）
           padX = Math.max(0.55, bb.w * 0.0045);
           padY = Math.max(0.60, bb.h * 0.032);
 
@@ -638,7 +652,7 @@
           if (rw > maxW) continue;
         }
 
-        // ✅ 公司核心词宽度护栏（关键修复）
+        // ✅ 公司核心词宽度护栏
         if (key === "company") {
           const maxW = Math.min(viewport.width * 0.18, bb.w * 0.45);
           if (rw > maxW) continue;
@@ -721,13 +735,7 @@
 
     for (const p of pages) {
       const page = await pdf.getPage(p.pageNumber);
-
-      // ✅ FIX: keep consistent with probe; reduces item split variance (esp. tables/CJK)
-      const textContent = await page.getTextContent({
-        normalizeWhitespace: true,
-        disableCombineTextItems: false
-      });
-
+      const textContent = await page.getTextContent();
       const rects = textItemsToRects(pdfjsLib, p.viewport, textContent, matchers);
 
       // ---- per-page debug snapshot (safe, in-memory only) ----
