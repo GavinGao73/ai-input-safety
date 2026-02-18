@@ -6,6 +6,47 @@
   <title>Ai input safety Filter</title>
   <meta name="robots" content="noindex" />
   <link rel="stylesheet" href="./assets/styles.css" />
+
+  <!-- ✅ Minimal, self-contained tab/panel visibility rules (so panels never show together) -->
+  <style>
+    /* hide radios but keep them functional */
+    .panel-radio{
+      position:absolute;
+      width:1px;height:1px;
+      opacity:0;
+      pointer-events:none;
+    }
+
+    /* ===== IO tabs: only one panel visible ===== */
+    #tab-in:checked  ~ .grid-mobile-one .io-out{ display:none !important; }
+    #tab-out:checked ~ .grid-mobile-one .io-in { display:none !important; }
+
+    /* active tab visual (doesn't fight your main CSS; only helps if missing) */
+    #tab-in:checked  ~ .io-tabs label[for="tab-in"],
+    #tab-out:checked ~ .io-tabs label[for="tab-out"]{
+      background: rgba(43,144,255,.20);
+      border-color: rgba(43,144,255,.35);
+      color: rgba(255,255,255,.92);
+    }
+
+    /* ===== Risk / Achv: mutually exclusive ===== */
+    /* default hidden */
+    .card-panels .panel-body{ display:none; }
+
+    #panel-risk:checked ~ .card-panels #riskDetails{ display:block; }
+    #panel-achv:checked ~ .card-panels #achvDetails{ display:block; }
+    #panel-none:checked ~ .card-panels #riskDetails,
+    #panel-none:checked ~ .card-panels #achvDetails{ display:none; }
+
+    /* ===== Filebar alignment helper (works with your existing CSS) ===== */
+    .filebar{ display:flex; align-items:center; gap:10px; }
+    #pdfName{
+      flex:1 1 auto;
+      min-width:0;
+      text-align:center;
+    }
+    #btnClear{ margin-left:auto; }
+  </style>
 </head>
 
 <body>
@@ -31,7 +72,7 @@
       </div>
     </header>
 
-    <!-- ===== IO Tabs (pure CSS) ===== -->
+    <!-- ===== IO Tabs (radio-driven) ===== -->
     <input class="panel-radio" type="radio" name="io" id="tab-in" checked />
     <input class="panel-radio" type="radio" name="io" id="tab-out" />
 
@@ -47,10 +88,14 @@
 
         <div class="barcard barcard-top">
           <div class="filebar filebar-flat">
-           <input id="pdfFile" type="file" accept="application/pdf" />
+            <input id="pdfFile" type="file" accept="application/pdf" />
             <label class="btn primary btn-s btn-slim" for="pdfFile" id="ui-upload-btn"></label>
-            <button class="btn secondary btn-s btn-slim" id="btnClear"></button>
+
+            <!-- ✅ filename in the middle -->
             <div class="filename" id="pdfName" aria-hidden="true"></div>
+
+            <!-- ✅ Clear pinned right -->
+            <button class="btn secondary btn-s btn-slim" id="btnClear"></button>
           </div>
         </div>
 
@@ -87,7 +132,6 @@
           <div class="top-actions">
             <button class="btn secondary btn-s btn-mini btn-slim" id="btnExportText" style="display:none;"></button>
             <button class="btn primary btn-s btn-mini btn-slim" id="btnExportRasterPdf" style="display:none;"></button>
-
             <button class="btn primary btn-s btn-mini btn-slim" id="btnCopy"></button>
           </div>
         </div>
@@ -117,16 +161,6 @@
         <label class="btn secondary btn-s btn-slim" for="panel-achv" id="ui-share-title"></label>
         <label class="btn secondary btn-s btn-slim" for="panel-none">关闭</label>
       </div>
-    
-    <div class="mobile-footer">
-    <div class="tiny footnote accent-link" id="ui-foot"></div>
-
-    <div class="links">
-      <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
-      <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
-      <a id="linkScope" href="./docs/mvp-scope.md" target="_blank"></a>
-    </div>
-  </div>
 
       <details class="fold fold-eq panel-body" id="riskDetails">
         <summary class="fold-sum" style="display:none;"></summary>
@@ -151,6 +185,17 @@
           </div>
         </div>
       </details>
+    </div>
+
+    <!-- ✅ Footer moved OUTSIDE card-panels to avoid layout breaking -->
+    <div class="mobile-footer">
+      <div class="tiny footnote accent-link" id="ui-foot"></div>
+
+      <div class="links">
+        <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
+        <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
+        <a id="linkScope" href="./docs/mvp-scope.md" target="_blank"></a>
+      </div>
     </div>
 
   </div>
