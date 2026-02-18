@@ -1,301 +1,311 @@
-# PDF Pipeline Decisions (DO NOT MODIFY LIGHTLY)
+# PDF 管线工程决策（严禁随意修改）
 
-This document records **non-obvious architectural constraints** of the PDF processing / redaction pipeline.
-These are **stability-critical decisions**. Changing them casually will break rendering, geometry alignment,
-or cause silent data loss.
+本文件记录 PDF 处理 / 覆盖（redaction）管线中**非直觉但极度关键的工程约束**。
 
----
+这些不是优化建议，而是**稳定性不变量**。  
+随意变更可能导致：
 
-## 1. PDF.js Version Lock
-
-Version: **3.11.174**
-
-Status: HARD LOCK
-
-Reason:
-
-- Rectangle geometry and text-layer alignment were validated against this exact build.
-- Later PDF.js versions modify internal transform matrices, font handling, and worker behavior.
-- Even minor upgrades can shift glyph positioning → redaction boxes become misaligned.
-- Font fallback logic changed across versions → previously working PDFs lose characters.
-
-Rule:
-
-- DO NOT upgrade PDF.js unless performing a full regression test of:
-  - text extraction
-  - bounding box coordinates
-  - raster export
-  - font rendering
-  - multi-language PDFs (DE + ZH)
+• 渲染异常  
+• 覆盖矩形错位  
+• 字符丢失  
+• 静默数据损坏
 
 ---
 
-## 2. Deployment Model (Same-Origin Requirement)
+## 1️⃣ PDF.js 版本锁定（HARD LOCK）
 
-PDF.js assets MUST be hosted **same-origin**.
+版本：3.11.174  
+状态：强制锁定
 
-Valid:
+原因：
 
-    ./pdfjs/3.11.174/
+• 覆盖矩形的几何计算已针对该版本验证  
+• 文本层坐标与 transform 行为依赖该构建  
+• 后续版本调整了内部矩阵与字体机制  
+• 即使小版本升级也可能改变 glyph 定位
 
-Invalid:
+潜在后果：
 
-    https://cdnjs.cloudflare.com/...
-    https://unpkg.com/...
+• 覆盖框漂移  
+• 字符位置偏移  
+• 先前正常的 PDF 出现字符丢失  
+• 多语言文档渲染不一致
 
-Reason:
+规则：
 
-- Workers are subject to strict cross-origin restrictions.
-- CMap loading fails under CORS → missing glyphs / invisible characters.
-- Standard font loading silently fails → tables appear empty.
-- Fake worker fallback causes severe performance and rendering inconsistencies.
+除非执行完整回归测试，否则**禁止升级 PDF.js**
 
-Rule:
+必须验证：
 
-- Worker, cmaps, and standard_fonts must be served from the same domain as the app.
-- Never rely on third-party CDN for production pipeline.
-
----
-
-## 3. Required PDF.js Asset Structure
-
-The following structure is REQUIRED:
-
-    /pdfjs/3.11.174/pdf.min.js
-    /pdfjs/3.11.174/pdf.worker.min.js
-    /pdfjs/3.11.174/cmaps/
-    /pdfjs/3.11.174/standard_fonts/
-
-Notes:
-
-- `cmaps/` must contain ALL bcmap files from the official distribution.
-- `standard_fonts/` must contain ALL font files (ttf / pfb / etc).
-- Empty folders are INVALID and will cause rendering corruption.
-
-Failure Symptoms When Missing:
-
-- Chinese text disappears
-- Tables partially blank
-- Massive console warnings
-- Redaction rectangles drift
+• 文本提取（text extraction）  
+• bounding box 坐标  
+• 栅格导出（raster export）  
+• 字体渲染  
+• 多语言 PDF（德语 + 中文）
 
 ---
 
-## 4. Base URL Resolution (GitHub Pages Safe)
+## 2️⃣ 部署模型（Same-Origin 强制）
 
-Base URL MUST be computed dynamically.
+PDF.js 资源必须同源加载。
 
-Correct:
+允许：
 
-```js
+./pdfjs/3.11.174/
+
+禁止：
+
+https://cdnjs.cloudflare.com/...  
+https://unpkg.com/...  
+
+原因：
+
+• Worker 受跨域严格限制  
+• CMap 在 CORS 下经常加载失败  
+• 标准字体可能静默加载失败  
+• Fake worker fallback 会破坏性能与一致性
+
+典型症状：
+
+• 字符不可见  
+• 中文文本消失  
+• 表格内容为空  
+• 大量 warning  
+• 覆盖矩形错位
+
+规则：
+
+worker / cmaps / standard_fonts **必须同域部署**
+
+生产环境**禁止依赖 CDN**
+
+---
+
+## 3️⃣ 必需资源结构（REQUIRED）
+
+目录结构不可改变：
+
+/pdfjs/3.11.174/pdf.min.js  
+/pdfjs/3.11.174/pdf.worker.min.js  
+/pdfjs/3.11.174/cmaps/  
+/pdfjs/3.11.174/standard_fonts/
+
+注意：
+
+• cmaps/ 必须包含全部 bcmap 文件  
+• standard_fonts/ 必须包含全部字体文件  
+• 空目录是无效配置
+
+缺失时的表现：
+
+• 中文字符丢失  
+• 表格局部空白  
+• 控制台 warning 激增  
+• 覆盖框漂移
+
+---
+
+## 4️⃣ Base URL 解析规则（GitHub Pages 安全）
+
+Base URL 必须动态计算。
+
+正确：
+
 function pdfjsBaseUrl() {
   return new URL(`./pdfjs/3.11.174/`, window.location.href).toString();
 }
-````
 
-Incorrect:
+错误：
 
-```js
-const base = "/pdfjs/3.11.174/";
+const base = "/pdfjs/3.11.174/";  
 const base = "https://gavingao73.github.io/pdfjs/3.11.174/";
-```
 
-Reason:
+原因：
 
-* GitHub Pages project sites include repo name in path.
-* Hardcoded roots break when:
+GitHub Pages 项目站点路径包含仓库名。
 
-  * repo renamed
-  * local testing
-  * subdirectory deployment
+硬编码根路径在以下场景必然失效：
 
-Rule:
+• 仓库改名  
+• 本地测试  
+• 子目录部署
 
-* NEVER hardcode absolute paths.
+规则：
+
+**严禁硬编码绝对路径**
 
 ---
 
-## 5. Worker Configuration
+## 5️⃣ Worker 配置不变量
 
-Worker MUST be same-origin.
+Worker 必须同源。
 
-Correct:
+正确：
 
-```js
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   pdfjsBaseUrl() + "pdf.worker.min.js";
-```
 
-Reason:
+原因：
 
-* Cross-origin worker = failure / fake worker fallback.
-* Fake worker = unpredictable performance & warnings.
+跨域 worker → Fake worker fallback → 不稳定行为
 
 ---
 
-## 6. CMap & Font Configuration (Critical)
+## 6️⃣ CMap 与字体配置（关键）
 
-Always supply BOTH:
+必须同时提供：
 
-```js
-cMapUrl: base + "cmaps/",
-cMapPacked: true,
+cMapUrl: base + "cmaps/"  
+cMapPacked: true  
 standardFontDataUrl: base + "standard_fonts/"
-```
 
-Reason:
+原因：
 
-Without these:
+缺失将导致：
 
-* Asian fonts fail
-* Glyph mapping breaks
-* Characters silently skipped
-* Rendering appears correct but text extraction wrong
+• 亚洲字体映射失败  
+• glyph 错误  
+• 字符被静默跳过  
+• 表面渲染正常但文本层错误
 
 ---
 
-## 7. Font Handling Strategy
+## 7️⃣ 字体处理策略（LOCKED）
 
-Current Stable Configuration:
+当前稳定配置：
 
-```js
-disableFontFace: true,
+disableFontFace: true  
 useSystemFonts: false
-```
 
-Reason:
+目标：
 
-* Prevent browser font injection variability.
-* Avoid OS-dependent rendering differences.
-* Ensure deterministic rasterization.
+• 避免浏览器字体注入差异  
+• 防止操作系统依赖行为  
+• 保持栅格化确定性
 
-DO NOT:
+严禁：
 
-* Toggle randomly while debugging visual issues.
-* Enable system fonts to "fix missing text".
+• 调试时随意切换这些参数  
+• 启用系统字体来“修复文本缺失”
 
-This masks root problems and destabilizes geometry.
+后果：
+
+这会掩盖真实问题并破坏几何一致性。
 
 ---
 
-## 8. Interpretation of Common Console Warnings
+## 8️⃣ 常见 Warning 的正确解读
 
 ### STSongStd-Light Warning
 
-Example:
+示例：
 
-```
 Warning: Cannot load system font: STSongStd-Light
-```
 
-Meaning:
+含义：
 
-* Informational, NOT fatal.
-* Does not imply rendering failure.
+• 信息性提示  
+• 非致命错误  
+• 不代表渲染失败
 
-Action:
+处理：
 
-* Ignore if text is visible and extraction correct.
+若文本显示正常 → 直接忽略
 
 ---
 
 ### getPathGenerator / ignoring character
 
-Meaning:
+含义：
 
-* Font program resolution timing issue.
-* Typically harmless if output visually correct.
+• 字体程序解析时序问题  
+• 通常无影响
 
-Action:
+处理：
 
-* Ignore unless characters visibly missing.
-
----
-
-## 9. Redaction Geometry Invariants
-
-Redaction rectangles depend on:
-
-* text-layer coordinates
-* viewport transforms
-* version-specific glyph metrics
-
-Implication:
-
-* PDF.js upgrade = geometry regression test REQUIRED.
-* Visual correctness alone is insufficient.
-
-Must validate:
-
-✔ Mask placement
-✔ Multi-line text
-✔ Table cells
-✔ Rotated text
-✔ Mixed fonts
+仅当字符可见缺失时才排查
 
 ---
 
-## 10. Regression Testing Rules
+## 9️⃣ 覆盖几何不变量
 
-Any change to:
+覆盖矩形依赖：
 
-* PDF.js version
-* Worker configuration
-* Font settings
-* CMap handling
-* Viewport scaling logic
+• 文本层坐标  
+• viewport transform  
+• 版本相关 glyph metrics
 
-REQUIRES:
+推论：
 
-1. Load multi-language PDF
-2. Verify text extraction length
-3. Verify rectangle alignment
-4. Verify raster export fidelity
+PDF.js 升级 = 必须执行几何回归测试
 
----
+视觉正确**不等于**几何正确。
 
-## 11. Encoding Rules (Repository-Wide)
+必须验证：
 
-ALL files MUST be UTF-8.
-
-Applies to:
-
-* js
-* md
-* json
-* test fixtures
-
-Reason:
-
-* Regex matching depends on Unicode stability.
-* Cross-language text otherwise corrupts.
-
-Failure Symptoms:
-
-* Garbled characters
-* Incorrect matching
-* Invisible text bugs
+✔ 覆盖位置  
+✔ 多行文本  
+✔ 表格单元格  
+✔ 旋转文本  
+✔ 混合字体
 
 ---
 
-## FINAL RULE
+## 🔟 回归测试规则
 
-If something appears visually wrong:
+以下任意变更均需测试：
 
-❌ DO NOT immediately tweak PDF.js flags
-❌ DO NOT upgrade libraries blindly
-❌ DO NOT assume fonts are "just warnings"
+• PDF.js 版本  
+• Worker 配置  
+• 字体参数  
+• CMap 机制  
+• viewport scaling 逻辑
 
-First verify:
+最低验证：
 
-✔ Asset paths
-✔ Same-origin loading
-✔ cmaps presence
-✔ standard_fonts presence
-
-Most pipeline failures originate from deployment, not logic.
+• 多语言 PDF 加载  
+• 文本长度一致  
+• 覆盖矩形对齐  
+• 栅格导出一致性
 
 ---
 
-```
+## 1️⃣1️⃣ 仓库编码规则（强制）
 
+所有文件必须 UTF-8 编码。
+
+适用：
+
+• js  
+• md  
+• json  
+• 测试文件
+
+原因：
+
+Regex 与 Unicode 行为依赖编码稳定。
+
+错误表现：
+
+• 乱码  
+• 匹配失败  
+• 不可见文本异常
+
+---
+
+# 最终规则（极重要）
+
+若出现视觉异常：
+
+❌ 不要立即修改 PDF.js 参数  
+❌ 不要盲目升级库  
+❌ 不要将 warning 视为根因  
+
+优先排查：
+
+✔ 资源路径  
+✔ 同源加载  
+✔ cmaps 完整性  
+✔ standard_fonts 完整性  
+
+绝大多数 PDF 管线问题源自**部署错误，而非算法错误**。
