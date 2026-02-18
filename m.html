@@ -1,4 +1,3 @@
-<!-- m.html (FULL, cleaned, no duplicate IDs, stable for app.js binding) -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -37,11 +36,16 @@
       <section class="card card-col" id="leftCard">
         <h3 id="ui-in-title"></h3>
 
+        <!-- file bar (IDs preserved) -->
         <div class="barcard barcard-top">
           <div class="filebar filebar-flat">
-            <!-- Mobile: avoid camera. PDF only. -->
+            <!-- Mobile: PDF only to avoid camera behavior -->
             <input id="pdfFile" type="file" accept="application/pdf" capture="none" />
-            <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn"></label>
+            <label class="btn primary btn-s btn-slim" for="pdfFile" id="ui-upload-btn"></label>
+
+            <!-- ✅ Move Clear here (single ID, no duplicates) -->
+            <button class="btn secondary btn-s btn-slim" id="btnClear"></button>
+
             <div class="filename" id="pdfName" aria-hidden="true"></div>
           </div>
         </div>
@@ -49,7 +53,6 @@
         <div class="outbox outbox-input">
           <div class="textarea-wrap" id="inputWrap">
             <textarea id="inputText" spellcheck="false"></textarea>
-
             <div class="input-overlay" id="inputOverlay" aria-hidden="true"></div>
             <div class="input-watermark" id="ui-input-watermark" aria-hidden="true"></div>
           </div>
@@ -65,29 +68,26 @@
             </select>
           </div>
 
-          <!-- Buttons are in bottom bar on mobile; keep layout stable -->
-          <div class="ctl-actions mobile-hidden">
-            <span class="tiny muted"></span>
+          <div class="ctl-actions">
+            <button class="btn primary btn-s btn-slim" id="btnGenerate"></button>
+            <button class="btn secondary btn-s btn-slim" id="btnManualRedact" style="display:none;"></button>
           </div>
         </div>
-
-        <details class="fold fold-eq" id="riskDetails">
-          <summary class="fold-sum" id="ui-risk-title"></summary>
-          <div class="fold-body">
-            <div class="risk" id="riskBox"></div>
-          </div>
-        </details>
 
         <div class="bottom-fixed tiny footnote accent-link" id="ui-foot"></div>
       </section>
 
-      <!-- ================= OUTPUT (SECOND) ================= -->
+      <!-- ================= OUTPUT (BOTTOM) ================= -->
       <section class="card card-col right" id="rightCard">
         <h3 id="ui-out-title"></h3>
 
-        <!-- top actions are in bottom bar on mobile -->
-        <div class="barcard barcard-top mobile-hidden">
-          <div class="top-actions"></div>
+        <div class="barcard barcard-top">
+          <div class="top-actions">
+            <button class="btn secondary btn-s btn-mini btn-slim" id="btnExportText" style="display:none;"></button>
+            <button class="btn primary btn-s btn-mini btn-slim" id="btnExportRasterPdf" style="display:none;"></button>
+
+            <button class="btn primary btn-s btn-mini btn-slim" id="btnCopy"></button>
+          </div>
         </div>
 
         <div class="outbox">
@@ -102,23 +102,6 @@
           </div>
         </div>
 
-        <details class="fold fold-eq" id="achvDetails">
-          <summary class="fold-sum" id="ui-share-title"></summary>
-          <div class="fold-body">
-            <div class="achv-preview">
-              <div class="achv-previewbox">
-                <img id="shareAutoImg" alt="achievement preview" />
-                <div class="achv-placeholder" id="ui-achv-placeholder"></div>
-              </div>
-
-              <div class="achv-right">
-                <button class="btn primary btn-fixed btn-s" id="btnShareDownload"></button>
-                <div class="achv-sub" id="ui-share-sub"></div>
-              </div>
-            </div>
-          </div>
-        </details>
-
         <div class="bottom-fixed links">
           <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
           <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
@@ -127,22 +110,44 @@
       </section>
     </div>
 
-    <!-- ================= Sticky Bottom Action Bar (mobile) ================= -->
-    <div class="mobile-actions" role="navigation" aria-label="Actions">
-      <div class="row">
-        <button class="btn primary btn-s" id="btnGenerate"></button>
-        <button class="btn primary btn-s" id="btnCopy"></button>
-        <button class="btn secondary btn-s" id="btnClear"></button>
+    <!-- ================= Mutual-exclusive panels (Risk / Achievement) ================= -->
+    <!-- ✅ Pure HTML/CSS: radio group ensures only one panel visible -->
+    <input class="panel-radio" type="radio" name="panel" id="panel-none" checked />
+    <input class="panel-radio" type="radio" name="panel" id="panel-risk" />
+    <input class="panel-radio" type="radio" name="panel" id="panel-achv" />
+
+    <div class="card card-panels">
+      <div class="panel-actions">
+        <label class="btn secondary btn-s btn-slim" for="panel-risk" id="ui-risk-title"></label>
+        <label class="btn secondary btn-s btn-slim" for="panel-achv" id="ui-share-title"></label>
+        <label class="btn secondary btn-s btn-slim" for="panel-none">关闭</label>
       </div>
 
-      <div class="row" style="margin-top:10px;">
-        <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn-mobile"></label>
+      <!-- Risk panel (IDs preserved) -->
+      <details class="fold fold-eq panel-body" id="riskDetails">
+        <summary class="fold-sum" style="display:none;"></summary>
+        <div class="fold-body">
+          <div class="risk" id="riskBox"></div>
+        </div>
+      </details>
 
-        <!-- Stage 3 buttons (Mode A / Mode B) -->
-        <button class="btn secondary btn-s" id="btnExportText" style="display:none;"></button>
-        <button class="btn primary btn-s" id="btnExportRasterPdf" style="display:none;"></button>
-        <button class="btn secondary btn-s" id="btnManualRedact" style="display:none;"></button>
-      </div>
+      <!-- Achievement panel (IDs preserved) -->
+      <details class="fold fold-eq panel-body" id="achvDetails">
+        <summary class="fold-sum" style="display:none;"></summary>
+        <div class="fold-body">
+          <div class="achv-preview">
+            <div class="achv-previewbox">
+              <img id="shareAutoImg" alt="achievement preview" />
+              <div class="achv-placeholder" id="ui-achv-placeholder"></div>
+            </div>
+
+            <div class="achv-right">
+              <button class="btn primary btn-fixed btn-s btn-slim" id="btnShareDownload"></button>
+              <div class="achv-sub" id="ui-share-sub"></div>
+            </div>
+          </div>
+        </div>
+      </details>
     </div>
 
   </div>
@@ -158,21 +163,5 @@
 
   <script src="./assets/app.js" defer></script>
   <script src="./assets/share.js" defer></script>
-
-  <!-- UI-only bridge: keep upload button text synced across language switches -->
-  <script>
-    function syncUploadText(){
-      const src = document.getElementById("ui-upload-btn");
-      const dst = document.getElementById("ui-upload-btn-mobile");
-      if (src && dst) dst.textContent = src.textContent || "";
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      syncUploadText();
-      document.querySelectorAll(".lang button").forEach(b=>{
-        b.addEventListener("click", ()=> setTimeout(syncUploadText, 0));
-      });
-    });
-  </script>
 </body>
 </html>
