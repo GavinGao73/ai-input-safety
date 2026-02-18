@@ -994,3 +994,141 @@ textarea{
     word-break: break-word;
   }
 }
+/* =========================
+   Mobile fixes v2 (append-only)
+   Target: align filebar, keep money row in-card, remove big blank gaps,
+           prevent output overflow.
+   ========================= */
+@media (max-width: 560px){
+
+  /* ---- 1) filebar: Clear at far right, filename centered ---- */
+  .filebar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  /* filename in the middle, shrinkable */
+  #pdfName.filename{
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: center;           /* center between buttons */
+    font-size: 11px;
+    opacity: .75;
+    padding: 0 6px;
+  }
+  /* Clear pinned to right */
+  #btnClear{
+    margin-left: 0 !important;
+  }
+  /* Make sure filebar can wrap rather than push out */
+  .filebar > *{ min-width: 0; }
+
+  /* ---- 2) money row: keep select short + filter button stays inside card ---- */
+  #leftControlBar.controlbar{
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px;
+    flex-wrap: nowrap;            /* keep single line */
+  }
+
+  /* left cluster: label + select */
+  #leftControlBar .moneyctl{
+    flex: 0 1 auto;
+    min-width: 0;
+    gap: 8px;
+  }
+  #leftControlBar .moneyctl label{
+    white-space: nowrap;
+  }
+  #leftControlBar .moneyctl select{
+    width: 108px;                 /* ✅ shorter than before */
+    max-width: 108px;
+    padding: 7px 10px;
+  }
+
+  /* right cluster: Filter button */
+  #leftControlBar .ctl-actions{
+    flex: 0 0 auto;
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+  }
+  #btnGenerate{
+    width: 120px;                 /* keep inside card */
+    max-width: 120px;
+    white-space: nowrap;
+  }
+
+  /* ---- 3) Remove the big blank gap between textarea and money row ----
+     Root cause: panel/card doesn't allocate height; textarea got flex,
+     but parent chain not flex/min-height=0; also some fixed heights remain.
+  */
+  .wrap-mobile{
+    min-height: 100dvh;
+    display:flex;
+    flex-direction:column;
+  }
+  .grid-mobile-one{
+    flex: 1 1 auto;
+    display:flex;
+    flex-direction:column;
+    min-height: 0;                /* critical */
+  }
+
+  /* active panel should fill remaining height */
+  .io-panel{
+    flex: 1 1 auto;
+    display:flex;
+    flex-direction:column;
+    min-height: 0;                /* critical */
+  }
+  .io-panel.card-col{
+    min-height: 0 !important;
+  }
+
+  /* textarea/output container participates in flex */
+  #leftCard .outbox,
+  #rightCard .outbox{
+    flex: 1 1 auto;
+    min-height: 0;
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* Make textarea/output flex-fill, remove any leftover fixed sizing */
+  textarea{
+    flex: 1 1 auto;
+    height: auto !important;
+    min-height: 240px;
+    max-height: none !important;
+  }
+  .output{
+    flex: 1 1 auto;
+    height: auto !important;
+    min-height: 220px;
+    max-height: none !important;
+  }
+
+  /* ---- 4) Prevent output page bottom overflow (too tall box) ----
+     Make bottom panels + footer take only intrinsic space.
+  */
+  .card-panels{
+    flex: 0 0 auto;
+    margin-top: 10px;
+  }
+  .mobile-footer{
+    flex: 0 0 auto;
+    margin-top: 8px;
+  }
+
+  /* Safety: no horizontal runaway (buttons pushed out) */
+  .card, .controlbar, .filebar{ overflow: hidden; }
+  textarea, .output{
+    width:100%;
+    max-width:100%;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+  }
+}
