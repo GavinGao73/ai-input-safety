@@ -675,3 +675,55 @@ textarea{
   .wrap{ padding-bottom: 90px; }
 }
 
+/* =========================
+   m.html fixes (append-only)
+   ========================= */
+
+/* 4) Prevent horizontal expansion / layout runaway */
+.grid,
+.card,
+.card-col,
+.filebar,
+.top-actions,
+.filename{
+  min-width: 0;
+}
+
+.output,
+textarea{
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* 3) Mutual-exclusive panels (radio-driven, no JS split) */
+.panel-radio{ position:absolute; left:-9999px; width:1px; height:1px; opacity:0; }
+
+.card-panels{
+  margin-top: 14px;
+  padding: 12px;
+}
+
+.panel-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+
+.panel-body{ display:none; margin-top:10px; }
+
+/* show exactly one */
+#panel-risk:checked ~ .card-panels #riskDetails{ display:block; }
+#panel-achv:checked ~ .card-panels #achvDetails{ display:block; }
+
+/* 5) Slightly smaller buttons on mobile (compact, no behavior change) */
+@media (max-width: 560px){
+  .btn-slim{
+    padding: 7px 10px;
+    border-radius: 12px;
+  }
+  .btn-mini.btn-slim{
+    width: 82px;
+    min-width: 82px;
+  }
+}
