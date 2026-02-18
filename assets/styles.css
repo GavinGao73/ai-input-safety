@@ -1,5 +1,5 @@
 /* =========================
-   assets/styles.css (FULL)
+   assets/styles.css (FULL, optimized / no behavior change)
    ========================= */
 
 :root{
@@ -556,11 +556,17 @@ textarea{
 }
 
 /* =========================
-   MOBILE VISUAL HIERARCHY
-   (append-only overrides)
+   Mobile (<=560px) — merged
    ========================= */
 
+/* desktop default: hide mobile action bar */
+.mobile-actions{ display:none; }
+
 @media (max-width: 560px){
+
+  /* show mobile action bar on small screens */
+  .mobile-actions{ display:block; }
+  .mobile-hidden{ display:none !important; }
 
   /* ---- overall spacing ---- */
   .wrap{ padding:14px 12px 20px; }
@@ -615,7 +621,6 @@ textarea{
     flex:1;
     width:100%;
   }
-  /* optional: make Generate visually stronger */
   #btnGenerate{ padding:12px 14px; border-radius:14px; }
 
   /* ---- right top buttons: wrap to two rows ---- */
@@ -663,16 +668,10 @@ textarea{
   .input-watermark{
     color:rgba(255,255,255,.22);
   }
-}
 
-/* =========================
-   MOBILE STICKY ACTION BAR
-   (append-only)
-   ========================= */
-
-@media (max-width: 560px){
-  .mobile-hidden{ display:none !important; }
-
+  /* =========================
+     Mobile sticky action bar
+     ========================= */
   .mobile-actions{
     position: sticky;
     bottom: 0;
@@ -691,23 +690,20 @@ textarea{
     display:flex;
     gap:10px;
     align-items:center;
+    flex-wrap: wrap;
   }
 
   .mobile-actions .row > .btn,
   .mobile-actions .row > button,
   .mobile-actions .row > label.btn{
     flex: 1 1 auto;
-    min-height: 44px;           /* touch target */
+    min-height: 44px;
     display:flex;
     align-items:center;
     justify-content:center;
     padding: 10px 12px;
   }
 
-  /* ensure Stage3 row can wrap if 3 buttons show */
-  .mobile-actions .row{
-    flex-wrap: wrap;
-  }
   .mobile-actions .row > *{
     min-width: calc(50% - 6px);
   }
@@ -726,3 +722,4 @@ textarea{
   /* prevent sticky bar from hiding scroll end */
   .wrap{ padding-bottom: 90px; }
 }
+
