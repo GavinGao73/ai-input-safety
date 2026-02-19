@@ -23,6 +23,32 @@
     }
   })();
   </script>
+
+  <!-- ✅ Minimal styling for manual name list input (safe; doesn't fight main CSS) -->
+  <style>
+    .namectl{
+      flex: 1 1 auto;
+      min-width: 0;
+      display:flex;
+      align-items:center;
+    }
+    #nameList{
+      width: 100%;
+      min-width: 0;
+      resize: none;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: rgba(255,255,255,.92);
+      line-height: 1.35;
+      font-size: 13px;
+      outline: none;
+    }
+    #nameList::placeholder{
+      color: rgba(255,255,255,.45);
+    }
+  </style>
 </head>
 
 <body>
@@ -71,13 +97,14 @@
         </div>
 
         <div class="controlbar controlbar-eq" id="leftControlBar">
-          <div class="moneyctl">
-            <label id="ui-money-label" for="moneyMode"></label>
-            <select id="moneyMode">
-              <option value="off">关闭</option>
-              <option value="m1">M1</option>
-              <option value="m2">M2</option>
-            </select>
+          <!-- ✅ Replace money selector with manual name list input -->
+          <div class="namectl">
+            <textarea
+              id="nameList"
+              rows="2"
+              spellcheck="false"
+              placeholder="姓名（可选）：每行一个 / 用逗号分隔；例如：张三, Li Ming"
+            ></textarea>
           </div>
 
           <div class="ctl-actions">
@@ -172,7 +199,8 @@
   <script src="./assets/pdf.js" defer></script>
   <script src="./assets/raster-export.js" defer></script>
   <script src="./assets/redact-ui.js" defer></script>
-  <script src="./assets/app.js" defer></script>
+  <!-- ✅ cache-bust -->
+  <script src="./assets/app.js?v=20260219a" defer></script>
   <script src="./assets/share.js" defer></script>
 </body>
 </html>
