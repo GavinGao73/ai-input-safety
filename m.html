@@ -7,9 +7,7 @@
   <meta name="robots" content="noindex" />
   <link rel="stylesheet" href="./assets/styles.css" />
 
-  <!-- ✅ Minimal, self-contained tab/panel visibility rules (so panels never show together) -->
   <style>
-    /* hide radios but keep them functional */
     .panel-radio{
       position:absolute;
       width:1px;height:1px;
@@ -21,7 +19,6 @@
     #tab-in:checked  ~ .grid-mobile-one .io-out{ display:none !important; }
     #tab-out:checked ~ .grid-mobile-one .io-in { display:none !important; }
 
-    /* active tab visual (doesn't fight your main CSS; only helps if missing) */
     #tab-in:checked  ~ .io-tabs label[for="tab-in"],
     #tab-out:checked ~ .io-tabs label[for="tab-out"]{
       background: rgba(43,144,255,.20);
@@ -29,16 +26,7 @@
       color: rgba(255,255,255,.92);
     }
 
-    /* ===== Risk / Achv: mutually exclusive ===== */
-    /* default hidden */
-    .card-panels .panel-body{ display:none; }
-
-    #panel-risk:checked ~ .card-panels #riskDetails{ display:block; }
-    #panel-achv:checked ~ .card-panels #achvDetails{ display:block; }
-    #panel-none:checked ~ .card-panels #riskDetails,
-    #panel-none:checked ~ .card-panels #achvDetails{ display:none; }
-
-    /* ===== Filebar alignment helper (works with your existing CSS) ===== */
+    /* ===== Filebar alignment helper ===== */
     .filebar{ display:flex; align-items:center; gap:10px; }
     #pdfName{
       flex:1 1 auto;
@@ -47,36 +35,30 @@
     }
     #btnClear{ margin-left:auto; }
 
-    /* ✅ Prevent EN/DE tab labels from wrapping (app.js will set shorter labels anyway) */
-    .io-tabs label{
-      white-space: nowrap;
-    }
+    .io-tabs label,
     .panel-actions label{
       white-space: nowrap;
     }
 
-    /* ✅ Minimal name input styling (safe; doesn't fight main CSS) */
-    .namectl{
-      flex: 1 1 auto;
-      min-width: 0;
+    /* manual terms input layout */
+    .manual-terms-box{
       display:flex;
-      align-items:center;
+      flex-direction:column;
+      gap:10px;
     }
-    #nameList{
-      width: 100%;
-      min-width: 0;
-      resize: none;
-      padding: 8px 10px;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.06);
-      color: rgba(255,255,255,.92);
-      line-height: 1.35;
-      font-size: 13px;
-      outline: none;
+    .manual-terms-box input{
+      width:100%;
+      box-sizing:border-box;
     }
-    #nameList::placeholder{
-      color: rgba(255,255,255,.45);
+
+    /* links under manual terms */
+    .manual-links{
+      display:flex;
+      gap:14px;
+      flex-wrap:wrap;
+    }
+    .manual-links a{
+      text-decoration: none;
     }
   </style>
 </head>
@@ -109,7 +91,6 @@
     <input class="panel-radio" type="radio" name="io" id="tab-out" />
 
     <div class="io-tabs" role="tablist" aria-label="Input Output Tabs">
-      <!-- ✅ text comes from i18n/app.js -->
       <label class="btn secondary btn-s btn-slim" for="tab-in" role="tab" id="ui-tab-in"></label>
       <label class="btn secondary btn-s btn-slim" for="tab-out" role="tab" id="ui-tab-out"></label>
     </div>
@@ -124,10 +105,8 @@
             <input id="pdfFile" type="file" accept="application/pdf" />
             <label class="btn primary btn-s btn-slim" for="pdfFile" id="ui-upload-btn"></label>
 
-            <!-- ✅ filename in the middle -->
             <div class="filename" id="pdfName" aria-hidden="true"></div>
 
-            <!-- ✅ Clear pinned right -->
             <button class="btn secondary btn-s btn-slim" id="btnClear"></button>
           </div>
         </div>
@@ -141,21 +120,30 @@
         </div>
 
         <div class="controlbar controlbar-eq" id="leftControlBar">
-          <!-- ✅ Replace money selector with manual name list input -->
-          <div class="namectl">
-            <textarea
-              id="nameList"
-              rows="2"
-              spellcheck="false"
-              placeholder="姓名（可选）：每行一个 / 用逗号分隔；例如：张三, Li Ming"
-            ></textarea>
-          </div>
+          <!-- ✅ Money: keep as hidden default (app.js still expects #moneyMode) -->
+          <input type="hidden" id="moneyMode" value="m2" />
 
           <div class="ctl-actions">
             <button class="btn primary btn-s btn-slim" id="btnGenerate"></button>
             <button class="btn secondary btn-s btn-slim" id="btnManualRedact" style="display:none;"></button>
           </div>
         </div>
+
+        <!-- ✅ Manual terms fold (same spec as risk fold) -->
+        <details class="fold fold-eq" id="manualDetails">
+          <summary class="fold-sum" id="ui-manual-terms-title">补充遮盖</summary>
+          <div class="fold-body">
+            <div class="manual-terms-box">
+              <div class="tiny muted" id="ui-manual-terms-hint">输入人名/公司名（逗号分隔）。只遮盖 PDF 原文中真实出现的内容。</div>
+              <input id="manualTerms" type="text" placeholder="例如：张三, 李四, Bei.de Tech GmbH" autocomplete="off" />
+              <div class="manual-links links">
+                <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
+                <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
+                <a id="linkScope" href="./docs/mvp-scope.md" target="_blank"></a>
+              </div>
+            </div>
+          </div>
+        </details>
       </section>
 
       <!-- ================= OUTPUT PANEL ================= -->
@@ -181,56 +169,20 @@
             <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
           </div>
         </div>
+
+        <!-- ✅ Risk moved here (replaces achievement area) -->
+        <details class="fold fold-eq" id="riskDetails">
+          <summary class="fold-sum" id="ui-risk-title"></summary>
+          <div class="fold-body">
+            <div class="risk" id="riskBox"></div>
+          </div>
+        </details>
       </section>
     </div>
 
-    <!-- ================= Mutual-exclusive panels (Risk / Achievement) ================= -->
-    <input class="panel-radio" type="radio" name="panel" id="panel-none" checked />
-    <input class="panel-radio" type="radio" name="panel" id="panel-risk" />
-    <input class="panel-radio" type="radio" name="panel" id="panel-achv" />
-
-    <div class="card card-panels">
-      <div class="panel-actions">
-        <label class="btn secondary btn-s btn-slim" for="panel-risk" id="ui-risk-title"></label>
-        <label class="btn secondary btn-s btn-slim" for="panel-achv" id="ui-share-title"></label>
-        <!-- ✅ text comes from i18n/app.js -->
-        <label class="btn secondary btn-s btn-slim" for="panel-none" id="ui-panel-close"></label>
-      </div>
-
-      <details class="fold fold-eq panel-body" id="riskDetails">
-        <summary class="fold-sum" style="display:none;"></summary>
-        <div class="fold-body">
-          <div class="risk" id="riskBox"></div>
-        </div>
-      </details>
-
-      <details class="fold fold-eq panel-body" id="achvDetails">
-        <summary class="fold-sum" style="display:none;"></summary>
-        <div class="fold-body">
-          <div class="achv-preview">
-            <div class="achv-previewbox">
-              <img id="shareAutoImg" alt="achievement preview" />
-              <div class="achv-placeholder" id="ui-achv-placeholder"></div>
-            </div>
-
-            <div class="achv-right">
-              <button class="btn primary btn-fixed btn-s btn-slim" id="btnShareDownload"></button>
-              <div class="achv-sub" id="ui-share-sub"></div>
-            </div>
-          </div>
-        </div>
-      </details>
-    </div>
-
-    <!-- ✅ Footer moved OUTSIDE card-panels to avoid layout breaking -->
+    <!-- ✅ Footer only (no achievement card anymore) -->
     <div class="mobile-footer">
       <div class="tiny footnote accent-link" id="ui-foot"></div>
-
-      <div class="links">
-        <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
-        <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
-        <a id="linkScope" href="./docs/mvp-scope.md" target="_blank"></a>
-      </div>
     </div>
 
   </div>
@@ -244,6 +196,6 @@
   <script src="./assets/redact-ui.js" defer></script>
   <!-- ✅ cache-bust for mobile -->
   <script src="./assets/app.js?v=20260219a" defer></script>
-  <script src="./assets/share.js" defer></script>
+  <!-- ✅ share.js removed (achievement deleted) -->
 </body>
 </html>
