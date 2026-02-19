@@ -1,8 +1,5 @@
 /* =========================
    assets/styles.css (FULL, consolidated)
-   - de-duplicated
-   - mobile: input/output fill panel + inner scroll
-   - bottom 3 buttons equal width
    ========================= */
 
 :root{
@@ -21,11 +18,9 @@
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
 
-  /* Typography baseline */
   --fs-body: 12px;
   --lh-body: 1.55;
 
-  /* Shared tokens */
   --panel-bg: rgba(255,255,255,.02);
   --panel-bd: rgba(255,255,255,.08);
   --box-bg: rgba(10,14,20,.55);
@@ -36,7 +31,6 @@
 }
 
 *{box-sizing:border-box}
-
 html, body{ height:100%; }
 
 body{
@@ -49,7 +43,7 @@ body{
 }
 
 /* =========================
-   Layout (desktop default)
+   Layout
    ========================= */
 
 .wrap{
@@ -65,17 +59,8 @@ header{
   margin-bottom:16px;
 }
 
-/* header logo */
-.logo{
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-.logo-top-icon{
-  height:44px;
-  width:auto;
-  display:block;
-}
+.logo{ display:flex; align-items:center; gap:12px; }
+.logo-top-icon{ height:44px; width:auto; display:block; }
 .brand-name{
   font-weight:900;
   font-size:20px;
@@ -85,12 +70,7 @@ header{
   color: rgba(255,255,255,.94);
 }
 
-/* language switch */
-.lang{
-  display:flex;
-  gap:6px;
-  margin-top:6px;
-}
+.lang{ display:flex; gap:6px; margin-top:6px; }
 .lang button{
   background:transparent;
   border:1px solid var(--line);
@@ -133,7 +113,6 @@ header{
   min-width:0;
 }
 
-/* titles */
 h3{
   margin:6px 0 10px;
   font-size:14px;
@@ -160,11 +139,7 @@ h3{
   align-items:center;
   min-width:0;
 }
-.filebar-flat{
-  padding:0;
-  border:0;
-  background:transparent;
-}
+.filebar-flat{ padding:0; border:0; background:transparent; }
 .filebar input[type="file"]{
   position:absolute;
   width:1px;
@@ -198,9 +173,7 @@ h3{
   color:#07111b;
   border:0;
 }
-.btn.secondary{
-  background:rgba(255,255,255,.05);
-}
+.btn.secondary{ background:rgba(255,255,255,.05); }
 .btn-s{ padding:8px 12px; border-radius:12px; }
 .btn-mini{ width:88px; min-width:88px; text-align:center; }
 .btn-fixed{ width:88px; min-width:88px; text-align:center; }
@@ -262,7 +235,7 @@ textarea{
 }
 
 /* =========================
-   Controlbar / Money / Feedback
+   Controlbar / Feedback
    ========================= */
 
 .controlbar{
@@ -278,27 +251,6 @@ textarea{
   min-width:0;
 }
 .controlbar-eq{ min-height:56px; }
-
-.moneyctl{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  min-width:0;
-}
-.moneyctl label{
-  color:var(--muted);
-  font-size:12px;
-  font-weight:800;
-  white-space:nowrap;
-}
-.moneyctl select{
-  background:var(--box-bg);
-  color:var(--text);
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:12px;
-  padding:8px 10px;
-  font-size:12px;
-}
 
 .feedback{
   display:flex;
@@ -353,6 +305,23 @@ textarea{
   overflow:auto;
 }
 
+/* ✅ Manual card header layout */
+.manual-sum{ gap:12px; }
+.manual-sum-title{ flex:1 1 auto; min-width:0; }
+.manual-sum-right{
+  flex:0 0 auto;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:6px;
+}
+.manual-sum-right .btn{ width:92px; min-width:92px; }
+.manual-sum-hint{
+  max-width: 220px;
+  text-align:right;
+  line-height:1.25;
+}
+
 /* risk */
 .risk{ padding:0; border:0; background:transparent; }
 .riskhead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
@@ -383,66 +352,8 @@ textarea{
 .riskitem .rv{ font-size:12px; color:var(--muted); }
 .riskadvice{ font-size:12px; line-height:1.5; color:rgba(255,255,255,.82); }
 
-/* achievement */
-.achv-preview{
-  display:flex;
-  gap:12px;
-  align-items:flex-start;
-}
-.achv-previewbox{
-  flex:1;
-  border-radius:16px;
-  background:rgba(255,255,255,.03);
-  border:1px dashed var(--box-bd);
-  height: 220px;
-  position:relative;
-  overflow:hidden;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-#shareAutoImg{
-  max-width: 100%;
-  max-height: 100%;
-  border-radius:14px;
-  box-shadow: 0 10px 40px rgba(0,0,0,.45);
-  display:none;
-}
-.achv-placeholder{
-  position:absolute;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:var(--hint-text);
-  font-size:12px;
-  text-align:center;
-  padding:12px;
-}
-.achv-right{
-  flex:0 0 132px;
-  display:flex;
-  flex-direction:column;
-  align-items:flex-end;
-  gap:8px;
-}
-.achv-sub{
-  font-size:12px;
-  color:rgba(255,255,255,.48);
-  text-align:right;
-  line-height:1.35;
-  white-space: pre-line;
-  overflow-wrap: break-word;
-  word-break: normal;
-  hyphens: auto;
-  max-width: 180px;
-}
-
 /* footer */
-.bottom-fixed{
-  margin-top:auto;
-  padding-top:12px;
-}
+.bottom-fixed{ margin-top:auto; padding-top:12px; }
 .accent-link{ color: rgba(120,255,240,.80); }
 
 .links{
@@ -493,12 +404,20 @@ textarea{
   overflow:auto;
   white-space:pre-wrap;
   pointer-events:none;
+  color: rgba(255,255,255,.92);
 }
 #inputWrap.pdf-overlay-on .input-overlay{ display:block; }
+
+/* ✅ Fix “two layers while selecting”: force textarea fill fully transparent + selection transparent */
 #inputWrap.pdf-overlay-on textarea{
   color: transparent;
   caret-color: rgba(255,255,255,.88);
+  -webkit-text-fill-color: transparent;
 }
+#inputWrap.pdf-overlay-on textarea::selection{
+  background: transparent;
+}
+
 .hit{
   background: rgba(255, 92, 92, 0.12);
   border: 1px solid rgba(255, 92, 92, 0.28);
@@ -556,9 +475,7 @@ textarea{
 }
 
 /* =========================
-   Mobile: m.html Scheme B
-   - Tabs show one panel only
-   - Panel fills screen, textarea/output scroll inside
+   Mobile (kept from your version)
    ========================= */
 
 .panel-radio{
@@ -569,12 +486,10 @@ textarea{
   opacity:0;
 }
 
-/* desktop: do not show IO tabs special layout */
 .io-tabs{ display:none; }
 
 @media (max-width: 560px){
 
-  /* --- global density --- */
   .wrap{ padding:12px 10px 14px; }
 
   header{ margin-bottom:10px; align-items:center; }
@@ -590,7 +505,6 @@ textarea{
 
   h3{ font-size:12px; margin:4px 0 6px; }
 
-  /* --- wrap-mobile: stable full screen (WeChat + browser) --- */
   .wrap-mobile{
     min-height: 100dvh;
     display:flex;
@@ -601,7 +515,6 @@ textarea{
     .wrap-mobile{ min-height: 100vh; }
   }
 
-  /* --- IO Tabs --- */
   .io-tabs{
     display:flex;
     gap:8px;
@@ -616,7 +529,6 @@ textarea{
     justify-content:center;
   }
 
-  /* active tab style */
   #tab-in:checked ~ .io-tabs label[for="tab-in"],
   #tab-out:checked ~ .io-tabs label[for="tab-out"]{
     background: rgba(43,144,255,.20);
@@ -624,31 +536,27 @@ textarea{
     color: rgba(255,255,255,.92);
   }
 
-  /* --- Mobile main container (single column) --- */
   .grid-mobile-one{
     flex: 1 1 auto;
     display:flex;
     flex-direction:column;
-    min-height:0; /* KEY */
+    min-height:0;
   }
 
-  /* show exactly one panel */
   .io-panel{ display:none; }
   #tab-in:checked ~ .grid-mobile-one .io-in{ display:flex; }
   #tab-out:checked ~ .grid-mobile-one .io-out{ display:flex; }
 
-  /* --- Panel as vertical layout that fills remaining height --- */
   .io-panel{
     flex: 1 1 auto;
     flex-direction:column;
-    min-height:0; /* KEY */
+    min-height:0;
   }
   .io-panel.card-col{ min-height:0 !important; }
 
-  /* outbox takes remaining space, textarea/output scroll inside */
   .io-panel .outbox{
     flex:1 1 auto;
-    min-height:0; /* KEY */
+    min-height:0;
     display:flex;
     flex-direction:column;
   }
@@ -659,7 +567,6 @@ textarea{
     flex-direction:column;
   }
 
-  /* textarea fills outbox; internal scroll */
   .io-panel textarea{
     flex:1 1 auto;
     height:auto !important;
@@ -669,7 +576,6 @@ textarea{
     padding:10px;
   }
 
-  /* output fills outbox; internal scroll */
   .io-panel .output{
     flex:1 1 auto;
     height:auto !important;
@@ -679,13 +585,11 @@ textarea{
     padding:10px;
   }
 
-  /* tighten font slightly for density (doesn't change style) */
   textarea, .output, .input-overlay{
     font-size: 11.5px;
     line-height: 1.5;
   }
 
-  /* --- filebar: Upload left, filename middle, Clear right --- */
   .filebar{ gap:8px; }
   #pdfName.filename{
     text-align:center;
@@ -697,85 +601,17 @@ textarea{
   }
   #btnClear{ margin-left:auto; }
 
-  /* --- money row: keep select compact + Filter stays inside right --- */
-  #leftControlBar.controlbar{
-    flex-direction:row;
-    align-items:center;
-    justify-content:space-between;
-    flex-wrap:nowrap;
-    gap:10px;
-  }
-  #leftControlBar .moneyctl{ flex:0 1 auto; min-width:0; gap:8px; }
-  #leftControlBar .moneyctl select{
-    width:108px;
-    max-width:108px;
-    padding:7px 10px;
-  }
-  #leftControlBar .ctl-actions{
-    flex:0 0 auto;
-    display:flex;
-    gap:8px;
-    justify-content:flex-end;
-  }
-  #btnGenerate{
-    width:120px;
-    max-width:120px;
-    white-space:nowrap;
-  }
+  .top-actions{ gap:10px; }
+  .top-actions .btn{ flex:1 1 0; min-width:0; }
 
-  /* --- output top actions: two buttons share row (if two) --- */
-  .top-actions{
-    gap:10px;
-  }
-  .top-actions .btn{
-    flex:1 1 0;
-    min-width:0;
-  }
-
-  /* --- hide text export on mobile (keep Copy as main) --- */
   #btnExportText{ display:none !important; }
 
-  /* --- Mutual exclusive bottom panels + equal width buttons --- */
-  .card-panels{
-    margin-top:10px;
-    padding:10px;
-    flex:0 0 auto;
-  }
-
-  .panel-actions{
-    display:flex;
-    gap:10px;
-    flex-wrap:nowrap;
-    align-items:center;
-  }
-
-  /* ✅ bottom 3 buttons: same size, evenly distributed */
-  .panel-actions .btn{
-    flex:1 1 0;
-    min-width:0;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
-
-  .panel-body{ display:none; margin-top:10px; }
-  #panel-risk:checked ~ .card-panels #riskDetails{ display:block; }
-  #panel-achv:checked ~ .card-panels #achvDetails{ display:block; }
-
-  /* footer stays under the bottom buttons */
   .mobile-footer{
     margin-top:10px;
     padding-top:8px;
     flex:0 0 auto;
   }
-  .mobile-footer .links{
-    margin-top:6px;
-    display:flex;
-    gap:12px;
-    flex-wrap:wrap;
-  }
 
-  /* --- prevent any horizontal runaway --- */
   .grid, .card, .card-col, .filebar, .top-actions, .controlbar, .filename{ min-width:0; }
   textarea, .output{
     width:100%;
@@ -785,20 +621,7 @@ textarea{
   }
 }
 
-/* =========================
-   Mutual-exclusive panels (desktop too)
-   ========================= */
-.card-panels{ margin-top:14px; padding:12px; }
-.panel-actions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-.panel-body{ display:none; margin-top:10px; }
-#panel-risk:checked ~ .card-panels #riskDetails{ display:block; }
-#panel-achv:checked ~ .card-panels #achvDetails{ display:block; }
-
-/* =========================
-   FORCE: m.html output never grows (no media query, wrap-mobile scoped)
-   ========================= */
-
-/* 1) 固定 m.html 的主容器高度，让子区域必须在内部滚动而不是撑页面 */
+/* FORCE: wrap-mobile does not grow */
 .wrap-mobile{
   height: 100dvh;
   overflow: hidden;
@@ -806,26 +629,14 @@ textarea{
 @supports not (height: 1dvh){
   .wrap-mobile{ height: 100vh; }
 }
-
-/* 2) 主内容区可伸缩，但允许内部滚动（关键：min-height:0） */
-.wrap-mobile .grid-mobile-one{
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-/* 3) IO 面板链路全部允许“被压缩” */
-.wrap-mobile .io-panel{
-  flex: 1 1 auto;
-  min-height: 0;
-}
+.wrap-mobile .grid-mobile-one{ flex: 1 1 auto; min-height: 0; }
+.wrap-mobile .io-panel{ flex: 1 1 auto; min-height: 0; }
 .wrap-mobile .io-panel .outbox{
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
-
-/* 4) ✅ 输出框：永远在 outbox 内部滚动，不再撑高卡片 */
 .wrap-mobile .io-panel .output{
   flex: 1 1 auto;
   min-height: 0 !important;
@@ -833,8 +644,6 @@ textarea{
   max-height: none !important;
   overflow: auto !important;
 }
-
-/* 同理：输入框 */
 .wrap-mobile .io-panel textarea{
   flex: 1 1 auto;
   min-height: 0 !important;
@@ -842,4 +651,3 @@ textarea{
   max-height: none !important;
   overflow: auto !important;
 }
-
