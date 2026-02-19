@@ -1,4 +1,3 @@
-<!-- index.html (simplified, no duplicate IDs, DOM Contract preserved) -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -8,47 +7,16 @@
   <meta name="robots" content="noindex" />
   <link rel="stylesheet" href="./assets/styles.css" />
 
-  <!-- ✅ Mobile auto-route: keep same URL entry, redirect early to avoid layout flash -->
   <script>
   (function () {
     try {
       var isSmallScreen = window.matchMedia && window.matchMedia("(max-width: 560px)").matches;
-
-      // Only redirect from index -> m.html (avoid loops)
       if (isSmallScreen && !/m\.html(?:$|\?)/.test(location.pathname + location.search)) {
         location.replace("m.html");
       }
-    } catch (e) {
-      // fail-open: if anything goes wrong, stay on index.html
-    }
+    } catch (e) {}
   })();
   </script>
-
-  <!-- ✅ Minimal styling for manual name list input (safe; doesn't fight main CSS) -->
-  <style>
-    .namectl{
-      flex: 1 1 auto;
-      min-width: 0;
-      display:flex;
-      align-items:center;
-    }
-    #nameList{
-      width: 100%;
-      min-width: 0;
-      resize: none;
-      padding: 8px 10px;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.06);
-      color: rgba(255,255,255,.92);
-      line-height: 1.35;
-      font-size: 13px;
-      outline: none;
-    }
-    #nameList::placeholder{
-      color: rgba(255,255,255,.45);
-    }
-  </style>
 </head>
 
 <body>
@@ -81,7 +49,6 @@
 
         <div class="barcard barcard-top">
           <div class="filebar filebar-flat">
-            <!-- Desktop can accept pdf + image; capture=none is harmless -->
             <input id="pdfFile" type="file" accept="application/pdf,image/*" capture="none" />
             <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn"></label>
             <div class="filename" id="pdfName" aria-hidden="true"></div>
@@ -97,15 +64,8 @@
         </div>
 
         <div class="controlbar controlbar-eq" id="leftControlBar">
-          <!-- ✅ Replace money selector with manual name list input -->
-          <div class="namectl">
-            <textarea
-              id="nameList"
-              rows="2"
-              spellcheck="false"
-              placeholder="姓名（可选）：每行一个 / 用逗号分隔；例如：张三, Li Ming"
-            ></textarea>
-          </div>
+          <!-- ✅ Money: keep hidden default (app.js still expects #moneyMode) -->
+          <input type="hidden" id="moneyMode" value="m2" />
 
           <div class="ctl-actions">
             <button class="btn primary btn-s" id="btnGenerate"></button>
@@ -113,10 +73,21 @@
           </div>
         </div>
 
-        <details class="fold fold-eq" id="riskDetails">
-          <summary class="fold-sum" id="ui-risk-title"></summary>
+        <!-- ✅ Manual terms fold (same size/spec as risk fold) -->
+        <details class="fold fold-eq" id="manualDetails">
+          <summary class="fold-sum" id="ui-manual-terms-title">补充遮盖</summary>
           <div class="fold-body">
-            <div class="risk" id="riskBox"></div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <div class="tiny muted" id="ui-manual-terms-hint">输入人名/公司名（逗号分隔）。只遮盖 PDF 原文中真实出现的内容。</div>
+              <input id="manualTerms" type="text" placeholder="例如：张三, 李四, Bei.de Tech GmbH" autocomplete="off" />
+
+              <!-- ✅ Links moved here -->
+              <div class="links">
+                <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
+                <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
+                <a id="linkScope" href="./docs/mvp-scope.md" target="_blank"></a>
+              </div>
+            </div>
           </div>
         </details>
 
@@ -166,28 +137,13 @@
           </div>
         </div>
 
-        <details class="fold fold-eq" id="achvDetails">
-          <summary class="fold-sum" id="ui-share-title"></summary>
+        <!-- ✅ Risk moved here (achievement removed) -->
+        <details class="fold fold-eq" id="riskDetails">
+          <summary class="fold-sum" id="ui-risk-title"></summary>
           <div class="fold-body">
-            <div class="achv-preview">
-              <div class="achv-previewbox">
-                <img id="shareAutoImg" alt="achievement preview" />
-                <div class="achv-placeholder" id="ui-achv-placeholder"></div>
-              </div>
-
-              <div class="achv-right">
-                <button class="btn primary btn-fixed btn-s" id="btnShareDownload"></button>
-                <div class="achv-sub" id="ui-share-sub"></div>
-              </div>
-            </div>
+            <div class="risk" id="riskBox"></div>
           </div>
         </details>
-
-        <div class="bottom-fixed links">
-          <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
-          <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
-          <a id="linkScope" href="./docs/mvp-scope.md" target="_blank"></a>
-        </div>
       </section>
     </div>
   </div>
@@ -199,8 +155,7 @@
   <script src="./assets/pdf.js" defer></script>
   <script src="./assets/raster-export.js" defer></script>
   <script src="./assets/redact-ui.js" defer></script>
-  <!-- ✅ cache-bust -->
-  <script src="./assets/app.js?v=20260219a" defer></script>
-  <script src="./assets/share.js" defer></script>
+  <script src="./assets/app.js" defer></script>
+  <!-- ✅ share.js removed (achievement deleted) -->
 </body>
 </html>
