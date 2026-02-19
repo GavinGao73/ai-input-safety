@@ -225,6 +225,27 @@ textarea{
   min-width:0;
 }
 
+/* ✅ Manual terms input/textarea sizing (more space) */
+input#manualTerms{
+  height:42px;
+  background:var(--box-bg);
+  border:1px solid var(--box-bd);
+  border-radius:12px;
+  color:rgba(255,255,255,.92);
+  padding:10px 12px;
+}
+textarea#manualTerms{
+  width:100%;
+  min-height:120px;
+  max-height:220px;
+  resize:vertical;
+  background:var(--box-bg);
+  border:1px solid var(--box-bd);
+  border-radius:12px;
+  color:rgba(255,255,255,.92);
+  padding:12px;
+}
+
 /* highlights */
 .hl{
   background: rgba(255, 92, 92, 0.14);
@@ -301,7 +322,7 @@ textarea{
 .fold summary::-webkit-details-marker{ display:none; }
 .fold-body{
   padding:14px 12px 12px;
-  max-height: 260px;
+  max-height: 340px; /* ✅ more room for Manual terms */
   overflow:auto;
 }
 
@@ -370,6 +391,14 @@ textarea{
 #ui-foot{
   font-size:12px;
   line-height:1.45;
+}
+
+/* ✅ When footnote is placed under Risk in RIGHT card */
+#rightCard #ui-foot{
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px solid var(--panel-bd);
+  color: rgba(120,255,240,.80);
 }
 
 /* =========================
@@ -651,3 +680,4 @@ textarea{
   max-height: none !important;
   overflow: auto !important;
 }
+
