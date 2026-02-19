@@ -470,10 +470,11 @@ function renderRiskBox(report, meta) {
 
 /* ================= Stage 3 UI texts (fallback-safe) ================= */
 function stage3Text(key){
+  // ✅ keep labels short on mobile to avoid wrapping
   const map = {
     zh: { btnExportText: "导出文本", btnExportPdf: "红删PDF", btnManual: "人工处理" },
-    de: { btnExportText: "Text", btnExportPdf: "Raster-PDF", btnManual: "Manuell" },
-    en: { btnExportText: "Export text", btnExportPdf: "Raster PDF", btnManual: "Manual" }
+    de: { btnExportText: "Text", btnExportPdf: "PDF", btnManual: "Manuell" },
+    en: { btnExportText: "Text", btnExportPdf: "PDF", btnManual: "Manual" }
   };
   const m = map[currentLang] || map.zh;
   return m[key] || "";
@@ -511,6 +512,19 @@ function setText() {
   if ($("ui-share-title")) $("ui-share-title").textContent = t.shareTitle;
   if ($("ui-share-sub")) $("ui-share-sub").textContent = t.shareSub;
   if ($("ui-achv-placeholder")) $("ui-achv-placeholder").textContent = t.achvPlaceholder;
+
+  // ✅ NEW: m.html tabs + panel close (fallback-safe)
+  // Prefer i18n keys if you add them later: tabIn/tabOut/panelClose
+  const tabFallback = {
+    zh: { in: "输入", out: "输出", close: "关闭" },
+    en: { in: "Input", out: "Output", close: "Close" },
+    de: { in: "Eingabe", out: "Ausgabe", close: "Schließen" }
+  };
+  const fb = tabFallback[currentLang] || tabFallback.zh;
+
+  if ($("ui-tab-in")) $("ui-tab-in").textContent = (t.tabIn || fb.in);
+  if ($("ui-tab-out")) $("ui-tab-out").textContent = (t.tabOut || fb.out);
+  if ($("ui-panel-close")) $("ui-panel-close").textContent = (t.panelClose || fb.close);
 
   const label = $("ui-money-label");
   const sel = $("moneyMode");
@@ -1002,4 +1016,3 @@ initEnabled();
 setText();
 bind();
 updateInputWatermarkVisibility();
-
