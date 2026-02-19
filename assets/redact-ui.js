@@ -76,7 +76,7 @@
 
       <div class="rui-body" style="flex:1; display:flex; flex-direction:column; gap:10px; padding:10px 14px;">
         <div class="rui-canvas-wrap" style="flex:1; display:flex; justify-content:center; align-items:center; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.10); border-radius:14px; overflow:hidden;">
-          <canvas class="rui-canvas" style="max-width:100%; max-height:100%;"></canvas>
+          <canvas class="rui-canvas" style="max-width:100%; max-height:100%; touch-action:none;"></canvas>
         </div>
 
         <div class="rui-bar" style="display:flex; align-items:center; gap:10px;">
@@ -139,12 +139,11 @@
     if (fileKind === "image") {
       pages = await window.RasterExport.renderImageToCanvas(file, DPI);
     } else {
-      // pdf
       const rendered = await window.RasterExport.renderPdfToCanvases(file, DPI);
       pages = rendered.pages;
     }
 
-    const rectsByPage = {}; // { [pageNumber]: [{x,y,w,h}] }
+    const rectsByPage = {};
     pages.forEach(p => { rectsByPage[p.pageNumber] = rectsByPage[p.pageNumber] || []; });
 
     let idx = 0;
@@ -156,13 +155,16 @@
       const p = pages[idx];
       const rects = rectsByPage[p.pageNumber] || [];
       drawPreview(p.canvas, overlayCanvas, rects);
+
       canvas.width = overlayCanvas.width;
       canvas.height = overlayCanvas.height;
       canvas.getContext("2d").drawImage(overlayCanvas, 0, 0);
 
       if (pageLabel) pageLabel.textContent = L.page(idx + 1, pages.length);
-      btnPrev.disabled = idx <= 0;
-      btnNext.disabled = idx >= pages.length - 1;
+
+      const multi = pages.length > 1;
+      btnPrev.disabled = !multi || idx <= 0;
+      btnNext.disabled = !multi || idx >= pages.length - 1;
       btnPrev.style.opacity = btnPrev.disabled ? 0.4 : 1;
       btnNext.style.opacity = btnNext.disabled ? 0.4 : 1;
     }
@@ -170,6 +172,7 @@
     // Drawing logic
     let isDown = false;
     let sx = 0, sy = 0;
+    let activePointerId = null;
 
     function getPos(ev) {
       const rect = canvas.getBoundingClientRect();
@@ -179,13 +182,23 @@
     }
 
     function onDown(ev) {
+      try { ev.preventDefault(); } catch (_) {}
       isDown = true;
+      activePointerId = ev.pointerId;
+
+      // ✅ critical: keep receiving move/up even if pointer leaves canvas
+      try { canvas.setPointerCapture(ev.pointerId); } catch (_) {}
+
       const p = getPos(ev);
       sx = p.x; sy = p.y;
     }
 
     function onMove(ev) {
       if (!isDown) return;
+      if (activePointerId != null && ev.pointerId !== activePointerId) return;
+
+      try { ev.preventDefault(); } catch (_) {}
+
       const p = getPos(ev);
       const x = Math.min(sx, p.x);
       const y = Math.min(sy, p.y);
@@ -194,20 +207,29 @@
 
       const page = pages[idx];
       const rects = rectsByPage[page.pageNumber] || [];
-      // preview with a temp rect
       const tmp = rects.concat([{ x, y, w, h }]);
       drawPreview(page.canvas, overlayCanvas, tmp);
       canvas.getContext("2d").drawImage(overlayCanvas, 0, 0);
     }
 
-    function onUp(ev) {
+    function finishUp(ev) {
       if (!isDown) return;
+      if (activePointerId != null && ev && ev.pointerId != null && ev.pointerId !== activePointerId) return;
+
+      try { if (ev) ev.preventDefault(); } catch (_) {}
+
       isDown = false;
-      const p = getPos(ev);
+
+      // ✅ release capture
+      try { if (activePointerId != null) canvas.releasePointerCapture(activePointerId); } catch (_) {}
+
+      const p = ev ? getPos(ev) : { x: sx, y: sy };
       const x = Math.min(sx, p.x);
       const y = Math.min(sy, p.y);
       const w = Math.abs(p.x - sx);
       const h = Math.abs(p.y - sy);
+
+      activePointerId = null;
 
       if (w < 6 || h < 6) { updatePageUI(); return; }
 
@@ -221,10 +243,21 @@
       updatePageUI();
     }
 
+    function onUp(ev) { finishUp(ev); }
+
+    function onCancel(ev) { finishUp(ev); }
+
+    function onLeave() {
+      // ✅ if we somehow didn't get pointerup, reset cleanly
+      if (!isDown) return;
+      finishUp(null);
+    }
+
     canvas.addEventListener("pointerdown", onDown);
     canvas.addEventListener("pointermove", onMove);
     canvas.addEventListener("pointerup", onUp);
-    canvas.addEventListener("pointercancel", onUp);
+    canvas.addEventListener("pointercancel", onCancel);
+    canvas.addEventListener("pointerleave", onLeave);
 
     btnPrev.onclick = () => { if (idx > 0) { idx--; updatePageUI(); } };
     btnNext.onclick = () => { if (idx < pages.length - 1) { idx++; updatePageUI(); } };
@@ -248,17 +281,16 @@
         canvas.removeEventListener("pointerdown", onDown);
         canvas.removeEventListener("pointermove", onMove);
         canvas.removeEventListener("pointerup", onUp);
-        canvas.removeEventListener("pointercancel", onUp);
+        canvas.removeEventListener("pointercancel", onCancel);
+        canvas.removeEventListener("pointerleave", onLeave);
       } catch (_) {}
       ui.remove();
     }
 
     btnCancel.onclick = () => close();
 
-    // done() contract
     const session = {
       async done() {
-        // return data for RasterExport (no export here to keep layering clean)
         return {
           pages: pages.map(p => ({
             pageNumber: p.pageNumber,
@@ -277,7 +309,6 @@
 
     btnExport.onclick = async () => {
       const res = await session.done();
-      // Delegate actual export to RasterExport
       await window.RasterExport.exportRasterSecurePdfFromVisual(res);
       close();
     };
