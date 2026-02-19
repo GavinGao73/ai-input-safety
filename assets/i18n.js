@@ -12,23 +12,12 @@ const I18N = {
 
     btnUpload: "上传文件",
 
-    moneyLabel: "金额：",
-    moneyOff: "关闭",
-    moneyM1: "M1",
-    moneyM2: "M2",
-
     btnGenerate: "过滤",
     btnCopy: "复制",
     btnCopied: "✔ 已复制",
     btnClear: "清空",
 
     riskTitle: "风险评分",
-
-    shareTitle: "过滤成就",
-    shareSub: "不含原文\n仅展示\n过滤数据\n与\n隐私声明\n仅用于\n对作者的\n支持与鼓励",
-    achvPlaceholder: "生成后显示预览",
-
-    btnDownload: "下载",
 
     fbQ: "有帮助吗？",
 
@@ -42,13 +31,13 @@ const I18N = {
     tabIn: "输入",
     tabOut: "输出",
 
-    // ✅ Bottom panel buttons (short, mobile-friendly)
-    panelRisk: "风险",
-    panelAchv: "成就",
-    panelClose: "关闭",
-
     // ✅ Output action (PDF)
-    btnRedactPdf: "红删PDF"
+    btnRedactPdf: "红删PDF",
+
+    // ✅ Manual terms card
+    manualTitle: "手工输入",
+    manualHint: "支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。",
+    manualPlaceholder: "例如：张三, 李四, Bei.de Tech GmbH"
   },
 
   en: {
@@ -61,24 +50,12 @@ const I18N = {
 
     btnUpload: "Upload",
 
-    moneyLabel: "Money:",
-    moneyOff: "Off",
-    moneyM1: "M1",
-    moneyM2: "M2",
-
     btnGenerate: "Filter",
     btnCopy: "Copy",
     btnCopied: "✔ Copied",
     btnClear: "Clear",
 
     riskTitle: "Risk score",
-
-    shareTitle: "Achievement",
-    shareSub:
-      "No original text.\nOnly\nlocal filter stats\nand\na privacy notice.\nFor support\n& encouragement\nonly.",
-    achvPlaceholder: "Preview appears after filtering",
-
-    btnDownload: "Download",
 
     fbQ: "Helpful?",
 
@@ -88,17 +65,14 @@ const I18N = {
 
     foot: "Filtering and edits are suggestions only. No legal commitment.",
 
-    // ✅ Mobile tabs
     tabIn: "Input",
     tabOut: "Output",
 
-    // ✅ Bottom panel buttons (short, mobile-friendly)
-    panelRisk: "Risk",
-    panelAchv: "Badge",
-    panelClose: "Close",
+    btnRedactPdf: "PDF",
 
-    // ✅ Output action (PDF)
-    btnRedactPdf: "PDF"
+    manualTitle: "Manual input",
+    manualHint: "Separate by commas/new lines. Only masks terms that actually appear in the PDF text.",
+    manualPlaceholder: "e.g. Alice, Bob, Bei.de Tech GmbH"
   },
 
   de: {
@@ -111,24 +85,12 @@ const I18N = {
 
     btnUpload: "Upload",
 
-    moneyLabel: "Betrag:",
-    moneyOff: "Aus",
-    moneyM1: "M1",
-    moneyM2: "M2",
-
     btnGenerate: "Filtern",
     btnCopy: "Kopieren",
     btnCopied: "✔ Kopiert",
     btnClear: "Leeren",
 
     riskTitle: "Risikowert",
-
-    shareTitle: "Ergebnis",
-    shareSub:
-      "Kein Originaltext.\nNur\nlokale Statistik\nund\nDatenschutzhinweis.\nNur zur\nUnterstützung\nund Ermutigung.",
-    achvPlaceholder: "Vorschau nach dem Filtern",
-
-    btnDownload: "Download",
 
     fbQ: "Hilfreich?",
 
@@ -138,17 +100,14 @@ const I18N = {
 
     foot: "Filterung und Änderungen sind nur Vorschläge. Keine rechtliche Zusage.",
 
-    // ✅ Mobile tabs
     tabIn: "Eingabe",
     tabOut: "Ausgabe",
 
-    // ✅ Bottom panel buttons (short, mobile-friendly)
-    panelRisk: "Risiko",
-    panelAchv: "Erfolg",
-    panelClose: "Zu",
+    btnRedactPdf: "PDF",
 
-    // ✅ Output action (PDF)
-    btnRedactPdf: "PDF"
+    manualTitle: "Manuelle Eingabe",
+    manualHint: "Trennung per Komma/Zeilenumbruch. Es wird nur maskiert, was im PDF-Text wirklich vorkommt.",
+    manualPlaceholder: "z.B. Max Mustermann, Erika, Bei.de Tech GmbH"
   }
 };
 
