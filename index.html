@@ -63,34 +63,49 @@
           </div>
         </div>
 
-        <!-- ✅ Manual input card (same spec as risk fold) -->
-        <details class="fold fold-eq" id="manualDetails">
-          <summary class="fold-sum manual-sum" id="ui-manual-terms-sum">
-            <span class="manual-sum-title" id="ui-manual-terms-title">手工输入</span>
-            <span class="manual-sum-right">
-              <button class="btn primary btn-s" id="btnGenerate" type="button"></button>
+        <!-- ===== Bottom layout (matches sketch) ===== -->
+        <div class="io-bottom-grid io-bottom-grid-left" aria-label="Manual input area">
+          <!-- Left: Manual input (expandable) -->
+          <details class="fold fold-tight" id="manualDetails">
+            <summary class="fold-sum manual-sum" id="ui-manual-terms-sum">
+              <span class="manual-sum-title" id="ui-manual-terms-title">手工输入</span>
               <span class="tiny muted manual-sum-hint" id="ui-manual-terms-hint"></span>
-            </span>
-          </summary>
+            </summary>
 
-          <div class="fold-body">
-            <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="fold-body manual-body">
+              <!-- ✅ Change to textarea to give real space (id kept as manualTerms for app.js compatibility) -->
               <textarea
                 id="manualTerms"
-                class="manual-terms-input"
-                placeholder="例如：张三, 李四, Bei.de Tech GmbH"
-                autocomplete="off"
+                class="manual-terms-textarea"
                 spellcheck="false"
+                autocomplete="off"
+                placeholder="例如：张三, 李四, Bei.de Tech GmbH"
               ></textarea>
+            </div>
+          </details>
 
-              <div class="links">
-                <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
-                <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
-                <a id="linkScope" href="./docs/mvp-scope.md" target="_blank"></a>
-              </div>
+          <!-- Right: button + tip rail -->
+          <div class="side-rail side-rail-left">
+            <button class="btn primary btn-s btn-fixed" id="btnGenerate" type="button"></button>
+
+            <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
+              支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。
+            </div>
+
+            <div class="side-rail-actions">
+              <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
             </div>
           </div>
-        </details>
+        </div>
+
+        <!-- ✅ Left bottom links (always visible) -->
+        <div class="left-footer">
+          <div class="links">
+            <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
+            <a id="linkPrivacy" href="./PRIVACY.md" target="_blank" rel="noopener"></a>
+            <a id="linkScope" href="./docs/mvp-scope.md" target="_blank" rel="noopener"></a>
+          </div>
+        </div>
       </section>
 
       <!-- MIDDLE -->
@@ -128,24 +143,31 @@
           <div class="output output-scroll" id="outputText"></div>
         </div>
 
-        <div class="controlbar controlbar-eq" id="rightFeedbackBar">
-          <div class="feedback feedback-inline feedback-right">
+        <!-- ===== Bottom layout (matches sketch) ===== -->
+        <div class="io-bottom-grid io-bottom-grid-right" aria-label="Risk and feedback area">
+          <!-- Left: Risk (expandable) -->
+          <details class="fold fold-tight" id="riskDetails" open>
+            <summary class="fold-sum" id="ui-risk-title"></summary>
+            <div class="fold-body risk-body">
+              <div class="risk" id="riskBox"></div>
+            </div>
+          </details>
+
+          <!-- Right: Feedback rail -->
+          <div class="side-rail side-rail-right">
             <div class="fbq" id="ui-fb-q"></div>
-            <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
-            <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
+
+            <div class="fb-buttons">
+              <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
+              <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
+            </div>
           </div>
         </div>
 
-        <!-- ✅ Risk moved here (achievement removed) -->
-        <details class="fold fold-eq" id="riskDetails">
-          <summary class="fold-sum" id="ui-risk-title"></summary>
-          <div class="fold-body">
-            <div class="risk" id="riskBox"></div>
-          </div>
-        </details>
-
-        <!-- ✅ Footnote moved under Risk -->
-        <div class="right-foot tiny footnote accent-link" id="ui-foot"></div>
+        <!-- ✅ Right bottom disclaimer (always at bottom, folded/open both visible) -->
+        <div class="right-footer">
+          <div class="tiny footnote accent-link" id="ui-foot"></div>
+        </div>
       </section>
     </div>
   </div>
