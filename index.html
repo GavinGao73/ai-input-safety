@@ -1,8 +1,10 @@
 <!-- =========================
-     index.html (FULL) — btnGenerate removed (auto filtering)
-     Modified:
-     - Remove btnExportText button (duplicate with Copy)
-     - Bottom details default collapsed (manualDetails + riskDetails)
+     index.html (FULL) — STRUCTURE REFACTOR (Control Panel in middle)
+     Key changes:
+     - Layout becomes: INPUT -> CONTROL PANEL -> OUTPUT (vertical stack)
+     - Manual + Risk moved into unified Control Panel (3:1 dual pane)
+     - Default: both panes collapsed (only 2 toggle rows visible)
+     - Keep all critical ids for app.js compatibility
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -48,9 +50,13 @@
       </div>
     </header>
 
-    <div class="grid">
-      <!-- LEFT: INPUT -->
-      <section class="card card-col" id="leftCard">
+    <!-- =========================
+         NEW: IO vertical stack
+         INPUT -> CONTROL PANEL -> OUTPUT
+         ========================= -->
+    <main class="io-stack" id="ioStack">
+      <!-- ================= INPUT ================= -->
+      <section class="card card-col io-zone io-input" id="leftCard">
         <h3 id="ui-in-title"></h3>
 
         <div class="barcard barcard-top">
@@ -69,40 +75,7 @@
           </div>
         </div>
 
-        <!-- ===== Bottom layout (matches sketch) ===== -->
-        <div class="io-bottom-grid io-bottom-grid-left" aria-label="Manual input area">
-          <!-- Left: Manual input (expandable) -->
-          <details class="fold fold-tight" id="manualDetails">
-            <summary class="fold-sum manual-sum" id="ui-manual-terms-sum">
-              <span class="manual-sum-title" id="ui-manual-terms-title">手工输入</span>
-              <span class="tiny muted manual-sum-hint" id="ui-manual-terms-hint"></span>
-            </summary>
-
-            <div class="fold-body manual-body">
-              <!-- ✅ Change to textarea to give real space (id kept as manualTerms for app.js compatibility) -->
-              <textarea
-                id="manualTerms"
-                class="manual-terms-textarea"
-                spellcheck="false"
-                autocomplete="off"
-                placeholder="例如：张三, 李四, Bei.de Tech GmbH"
-              ></textarea>
-            </div>
-          </details>
-
-          <!-- Right: tip rail (no Filter button) -->
-          <div class="side-rail side-rail-left">
-            <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
-              支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。
-            </div>
-
-            <div class="side-rail-actions">
-              <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ✅ Left bottom links (always visible) -->
+        <!-- ✅ Links stay with input zone (always visible) -->
         <div class="left-footer">
           <div class="links">
             <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
@@ -112,31 +85,73 @@
         </div>
       </section>
 
-      <!-- MIDDLE -->
-      <div class="mid-filter" aria-hidden="true">
-        <div class="flow-line"></div>
+      <!-- ================= CONTROL PANEL (NEW) ================= -->
+      <section class="card card-col control-panel" id="controlPanel" data-open="">
+        <!-- Top: ONLY two clickable titles (toggles) -->
+        <div class="cp-toggles" aria-label="Control Panel Toggles">
+          <button class="cp-toggle" type="button" data-toggle="manual" aria-expanded="false">
+            <span class="cp-toggle-title" id="ui-manual-terms-title">手工输入</span>
+            <span class="tiny muted cp-toggle-hint" id="ui-manual-terms-hint"></span>
+          </button>
 
-        <div class="filter-badge filter-badge-plain">
-          <img
-            src="./assets/logo-filter-icon.png"
-            class="filter-icon-mid"
-            alt="Filter"
-            loading="eager"
-            decoding="async"
-          />
+          <button class="cp-toggle" type="button" data-toggle="risk" aria-expanded="false">
+            <span class="cp-toggle-title" id="ui-risk-title"></span>
+          </button>
         </div>
 
-        <div class="flow-line"></div>
-        <div class="mid-title" id="ui-mid-title">Filter</div>
-      </div>
+        <!-- Body: fixed inner layout, 3:1 (left wide, right narrow) -->
+        <div class="cp-body" aria-label="Control Panel Body">
+          <div class="cp-grid">
+            <!-- LEFT 3 -->
+            <div class="cp-left">
+              <!-- MANUAL (left) -->
+              <div class="cp-pane cp-manual" data-pane="manual" aria-hidden="true">
+                <textarea
+                  id="manualTerms"
+                  class="manual-terms-textarea"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="例如：张三, 李四, Bei.de Tech GmbH"
+                ></textarea>
 
-      <!-- RIGHT: OUTPUT -->
-      <section class="card card-col right" id="rightCard">
+                <!-- keep legacy manual button id for compatibility (still hidden if you want) -->
+                <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
+              </div>
+
+              <!-- RISK (left) -->
+              <div class="cp-pane cp-risk" data-pane="risk" aria-hidden="true">
+                <div class="risk" id="riskBox"></div>
+              </div>
+            </div>
+
+            <!-- RIGHT 1 -->
+            <div class="cp-right">
+              <!-- MANUAL HELP (right) -->
+              <div class="cp-pane cp-manual-help" data-pane="manual" aria-hidden="true">
+                <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
+                  支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。
+                </div>
+              </div>
+
+              <!-- RISK FEEDBACK (right) -->
+              <div class="cp-pane cp-risk-feedback" data-pane="risk" aria-hidden="true">
+                <div class="fbq" id="ui-fb-q"></div>
+                <div class="fb-buttons">
+                  <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
+                  <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= OUTPUT ================= -->
+      <section class="card card-col right io-zone io-output" id="rightCard">
         <h3 id="ui-out-title"></h3>
 
         <div class="barcard barcard-top">
           <div class="top-actions">
-            <!-- ✅ removed btnExportText -->
             <button class="btn primary btn-s btn-mini" id="btnExportRasterPdf" style="display:none;"></button>
             <button class="btn primary btn-s btn-mini" id="btnCopy"></button>
             <button class="btn secondary btn-s btn-mini" id="btnClear"></button>
@@ -147,33 +162,12 @@
           <div class="output output-scroll" id="outputText"></div>
         </div>
 
-        <!-- ===== Bottom layout (matches sketch) ===== -->
-        <div class="io-bottom-grid io-bottom-grid-right" aria-label="Risk and feedback area">
-          <!-- Left: Risk (expandable) — default collapsed -->
-          <details class="fold fold-tight" id="riskDetails">
-            <summary class="fold-sum" id="ui-risk-title"></summary>
-            <div class="fold-body risk-body">
-              <div class="risk" id="riskBox"></div>
-            </div>
-          </details>
-
-          <!-- Right: Feedback rail -->
-          <div class="side-rail side-rail-right">
-            <div class="fbq" id="ui-fb-q"></div>
-
-            <div class="fb-buttons">
-              <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
-              <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ✅ Right bottom disclaimer (always at bottom) -->
+        <!-- ✅ Disclaimer stays at bottom of output zone -->
         <div class="right-footer">
           <div class="tiny footnote accent-link" id="ui-foot"></div>
         </div>
       </section>
-    </div>
+    </main>
   </div>
 
   <!-- JS（顺序非常重要，不要改） -->
