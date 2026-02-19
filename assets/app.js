@@ -1,16 +1,21 @@
 // assets/app.js
-// ✅ This round (single goal):
-// - Ensure RasterExport enabledKeys includes company + person_name,
-//   so company/person rules actually participate in PDF redaction.
-// - Keep everything else the same (no UI rewiring).
+// ✅ Personal build (2026-02-19)
+// Goals:
+// - NO auto person-name detection: only manual name list OR manual redaction.
+// - Money protection always ON (default M1). Remove money selector UI.
+// - Replace "money" control area with name input UI (handled in HTML).
+// - Image input defaults to Manual redact mode (already true).
 
-console.log("[APP] loaded v20260219a");
+console.log("[APP] loaded v20260219-personal");
 
 let currentLang = "zh";
 window.currentLang = currentLang;
 
 const enabled = new Set();
-let moneyMode = "off"; // off | m1 | m2
+
+// ✅ Money protection always ON (M1). No UI selector.
+let moneyMode = "m1"; // fixed: "m1"
+window.__safe_moneyMode = moneyMode;
 
 let lastOutputPlain = "";
 
@@ -21,21 +26,29 @@ let lastProbe = null;              // { hasTextLayer, text }
 let lastPdfOriginalText = "";      // extracted text for readable PDF
 let lastStage3Mode = "none";       // "A" | "B" | "none"
 
-/* ================= compat helpers (mobile safe) ================= */
-// replaceAll polyfill helper (string token only)
-function repAll(str, needle, repl) {
-  return String(str).split(String(needle)).join(String(repl));
+// ================= Manual name list (NO auto NER) =================
+let nameList = []; // array of strings (user-provided)
+function normalizeName(s){
+  return String(s || "").trim();
 }
+function setNameListFromText(raw){
+  const s = String(raw || "");
+  // split by newlines and common separators
+  const parts = s
+    .split(/[\n\r,，;；、]+/g)
+    .map(normalizeName)
+    .filter(Boolean);
 
-// safe flatten for DETECTION_ITEMS groups
-function forEachDetectionItem(fn) {
-  const groups = window.DETECTION_ITEMS || {};
-  for (const k in groups) {
-    if (!Object.prototype.hasOwnProperty.call(groups, k)) continue;
-    const arr = groups[k];
-    if (!arr || !arr.length) continue;
-    for (let i = 0; i < arr.length; i++) fn(arr[i]);
+  // de-dup while keeping order
+  const seen = new Set();
+  const out = [];
+  for (const p of parts) {
+    const key = p.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(p);
   }
+  nameList = out.slice(0, 24); // hard cap (local perf)
 }
 
 function show(el, yes){
@@ -48,25 +61,19 @@ let lastRunMeta = {
   fromPdf: false,
   inputLen: 0,
   enabledCount: 0,
-  moneyMode: "off",
+  moneyMode: "m1",
   lang: "zh"
 };
 
 function $(id) { return document.getElementById(id); }
 
 function escapeHTML(s){
-  const str = String(s || "");
-  // single-pass escape (no replaceAll dependency)
-  return str.replace(/[&<>"']/g, function(ch){
-    switch (ch) {
-      case "&": return "&amp;";
-      case "<": return "&lt;";
-      case ">": return "&gt;";
-      case '"': return "&quot;";
-      case "'": return "&#039;";
-      default: return ch;
-    }
-  });
+  return String(s || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 /* ================= RULES SAFE ACCESS (CRITICAL) ================= */
@@ -75,20 +82,13 @@ function getRulesSafe() {
   return (r && typeof r === "object") ? r : null;
 }
 
-/* ================= ENABLED KEYS FOR EXPORT (THIS ROUND) ================= */
-// Make export reflect product strategy: include company/person_name.
-// (Even if the UI forgets to enable them.)
+/* ================= ENABLED KEYS FOR EXPORT ================= */
+// Personal: keep strategy simple. We DO NOT force person_name.
 function effectiveEnabledKeys() {
-  const MUST_INCLUDE = ["company", "person_name"];
-  const base = new Set();
-  if (enabled && enabled.forEach) {
-    enabled.forEach(function(v){ base.add(v); });
-  }
-  for (let i = 0; i < MUST_INCLUDE.length; i++) base.add(MUST_INCLUDE[i]);
-  // convert Set -> Array safely
-  const out = [];
-  base.forEach(function(v){ out.push(v); });
-  return out;
+  const MUST_INCLUDE = ["company"]; // optional; remove if you want pure personal
+  const base = new Set(Array.from(enabled || []));
+  for (const k of MUST_INCLUDE) base.add(k);
+  return Array.from(base);
 }
 
 /* ================= placeholders ================= */
@@ -158,6 +158,51 @@ function updateInputWatermarkVisibility(){
   wrap.classList.toggle("has-content", has);
 }
 
+/* ================= Manual name list masking ================= */
+function escapeRegExp(s){
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// heuristic boundaries for Latin names (EN/DE)
+function makeLatinNameRegex(name){
+  const n = escapeRegExp(name);
+  // \b works for latin; keep it simple and case-insensitive
+  return new RegExp(`\\b${n}\\b`, "gi");
+}
+
+// Chinese names: no \b. Use loose punctuation/space boundaries to reduce false hits.
+function makeCjkNameRegex(name){
+  const n = escapeRegExp(name);
+  // boundary: start or non-CJK before; end or non-CJK after
+  // CJK range: \u4E00-\u9FFF (basic)
+  return new RegExp(`(^|[^\\u4E00-\\u9FFF])(${n})(?=$|[^\\u4E00-\\u9FFF])`, "g");
+}
+
+function applyNameListMask(out, addHit){
+  if (!nameList || !nameList.length) return out;
+
+  let s = String(out || "");
+  for (const nm of nameList) {
+    if (!nm) continue;
+
+    const hasCjk = /[\u4E00-\u9FFF]/.test(nm);
+    if (hasCjk) {
+      const re = makeCjkNameRegex(nm);
+      s = s.replace(re, (m, p1, p2) => {
+        if (typeof addHit === "function") addHit("person_name");
+        return `${p1}${placeholder("PERSON")}`;
+      });
+    } else {
+      const re = makeLatinNameRegex(nm);
+      s = s.replace(re, () => {
+        if (typeof addHit === "function") addHit("person_name");
+        return placeholder("PERSON");
+      });
+    }
+  }
+  return s;
+}
+
 /* ================= PDF input overlay highlight (only for PDF) ================= */
 function renderInputOverlayForPdf(originalText){
   const overlay = $("inputOverlay");
@@ -190,16 +235,12 @@ function markHitsInOriginal(text){
   const snap = window.__export_snapshot || null;
   const enabledKeysArr = (snap && Array.isArray(snap.enabledKeys))
     ? snap.enabledKeys
-    : (function(){
-        const arr = [];
-        if (enabled && enabled.forEach) enabled.forEach(function(v){ arr.push(v); });
-        return arr;
-      })();
+    : Array.from(enabled || []);
 
   const enabledSet = new Set(enabledKeysArr);
 
+  // ✅ NO person_name auto highlight here.
   const PRIORITY = [
-    "person_name",
     "company",
     "email",
     "bank",
@@ -213,53 +254,64 @@ function markHitsInOriginal(text){
     "number"
   ];
 
-  for (let i = 0; i < PRIORITY.length; i++) {
-    const key = PRIORITY[i];
+  // highlight manual names too (so user sees what got masked)
+  if (nameList && nameList.length) {
+    for (const nm of nameList) {
+      const hasCjk = /[\u4E00-\u9FFF]/.test(nm);
+      if (hasCjk) {
+        const re = makeCjkNameRegex(nm);
+        s = s.replace(re, (m, p1, p2) => `${p1}${S1}${p2}${S2}`);
+      } else {
+        const re = makeLatinNameRegex(nm);
+        s = s.replace(re, (m) => `${S1}${m}${S2}`);
+      }
+    }
+  }
 
+  for (const key of PRIORITY) {
     if (key !== "money" && !enabledSet.has(key)) continue;
 
     const r = window.RULES_BY_KEY && window.RULES_BY_KEY[key];
     if (!r || !r.pattern) continue;
 
     if (key === "money") {
-      if (moneyMode === "off") continue;
-      s = s.replace(r.pattern, function(m){ return S1 + m + S2; });
+      // money always ON
+      s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
       continue;
     }
 
-    s = s.replace(r.pattern, function(m){ return S1 + m + S2; });
+    s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
   }
 
   const esc = escapeHTML(s);
-  // no replaceAll dependency
-  return repAll(repAll(esc, S1, `<span class="hit">`), S2, `</span>`);
+  return esc
+    .replaceAll(S1, `<span class="hit">`)
+    .replaceAll(S2, `</span>`);
 }
 
-/* ================= Money M2 ================= */
+/* ================= Money M2 helpers (kept, but we use M1 only) ================= */
 function normalizeAmountToNumber(raw) {
   let s = String(raw || "").replace(/\s+/g, "");
-  const hasDot = s.indexOf(".") >= 0;
-  const hasComma = s.indexOf(",") >= 0;
+  const hasDot = s.includes(".");
+  const hasComma = s.includes(",");
 
   if (hasDot && hasComma) {
     const lastDot = s.lastIndexOf(".");
     const lastComma = s.lastIndexOf(",");
     const decSep = lastDot > lastComma ? "." : ",";
     const thouSep = decSep === "." ? "," : ".";
-    s = repAll(s, thouSep, "");
-    // replace only last decimal separator -> easiest: split/join then fix last
-    // but here we can just replace ALL decSep with "." after removing thousands
-    s = repAll(s, decSep, ".");
+    s = s.replaceAll(thouSep, "");
+    s = s.replace(decSep, ".");
   } else if (hasComma && !hasDot) {
     const idx = s.lastIndexOf(",");
     const decimals = s.length - idx - 1;
     if (decimals === 2) s = s.replace(",", ".");
-    else s = repAll(s, ",", "");
+    else s = s.replaceAll(",", "");
   } else {
     if (hasDot) {
       const idx = s.lastIndexOf(".");
       const decimals = s.length - idx - 1;
-      if (decimals !== 2) s = repAll(s, ".", "");
+      if (decimals !== 2) s = s.replaceAll(".", "");
     }
   }
 
@@ -293,8 +345,7 @@ function moneyRangeLabel(currency, amount) {
         [50000, Infinity, "50k+"]
       ];
 
-  for (let i = 0; i < bands.length; i++) {
-    const lo = bands[i][0], hi = bands[i][1], label = bands[i][2];
+  for (const [lo, hi, label] of bands) {
     if (a >= lo && a < hi) return label;
   }
   return placeholder("MONEY");
@@ -312,7 +363,7 @@ function formatCurrencyForM2(currency) {
 /* ================= init enabled ================= */
 function initEnabled() {
   enabled.clear();
-  forEachDetectionItem(function(i){
+  Object.values(window.DETECTION_ITEMS || {}).flat().forEach(i => {
     if (i && i.defaultOn) enabled.add(i.key);
   });
 }
@@ -330,7 +381,7 @@ const RISK_WEIGHTS = {
   number: 2,
   money: 0,
   company: 8,
-  person_name: 10
+  person_name: 10 // manual list hits count here
 };
 
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
@@ -342,10 +393,10 @@ function riskI18n(lang) {
     high: "高风险",
     top: "主要风险来源",
     advice: "建议",
-    adviceLow: "可以继续使用；合同/报价类建议开启金额保护。",
-    adviceMid: "建议检查 Top 项；必要时加严遮盖。",
+    adviceLow: "可以继续使用；金额保护已默认开启。",
+    adviceMid: "建议检查 Top 项；必要时加严遮盖或手工涂抹。",
     adviceHigh: "不建议直接发送：请删除签名落款/账号信息，并加严遮盖后再试。",
-    meta: (m) => `命中 ${m.hits}｜金额 ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜文件" : ""}`
+    meta: (m) => `命中 ${m.hits}｜金额 M1${m.fromPdf ? "｜文件" : ""}`
   };
   const de = {
     low: "Niedrig",
@@ -353,10 +404,10 @@ function riskI18n(lang) {
     high: "Hoch",
     top: "Top-Risiken",
     advice: "Empfehlung",
-    adviceLow: "Kann verwendet werden. Für Angebote/Verträge Betragsschutz aktivieren.",
-    adviceMid: "Top-Risiken prüfen; ggf. stärker maskieren.",
+    adviceLow: "Kann verwendet werden. Betragsschutz ist standardmäßig aktiv.",
+    adviceMid: "Top-Risiken prüfen; ggf. stärker maskieren oder manuell schwärzen.",
     adviceHigh: "Nicht direkt senden: Signatur/Kontodaten entfernen und mehr Maskierung aktivieren.",
-    meta: (m) => `Treffer ${m.hits}｜Betrag ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜Datei" : ""}`
+    meta: (m) => `Treffer ${m.hits}｜Betrag M1${m.fromPdf ? "｜Datei" : ""}`
   };
   const en = {
     low: "Low",
@@ -364,10 +415,10 @@ function riskI18n(lang) {
     high: "High",
     top: "Top risk sources",
     advice: "Advice",
-    adviceLow: "Ok to use. For quotes/contracts, enable money protection.",
-    adviceMid: "Review top risks; consider stronger masking.",
+    adviceLow: "Ok to use. Money protection is on by default.",
+    adviceMid: "Review top risks; consider stronger masking or manual redaction.",
     adviceHigh: "Do not send as-is: remove signature/account details and mask more.",
-    meta: (m) => `Hits ${m.hits}｜Money ${String(m.moneyMode || "").toUpperCase()}${m.fromPdf ? "｜File" : ""}`
+    meta: (m) => `Hits ${m.hits}｜Money M1${m.fromPdf ? "｜File" : ""}`
   };
   return (lang === "de") ? de : (lang === "en") ? en : zh;
 }
@@ -386,7 +437,7 @@ function labelForKey(k) {
       number: "数字",
       money: "金额",
       company: "公司",
-      person_name: "姓名"
+      person_name: "姓名（名单）"
     },
     de: {
       bank: "Bank/Payment",
@@ -400,7 +451,7 @@ function labelForKey(k) {
       number: "Zahl",
       money: "Betrag",
       company: "Firma",
-      person_name: "Name"
+      person_name: "Name (Liste)"
     },
     en: {
       bank: "Bank/Payment",
@@ -414,7 +465,7 @@ function labelForKey(k) {
       number: "Numbers",
       money: "Money",
       company: "Company",
-      person_name: "Name"
+      person_name: "Name (list)"
     }
   };
   const m = map[currentLang] || map.zh;
@@ -424,21 +475,18 @@ function labelForKey(k) {
 function computeRiskReport(hitsByKey, meta) {
   let score = 0;
 
-  for (const k in (hitsByKey || {})) {
-    if (!Object.prototype.hasOwnProperty.call(hitsByKey, k)) continue;
-    const c = hitsByKey[k];
+  for (const [k, c] of Object.entries(hitsByKey || {})) {
     if (!c) continue;
     const w = RISK_WEIGHTS[k] || 0;
     const capped = Math.min(c, 12);
     score += w * capped;
   }
 
-  if (meta.moneyMode === "m1") score += 10;
-  if (meta.moneyMode === "m2") score += 14;
+  // money fixed M1
+  score += 10;
 
   if (meta.inputLen >= 1500) score += 6;
   if (meta.inputLen >= 4000) score += 8;
-
   if (meta.fromPdf) score += 6;
 
   score = clamp(Math.round(score), 0, 100);
@@ -547,11 +595,11 @@ function setText() {
 
   if ($("ui-upload-btn")) $("ui-upload-btn").textContent = t.btnUpload;
 
-  // ✅ Mobile tabs
+  // Mobile tabs
   if ($("ui-tab-in")) $("ui-tab-in").textContent = t.tabIn || "";
   if ($("ui-tab-out")) $("ui-tab-out").textContent = t.tabOut || "";
 
-  // ✅ Risk/Achv labels (mobile uses LABEL, desktop uses SUMMARY)
+  // Risk/Achv buttons
   const riskEl = $("ui-risk-title");
   if (riskEl) {
     const isLabel = (riskEl.tagName && riskEl.tagName.toUpperCase() === "LABEL") || riskEl.hasAttribute("for");
@@ -569,14 +617,10 @@ function setText() {
   if ($("ui-share-sub")) $("ui-share-sub").textContent = t.shareSub;
   if ($("ui-achv-placeholder")) $("ui-achv-placeholder").textContent = t.achvPlaceholder;
 
-  const label = $("ui-money-label");
+  // ✅ Money UI removed in personal build; but keep label safely if exists
+  if ($("ui-money-label")) $("ui-money-label").textContent = ""; // avoid showing old "金额："
   const sel = $("moneyMode");
-  if (label) label.textContent = t.moneyLabel;
-  if (sel && sel.options && sel.options.length >= 3) {
-    sel.options[0].text = t.moneyOff;
-    sel.options[1].text = t.moneyM1;
-    sel.options[2].text = t.moneyM2;
-  }
+  if (sel) sel.style.display = "none"; // if HTML still has it, hide
 
   if ($("btnGenerate")) $("btnGenerate").textContent = t.btnGenerate;
   if ($("btnCopy")) $("btnCopy").textContent = t.btnCopy;
@@ -600,8 +644,8 @@ function applyRules(text) {
   let hits = 0;
   const hitsByKey = {};
 
+  // ✅ NO person_name auto rule
   const PRIORITY = [
-    "person_name",
     "company",
     "email",
     "bank",
@@ -622,19 +666,23 @@ function applyRules(text) {
 
   const rules = getRulesSafe();
 
-  const enabledKeysArr = effectiveEnabledKeys(); // includes company + person_name
+  const enabledKeysArr = effectiveEnabledKeys();
   const enabledSet = new Set(enabledKeysArr);
 
+  // meta
+  lastRunMeta.inputLen = (String(text || "")).length;
+  lastRunMeta.enabledCount = enabledSet.size;
+  lastRunMeta.moneyMode = "m1";
+  lastRunMeta.lang = currentLang;
+
   if (!rules) {
-    lastRunMeta.inputLen = out.length;
-    lastRunMeta.enabledCount = enabledSet.size;
-    lastRunMeta.moneyMode = moneyMode;
-    lastRunMeta.lang = currentLang;
+    // still apply manual name list masking
+    out = applyNameListMask(out, addHit);
 
     renderOutput(out);
 
-    const report = computeRiskReport({}, {
-      hits: 0,
+    const report = computeRiskReport(hitsByKey, {
+      hits,
       enabledCount: enabledSet.size,
       moneyMode,
       fromPdf: lastRunMeta.fromPdf,
@@ -642,7 +690,7 @@ function applyRules(text) {
     });
 
     renderRiskBox(report, {
-      hits: 0,
+      hits,
       enabledCount: enabledSet.size,
       moneyMode,
       fromPdf: lastRunMeta.fromPdf,
@@ -655,41 +703,32 @@ function applyRules(text) {
 
     window.__export_snapshot = {
       enabledKeys: enabledKeysArr,
-      moneyMode: (typeof moneyMode === "string" ? moneyMode : "off"),
+      moneyMode: "m1",
       lang: currentLang,
-      fromPdf: !!lastRunMeta.fromPdf
+      fromPdf: !!lastRunMeta.fromPdf,
+      nameList: nameList.slice(0)
     };
 
     window.dispatchEvent(new Event("safe:updated"));
     return out;
   }
 
-  for (let i = 0; i < PRIORITY.length; i++) {
-    const key = PRIORITY[i];
+  // 1) apply manual name list first (highest priority)
+  out = applyNameListMask(out, addHit);
 
+  // 2) apply built-in rules
+  for (const key of PRIORITY) {
     if (key !== "money" && !enabledSet.has(key)) continue;
 
     const r = rules[key];
     if (!r || !r.pattern) continue;
 
     if (key === "money") {
-      if (moneyMode === "off") continue;
-
-      out = out.replace(r.pattern, (m, cur1, amt1, sym, amt2, amt3, unit) => {
+      // money fixed M1
+      out = out.replace(r.pattern, () => {
         addHit("money");
-
-        if (moneyMode === "m1") return placeholder("MONEY");
-
-        const currencyRaw = cur1 || sym || unit || "";
-        const amountRaw = amt1 || amt2 || amt3 || "";
-        const currency = formatCurrencyForM2(currencyRaw);
-        const num = normalizeAmountToNumber(amountRaw);
-        const range = moneyRangeLabel(currencyRaw, num);
-
-        if (currentLang === "zh") return (currency ? currency : "") + "【" + range + "】";
-        return (currency ? currency : "") + "[" + range + "]";
+        return placeholder("MONEY");
       });
-
       continue;
     }
 
@@ -699,21 +738,16 @@ function applyRules(text) {
     });
   }
 
-  lastRunMeta.inputLen = (String(text || "")).length;
-  lastRunMeta.enabledCount = enabledSet.size;
-  lastRunMeta.moneyMode = moneyMode;
-  lastRunMeta.lang = currentLang;
-
   const report = computeRiskReport(hitsByKey, {
     hits,
     enabledCount: enabledSet.size,
-    moneyMode: lastRunMeta.moneyMode,
+    moneyMode: "m1",
     fromPdf: lastRunMeta.fromPdf,
     inputLen: lastRunMeta.inputLen
   });
 
   window.__safe_hits = hits;
-  window.__safe_moneyMode = moneyMode;
+  window.__safe_moneyMode = "m1";
   window.__safe_breakdown = hitsByKey;
   window.__safe_score = report.score;
   window.__safe_level = report.level;
@@ -722,7 +756,7 @@ function applyRules(text) {
     hitsByKey,
     score: report.score,
     level: report.level,
-    moneyMode,
+    moneyMode: "m1",
     enabledCount: enabledSet.size,
     fromPdf: lastRunMeta.fromPdf
   };
@@ -731,7 +765,7 @@ function applyRules(text) {
   renderRiskBox(report, {
     hits,
     enabledCount: enabledSet.size,
-    moneyMode,
+    moneyMode: "m1",
     fromPdf: lastRunMeta.fromPdf,
     inputLen: lastRunMeta.inputLen
   });
@@ -748,9 +782,10 @@ function applyRules(text) {
 
   window.__export_snapshot = {
     enabledKeys: enabledKeysArr,
-    moneyMode: (typeof moneyMode === "string" ? moneyMode : "off"),
+    moneyMode: "m1",
     lang: currentLang,
-    fromPdf: !!lastRunMeta.fromPdf
+    fromPdf: !!lastRunMeta.fromPdf,
+    nameList: nameList.slice(0)
   };
 
   window.dispatchEvent(new Event("safe:updated"));
@@ -764,10 +799,11 @@ async function handleFile(file) {
   lastUploadedFile = file;
   lastProbe = null;
   lastPdfOriginalText = "";
-  lastFileKind = (file.type === "application/pdf") ? "pdf" : (file.type && file.type.indexOf("image/") === 0 ? "image" : "");
+  lastFileKind = (file.type === "application/pdf") ? "pdf" : (file.type && file.type.startsWith("image/") ? "image" : "");
 
   setStage3Ui("none");
 
+  // ✅ Image defaults to manual mode
   if (lastFileKind === "image") {
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
@@ -834,11 +870,10 @@ function bindPdfUI() {
 
 /* ================= bind ================= */
 function bind() {
-  const langBtns = document.querySelectorAll(".lang button");
-  for (let i = 0; i < langBtns.length; i++) {
-    const b = langBtns[i];
+  // language buttons
+  document.querySelectorAll(".lang button").forEach(b => {
     b.onclick = () => {
-      for (let j = 0; j < langBtns.length; j++) langBtns[j].classList.remove("active");
+      document.querySelectorAll(".lang button").forEach(x => x.classList.remove("active"));
       b.classList.add("active");
       currentLang = b.dataset.lang;
       window.currentLang = currentLang;
@@ -853,23 +888,20 @@ function bind() {
 
       if (ta) renderInputOverlayForPdf(ta.value || "");
     };
-  }
+  });
 
-  const mm = $("moneyMode");
-  if (mm) {
-    mm.addEventListener("change", () => {
-      moneyMode = mm.value || "off";
+  // ✅ Name list input (replaces money UI area)
+  const nameTa = $("nameList");
+  if (nameTa) {
+    nameTa.addEventListener("input", () => {
+      setNameListFromText(nameTa.value || "");
       const inTxt = (($("inputText") && $("inputText").value) || "").trim();
       if (inTxt) applyRules(inTxt);
-      else {
-        window.__safe_moneyMode = moneyMode;
-        window.dispatchEvent(new Event("safe:updated"));
-      }
-      renderInputOverlayForPdf((($("inputText") && $("inputText").value) || ""));
+      else window.dispatchEvent(new Event("safe:updated"));
+      renderInputOverlayForPdf(($("inputText") && $("inputText").value) || "");
     });
-
-    moneyMode = mm.value || "off";
-    window.__safe_moneyMode = moneyMode;
+    // init
+    setNameListFromText(nameTa.value || "");
   }
 
   const btnGenerate = $("btnGenerate");
@@ -879,7 +911,7 @@ function bind() {
       const wrap = $("inputWrap");
       if (wrap) wrap.classList.remove("pdf-overlay-on");
       if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
-      applyRules((($("inputText") && $("inputText").value) || ""));
+      applyRules(($("inputText") && $("inputText").value) || "");
     };
   }
 
@@ -914,6 +946,10 @@ function bind() {
       }
       if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
 
+      // reset names
+      nameList = [];
+      if ($("nameList")) $("nameList").value = "";
+
       lastUploadedFile = null;
       lastFileKind = "";
       lastProbe = null;
@@ -944,12 +980,12 @@ function bind() {
   const up = $("btnUp");
   const down = $("btnDown");
   if (up) up.onclick = () => {
-    const n = Number(($("upCount") && $("upCount").textContent) || "0") + 1;
-    if ($("upCount")) $("upCount").textContent = String(n);
+    const n = Number($("upCount").textContent || "0") + 1;
+    $("upCount").textContent = String(n);
   };
   if (down) down.onclick = () => {
-    const n = Number(($("downCount") && $("downCount").textContent) || "0") + 1;
-    if ($("downCount")) $("downCount").textContent = String(n);
+    const n = Number($("downCount").textContent || "0") + 1;
+    $("downCount").textContent = String(n);
   };
 
   const ta = $("inputText");
@@ -1003,27 +1039,27 @@ function bind() {
 
         if (!f) { say(`<span style="color:#ffb4b4;">No file loaded</span>`); return; }
         if (lastFileKind !== "pdf") { say(`<span style="color:#ffb4b4;">Not a PDF file</span>`); return; }
-        if (!lastProbe) { say(`<span style="color:#ffb4b4;">No PDF probe result (probePdfTextLayer missing or failed)</span>`); return; }
+        if (!lastProbe) { say(`<span style="color:#ffb4b4;">No PDF probe result</span>`); return; }
         if (!lastProbe.hasTextLayer) { say(`<span style="color:#ffb4b4;">PDF not readable (Mode B). Use Manual.</span>`); return; }
 
-        if (!window.RasterExport) { say(`<span style="color:#ffb4b4;">RasterExport not loaded</span>`); return; }
-        if (!window.RasterExport.exportRasterSecurePdfFromReadablePdf) {
-          say(`<span style="color:#ffb4b4;">RasterExport API missing (exportRasterSecurePdfFromReadablePdf)</span>`);
+        if (!window.RasterExport || !window.RasterExport.exportRasterSecurePdfFromReadablePdf) {
+          say(`<span style="color:#ffb4b4;">RasterExport not loaded</span>`);
           return;
         }
 
         const snap = window.__export_snapshot || {};
         const enabledKeys = Array.isArray(snap.enabledKeys) ? snap.enabledKeys : effectiveEnabledKeys();
-        const mm2 = (typeof snap.moneyMode === "string") ? snap.moneyMode : (typeof moneyMode === "string" ? moneyMode : "off");
         const lang = snap.lang || currentLang;
 
-        say(`Working…\nlang=${escapeHTML(lang)}\nmoneyMode=${escapeHTML(mm2)}\nenabledKeys=${enabledKeys.length}`);
+        // money fixed M1; names are list-based, raster export will still use rules-by-key
+        // (if you later want raster-redaction to also apply nameList, we can pass it into RasterExport too)
+        say(`Working…\nlang=${escapeHTML(lang)}\nmoneyMode=M1\nenabledKeys=${enabledKeys.length}`);
 
         await window.RasterExport.exportRasterSecurePdfFromReadablePdf({
           file: f,
           lang,
           enabledKeys,
-          moneyMode: mm2,
+          moneyMode: "m1",
           dpi: 600,
           filename: `raster_secure_${Date.now()}.pdf`
         });
