@@ -63,25 +63,20 @@
           </div>
         </div>
 
-        <div class="controlbar controlbar-eq" id="leftControlBar">
-          <!-- ✅ Money: keep hidden default (app.js still expects #moneyMode) -->
-          <input type="hidden" id="moneyMode" value="m2" />
-
-          <div class="ctl-actions">
-            <button class="btn primary btn-s" id="btnGenerate"></button>
-            <button class="btn secondary btn-s" id="btnManualRedact" style="display:none;"></button>
-          </div>
-        </div>
-
-        <!-- ✅ Manual terms fold (same size/spec as risk fold) -->
+        <!-- ✅ Manual input card (same spec as risk fold) -->
         <details class="fold fold-eq" id="manualDetails">
-          <summary class="fold-sum" id="ui-manual-terms-title">补充遮盖</summary>
+          <summary class="fold-sum manual-sum" id="ui-manual-terms-sum">
+            <span class="manual-sum-title" id="ui-manual-terms-title">手工输入</span>
+            <span class="manual-sum-right">
+              <button class="btn primary btn-s" id="btnGenerate" type="button"></button>
+              <span class="tiny muted manual-sum-hint" id="ui-manual-terms-hint"></span>
+            </span>
+          </summary>
+
           <div class="fold-body">
             <div style="display:flex;flex-direction:column;gap:10px;">
-              <div class="tiny muted" id="ui-manual-terms-hint">输入人名/公司名（逗号分隔）。只遮盖 PDF 原文中真实出现的内容。</div>
               <input id="manualTerms" type="text" placeholder="例如：张三, 李四, Bei.de Tech GmbH" autocomplete="off" />
 
-              <!-- ✅ Links moved here -->
               <div class="links">
                 <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
                 <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
@@ -90,6 +85,12 @@
             </div>
           </div>
         </details>
+
+        <div class="controlbar controlbar-eq" id="leftControlBar">
+          <div class="ctl-actions">
+            <button class="btn secondary btn-s" id="btnManualRedact" style="display:none;"></button>
+          </div>
+        </div>
 
         <div class="bottom-fixed tiny footnote accent-link" id="ui-foot"></div>
       </section>
@@ -156,6 +157,5 @@
   <script src="./assets/raster-export.js" defer></script>
   <script src="./assets/redact-ui.js" defer></script>
   <script src="./assets/app.js" defer></script>
-  <!-- ✅ share.js removed (achievement deleted) -->
 </body>
 </html>
