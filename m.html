@@ -46,6 +46,14 @@
       text-align:center;
     }
     #btnClear{ margin-left:auto; }
+
+    /* ✅ Prevent EN/DE tab labels from wrapping (app.js will set shorter labels anyway) */
+    .io-tabs label{
+      white-space: nowrap;
+    }
+    .panel-actions label{
+      white-space: nowrap;
+    }
   </style>
 </head>
 
@@ -77,8 +85,9 @@
     <input class="panel-radio" type="radio" name="io" id="tab-out" />
 
     <div class="io-tabs" role="tablist" aria-label="Input Output Tabs">
-      <label class="btn secondary btn-s btn-slim" for="tab-in" role="tab">输入</label>
-      <label class="btn secondary btn-s btn-slim" for="tab-out" role="tab">输出</label>
+      <!-- ✅ text comes from i18n/app.js -->
+      <label class="btn secondary btn-s btn-slim" for="tab-in" role="tab" id="ui-tab-in"></label>
+      <label class="btn secondary btn-s btn-slim" for="tab-out" role="tab" id="ui-tab-out"></label>
     </div>
 
     <div class="grid grid-mobile-one">
@@ -159,7 +168,8 @@
       <div class="panel-actions">
         <label class="btn secondary btn-s btn-slim" for="panel-risk" id="ui-risk-title"></label>
         <label class="btn secondary btn-s btn-slim" for="panel-achv" id="ui-share-title"></label>
-        <label class="btn secondary btn-s btn-slim" for="panel-none">关闭</label>
+        <!-- ✅ text comes from i18n/app.js -->
+        <label class="btn secondary btn-s btn-slim" for="panel-none" id="ui-panel-close"></label>
       </div>
 
       <details class="fold fold-eq panel-body" id="riskDetails">
