@@ -185,7 +185,7 @@ function markHitsInOriginal(text){
     // money is controlled by moneyMode, others by enabledSet
     if (key !== "money" && !enabledSet.has(key)) continue;
 
-    const r = RULES_BY_KEY[key];
+    const r = window.RULES_BY_KEY && window.RULES_BY_KEY[key];
     if (!r || !r.pattern) continue;
 
     if (key === "money") {
@@ -202,7 +202,6 @@ function markHitsInOriginal(text){
     .replaceAll(S1, `<span class="hit">`)
     .replaceAll(S2, `</span>`);
 }
-
 
 /* ================= Money M2 ================= */
 function normalizeAmountToNumber(raw) {
@@ -278,8 +277,8 @@ function formatCurrencyForM2(currency) {
 /* ================= init enabled ================= */
 function initEnabled() {
   enabled.clear();
-  Object.values(DETECTION_ITEMS).flat().forEach(i => {
-    if (i.defaultOn) enabled.add(i.key);
+  Object.values(window.DETECTION_ITEMS || {}).flat().forEach(i => {
+    if (i && i.defaultOn) enabled.add(i.key);
   });
 }
 
@@ -470,7 +469,6 @@ function renderRiskBox(report, meta) {
 
 /* ================= Stage 3 UI texts (fallback-safe) ================= */
 function stage3Text(key){
-  // ✅ keep labels short on mobile to avoid wrapping
   const map = {
     zh: { btnExportText: "导出文本", btnExportPdf: "红删PDF", btnManual: "人工处理" },
     de: { btnExportText: "Text", btnExportPdf: "PDF", btnManual: "Manuell" },
@@ -490,14 +488,19 @@ function setStage3Ui(mode){
   show(btnPdf,  lastStage3Mode === "A");
   show(btnMan,  lastStage3Mode === "B");
 
+  // ✅ use I18N if present, fallback to stage3Text
+  const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : null;
+
   if (btnText) btnText.textContent = stage3Text("btnExportText");
-  if (btnPdf)  btnPdf.textContent  = stage3Text("btnExportPdf");
+  if (btnPdf)  btnPdf.textContent  = (t && t.btnRedactPdf) ? t.btnRedactPdf : stage3Text("btnExportPdf");
   if (btnMan)  btnMan.textContent  = stage3Text("btnManual");
 }
 
 /* ================= UI text ================= */
 function setText() {
-  const t = I18N[currentLang];
+  const t = window.I18N && window.I18N[currentLang];
+  if (!t) return;
+
   window.currentLang = currentLang;
 
   if ($("ui-in-title")) $("ui-in-title").textContent = t.inTitle;
@@ -508,23 +511,28 @@ function setText() {
 
   if ($("ui-upload-btn")) $("ui-upload-btn").textContent = t.btnUpload;
 
-  if ($("ui-risk-title")) $("ui-risk-title").textContent = t.riskTitle;
-  if ($("ui-share-title")) $("ui-share-title").textContent = t.shareTitle;
+  // ✅ Mobile tabs
+  if ($("ui-tab-in")) $("ui-tab-in").textContent = t.tabIn || "";
+  if ($("ui-tab-out")) $("ui-tab-out").textContent = t.tabOut || "";
+
+  // ✅ Risk/Achv button labels:
+  const riskEl = $("ui-risk-title");
+  if (riskEl) {
+    const isLabel = (riskEl.tagName && riskEl.tagName.toUpperCase() === "LABEL") || riskEl.hasAttribute("for");
+    riskEl.textContent = isLabel ? (t.panelRisk || t.riskTitle) : (t.riskTitle || "");
+  }
+
+  const achvEl = $("ui-share-title");
+  if (achvEl) {
+    const isLabel = (achvEl.tagName && achvEl.tagName.toUpperCase() === "LABEL") || achvEl.hasAttribute("for");
+    achvEl.textContent = isLabel ? (t.panelAchv || t.shareTitle) : (t.shareTitle || "");
+  }
+
+  // ✅ Panel close
+  if ($("ui-panel-close")) $("ui-panel-close").textContent = t.panelClose || "";
+
   if ($("ui-share-sub")) $("ui-share-sub").textContent = t.shareSub;
   if ($("ui-achv-placeholder")) $("ui-achv-placeholder").textContent = t.achvPlaceholder;
-
-  // ✅ NEW: m.html tabs + panel close (fallback-safe)
-  // Prefer i18n keys if you add them later: tabIn/tabOut/panelClose
-  const tabFallback = {
-    zh: { in: "输入", out: "输出", close: "关闭" },
-    en: { in: "Input", out: "Output", close: "Close" },
-    de: { in: "Eingabe", out: "Ausgabe", close: "Schließen" }
-  };
-  const fb = tabFallback[currentLang] || tabFallback.zh;
-
-  if ($("ui-tab-in")) $("ui-tab-in").textContent = (t.tabIn || fb.in);
-  if ($("ui-tab-out")) $("ui-tab-out").textContent = (t.tabOut || fb.out);
-  if ($("ui-panel-close")) $("ui-panel-close").textContent = (t.panelClose || fb.close);
 
   const label = $("ui-money-label");
   const sel = $("moneyMode");
@@ -696,7 +704,7 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
-  // auto expand
+  // auto expand (desktop <details>)
   const hasOut = String(out || "").trim().length > 0;
   const rd = $("riskDetails");
   const ad = $("achvDetails");
@@ -837,66 +845,74 @@ function bind() {
     window.__safe_moneyMode = moneyMode;
   }
 
-  $("btnGenerate").onclick = () => {
-    lastRunMeta.fromPdf = false;
-    const wrap = $("inputWrap");
-    if (wrap) wrap.classList.remove("pdf-overlay-on");
-    if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
-    applyRules($("inputText").value || "");
-  };
+  const btnGenerate = $("btnGenerate");
+  if (btnGenerate) {
+    btnGenerate.onclick = () => {
+      lastRunMeta.fromPdf = false;
+      const wrap = $("inputWrap");
+      if (wrap) wrap.classList.remove("pdf-overlay-on");
+      if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
+      applyRules(($("inputText") && $("inputText").value) || "");
+    };
+  }
 
-  $("btnClear").onclick = () => {
-    if ($("inputText")) $("inputText").value = "";
-    renderOutput("");
+  const btnClear = $("btnClear");
+  if (btnClear) {
+    btnClear.onclick = () => {
+      if ($("inputText")) $("inputText").value = "";
+      renderOutput("");
 
-    window.__safe_hits = 0;
-    window.__safe_breakdown = {};
-    window.__safe_score = 0;
-    window.__safe_level = "low";
-    window.__safe_report = null;
+      window.__safe_hits = 0;
+      window.__safe_breakdown = {};
+      window.__safe_score = 0;
+      window.__safe_level = "low";
+      window.__safe_report = null;
 
-    lastRunMeta.fromPdf = false;
+      lastRunMeta.fromPdf = false;
 
-    const rb = $("riskBox");
-    if (rb) rb.innerHTML = "";
+      const rb = $("riskBox");
+      if (rb) rb.innerHTML = "";
 
-    const rd = $("riskDetails");
-    const ad = $("achvDetails");
-    if (rd) rd.open = false;
-    if (ad) ad.open = false;
+      const rd = $("riskDetails");
+      const ad = $("achvDetails");
+      if (rd) rd.open = false;
+      if (ad) ad.open = false;
 
-    if ($("pdfName")) $("pdfName").textContent = "";
+      if ($("pdfName")) $("pdfName").textContent = "";
 
-    const wrap = $("inputWrap");
-    if (wrap) {
-      wrap.classList.remove("pdf-overlay-on");
-      wrap.classList.remove("has-content");
-    }
-    if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
-
-    lastUploadedFile = null;
-    lastFileKind = "";
-    lastProbe = null;
-    lastPdfOriginalText = "";
-    setStage3Ui("none");
-
-    window.__export_snapshot = null;
-
-    window.dispatchEvent(new Event("safe:updated"));
-  };
-
-  $("btnCopy").onclick = async () => {
-    const t = I18N[currentLang];
-    try {
-      await navigator.clipboard.writeText(lastOutputPlain || "");
-      const btn = $("btnCopy");
-      if (btn) {
-        const old = btn.textContent;
-        btn.textContent = t.btnCopied || old;
-        setTimeout(() => { btn.textContent = t.btnCopy || old; }, 900);
+      const wrap = $("inputWrap");
+      if (wrap) {
+        wrap.classList.remove("pdf-overlay-on");
+        wrap.classList.remove("has-content");
       }
-    } catch (e) {}
-  };
+      if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
+
+      lastUploadedFile = null;
+      lastFileKind = "";
+      lastProbe = null;
+      lastPdfOriginalText = "";
+      setStage3Ui("none");
+
+      window.__export_snapshot = null;
+
+      window.dispatchEvent(new Event("safe:updated"));
+    };
+  }
+
+  const btnCopy = $("btnCopy");
+  if (btnCopy) {
+    btnCopy.onclick = async () => {
+      const t = window.I18N && window.I18N[currentLang];
+      try {
+        await navigator.clipboard.writeText(lastOutputPlain || "");
+        if (t) {
+          const old = btnCopy.textContent;
+          btnCopy.textContent = t.btnCopied || old;
+          setTimeout(() => { btnCopy.textContent = t.btnCopy || old; }, 900);
+        }
+      } catch (e) {}
+    };
+  }
 
   const up = $("btnUp");
   const down = $("btnDown");
@@ -1016,3 +1032,4 @@ initEnabled();
 setText();
 bind();
 updateInputWatermarkVisibility();
+
