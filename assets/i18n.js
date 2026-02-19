@@ -59,7 +59,7 @@ const I18N = {
     inputWatermark:
       "AI systems can extract hidden text-layer data.\nAll processing runs locally. Nothing is stored or transmitted.",
 
-    btnUpload: "Upload file",
+    btnUpload: "Upload",
 
     moneyLabel: "Money:",
     moneyOff: "Off",
@@ -73,7 +73,7 @@ const I18N = {
 
     riskTitle: "Risk score",
 
-    shareTitle: "Filter achievement",
+    shareTitle: "Achievement",
     shareSub:
       "No original text.\nOnly\nlocal filter stats\nand\na privacy notice.\nFor support\n& encouragement\nonly.",
     achvPlaceholder: "Preview appears after filtering",
@@ -82,9 +82,9 @@ const I18N = {
 
     fbQ: "Helpful?",
 
-    learn: "Learn More",
+    learn: "Learn",
     privacy: "Privacy",
-    scope: "MVP Scope",
+    scope: "Scope",
 
     foot: "Filtering and edits are suggestions only. No legal commitment.",
 
@@ -109,7 +109,7 @@ const I18N = {
     inputWatermark:
       "KI-Systeme lesen auch verborgene Textlayer-Daten.\nVerarbeitung erfolgt ausschließlich lokal. Keine Speicherung.",
 
-    btnUpload: "Datei hochladen",
+    btnUpload: "Upload",
 
     moneyLabel: "Betrag:",
     moneyOff: "Aus",
@@ -123,7 +123,7 @@ const I18N = {
 
     riskTitle: "Risikowert",
 
-    shareTitle: "Filter-Ergebnis",
+    shareTitle: "Ergebnis",
     shareSub:
       "Kein Originaltext.\nNur\nlokale Statistik\nund\nDatenschutzhinweis.\nNur zur\nUnterstützung\nund Ermutigung.",
     achvPlaceholder: "Vorschau nach dem Filtern",
@@ -132,9 +132,9 @@ const I18N = {
 
     fbQ: "Hilfreich?",
 
-    learn: "Mehr erfahren",
+    learn: "Info",
     privacy: "Datenschutz",
-    scope: "MVP-Umfang",
+    scope: "Umfang",
 
     foot: "Filterung und Änderungen sind nur Vorschläge. Keine rechtliche Zusage.",
 
