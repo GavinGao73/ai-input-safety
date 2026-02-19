@@ -45,9 +45,11 @@
       flex-direction:column;
       gap:10px;
     }
-    .manual-terms-box input{
+    .manual-terms-box textarea{
       width:100%;
       box-sizing:border-box;
+      min-height:96px;
+      resize:vertical;
     }
 
     .manual-links{
@@ -134,7 +136,13 @@
 
           <div class="fold-body">
             <div class="manual-terms-box">
-              <input id="manualTerms" type="text" placeholder="例如：张三, 李四, Bei.de Tech GmbH" autocomplete="off" />
+              <textarea
+                id="manualTerms"
+                placeholder="例如：张三, 李四, Bei.de Tech GmbH"
+                autocomplete="off"
+                spellcheck="false"
+              ></textarea>
+
               <div class="manual-links links">
                 <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
                 <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
@@ -176,11 +184,10 @@
             <div class="risk" id="riskBox"></div>
           </div>
         </details>
-      </section>
-    </div>
 
-    <div class="mobile-footer">
-      <div class="tiny footnote accent-link" id="ui-foot"></div>
+        <!-- ✅ Footnote moved under Risk (remove bottom extra card) -->
+        <div class="tiny footnote accent-link" id="ui-foot"></div>
+      </section>
     </div>
 
   </div>
