@@ -1,10 +1,12 @@
 // assets/app.js
 // ✅ Personal build (2026-02-19)
-// Goals (personal):
-// - NO auto person-name detection.
-// - Money protection always ON (fixed M1).
-// - Manual Terms: user inputs ANY terms; only mask if term appears in PDF original text (when from PDF).
-// - Output masking uses BLACK BAR only (█), no label placeholders.
+// Goals:
+// - NO auto person-name detection: only manual terms list OR manual redaction.
+// - Money protection always ON (default M1). Remove money selector UI.
+// - Replace "money" control area with manual terms UI (handled in HTML).
+// - Manual terms can be person names / company names / any exact terms that appear in PDF text-layer.
+// - Manual terms are masked with neutral placeholder: TERM => "【遮盖】" / "[REDACTED]" (no "姓名").
+// - PDF raster export receives manualTerms (raster-export.js will consume it next step).
 
 console.log("[APP] loaded v20260219-personal");
 
@@ -26,47 +28,35 @@ let lastProbe = null;              // { hasTextLayer, text }
 let lastPdfOriginalText = "";      // extracted text for readable PDF
 let lastStage3Mode = "none";       // "A" | "B" | "none"
 
-// ================= Manual terms (user-provided) =================
-// "manualTerms" masks anything user typed, IF it exists in PDF original text (when from PDF).
-let manualTerms = []; // array of strings
+// ================= Manual terms (NO auto NER) =================
+let manualTerms = []; // array of strings (user-provided)
+
 function normalizeTerm(s){
   return String(s || "").trim();
 }
+
+/**
+ * 输入规则（不做“必须人名”的限制）：
+ * - 支持逗号/中文逗号/分号/顿号/换行作为分隔
+ * - 自动去重（不区分大小写）
+ * - 最大 24 个（防止本地正则性能问题）
+ */
 function setManualTermsFromText(raw){
   const s = String(raw || "");
-
-  // split by newlines and common separators
   const parts = s
     .split(/[\n\r,，;；、]+/g)
     .map(normalizeTerm)
     .filter(Boolean);
 
-  // de-dup while keeping order (case-insensitive for latin)
   const seen = new Set();
   const out = [];
   for (const p of parts) {
-    const key = /[\u4E00-\u9FFF]/.test(p) ? p : p.toLowerCase();
+    const key = p.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(p);
   }
-  manualTerms = out.slice(0, 24); // hard cap (local perf)
-}
-
-// Only apply manual term if:
-// - not from PDF: allow (user typed raw text, they control it)
-// - from PDF: term must appear in lastPdfOriginalText
-function termAppearsInPdfOriginal(term){
-  const t = normalizeTerm(term);
-  if (!t) return false;
-  const pdf = String(lastPdfOriginalText || "");
-  if (!pdf) return false;
-
-  const hasCjk = /[\u4E00-\u9FFF]/.test(t);
-  if (hasCjk) return pdf.indexOf(t) !== -1;
-
-  // latin: case-insensitive contains
-  return pdf.toLowerCase().indexOf(t.toLowerCase()) !== -1;
+  manualTerms = out.slice(0, 24);
 }
 
 function show(el, yes){
@@ -101,31 +91,68 @@ function getRulesSafe() {
 }
 
 /* ================= ENABLED KEYS FOR EXPORT ================= */
-// Personal: keep strategy simple. (We can choose to always include company.)
+// Personal: keep strategy simple. We DO NOT force person_name.
 function effectiveEnabledKeys() {
-  const MUST_INCLUDE = ["company"];
+  const MUST_INCLUDE = ["company"]; // optional; remove if you want pure personal
   const base = new Set(Array.from(enabled || []));
   for (const k of MUST_INCLUDE) base.add(k);
   return Array.from(base);
 }
 
-/* ================= BLACK BAR masking ================= */
-function redactBarFromText(txt){
-  // Keep it readable but safe: length-based black bar with cap.
-  const s = String(txt || "");
-  const n = Math.max(4, Math.min(18, s.length)); // 4..18
-  return "█".repeat(n);
+/* ================= placeholders ================= */
+function placeholder(key) {
+  const map = {
+    zh: {
+      PHONE: "【电话】",
+      EMAIL: "【邮箱】",
+      ACCOUNT: "【账号】",
+      ADDRESS: "【地址】",
+      HANDLE: "【账号名】",
+      REF: "【编号】",
+      TITLE: "【称谓】",
+      NUMBER: "【数字】",
+      MONEY: "【金额】",
+      COMPANY: "【公司】",
+      TERM: "【遮盖】" // ✅ neutral placeholder for manual terms
+    },
+    de: {
+      PHONE: "[Telefon]",
+      EMAIL: "[E-Mail]",
+      ACCOUNT: "[Konto]",
+      ADDRESS: "[Adresse]",
+      HANDLE: "[Handle]",
+      REF: "[Referenz]",
+      TITLE: "[Anrede]",
+      NUMBER: "[Zahl]",
+      MONEY: "[Betrag]",
+      COMPANY: "[Firma]",
+      TERM: "[REDACTED]"
+    },
+    en: {
+      PHONE: "[Phone]",
+      EMAIL: "[Email]",
+      ACCOUNT: "[Account]",
+      ADDRESS: "[Address]",
+      HANDLE: "[Handle]",
+      REF: "[Ref]",
+      TITLE: "[Title]",
+      NUMBER: "[Number]",
+      MONEY: "[Amount]",
+      COMPANY: "[Company]",
+      TERM: "[REDACTED]"
+    }
+  };
+  return (map[currentLang] && map[currentLang][key]) || `[${key}]`;
 }
 
-/* ================= output render ================= */
+/* ================= output render (highlight placeholders) ================= */
 function renderOutput(outPlain){
   lastOutputPlain = String(outPlain || "");
   const host = $("outputText");
   if (!host) return;
 
-  // highlight black bars (>=4 chars)
   const html = escapeHTML(lastOutputPlain)
-    .replace(/█{4,}/g, (m) => `<span class="hl">${m}</span>`);
+    .replace(/(【[^【】]{1,36}】|\[[^\[\]]{1,36}\])/g, `<span class="hl">$1</span>`);
 
   host.innerHTML = html;
 }
@@ -139,36 +166,45 @@ function updateInputWatermarkVisibility(){
   wrap.classList.toggle("has-content", has);
 }
 
-/* ================= Manual term masking ================= */
+/* ================= Manual terms masking ================= */
 function escapeRegExp(s){
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function makeTermRegex(term){
-  const t = escapeRegExp(term);
-  const hasCjk = /[\u4E00-\u9FFF]/.test(term);
-  // CJK: exact match; Latin: case-insensitive
-  return new RegExp(t, hasCjk ? "g" : "gi");
+// heuristic boundaries for Latin terms (EN/DE)
+function makeLatinTermRegex(term){
+  const n = escapeRegExp(term);
+  return new RegExp(`\\b${n}\\b`, "gi");
+}
+
+// CJK terms: no \b. Use loose punctuation/space boundaries to reduce false hits.
+function makeCjkTermRegex(term){
+  const n = escapeRegExp(term);
+  // boundary: start or non-CJK before; end or non-CJK after
+  return new RegExp(`(^|[^\\u4E00-\\u9FFF])(${n})(?=$|[^\\u4E00-\\u9FFF])`, "g");
 }
 
 function applyManualTermsMask(out, addHit){
   if (!manualTerms || !manualTerms.length) return out;
 
   let s = String(out || "");
-  for (const term of manualTerms) {
-    const t = normalizeTerm(term);
-    if (!t) continue;
+  for (const tm of manualTerms) {
+    if (!tm) continue;
 
-    // when PDF: only mask if it exists in original PDF extracted text
-    if (lastRunMeta.fromPdf) {
-      if (!termAppearsInPdfOriginal(t)) continue;
+    const hasCjk = /[\u4E00-\u9FFF]/.test(tm);
+    if (hasCjk) {
+      const re = makeCjkTermRegex(tm);
+      s = s.replace(re, (m, p1, p2) => {
+        if (typeof addHit === "function") addHit("manual_term");
+        return `${p1}${placeholder("TERM")}`;
+      });
+    } else {
+      const re = makeLatinTermRegex(tm);
+      s = s.replace(re, () => {
+        if (typeof addHit === "function") addHit("manual_term");
+        return placeholder("TERM");
+      });
     }
-
-    const re = makeTermRegex(t);
-    s = s.replace(re, (m) => {
-      if (typeof addHit === "function") addHit("manual_term");
-      return redactBarFromText(m);
-    });
   }
   return s;
 }
@@ -223,15 +259,17 @@ function markHitsInOriginal(text){
     "number"
   ];
 
-  // highlight manual terms too (only if appears in PDF original, to match actual masking behavior)
+  // ✅ highlight manual terms too
   if (manualTerms && manualTerms.length) {
-    for (const term of manualTerms) {
-      const t = normalizeTerm(term);
-      if (!t) continue;
-      if (lastRunMeta.fromPdf && !termAppearsInPdfOriginal(t)) continue;
-
-      const re = makeTermRegex(t);
-      s = s.replace(re, (m) => `${S1}${m}${S2}`);
+    for (const tm of manualTerms) {
+      const hasCjk = /[\u4E00-\u9FFF]/.test(tm);
+      if (hasCjk) {
+        const re = makeCjkTermRegex(tm);
+        s = s.replace(re, (m, p1, p2) => `${p1}${S1}${p2}${S2}`);
+      } else {
+        const re = makeLatinTermRegex(tm);
+        s = s.replace(re, (m) => `${S1}${m}${S2}`);
+      }
     }
   }
 
@@ -256,6 +294,77 @@ function markHitsInOriginal(text){
     .replaceAll(S2, `</span>`);
 }
 
+/* ================= Money M2 helpers (kept, but we use M1 only) ================= */
+function normalizeAmountToNumber(raw) {
+  let s = String(raw || "").replace(/\s+/g, "");
+  const hasDot = s.includes(".");
+  const hasComma = s.includes(",");
+
+  if (hasDot && hasComma) {
+    const lastDot = s.lastIndexOf(".");
+    const lastComma = s.lastIndexOf(",");
+    const decSep = lastDot > lastComma ? "." : ",";
+    const thouSep = decSep === "." ? "," : ".";
+    s = s.replaceAll(thouSep, "");
+    s = s.replace(decSep, ".");
+  } else if (hasComma && !hasDot) {
+    const idx = s.lastIndexOf(",");
+    const decimals = s.length - idx - 1;
+    if (decimals === 2) s = s.replace(",", ".");
+    else s = s.replaceAll(",", "");
+  } else {
+    if (hasDot) {
+      const idx = s.lastIndexOf(".");
+      const decimals = s.length - idx - 1;
+      if (decimals !== 2) s = s.replaceAll(".", "");
+    }
+  }
+
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function moneyRangeLabel(currency, amount) {
+  const cur = String(currency || "").toUpperCase();
+  const isCNY = (cur === "CNY" || cur === "RMB" || cur === "¥" || cur === "元");
+
+  const a = amount;
+  if (!Number.isFinite(a) || a <= 0) return placeholder("MONEY");
+
+  const bands = isCNY
+    ? [
+        [0, 500, "<500"],
+        [500, 2000, "500–2k"],
+        [2000, 10000, "2k–10k"],
+        [10000, 50000, "10k–50k"],
+        [50000, 200000, "50k–200k"],
+        [200000, Infinity, "200k+"]
+      ]
+    : [
+        [0, 100, "<100"],
+        [100, 500, "100–500"],
+        [500, 1000, "500–1k"],
+        [1000, 3000, "1k–3k"],
+        [3000, 10000, "3k–10k"],
+        [10000, 50000, "10k–50k"],
+        [50000, Infinity, "50k+"]
+      ];
+
+  for (const [lo, hi, label] of bands) {
+    if (a >= lo && a < hi) return label;
+  }
+  return placeholder("MONEY");
+}
+
+function formatCurrencyForM2(currency) {
+  const c = String(currency || "").trim();
+  if (!c) return "";
+  if (c === "€" || c.toUpperCase() === "EUR") return "EUR";
+  if (c === "$" || c.toUpperCase() === "USD") return "USD";
+  if (c === "¥" || c.toUpperCase() === "CNY" || c.toUpperCase() === "RMB") return "CNY";
+  return c.toUpperCase();
+}
+
 /* ================= init enabled ================= */
 function initEnabled() {
   enabled.clear();
@@ -277,7 +386,7 @@ const RISK_WEIGHTS = {
   number: 2,
   money: 0,
   company: 8,
-  manual_term: 10
+  manual_term: 10 // ✅ manual list hits count here
 };
 
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
@@ -333,7 +442,7 @@ function labelForKey(k) {
       number: "数字",
       money: "金额",
       company: "公司",
-      manual_term: "手工遮盖词"
+      manual_term: "补充遮盖（手工词条）"
     },
     de: {
       bank: "Bank/Payment",
@@ -347,7 +456,7 @@ function labelForKey(k) {
       number: "Zahl",
       money: "Betrag",
       company: "Firma",
-      manual_term: "Manuelle Begriffe"
+      manual_term: "Zusatz (manuell)"
     },
     en: {
       bank: "Bank/Payment",
@@ -361,7 +470,7 @@ function labelForKey(k) {
       number: "Numbers",
       money: "Money",
       company: "Company",
-      manual_term: "Manual terms"
+      manual_term: "Extra (manual)"
     }
   };
   const m = map[currentLang] || map.zh;
@@ -495,33 +604,26 @@ function setText() {
   if ($("ui-tab-in")) $("ui-tab-in").textContent = t.tabIn || "";
   if ($("ui-tab-out")) $("ui-tab-out").textContent = t.tabOut || "";
 
-  // Panel labels
+  // Risk title (details/label dual-use)
   const riskEl = $("ui-risk-title");
   if (riskEl) {
     const isLabel = (riskEl.tagName && riskEl.tagName.toUpperCase() === "LABEL") || riskEl.hasAttribute("for");
     riskEl.textContent = isLabel ? (t.panelRisk || t.riskTitle) : (t.riskTitle || "");
   }
 
-  const achvEl = $("ui-share-title");
-  if (achvEl) {
-    const isLabel = (achvEl.tagName && achvEl.tagName.toUpperCase() === "LABEL") || achvEl.hasAttribute("for");
-    achvEl.textContent = isLabel ? (t.panelAchv || t.shareTitle) : (t.shareTitle || "");
-  }
+  // ✅ Manual terms UI (new i18n keys; safe fallback)
+  if ($("ui-manual-terms-title")) $("ui-manual-terms-title").textContent = t.manualTitle || "手工输入";
+  if ($("ui-manual-terms-hint"))  $("ui-manual-terms-hint").textContent  = t.manualHint  || "输入要遮盖的词（逗号/换行分隔）。只遮盖 PDF 原文中真实出现的内容。";
+  if ($("manualTerms")) $("manualTerms").placeholder = t.manualPlaceholder || "例如：张三, 李四, Bei.de Tech GmbH";
 
-  if ($("ui-panel-close")) $("ui-panel-close").textContent = t.panelClose || "";
-
-  if ($("ui-share-sub")) $("ui-share-sub").textContent = t.shareSub;
-  if ($("ui-achv-placeholder")) $("ui-achv-placeholder").textContent = t.achvPlaceholder;
-
-  // Money selector removed (in case old HTML still contains it)
-  const sel = $("moneyMode");
-  if (sel) sel.style.display = "none";
+  // ✅ Money UI removed in personal build; but keep label safely if exists
   if ($("ui-money-label")) $("ui-money-label").textContent = "";
+  const sel = $("moneyMode");
+  if (sel) sel.style.display = "none"; // if HTML still has it, hide
 
   if ($("btnGenerate")) $("btnGenerate").textContent = t.btnGenerate;
   if ($("btnCopy")) $("btnCopy").textContent = t.btnCopy;
   if ($("btnClear")) $("btnClear").textContent = t.btnClear;
-  if ($("btnShareDownload")) $("btnShareDownload").textContent = t.btnDownload;
 
   if ($("ui-fb-q")) $("ui-fb-q").textContent = t.fbQ;
 
@@ -560,6 +662,7 @@ function applyRules(text) {
   }
 
   const rules = getRulesSafe();
+
   const enabledKeysArr = effectiveEnabledKeys();
   const enabledSet = new Set(enabledKeysArr);
 
@@ -569,31 +672,67 @@ function applyRules(text) {
   lastRunMeta.moneyMode = "m1";
   lastRunMeta.lang = currentLang;
 
-  // 1) manual terms first (highest priority)
+  if (!rules) {
+    // still apply manual terms masking
+    out = applyManualTermsMask(out, addHit);
+
+    renderOutput(out);
+
+    const report = computeRiskReport(hitsByKey, {
+      hits,
+      enabledCount: enabledSet.size,
+      moneyMode,
+      fromPdf: lastRunMeta.fromPdf,
+      inputLen: out.length
+    });
+
+    renderRiskBox(report, {
+      hits,
+      enabledCount: enabledSet.size,
+      moneyMode,
+      fromPdf: lastRunMeta.fromPdf,
+      inputLen: out.length
+    });
+
+    updateInputWatermarkVisibility();
+    const ta = $("inputText");
+    if (ta) renderInputOverlayForPdf(ta.value || "");
+
+    window.__export_snapshot = {
+      enabledKeys: enabledKeysArr,
+      moneyMode: "m1",
+      lang: currentLang,
+      fromPdf: !!lastRunMeta.fromPdf,
+      manualTerms: manualTerms.slice(0)
+    };
+
+    window.dispatchEvent(new Event("safe:updated"));
+    return out;
+  }
+
+  // 1) apply manual terms first (highest priority)
   out = applyManualTermsMask(out, addHit);
 
-  // 2) built-in rules
-  if (rules) {
-    for (const key of PRIORITY) {
-      if (key !== "money" && !enabledSet.has(key)) continue;
+  // 2) apply built-in rules
+  for (const key of PRIORITY) {
+    if (key !== "money" && !enabledSet.has(key)) continue;
 
-      const r = rules[key];
-      if (!r || !r.pattern) continue;
+    const r = rules[key];
+    if (!r || !r.pattern) continue;
 
-      if (key === "money") {
-        // fixed M1
-        out = out.replace(r.pattern, (m) => {
-          addHit("money");
-          return redactBarFromText(m);
-        });
-        continue;
-      }
-
-      out = out.replace(r.pattern, (m) => {
-        addHit(key);
-        return redactBarFromText(m);
+    if (key === "money") {
+      // money fixed M1
+      out = out.replace(r.pattern, () => {
+        addHit("money");
+        return placeholder("MONEY");
       });
+      continue;
     }
+
+    out = out.replace(r.pattern, () => {
+      addHit(key);
+      return placeholder(r.tag);
+    });
   }
 
   const report = computeRiskReport(hitsByKey, {
@@ -630,15 +769,12 @@ function applyRules(text) {
 
   const hasOut = String(out || "").trim().length > 0;
   const rd = $("riskDetails");
-  const ad = $("achvDetails");
   if (rd) rd.open = hasOut;
-  if (ad) ad.open = hasOut;
 
   updateInputWatermarkVisibility();
   const ta = $("inputText");
   if (ta) renderInputOverlayForPdf(ta.value || "");
 
-  // snapshot for other modules
   window.__export_snapshot = {
     enabledKeys: enabledKeysArr,
     moneyMode: "m1",
@@ -662,7 +798,7 @@ async function handleFile(file) {
 
   setStage3Ui("none");
 
-  // Image defaults to manual mode
+  // ✅ Image defaults to manual mode
   if (lastFileKind === "image") {
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
@@ -749,30 +885,39 @@ function bind() {
     };
   });
 
-  // Manual terms input (HTML must provide id="manualTerms" OR fallback to id="nameList")
+  // ✅ Manual terms input (HTML id="manualTerms" OR fallback id="nameList")
   const termInput = $("manualTerms") || $("nameList");
   if (termInput) {
     termInput.addEventListener("input", () => {
       setManualTermsFromText(termInput.value || "");
+
+      // ✅ keep snapshot ALWAYS in sync (prevents raster export missing manual terms)
+      if (!window.__export_snapshot) window.__export_snapshot = {};
+      window.__export_snapshot.manualTerms = manualTerms.slice(0);
+
       const inTxt = (($("inputText") && $("inputText").value) || "").trim();
       if (inTxt) applyRules(inTxt);
       else window.dispatchEvent(new Event("safe:updated"));
       renderInputOverlayForPdf(($("inputText") && $("inputText").value) || "");
     });
+
+    // init
     setManualTermsFromText(termInput.value || "");
+    if (!window.__export_snapshot) window.__export_snapshot = {};
+    window.__export_snapshot.manualTerms = manualTerms.slice(0);
   }
 
   const btnGenerate = $("btnGenerate");
-if (btnGenerate) {
-  btnGenerate.onclick = (e) => {
-    if (e) { e.preventDefault(); e.stopPropagation(); } // ✅ prevent <summary> toggling
-    lastRunMeta.fromPdf = false;
-    const wrap = $("inputWrap");
-    if (wrap) wrap.classList.remove("pdf-overlay-on");
-    if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
-    applyRules(($("inputText") && $("inputText").value) || "");
-  };
-}
+  if (btnGenerate) {
+    btnGenerate.onclick = (e) => {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      lastRunMeta.fromPdf = false;
+      const wrap = $("inputWrap");
+      if (wrap) wrap.classList.remove("pdf-overlay-on");
+      if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
+      applyRules(($("inputText") && $("inputText").value) || "");
+    };
+  }
 
   const btnClear = $("btnClear");
   if (btnClear) {
@@ -792,9 +937,7 @@ if (btnGenerate) {
       if (rb) rb.innerHTML = "";
 
       const rd = $("riskDetails");
-      const ad = $("achvDetails");
       if (rd) rd.open = false;
-      if (ad) ad.open = false;
 
       if ($("pdfName")) $("pdfName").textContent = "";
 
@@ -807,8 +950,8 @@ if (btnGenerate) {
 
       // reset manual terms
       manualTerms = [];
-      const termInput = $("manualTerms") || $("nameList");
-      if (termInput) termInput.value = "";
+      const termInput2 = $("manualTerms") || $("nameList");
+      if (termInput2) termInput2.value = "";
 
       lastUploadedFile = null;
       lastFileKind = "";
@@ -817,6 +960,7 @@ if (btnGenerate) {
       setStage3Ui("none");
 
       window.__export_snapshot = null;
+
       window.dispatchEvent(new Event("safe:updated"));
     };
   }
@@ -909,10 +1053,9 @@ if (btnGenerate) {
         const snap = window.__export_snapshot || {};
         const enabledKeys = Array.isArray(snap.enabledKeys) ? snap.enabledKeys : effectiveEnabledKeys();
         const lang = snap.lang || currentLang;
+        const manualTermsSafe = Array.isArray(snap.manualTerms) ? snap.manualTerms : [];
 
-        // NOTE: For PDF raster-redaction to also mask manualTerms,
-        // RasterExport must accept & apply snap.manualTerms. We'll wire that in raster-export.js next.
-        say(`Working…\nlang=${escapeHTML(lang)}\nmoneyMode=M1\nenabledKeys=${enabledKeys.length}`);
+        say(`Working…\nlang=${escapeHTML(lang)}\nmoneyMode=M1\nenabledKeys=${enabledKeys.length}\nmanualTerms=${manualTermsSafe.length}`);
 
         await window.RasterExport.exportRasterSecurePdfFromReadablePdf({
           file: f,
@@ -921,7 +1064,7 @@ if (btnGenerate) {
           moneyMode: "m1",
           dpi: 600,
           filename: `raster_secure_${Date.now()}.pdf`,
-          manualTerms: Array.isArray(snap.manualTerms) ? snap.manualTerms : []
+          manualTerms: manualTermsSafe
         });
 
         say(`Done ✅\nDownload should start.`);
@@ -955,3 +1098,4 @@ initEnabled();
 setText();
 bind();
 updateInputWatermarkVisibility();
+
