@@ -35,12 +35,11 @@
     }
     #btnClear{ margin-left:auto; }
 
-    .io-tabs label,
-    .panel-actions label{
+    .io-tabs label{
       white-space: nowrap;
     }
 
-    /* manual terms input layout */
+    /* manual terms fold body */
     .manual-terms-box{
       display:flex;
       flex-direction:column;
@@ -51,15 +50,12 @@
       box-sizing:border-box;
     }
 
-    /* links under manual terms */
     .manual-links{
       display:flex;
       gap:14px;
       flex-wrap:wrap;
     }
-    .manual-links a{
-      text-decoration: none;
-    }
+    .manual-links a{ text-decoration:none; }
   </style>
 </head>
 
@@ -119,22 +115,25 @@
           </div>
         </div>
 
+        <!-- ✅ Left controlbar now only keeps Manual button (image/manual mode), no money UI -->
         <div class="controlbar controlbar-eq" id="leftControlBar">
-          <!-- ✅ Money: keep as hidden default (app.js still expects #moneyMode) -->
-          <input type="hidden" id="moneyMode" value="m2" />
-
           <div class="ctl-actions">
-            <button class="btn primary btn-s btn-slim" id="btnGenerate"></button>
             <button class="btn secondary btn-s btn-slim" id="btnManualRedact" style="display:none;"></button>
           </div>
         </div>
 
-        <!-- ✅ Manual terms fold (same spec as risk fold) -->
+        <!-- ✅ Manual input card: title left, filter button right + hint under button -->
         <details class="fold fold-eq" id="manualDetails">
-          <summary class="fold-sum" id="ui-manual-terms-title">补充遮盖</summary>
+          <summary class="fold-sum manual-sum" id="ui-manual-terms-sum">
+            <span class="manual-sum-title" id="ui-manual-terms-title">手工输入</span>
+            <span class="manual-sum-right">
+              <button class="btn primary btn-s btn-slim" id="btnGenerate" type="button"></button>
+              <span class="tiny muted manual-sum-hint" id="ui-manual-terms-hint"></span>
+            </span>
+          </summary>
+
           <div class="fold-body">
             <div class="manual-terms-box">
-              <div class="tiny muted" id="ui-manual-terms-hint">输入人名/公司名（逗号分隔）。只遮盖 PDF 原文中真实出现的内容。</div>
               <input id="manualTerms" type="text" placeholder="例如：张三, 李四, Bei.de Tech GmbH" autocomplete="off" />
               <div class="manual-links links">
                 <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
@@ -170,7 +169,7 @@
           </div>
         </div>
 
-        <!-- ✅ Risk moved here (replaces achievement area) -->
+        <!-- ✅ Risk here -->
         <details class="fold fold-eq" id="riskDetails">
           <summary class="fold-sum" id="ui-risk-title"></summary>
           <div class="fold-body">
@@ -180,7 +179,6 @@
       </section>
     </div>
 
-    <!-- ✅ Footer only (no achievement card anymore) -->
     <div class="mobile-footer">
       <div class="tiny footnote accent-link" id="ui-foot"></div>
     </div>
@@ -194,8 +192,6 @@
   <script src="./assets/pdf.js" defer></script>
   <script src="./assets/raster-export.js" defer></script>
   <script src="./assets/redact-ui.js" defer></script>
-  <!-- ✅ cache-bust for mobile -->
-  <script src="./assets/app.js?v=20260219a" defer></script>
-  <!-- ✅ share.js removed (achievement deleted) -->
+  <script src="./assets/app.js?v=20260219b" defer></script>
 </body>
 </html>
