@@ -21,6 +21,23 @@ let lastProbe = null;              // { hasTextLayer, text }
 let lastPdfOriginalText = "";      // extracted text for readable PDF
 let lastStage3Mode = "none";       // "A" | "B" | "none"
 
+/* ================= compat helpers (mobile safe) ================= */
+// replaceAll polyfill helper (string token only)
+function repAll(str, needle, repl) {
+  return String(str).split(String(needle)).join(String(repl));
+}
+
+// safe flatten for DETECTION_ITEMS groups
+function forEachDetectionItem(fn) {
+  const groups = window.DETECTION_ITEMS || {};
+  for (const k in groups) {
+    if (!Object.prototype.hasOwnProperty.call(groups, k)) continue;
+    const arr = groups[k];
+    if (!arr || !arr.length) continue;
+    for (let i = 0; i < arr.length; i++) fn(arr[i]);
+  }
+}
+
 function show(el, yes){
   if (!el) return;
   el.style.display = yes ? "" : "none";
@@ -38,12 +55,18 @@ let lastRunMeta = {
 function $(id) { return document.getElementById(id); }
 
 function escapeHTML(s){
-  return String(s || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+  const str = String(s || "");
+  // single-pass escape (no replaceAll dependency)
+  return str.replace(/[&<>"']/g, function(ch){
+    switch (ch) {
+      case "&": return "&amp;";
+      case "<": return "&lt;";
+      case ">": return "&gt;";
+      case '"': return "&quot;";
+      case "'": return "&#039;";
+      default: return ch;
+    }
+  });
 }
 
 /* ================= RULES SAFE ACCESS (CRITICAL) ================= */
@@ -57,9 +80,15 @@ function getRulesSafe() {
 // (Even if the UI forgets to enable them.)
 function effectiveEnabledKeys() {
   const MUST_INCLUDE = ["company", "person_name"];
-  const base = new Set(Array.from(enabled || []));
-  for (const k of MUST_INCLUDE) base.add(k);
-  return Array.from(base);
+  const base = new Set();
+  if (enabled && enabled.forEach) {
+    enabled.forEach(function(v){ base.add(v); });
+  }
+  for (let i = 0; i < MUST_INCLUDE.length; i++) base.add(MUST_INCLUDE[i]);
+  // convert Set -> Array safely
+  const out = [];
+  base.forEach(function(v){ out.push(v); });
+  return out;
 }
 
 /* ================= placeholders ================= */
@@ -155,16 +184,17 @@ function renderInputOverlayForPdf(originalText){
 function markHitsInOriginal(text){
   let s = String(text || "");
 
-  // we use sentinel tokens, then escape, then convert to spans
   const S1 = "⟦HIT⟧";
   const S2 = "⟦/HIT⟧";
 
-  // ✅ SINGLE SOURCE OF TRUTH for enabled keys (auto-link with raster export)
-  // Prefer snapshot created by applyRules(); fallback to current enabled Set.
   const snap = window.__export_snapshot || null;
   const enabledKeysArr = (snap && Array.isArray(snap.enabledKeys))
     ? snap.enabledKeys
-    : Array.from(enabled || []);
+    : (function(){
+        const arr = [];
+        if (enabled && enabled.forEach) enabled.forEach(function(v){ arr.push(v); });
+        return arr;
+      })();
 
   const enabledSet = new Set(enabledKeysArr);
 
@@ -183,8 +213,9 @@ function markHitsInOriginal(text){
     "number"
   ];
 
-  for (const key of PRIORITY) {
-    // money is controlled by moneyMode, others by enabledSet
+  for (let i = 0; i < PRIORITY.length; i++) {
+    const key = PRIORITY[i];
+
     if (key !== "money" && !enabledSet.has(key)) continue;
 
     const r = window.RULES_BY_KEY && window.RULES_BY_KEY[key];
@@ -192,42 +223,43 @@ function markHitsInOriginal(text){
 
     if (key === "money") {
       if (moneyMode === "off") continue;
-      s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
+      s = s.replace(r.pattern, function(m){ return S1 + m + S2; });
       continue;
     }
 
-    s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
+    s = s.replace(r.pattern, function(m){ return S1 + m + S2; });
   }
 
   const esc = escapeHTML(s);
-  return esc
-    .replaceAll(S1, `<span class="hit">`)
-    .replaceAll(S2, `</span>`);
+  // no replaceAll dependency
+  return repAll(repAll(esc, S1, `<span class="hit">`), S2, `</span>`);
 }
 
 /* ================= Money M2 ================= */
 function normalizeAmountToNumber(raw) {
   let s = String(raw || "").replace(/\s+/g, "");
-  const hasDot = s.includes(".");
-  const hasComma = s.includes(",");
+  const hasDot = s.indexOf(".") >= 0;
+  const hasComma = s.indexOf(",") >= 0;
 
   if (hasDot && hasComma) {
     const lastDot = s.lastIndexOf(".");
     const lastComma = s.lastIndexOf(",");
     const decSep = lastDot > lastComma ? "." : ",";
     const thouSep = decSep === "." ? "," : ".";
-    s = s.replaceAll(thouSep, "");
-    s = s.replace(decSep, ".");
+    s = repAll(s, thouSep, "");
+    // replace only last decimal separator -> easiest: split/join then fix last
+    // but here we can just replace ALL decSep with "." after removing thousands
+    s = repAll(s, decSep, ".");
   } else if (hasComma && !hasDot) {
     const idx = s.lastIndexOf(",");
     const decimals = s.length - idx - 1;
     if (decimals === 2) s = s.replace(",", ".");
-    else s = s.replaceAll(",", "");
+    else s = repAll(s, ",", "");
   } else {
     if (hasDot) {
       const idx = s.lastIndexOf(".");
       const decimals = s.length - idx - 1;
-      if (decimals !== 2) s = s.replaceAll(".", "");
+      if (decimals !== 2) s = repAll(s, ".", "");
     }
   }
 
@@ -261,7 +293,8 @@ function moneyRangeLabel(currency, amount) {
         [50000, Infinity, "50k+"]
       ];
 
-  for (const [lo, hi, label] of bands) {
+  for (let i = 0; i < bands.length; i++) {
+    const lo = bands[i][0], hi = bands[i][1], label = bands[i][2];
     if (a >= lo && a < hi) return label;
   }
   return placeholder("MONEY");
@@ -279,7 +312,7 @@ function formatCurrencyForM2(currency) {
 /* ================= init enabled ================= */
 function initEnabled() {
   enabled.clear();
-  Object.values(window.DETECTION_ITEMS || {}).flat().forEach(i => {
+  forEachDetectionItem(function(i){
     if (i && i.defaultOn) enabled.add(i.key);
   });
 }
@@ -391,7 +424,9 @@ function labelForKey(k) {
 function computeRiskReport(hitsByKey, meta) {
   let score = 0;
 
-  for (const [k, c] of Object.entries(hitsByKey || {})) {
+  for (const k in (hitsByKey || {})) {
+    if (!Object.prototype.hasOwnProperty.call(hitsByKey, k)) continue;
+    const c = hitsByKey[k];
     if (!c) continue;
     const w = RISK_WEIGHTS[k] || 0;
     const capped = Math.min(c, 12);
@@ -490,7 +525,6 @@ function setStage3Ui(mode){
   show(btnPdf,  lastStage3Mode === "A");
   show(btnMan,  lastStage3Mode === "B");
 
-  // ✅ use I18N if present, fallback to stage3Text
   const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : null;
 
   if (btnText) btnText.textContent = stage3Text("btnExportText");
@@ -517,7 +551,7 @@ function setText() {
   if ($("ui-tab-in")) $("ui-tab-in").textContent = t.tabIn || "";
   if ($("ui-tab-out")) $("ui-tab-out").textContent = t.tabOut || "";
 
-  // ✅ Risk/Achv button labels:
+  // ✅ Risk/Achv labels (mobile uses LABEL, desktop uses SUMMARY)
   const riskEl = $("ui-risk-title");
   if (riskEl) {
     const isLabel = (riskEl.tagName && riskEl.tagName.toUpperCase() === "LABEL") || riskEl.hasAttribute("for");
@@ -530,7 +564,6 @@ function setText() {
     achvEl.textContent = isLabel ? (t.panelAchv || t.shareTitle) : (t.shareTitle || "");
   }
 
-  // ✅ Panel close
   if ($("ui-panel-close")) $("ui-panel-close").textContent = t.panelClose || "";
 
   if ($("ui-share-sub")) $("ui-share-sub").textContent = t.shareSub;
@@ -589,8 +622,6 @@ function applyRules(text) {
 
   const rules = getRulesSafe();
 
-  // ✅ SINGLE SOURCE OF TRUTH:
-  // output / overlay / raster export all follow the same enabled keys set
   const enabledKeysArr = effectiveEnabledKeys(); // includes company + person_name
   const enabledSet = new Set(enabledKeysArr);
 
@@ -622,7 +653,6 @@ function applyRules(text) {
     const ta = $("inputText");
     if (ta) renderInputOverlayForPdf(ta.value || "");
 
-    // ✅ export snapshot (always consistent)
     window.__export_snapshot = {
       enabledKeys: enabledKeysArr,
       moneyMode: (typeof moneyMode === "string" ? moneyMode : "off"),
@@ -634,8 +664,9 @@ function applyRules(text) {
     return out;
   }
 
-  for (const key of PRIORITY) {
-    // ✅ money uses moneyMode; others use enabledSet (NOT the UI checkbox Set)
+  for (let i = 0; i < PRIORITY.length; i++) {
+    const key = PRIORITY[i];
+
     if (key !== "money" && !enabledSet.has(key)) continue;
 
     const r = rules[key];
@@ -668,7 +699,6 @@ function applyRules(text) {
     });
   }
 
-  // meta
   lastRunMeta.inputLen = (String(text || "")).length;
   lastRunMeta.enabledCount = enabledSet.size;
   lastRunMeta.moneyMode = moneyMode;
@@ -706,19 +736,16 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
-  // auto expand (desktop <details>)
   const hasOut = String(out || "").trim().length > 0;
   const rd = $("riskDetails");
   const ad = $("achvDetails");
   if (rd) rd.open = hasOut;
   if (ad) ad.open = hasOut;
 
-  // watermark + overlay
   updateInputWatermarkVisibility();
   const ta = $("inputText");
   if (ta) renderInputOverlayForPdf(ta.value || "");
 
-  // ✅ export snapshot (always consistent)
   window.__export_snapshot = {
     enabledKeys: enabledKeysArr,
     moneyMode: (typeof moneyMode === "string" ? moneyMode : "off"),
@@ -737,7 +764,7 @@ async function handleFile(file) {
   lastUploadedFile = file;
   lastProbe = null;
   lastPdfOriginalText = "";
-  lastFileKind = (file.type === "application/pdf") ? "pdf" : (file.type && file.type.startsWith("image/") ? "image" : "");
+  lastFileKind = (file.type === "application/pdf") ? "pdf" : (file.type && file.type.indexOf("image/") === 0 ? "image" : "");
 
   setStage3Ui("none");
 
@@ -807,9 +834,11 @@ function bindPdfUI() {
 
 /* ================= bind ================= */
 function bind() {
-  document.querySelectorAll(".lang button").forEach(b => {
+  const langBtns = document.querySelectorAll(".lang button");
+  for (let i = 0; i < langBtns.length; i++) {
+    const b = langBtns[i];
     b.onclick = () => {
-      document.querySelectorAll(".lang button").forEach(x => x.classList.remove("active"));
+      for (let j = 0; j < langBtns.length; j++) langBtns[j].classList.remove("active");
       b.classList.add("active");
       currentLang = b.dataset.lang;
       window.currentLang = currentLang;
@@ -819,28 +848,24 @@ function bind() {
       const ta = $("inputText");
       const inTxt = (ta && ta.value) ? String(ta.value).trim() : "";
 
-      if (inTxt) {
-        applyRules(inTxt);
-      } else {
-        window.dispatchEvent(new Event("safe:updated"));
-      }
+      if (inTxt) applyRules(inTxt);
+      else window.dispatchEvent(new Event("safe:updated"));
 
       if (ta) renderInputOverlayForPdf(ta.value || "");
     };
-  });
+  }
 
   const mm = $("moneyMode");
   if (mm) {
     mm.addEventListener("change", () => {
       moneyMode = mm.value || "off";
-      const inTxt = ($("inputText").value || "").trim();
-      if (inTxt) {
-        applyRules(inTxt);
-      } else {
+      const inTxt = (($("inputText") && $("inputText").value) || "").trim();
+      if (inTxt) applyRules(inTxt);
+      else {
         window.__safe_moneyMode = moneyMode;
         window.dispatchEvent(new Event("safe:updated"));
       }
-      renderInputOverlayForPdf($("inputText").value || "");
+      renderInputOverlayForPdf((($("inputText") && $("inputText").value) || ""));
     });
 
     moneyMode = mm.value || "off";
@@ -854,7 +879,7 @@ function bind() {
       const wrap = $("inputWrap");
       if (wrap) wrap.classList.remove("pdf-overlay-on");
       if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
-      applyRules(($("inputText") && $("inputText").value) || "");
+      applyRules((($("inputText") && $("inputText").value) || ""));
     };
   }
 
@@ -919,12 +944,12 @@ function bind() {
   const up = $("btnUp");
   const down = $("btnDown");
   if (up) up.onclick = () => {
-    const n = Number($("upCount").textContent || "0") + 1;
-    $("upCount").textContent = String(n);
+    const n = Number(($("upCount") && $("upCount").textContent) || "0") + 1;
+    if ($("upCount")) $("upCount").textContent = String(n);
   };
   if (down) down.onclick = () => {
-    const n = Number($("downCount").textContent || "0") + 1;
-    $("downCount").textContent = String(n);
+    const n = Number(($("downCount") && $("downCount").textContent) || "0") + 1;
+    if ($("downCount")) $("downCount").textContent = String(n);
   };
 
   const ta = $("inputText");
@@ -989,16 +1014,16 @@ function bind() {
 
         const snap = window.__export_snapshot || {};
         const enabledKeys = Array.isArray(snap.enabledKeys) ? snap.enabledKeys : effectiveEnabledKeys();
-        const mm = (typeof snap.moneyMode === "string") ? snap.moneyMode : (typeof moneyMode === "string" ? moneyMode : "off");
+        const mm2 = (typeof snap.moneyMode === "string") ? snap.moneyMode : (typeof moneyMode === "string" ? moneyMode : "off");
         const lang = snap.lang || currentLang;
 
-        say(`Working…\nlang=${escapeHTML(lang)}\nmoneyMode=${escapeHTML(mm)}\nenabledKeys=${enabledKeys.length}`);
+        say(`Working…\nlang=${escapeHTML(lang)}\nmoneyMode=${escapeHTML(mm2)}\nenabledKeys=${enabledKeys.length}`);
 
         await window.RasterExport.exportRasterSecurePdfFromReadablePdf({
           file: f,
           lang,
           enabledKeys,
-          moneyMode: mm,
+          moneyMode: mm2,
           dpi: 600,
           filename: `raster_secure_${Date.now()}.pdf`
         });
@@ -1034,4 +1059,3 @@ initEnabled();
 setText();
 bind();
 updateInputWatermarkVisibility();
-
