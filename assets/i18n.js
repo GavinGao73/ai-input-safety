@@ -36,7 +36,19 @@ const I18N = {
     privacy: "隐私原则",
     scope: "MVP 范围",
 
-    foot: "过滤和修改仅为建议，不构成法律承诺"
+    foot: "过滤和修改仅为建议，不构成法律承诺",
+
+    // ✅ Mobile tabs
+    tabIn: "输入",
+    tabOut: "输出",
+
+    // ✅ Bottom panel buttons (short, mobile-friendly)
+    panelRisk: "风险",
+    panelAchv: "成就",
+    panelClose: "关闭",
+
+    // ✅ Output action (PDF)
+    btnRedactPdf: "红删PDF"
   },
 
   en: {
@@ -74,7 +86,19 @@ const I18N = {
     privacy: "Privacy",
     scope: "MVP Scope",
 
-    foot: "Filtering and edits are suggestions only. No legal commitment."
+    foot: "Filtering and edits are suggestions only. No legal commitment.",
+
+    // ✅ Mobile tabs
+    tabIn: "Input",
+    tabOut: "Output",
+
+    // ✅ Bottom panel buttons (short, mobile-friendly)
+    panelRisk: "Risk",
+    panelAchv: "Badge",
+    panelClose: "Close",
+
+    // ✅ Output action (PDF)
+    btnRedactPdf: "PDF"
   },
 
   de: {
@@ -112,7 +136,19 @@ const I18N = {
     privacy: "Datenschutz",
     scope: "MVP-Umfang",
 
-    foot: "Filterung und Änderungen sind nur Vorschläge. Keine rechtliche Zusage."
+    foot: "Filterung und Änderungen sind nur Vorschläge. Keine rechtliche Zusage.",
+
+    // ✅ Mobile tabs
+    tabIn: "Eingabe",
+    tabOut: "Ausgabe",
+
+    // ✅ Bottom panel buttons (short, mobile-friendly)
+    panelRisk: "Risiko",
+    panelAchv: "Erfolg",
+    panelClose: "Zu",
+
+    // ✅ Output action (PDF)
+    btnRedactPdf: "PDF"
   }
 };
 
