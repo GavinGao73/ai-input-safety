@@ -911,7 +911,6 @@ function bind() {
   if (btnGenerate) {
     btnGenerate.onclick = (e) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
-      lastRunMeta.fromPdf = false;
       const wrap = $("inputWrap");
       if (wrap) wrap.classList.remove("pdf-overlay-on");
       if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
