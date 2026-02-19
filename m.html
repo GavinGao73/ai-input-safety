@@ -1,8 +1,9 @@
 <!-- =========================
-     m.html (FULL) — btnGenerate removed (auto filtering)
-     Modified:
-     - Remove btnExportText button (duplicate with Copy)
-     - Bottom details default collapsed (manualDetails + riskDetails)
+     m.html (FULL) — STRUCTURE REFACTOR (Control Panel in middle)
+     Key changes:
+     - Remove IO tabs (radio) to match: INPUT -> CONTROL -> OUTPUT
+     - Manual + Risk moved into unified Control Panel
+     - Keep ids for app.js compatibility
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -12,62 +13,6 @@
   <title>Ai input safety Filter</title>
   <meta name="robots" content="noindex" />
   <link rel="stylesheet" href="./assets/styles.css" />
-
-  <style>
-    .panel-radio{
-      position:absolute;
-      width:1px;height:1px;
-      opacity:0;
-      pointer-events:none;
-    }
-
-    /* ===== IO tabs: only one panel visible ===== */
-    #tab-in:checked  ~ .grid-mobile-one .io-out{ display:none !important; }
-    #tab-out:checked ~ .grid-mobile-one .io-in { display:none !important; }
-
-    #tab-in:checked  ~ .io-tabs label[for="tab-in"],
-    #tab-out:checked ~ .io-tabs label[for="tab-out"]{
-      background: rgba(43,144,255,.20);
-      border-color: rgba(43,144,255,.35);
-      color: rgba(255,255,255,.92);
-    }
-
-    /* ===== Filebar alignment helper ===== */
-    .filebar{ display:flex; align-items:center; gap:10px; }
-    #pdfName{
-      flex:1 1 auto;
-      min-width:0;
-      text-align:center;
-    }
-    #btnClear{ margin-left:auto; }
-
-    .io-tabs label{
-      white-space: nowrap;
-    }
-
-    /* manual terms fold body */
-    .manual-terms-box{
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-    }
-    .manual-terms-box textarea{
-      width:100%;
-      box-sizing:border-box;
-      min-height:96px;
-      resize:vertical;
-    }
-
-    .manual-links{
-      display:flex;
-      gap:14px;
-      flex-wrap:wrap;
-    }
-    .manual-links a{ text-decoration:none; }
-
-    /* ✅ Remove legacy button slot spacing on mobile summary */
-    .manual-sum-right{ display:none !important; }
-  </style>
 </head>
 
 <body>
@@ -93,18 +38,13 @@
       </div>
     </header>
 
-    <!-- ===== IO Tabs (radio-driven) ===== -->
-    <input class="panel-radio" type="radio" name="io" id="tab-in" checked />
-    <input class="panel-radio" type="radio" name="io" id="tab-out" />
-
-    <div class="io-tabs" role="tablist" aria-label="Input Output Tabs">
-      <label class="btn secondary btn-s btn-slim" for="tab-in" role="tab" id="ui-tab-in"></label>
-      <label class="btn secondary btn-s btn-slim" for="tab-out" role="tab" id="ui-tab-out"></label>
-    </div>
-
-    <div class="grid grid-mobile-one">
-      <!-- ================= INPUT PANEL ================= -->
-      <section class="card card-col io-panel io-in" id="leftCard">
+    <!-- =========================
+         Mobile uses same vertical stack
+         INPUT -> CONTROL PANEL -> OUTPUT
+         ========================= -->
+    <main class="io-stack io-stack-mobile" id="ioStack">
+      <!-- ================= INPUT ================= -->
+      <section class="card card-col io-zone io-input" id="leftCard">
         <h3 id="ui-in-title"></h3>
 
         <div class="barcard barcard-top">
@@ -126,51 +66,76 @@
           </div>
         </div>
 
-        <!-- ✅ Left controlbar now only keeps Manual button (image/manual mode), no money UI -->
-        <div class="controlbar controlbar-eq" id="leftControlBar">
-          <div class="ctl-actions">
-            <button class="btn secondary btn-s btn-slim" id="btnManualRedact" style="display:none;"></button>
+        <!-- Links under input -->
+        <div class="left-footer">
+          <div class="links">
+            <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
+            <a id="linkPrivacy" href="./PRIVACY.md" target="_blank" rel="noopener"></a>
+            <a id="linkScope" href="./docs/mvp-scope.md" target="_blank" rel="noopener"></a>
           </div>
         </div>
+      </section>
 
-        <!-- ✅ Manual input card (AUTO): no filter button — default collapsed -->
-        <details class="fold fold-eq" id="manualDetails">
-          <summary class="fold-sum manual-sum" id="ui-manual-terms-sum">
-            <span class="manual-sum-title" id="ui-manual-terms-title">手工输入</span>
-            <span class="tiny muted manual-sum-hint" id="ui-manual-terms-hint"></span>
-            <!-- legacy right area kept for backward-compat but hidden by CSS -->
-            <span class="manual-sum-right">
-              <button class="btn primary btn-s btn-slim" id="btnGenerate" type="button"></button>
-              <span class="tiny muted manual-sum-hint"></span>
-            </span>
-          </summary>
+      <!-- ================= CONTROL PANEL ================= -->
+      <section class="card card-col control-panel" id="controlPanel" data-open="">
+        <div class="cp-toggles" aria-label="Control Panel Toggles">
+          <button class="cp-toggle" type="button" data-toggle="manual" aria-expanded="false">
+            <span class="cp-toggle-title" id="ui-manual-terms-title">手工输入</span>
+            <span class="tiny muted cp-toggle-hint" id="ui-manual-terms-hint"></span>
+          </button>
 
-          <div class="fold-body">
-            <div class="manual-terms-box">
-              <textarea
-                id="manualTerms"
-                placeholder="例如：张三, 李四, Bei.de Tech GmbH"
-                autocomplete="off"
-                spellcheck="false"
-              ></textarea>
+          <button class="cp-toggle" type="button" data-toggle="risk" aria-expanded="false">
+            <span class="cp-toggle-title" id="ui-risk-title"></span>
+          </button>
+        </div>
 
-              <div class="manual-links links">
-                <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
-                <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
-                <a id="linkScope" href="./docs/mvp-scope.md" target="_blank"></a>
+        <div class="cp-body" aria-label="Control Panel Body">
+          <div class="cp-grid">
+            <!-- LEFT 3 -->
+            <div class="cp-left">
+              <div class="cp-pane cp-manual" data-pane="manual" aria-hidden="true">
+                <textarea
+                  id="manualTerms"
+                  class="manual-terms-textarea"
+                  placeholder="例如：张三, 李四, Bei.de Tech GmbH"
+                  autocomplete="off"
+                  spellcheck="false"
+                ></textarea>
+
+                <button class="btn secondary btn-s btn-slim" id="btnManualRedact" style="display:none;"></button>
+              </div>
+
+              <div class="cp-pane cp-risk" data-pane="risk" aria-hidden="true">
+                <div class="risk" id="riskBox"></div>
+              </div>
+            </div>
+
+            <!-- RIGHT 1 -->
+            <div class="cp-right">
+              <div class="cp-pane cp-manual-help" data-pane="manual" aria-hidden="true">
+                <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
+                  支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。
+                </div>
+              </div>
+
+              <div class="cp-pane cp-risk-feedback" data-pane="risk" aria-hidden="true">
+                <div class="fbq" id="ui-fb-q"></div>
+                <div class="fb-buttons">
+                  <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
+                  <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
+                </div>
               </div>
             </div>
           </div>
-        </details>
+        </div>
       </section>
 
-      <!-- ================= OUTPUT PANEL ================= -->
-      <section class="card card-col right io-panel io-out" id="rightCard">
+      <!-- ================= OUTPUT ================= -->
+      <section class="card card-col right io-zone io-output" id="rightCard">
         <h3 id="ui-out-title"></h3>
 
         <div class="barcard barcard-top">
           <div class="top-actions">
-            <!-- ✅ removed btnExportText -->
             <button class="btn primary btn-s btn-mini btn-slim" id="btnExportRasterPdf" style="display:none;"></button>
             <button class="btn primary btn-s btn-mini btn-slim" id="btnCopy"></button>
           </div>
@@ -180,27 +145,9 @@
           <div class="output output-scroll" id="outputText"></div>
         </div>
 
-        <div class="controlbar controlbar-eq" id="rightFeedbackBar">
-          <div class="feedback feedback-inline feedback-right">
-            <div class="fbq" id="ui-fb-q"></div>
-            <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
-            <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
-          </div>
-        </div>
-
-        <!-- ✅ Risk here — default collapsed -->
-        <details class="fold fold-eq" id="riskDetails">
-          <summary class="fold-sum" id="ui-risk-title"></summary>
-          <div class="fold-body">
-            <div class="risk" id="riskBox"></div>
-          </div>
-        </details>
-
-        <!-- ✅ Footnote moved under Risk (remove bottom extra card) -->
         <div class="tiny footnote accent-link" id="ui-foot"></div>
       </section>
-    </div>
-
+    </main>
   </div>
 
   <!-- JS（顺序非常重要，不要改） -->
