@@ -933,6 +933,9 @@ function bind() {
       window.__safe_report = null;
 
       lastRunMeta.fromPdf = false;
+      
+      const md = $("manualDetails");
+      if (md) md.open = false;   // ✅ 清空后强制折叠“手工输入”
 
       const rb = $("riskBox");
       if (rb) rb.innerHTML = "";
