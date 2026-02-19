@@ -1,3 +1,6 @@
+<!-- =========================
+     m.html (FULL) — btnGenerate removed (auto filtering)
+     ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -58,6 +61,9 @@
       flex-wrap:wrap;
     }
     .manual-links a{ text-decoration:none; }
+
+    /* ✅ Remove legacy button slot spacing on mobile summary */
+    .manual-sum-right{ display:none !important; }
   </style>
 </head>
 
@@ -124,13 +130,15 @@
           </div>
         </div>
 
-        <!-- ✅ Manual input card: title left, filter button right + hint under button -->
+        <!-- ✅ Manual input card (AUTO): no filter button -->
         <details class="fold fold-eq" id="manualDetails">
           <summary class="fold-sum manual-sum" id="ui-manual-terms-sum">
             <span class="manual-sum-title" id="ui-manual-terms-title">手工输入</span>
+            <span class="tiny muted manual-sum-hint" id="ui-manual-terms-hint"></span>
+            <!-- legacy right area kept for backward-compat but hidden by CSS -->
             <span class="manual-sum-right">
               <button class="btn primary btn-s btn-slim" id="btnGenerate" type="button"></button>
-              <span class="tiny muted manual-sum-hint" id="ui-manual-terms-hint"></span>
+              <span class="tiny muted manual-sum-hint"></span>
             </span>
           </summary>
 
