@@ -14,6 +14,8 @@
   "use strict";
 
   const DEFAULT_DPI = 600;
+
+  // ✅ keep version centralized
   const PDFJS_VERSION = "3.11.174";
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
@@ -25,15 +27,18 @@
     return "已遮盖";
   }
 
+  // ✅ Base URL that auto-includes repo name on GitHub Pages project sites
   function pdfjsBaseUrl() {
     return new URL(`./pdfjs/${PDFJS_VERSION}/`, window.location.href).toString();
   }
 
-  // --------- Safe dynamic loaders ----------
+  // --------- Safe dynamic loaders (no logs) ----------
   async function loadPdfJsIfNeeded() {
     if (window.pdfjsLib && window.pdfjsLib.getDocument) return window.pdfjsLib;
 
     const base = pdfjsBaseUrl();
+
+    // ✅ Prefer same-origin pdf.min.js (fixes CORS issues with fonts/CMaps in practice)
     const candidates = [
       base + "pdf.min.js",
       `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.min.js`
@@ -63,10 +68,12 @@
       throw (lastErr || new Error("pdfjsLib not available"));
     }
 
+    // ✅ Prefer same-origin worker (critical: no fake worker / no CORS)
     try {
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = base + "pdf.worker.min.js";
     } catch (_) {}
 
+    // Fallback worker
     try {
       if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
         window.pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -131,7 +138,7 @@
     return c;
   }
 
-  // SOLID BLACK ONLY — NO TEXT
+  // ✅ SOLID BLACK ONLY — NO TEXT
   function drawRedactionsOnCanvas(canvas, rects) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -165,14 +172,21 @@
     const pdfjsLib = await loadPdfJsIfNeeded();
     const ab = await readFileAsArrayBuffer(file);
 
+    // ✅ SAME-ORIGIN CMap + standard fonts base URLs (needed for correct text rendering)
     const BASE = pdfjsBaseUrl();
 
     const loadingTask = pdfjsLib.getDocument({
       data: ab,
+
+      // ✅ keep consistent with probe
       disableFontFace: false,
       useSystemFonts: true,
+
+      // CMaps (font character maps)
       cMapUrl: BASE + "cmaps/",
       cMapPacked: true,
+
+      // Standard font data (LiberationSans, etc.)
       standardFontDataUrl: BASE + "standard_fonts/"
     });
 
@@ -202,7 +216,7 @@
     return { pdf, pages, dpi: dpi || DEFAULT_DPI };
   }
 
-  // --------- manual terms helpers ----------
+  // --------- Manual terms parsing ----------
   function normalizeTerm(s) {
     return String(s || "").trim();
   }
@@ -219,7 +233,7 @@
     const seen = new Set();
     const out = [];
     for (const x of arr) {
-      const k = x.toLowerCase();
+      const k = String(x).toLowerCase();
       if (seen.has(k)) continue;
       seen.add(k);
       out.push(x);
@@ -228,20 +242,46 @@
     return out;
   }
 
-  function escapeRegExp(s){
-    return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  function resolveManualTermsFromOptsOrSnapshot(opts) {
+    // 1) explicit opts.manualTerms (string or array)
+    const mt = opts && opts.manualTerms;
+    let terms = [];
+
+    if (Array.isArray(mt)) terms = mt.map(normalizeTerm).filter(Boolean);
+    else if (typeof mt === "string") terms = splitTerms(mt);
+
+    // 2) fallback to export snapshot (compat)
+    if (!terms.length) {
+      const snap = window.__export_snapshot || {};
+      if (Array.isArray(snap.manualTerms)) terms = snap.manualTerms.map(normalizeTerm).filter(Boolean);
+      else if (typeof snap.manualTerms === "string") terms = splitTerms(snap.manualTerms);
+      else if (Array.isArray(snap.nameList)) terms = snap.nameList.map(normalizeTerm).filter(Boolean);
+    }
+
+    // cap for perf
+    return dedupKeepOrder(terms, 24);
   }
 
-  function makeLatinExactRegex(term){
-    const t = escapeRegExp(term);
-    // word boundary for latin; case-insensitive
-    return new RegExp(`\\b${t}\\b`, "giu");
+  // --------- Manual terms regex helpers ----------
+  function escapeRegExp(s) {
+    return String(s || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
-  function makeCjkLooseRegex(term){
-    const t = escapeRegExp(term);
-    // boundary: start or non-CJK before; end or non-CJK after
-    return new RegExp(`(^|[^\\u4E00-\\u9FFF])(${t})(?=$|[^\\u4E00-\\u9FFF])`, "gu");
+  // Latin term: exact word match with boundaries (EN/DE)
+  function makeLatinExactRegex(term) {
+    const t = String(term || "").trim();
+    if (!t) return null;
+    const src = escapeRegExp(t);
+    try { return new RegExp(`\\b${src}\\b`, "iu"); } catch (_) { return null; }
+  }
+
+  // CJK term: loose boundary (avoid attaching to other CJK blocks)
+  // NOTE: Left boundary is consumed (group1), actual term is group2.
+  function makeCjkLooseRegex(term) {
+    const t = String(term || "").trim();
+    if (!t) return null;
+    const src = escapeRegExp(t);
+    try { return new RegExp(`(^|[^\\u4E00-\\u9FFF])(${src})(?=$|[^\\u4E00-\\u9FFF])`, "u"); } catch (_) { return null; }
   }
 
   // --------- Rules -> matchers ----------
@@ -295,6 +335,22 @@
       try { return new RegExp(re.source, flags); } catch (_) { return null; }
     }
 
+    // ✅ Manual terms matcher(s): highest priority
+    const terms = Array.isArray(manualTerms) ? manualTerms : [];
+    for (const termRaw of terms) {
+      const term = String(termRaw || "").trim();
+      if (!term) continue;
+      if (term.length > 80) continue;
+
+      const hasCjk = /[\u4E00-\u9FFF]/.test(term);
+      const re0 = hasCjk ? makeCjkLooseRegex(term) : makeLatinExactRegex(term);
+      const re = forceGlobal(re0);
+      if (!re) continue;
+
+      matchers.push({ key: "manual_term", re, mode: "manual", __term: term });
+    }
+
+    // Built-in rules
     for (const k of PRIORITY) {
       if (k === "money") {
         if (!moneyMode || moneyMode === "off") continue;
@@ -318,27 +374,19 @@
       matchers.push({ key: k, re, mode: r.mode || "" });
     }
 
-    // ✅ Manual terms matcher(s): exact terms only
-    const terms = Array.isArray(manualTerms) ? manualTerms : [];
-    for (const term of terms) {
-      if (!term) continue;
-      // avoid pathological long inputs
-      if (term.length > 80) continue;
-
-      const hasCjk = /[\u4E00-\u9FFF]/.test(term);
-      const re = hasCjk ? makeCjkLooseRegex(term) : makeLatinExactRegex(term);
-      matchers.unshift({ key: "manual_term", re, mode: "manual" }); // highest priority
-    }
+    // Ensure manual first
+    matchers.sort((a, b) => (a.key === "manual_term" ? -1 : 0) - (b.key === "manual_term" ? -1 : 0));
 
     return matchers;
   }
 
-  // --------- Text items -> rects ----------
+  // --------- Text items -> rects (value-first, keep labels) ----------
   function textItemsToRects(pdfjsLib, viewport, textContent, matchers) {
     const Util = pdfjsLib.Util;
     const items = (textContent && textContent.items) ? textContent.items : [];
     if (!items.length || !matchers || !matchers.length) return [];
 
+    // ✅ hard guard: avoid over-redacting if a rule accidentally matches huge spans
     const MAX_MATCH_LEN = {
       manual_term: 90,
       person_name: 40,
@@ -496,10 +544,14 @@
       if (it && it.hasEOL) pageText += "\n";
     }
 
-    // Do NOT convert '\n' to spaces (avoid cross-line greedy matches)
+    // ✅ CRITICAL FIX:
+    // Do NOT convert '\n' to spaces (it enables cross-line greedy matches).
+    // Use a sentinel char that typical rules won't match (\u0000).
     const matchText = pageText.replace(/\n/g, "\u0000");
 
+    // spans = {a,b,key,preferSub?}
     const spans = [];
+
     for (const mm of matchers) {
       const re0 = mm.re;
       if (!(re0 instanceof RegExp)) continue;
@@ -510,16 +562,38 @@
 
       const hits = getAllMatchesWithGroups(re, matchText);
       for (const h of hits) {
-        const a = h.index;
-        const b = a + h.len;
+        let a = h.index;
+        let b = a + h.len;
         const key = mm.key;
 
+        // ✅ length guard (avoid catastrophic over-redaction)
         const maxLen = MAX_MATCH_LEN[key] || 120;
         if ((b - a) > maxLen) continue;
 
         const m = h.m || [];
         const full = String(m[0] || "");
+
+        // if match contains sentinel, skip
         if (full.indexOf("\u0000") >= 0) continue;
+
+        // ✅ manual_term: adjust span to the real term (avoid left-boundary char in group1)
+        if (key === "manual_term") {
+          const g2 = (m[2] != null) ? String(m[2]) : "";
+          const g1 = (m[1] != null) ? String(m[1]) : "";
+          const term = g2 || g1;
+          if (term) {
+            const pos = full.indexOf(term);
+            if (pos >= 0) {
+              a = h.index + pos;
+              b = a + term.length;
+            }
+          }
+          // extra guard
+          if ((b - a) <= 0 || (b - a) > (MAX_MATCH_LEN.manual_term || 90)) continue;
+
+          spans.push({ a, b, key, preferSub: null });
+          continue;
+        }
 
         // keep preferSub logic for existing keys only
         let preferSub = null;
@@ -577,9 +651,10 @@
 
     if (!spans.length) return [];
 
+    // Merge spans (same key + overlap/close)
     spans.sort((x, y) => (x.a - y.a) || (x.b - y.b));
     const merged = [];
-    const MERGE_GAP = 0;
+    const MERGE_GAP = 0; // tighter
 
     function samePreferSub(p, q) {
       if (!p && !q) return true;
@@ -606,6 +681,7 @@
       }
     }
 
+    // Map spans -> rects
     const rects = [];
 
     for (const sp of merged) {
@@ -653,16 +729,21 @@
         const x1 = bb.x + bb.w * (ls / len);
         const x2 = bb.x + bb.w * (le / len);
 
+        // ✅ Key-aware padding
         let padX, padY;
+
         if (key === "person_name") {
           padX = Math.max(0.25, bb.w * 0.002);
           padY = Math.max(0.55, bb.h * 0.030);
+
         } else if (key === "company") {
           padX = Math.max(0.55, bb.w * 0.0045);
           padY = Math.max(0.60, bb.h * 0.032);
+
         } else if (key === "manual_term") {
-          padX = Math.max(0.55, bb.w * 0.004);
+          padX = Math.max(0.55, bb.w * 0.0040);
           padY = Math.max(0.65, bb.h * 0.035);
+
         } else {
           padX = Math.max(0.55, bb.w * 0.005);
           padY = Math.max(0.75, bb.h * 0.045);
@@ -678,13 +759,21 @@
         rw = clamp(rw, 1, viewport.width - rx);
         rh = clamp(rh, 6, viewport.height - ry);
 
+        // ✅ 人名宽度护栏
         if (key === "person_name") {
           const maxW = Math.min(viewport.width * 0.22, bb.w * 0.55);
           if (rw > maxW) continue;
         }
 
+        // ✅ 公司核心词宽度护栏
         if (key === "company") {
           const maxW = Math.min(viewport.width * 0.18, bb.w * 0.45);
+          if (rw > maxW) continue;
+        }
+
+        // ✅ 手工词条宽度护栏（防止误涂整行）
+        if (key === "manual_term") {
+          const maxW = Math.min(viewport.width * 0.28, bb.w * 0.70);
           if (rw > maxW) continue;
         }
 
@@ -698,6 +787,7 @@
 
     if (!rects.length) return [];
 
+    // Conservative merge of rects on same line & same key only
     rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
     const out = [];
 
@@ -742,33 +832,14 @@
     return out.map(({ x, y, w, h }) => ({ x, y, w, h }));
   }
 
-  function resolveManualTermsFromOptsOrSnapshot(opts) {
-    // 1) explicit opts.manualTerms (string or array)
-    const mt = opts && opts.manualTerms;
-    let terms = [];
-    if (Array.isArray(mt)) terms = mt.map(normalizeTerm).filter(Boolean);
-    else if (typeof mt === "string") terms = splitTerms(mt);
-
-    // 2) fallback to export snapshot (compat)
-    if (!terms.length) {
-      const snap = window.__export_snapshot || {};
-      if (Array.isArray(snap.manualTerms)) terms = snap.manualTerms.map(normalizeTerm).filter(Boolean);
-      else if (typeof snap.manualTerms === "string") terms = splitTerms(snap.manualTerms);
-      else if (Array.isArray(snap.nameList)) terms = snap.nameList.map(normalizeTerm).filter(Boolean);
-    }
-
-    // cap for perf
-    terms = dedupKeepOrder(terms, 24);
-    return terms;
-  }
-
   async function autoRedactReadablePdf({ file, lang, enabledKeys, moneyMode, dpi, manualTerms }) {
     const pdfjsLib = await loadPdfJsIfNeeded();
     const { pdf, pages } = await renderPdfToCanvases(file, dpi || DEFAULT_DPI);
 
     const matchers = buildRuleMatchers(enabledKeys, moneyMode, manualTerms);
-    const _placeholder = langPlaceholder(lang);
+    const _placeholder = langPlaceholder(lang); // kept for compat (not used)
 
+    // ---- status snapshot (no logs) ----
     try {
       window.__RasterExportLast = {
         when: Date.now(),
@@ -787,9 +858,11 @@
       const textContent = await page.getTextContent();
       const rects = textItemsToRects(pdfjsLib, p.viewport, textContent, matchers);
 
+      // ---- per-page debug snapshot (safe, in-memory only) ----
       try {
         const last = window.__RasterExportLast || {};
         const prevPerPage = Array.isArray(last.perPage) ? last.perPage : [];
+
         const rectCount = Array.isArray(rects) ? rects.length : 0;
 
         window.__RasterExportLast = Object.assign({}, last, {
@@ -861,6 +934,7 @@
 
       const manualTerms = resolveManualTermsFromOptsOrSnapshot(opts);
 
+      // ---- status snapshot before work ----
       try {
         window.__RasterExportLast = {
           when: Date.now(),
@@ -885,6 +959,7 @@
 
       const name = (opts && opts.filename) || `raster_secure_${Date.now()}.pdf`;
 
+      // ---- status snapshot before export ----
       try {
         const last = window.__RasterExportLast || {};
         window.__RasterExportLast = Object.assign({}, last, {
@@ -902,8 +977,9 @@
       if (!result || !result.pages || !result.pages.length) return;
 
       const dpi = result.dpi || DEFAULT_DPI;
-      const _placeholder = langPlaceholder(result.lang || "zh");
+      const _placeholder = langPlaceholder(result.lang || "zh"); // kept for compat (not used)
 
+      // ---- status snapshot ----
       try {
         window.__RasterExportLast = {
           when: Date.now(),
@@ -930,6 +1006,7 @@
     drawRedactionsOnCanvas
   };
 
+  // ---- minimal status beacon (no logs, in-memory only) ----
   try {
     window.__RasterExportStatus = {
       loaded: true,
