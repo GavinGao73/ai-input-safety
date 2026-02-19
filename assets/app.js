@@ -1,13 +1,15 @@
 // =========================
 // assets/app.js (FULL)
-// ✅ Personal build (2026-02-19b)
-// ✅ Control Panel refactor (2026-02-19c):
-// - New unified Control Panel (manual/risk) with paired panes
-// - No details nesting; default collapsed; no auto-open on output
-// - btnClear hard clears + forces both panels collapsed
+// ✅ Personal build (2026-02-19c)
+// This revision (layout control titles OUTSIDE details):
+// - Support new desktop/mobile structure:
+//   - "手工输入" / "风险评分" are now top-level toggle rows (same level as Filter flow).
+//   - Their bodies are separate containers (default collapsed), each body contains 3:1 paired cards.
+// - Backward-compatible: if legacy <details id="manualDetails/riskDetails"> exists, still works.
+// - Auto filtering unchanged.
 // =========================
 
-console.log("[APP] loaded v20260219c-personal-auto-controlpanel");
+console.log("[APP] loaded v20260219c-personal-auto-ctl");
 
 let currentLang = "zh";
 window.currentLang = currentLang;
@@ -112,7 +114,7 @@ function placeholder(key) {
       NUMBER: "【数字】",
       MONEY: "【金额】",
       COMPANY: "【公司】",
-      TERM: "【遮盖】" // ✅ neutral placeholder for manual terms
+      TERM: "【遮盖】"
     },
     de: {
       PHONE: "[Telefon]",
@@ -169,17 +171,12 @@ function updateInputWatermarkVisibility(){
 function escapeRegExp(s){
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-
-// heuristic boundaries for Latin terms (EN/DE)
 function makeLatinTermRegex(term){
   const n = escapeRegExp(term);
   return new RegExp(`\\b${n}\\b`, "gi");
 }
-
-// CJK terms: no \b. Use loose punctuation/space boundaries to reduce false hits.
 function makeCjkTermRegex(term){
   const n = escapeRegExp(term);
-  // boundary: start or non-CJK before; end or non-CJK after
   return new RegExp(`(^|[^\\u4E00-\\u9FFF])(${n})(?=$|[^\\u4E00-\\u9FFF])`, "g");
 }
 
@@ -230,7 +227,6 @@ function renderInputOverlayForPdf(originalText){
   overlay.scrollLeft = ta.scrollLeft;
 }
 
-/* mark hits in original input (keeps original chars) */
 function markHitsInOriginal(text){
   let s = String(text || "");
 
@@ -258,7 +254,6 @@ function markHitsInOriginal(text){
     "number"
   ];
 
-  // ✅ highlight manual terms too
   if (manualTerms && manualTerms.length) {
     for (const tm of manualTerms) {
       const hasCjk = /[\u4E00-\u9FFF]/.test(tm);
@@ -279,7 +274,6 @@ function markHitsInOriginal(text){
     if (!r || !r.pattern) continue;
 
     if (key === "money") {
-      // money always ON
       s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
       continue;
     }
@@ -291,77 +285,6 @@ function markHitsInOriginal(text){
   return esc
     .replaceAll(S1, `<span class="hit">`)
     .replaceAll(S2, `</span>`);
-}
-
-/* ================= Money M2 helpers (kept, but we use M1 only) ================= */
-function normalizeAmountToNumber(raw) {
-  let s = String(raw || "").replace(/\s+/g, "");
-  const hasDot = s.includes(".");
-  const hasComma = s.includes(",");
-
-  if (hasDot && hasComma) {
-    const lastDot = s.lastIndexOf(".");
-    const lastComma = s.lastIndexOf(",");
-    const decSep = lastDot > lastComma ? "." : ",";
-    const thouSep = decSep === "." ? "," : ".";
-    s = s.replaceAll(thouSep, "");
-    s = s.replace(decSep, ".");
-  } else if (hasComma && !hasDot) {
-    const idx = s.lastIndexOf(",");
-    const decimals = s.length - idx - 1;
-    if (decimals === 2) s = s.replace(",", ".");
-    else s = s.replaceAll(",", "");
-  } else {
-    if (hasDot) {
-      const idx = s.lastIndexOf(".");
-      const decimals = s.length - idx - 1;
-      if (decimals !== 2) s = s.replaceAll(".", "");
-    }
-  }
-
-  const n = Number(s);
-  return Number.isFinite(n) ? n : NaN;
-}
-
-function moneyRangeLabel(currency, amount) {
-  const cur = String(currency || "").toUpperCase();
-  const isCNY = (cur === "CNY" || cur === "RMB" || cur === "¥" || cur === "元");
-
-  const a = amount;
-  if (!Number.isFinite(a) || a <= 0) return placeholder("MONEY");
-
-  const bands = isCNY
-    ? [
-        [0, 500, "<500"],
-        [500, 2000, "500–2k"],
-        [2000, 10000, "2k–10k"],
-        [10000, 50000, "10k–50k"],
-        [50000, 200000, "50k–200k"],
-        [200000, Infinity, "200k+"]
-      ]
-    : [
-        [0, 100, "<100"],
-        [100, 500, "100–500"],
-        [500, 1000, "500–1k"],
-        [1000, 3000, "1k–3k"],
-        [3000, 10000, "3k–10k"],
-        [10000, 50000, "10k–50k"],
-        [50000, Infinity, "50k+"]
-      ];
-
-  for (const [lo, hi, label] of bands) {
-    if (a >= lo && a < hi) return label;
-  }
-  return placeholder("MONEY");
-}
-
-function formatCurrencyForM2(currency) {
-  const c = String(currency || "").trim();
-  if (!c) return "";
-  if (c === "€" || c.toUpperCase() === "EUR") return "EUR";
-  if (c === "$" || c.toUpperCase() === "USD") return "USD";
-  if (c === "¥" || c.toUpperCase() === "CNY" || c.toUpperCase() === "RMB") return "CNY";
-  return c.toUpperCase();
 }
 
 /* ================= init enabled ================= */
@@ -385,7 +308,7 @@ const RISK_WEIGHTS = {
   number: 2,
   money: 0,
   company: 8,
-  manual_term: 10 // ✅ manual list hits count here
+  manual_term: 10
 };
 
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
@@ -584,34 +507,50 @@ function setStage3Ui(mode){
   if (btnMan)  btnMan.textContent  = stage3Text("btnManual");
 }
 
-/* ================= Control Panel: open/close model ================= */
-function getControlPanel() {
-  return $("controlPanel");
+/* ================= NEW: unified control toggles (button + body) ================= */
+function setCtlExpanded(btn, body, expanded){
+  if (btn) btn.setAttribute("aria-expanded", expanded ? "true" : "false");
+  if (body) body.style.display = expanded ? "" : "none";
 }
 
-function setControlPanelOpen(which){
-  const cp = getControlPanel();
-  if (!cp) return;
-
-  const next = (cp.dataset.open === which) ? "" : (which || "");
-  cp.dataset.open = next;
-
-  // sync aria-expanded
-  document.querySelectorAll(".cp-toggle").forEach(btn => {
-    const isOn = (btn.dataset.toggle === next);
-    btn.setAttribute("aria-expanded", isOn ? "true" : "false");
-  });
-
-  // sync aria-hidden (paired panes rely on CSS display, aria improves accessibility)
-  document.querySelectorAll(".cp-pane").forEach(p => {
-    const k = p.dataset.pane || "";
-    const on = (k === next);
-    p.setAttribute("aria-hidden", on ? "false" : "true");
-  });
+function toggleCtl(btn, body){
+  const cur = (btn && btn.getAttribute("aria-expanded") === "true");
+  setCtlExpanded(btn, body, !cur);
 }
 
-function collapseControlPanel(){
-  setControlPanelOpen("");
+function openRiskAreaIfNeeded(){
+  // New layout
+  const btn = $("btnToggleRisk");
+  const body = $("riskBody");
+  if (btn && body) {
+    setCtlExpanded(btn, body, true);
+    return;
+  }
+  // Legacy details
+  const rd = $("riskDetails");
+  if (rd && "open" in rd) rd.open = true;
+}
+
+function collapseManualArea(){
+  const btn = $("btnToggleManual");
+  const body = $("manualBody");
+  if (btn && body) {
+    setCtlExpanded(btn, body, false);
+    return;
+  }
+  const md = $("manualDetails");
+  if (md && "open" in md) md.open = false;
+}
+
+function collapseRiskArea(){
+  const btn = $("btnToggleRisk");
+  const body = $("riskBody");
+  if (btn && body) {
+    setCtlExpanded(btn, body, false);
+    return;
+  }
+  const rd = $("riskDetails");
+  if (rd && "open" in rd) rd.open = false;
 }
 
 /* ================= UI text ================= */
@@ -629,27 +568,38 @@ function setText() {
 
   if ($("ui-upload-btn")) $("ui-upload-btn").textContent = t.btnUpload;
 
-  // Mobile tabs (legacy, m.html old) — keep safe
+  // Mobile tabs
   if ($("ui-tab-in")) $("ui-tab-in").textContent = t.tabIn || "";
   if ($("ui-tab-out")) $("ui-tab-out").textContent = t.tabOut || "";
 
-  // Risk title (now used inside cp-toggle span)
+  // NEW: control titles (button)
+  const btnMan = $("btnToggleManual");
+  const btnRisk = $("btnToggleRisk");
+  if (btnMan) btnMan.textContent = t.manualTitle || "手工输入";
+  if (btnRisk) btnRisk.textContent = (t.riskTitle || t.panelRisk || "风险评分");
+
+  // Legacy risk title (details summary)
   const riskEl = $("ui-risk-title");
   if (riskEl) {
-    riskEl.textContent = (t.riskTitle || t.panelRisk || "");
+    const isLabel = (riskEl.tagName && riskEl.tagName.toUpperCase() === "LABEL") || riskEl.hasAttribute("for");
+    riskEl.textContent = isLabel ? (t.panelRisk || t.riskTitle) : (t.riskTitle || "");
   }
 
-  // ✅ Manual terms UI
+  // Manual terms UI
   if ($("ui-manual-terms-title")) $("ui-manual-terms-title").textContent = t.manualTitle || "手工输入";
   if ($("ui-manual-terms-hint"))  $("ui-manual-terms-hint").textContent  = t.manualHint  || "支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。";
   if ($("manualTerms")) $("manualTerms").placeholder = t.manualPlaceholder || "例如：张三, 李四, Bei.de Tech GmbH";
 
-  // ✅ Money UI removed in personal build; but keep label safely if exists
+  // Rail note (new)
+  const railMan = $("ui-manual-rail-note");
+  if (railMan) railMan.textContent = t.manualHint || "支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。";
+
+  // Money UI removed
   if ($("ui-money-label")) $("ui-money-label").textContent = "";
   const sel = $("moneyMode");
   if (sel) sel.style.display = "none";
 
-  // ✅ "Filter" button removed: if legacy exists, hide it
+  // Legacy "Filter" button removed
   const btnGenerate = $("btnGenerate");
   if (btnGenerate) {
     btnGenerate.textContent = "";
@@ -707,7 +657,6 @@ function applyRules(text) {
   lastRunMeta.lang = currentLang;
 
   if (!rules) {
-    // still apply manual terms masking
     out = applyManualTermsMask(out, addHit);
 
     renderOutput(out);
@@ -744,10 +693,10 @@ function applyRules(text) {
     return out;
   }
 
-  // 1) apply manual terms first (highest priority)
+  // 1) manual terms first
   out = applyManualTermsMask(out, addHit);
 
-  // 2) apply built-in rules
+  // 2) built-in rules
   for (const key of PRIORITY) {
     if (key !== "money" && !enabledSet.has(key)) continue;
 
@@ -755,7 +704,6 @@ function applyRules(text) {
     if (!r || !r.pattern) continue;
 
     if (key === "money") {
-      // money fixed M1
       out = out.replace(r.pattern, () => {
         addHit("money");
         return placeholder("MONEY");
@@ -801,7 +749,11 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
-  // ✅ DO NOT auto-open risk panel (spec: default collapsed; user toggles)
+  // ✅ New behavior:
+  // - do NOT auto-open risk panel on output; keep collapsed unless user opens
+  // - BUT keep legacy behavior if you still rely on <details>: (set to closed by default)
+  // (No-op here)
+
   updateInputWatermarkVisibility();
   const ta = $("inputText");
   if (ta) renderInputOverlayForPdf(ta.value || "");
@@ -829,7 +781,7 @@ async function handleFile(file) {
 
   setStage3Ui("none");
 
-  // ✅ Image defaults to manual mode
+  // Image => manual mode button
   if (lastFileKind === "image") {
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
@@ -896,14 +848,6 @@ function bindPdfUI() {
 
 /* ================= bind ================= */
 function bind() {
-  // ✅ Control Panel toggles (paired open/close)
-  document.querySelectorAll(".cp-toggle").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const which = btn.dataset.toggle || "";
-      setControlPanelOpen(which);
-    });
-  });
-
   // language buttons
   document.querySelectorAll(".lang button").forEach(b => {
     b.onclick = () => {
@@ -924,13 +868,29 @@ function bind() {
     };
   });
 
-  // ✅ Manual terms input
+  // ✅ NEW: title-row toggles (if present)
+  const btnToggleManual = $("btnToggleManual");
+  const manualBody = $("manualBody");
+  if (btnToggleManual && manualBody) {
+    // default collapsed (safety)
+    setCtlExpanded(btnToggleManual, manualBody, false);
+    btnToggleManual.onclick = () => toggleCtl(btnToggleManual, manualBody);
+  }
+
+  const btnToggleRisk = $("btnToggleRisk");
+  const riskBody = $("riskBody");
+  if (btnToggleRisk && riskBody) {
+    setCtlExpanded(btnToggleRisk, riskBody, false);
+    btnToggleRisk.onclick = () => toggleCtl(btnToggleRisk, riskBody);
+  }
+
+  // ✅ Manual terms input (HTML id="manualTerms" OR fallback id="nameList")
   const termInput = $("manualTerms") || $("nameList");
   if (termInput) {
     termInput.addEventListener("input", () => {
       setManualTermsFromText(termInput.value || "");
 
-      // ✅ keep snapshot ALWAYS in sync
+      // keep snapshot ALWAYS in sync
       if (!window.__export_snapshot) window.__export_snapshot = {};
       window.__export_snapshot.manualTerms = manualTerms.slice(0);
 
@@ -946,7 +906,7 @@ function bind() {
     window.__export_snapshot.manualTerms = manualTerms.slice(0);
   }
 
-  // ✅ btnGenerate removed: if legacy exists, disable/hide safely
+  // Legacy btnGenerate: disable/hide safely
   const btnGenerate = $("btnGenerate");
   if (btnGenerate) {
     btnGenerate.onclick = null;
@@ -956,22 +916,23 @@ function bind() {
   const btnClear = $("btnClear");
   if (btnClear) {
     btnClear.onclick = () => {
-      // 1) clear input + output
       if ($("inputText")) $("inputText").value = "";
       renderOutput("");
 
-      // 2) reset risk rendering
       window.__safe_hits = 0;
       window.__safe_breakdown = {};
       window.__safe_score = 0;
       window.__safe_level = "low";
       window.__safe_report = null;
 
+      lastRunMeta.fromPdf = false;
+
+      // ✅ collapse control areas
+      collapseManualArea();
+      collapseRiskArea();
+
       const rb = $("riskBox");
       if (rb) rb.innerHTML = "";
-
-      // 3) reset PDF overlay state
-      lastRunMeta.fromPdf = false;
 
       if ($("pdfName")) $("pdfName").textContent = "";
 
@@ -982,22 +943,17 @@ function bind() {
       }
       if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
 
-      // 4) reset manual terms
+      // reset manual terms
       manualTerms = [];
       const termInput2 = $("manualTerms") || $("nameList");
       if (termInput2) termInput2.value = "";
 
-      // 5) stage3 state reset
       lastUploadedFile = null;
       lastFileKind = "";
       lastProbe = null;
       lastPdfOriginalText = "";
       setStage3Ui("none");
 
-      // 6) ✅ FORCE collapse both panels (spec)
-      collapseControlPanel();
-
-      // 7) export snapshot reset
       window.__export_snapshot = null;
 
       window.dispatchEvent(new Event("safe:updated"));
@@ -1039,7 +995,6 @@ function bind() {
     ta.addEventListener("input", () => {
       updateInputWatermarkVisibility();
 
-      // keep PDF overlay sync while typing
       if (lastRunMeta.fromPdf) renderInputOverlayForPdf(ta.value || "");
 
       const v = String(ta.value || "");
@@ -1084,9 +1039,10 @@ function bind() {
   const btnExportRasterPdf = $("btnExportRasterPdf");
   if (btnExportRasterPdf) {
     btnExportRasterPdf.onclick = async () => {
-      // NOTE: no longer auto-open panel; just render progress into riskBox
-      const rb = $("riskBox");
+      // ✅ ensure risk area visible while showing progress text
+      openRiskAreaIfNeeded();
 
+      const rb = $("riskBox");
       const say = (html) => {
         if (rb) rb.innerHTML = `<div class="tiny" style="white-space:pre-wrap;line-height:1.6;">${html}</div>`;
       };
@@ -1152,9 +1108,5 @@ function bind() {
 /* ================= boot ================= */
 initEnabled();
 setText();
-
-// ✅ Default: both groups collapsed
-collapseControlPanel();
-
 bind();
 updateInputWatermarkVisibility();
