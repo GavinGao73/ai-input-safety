@@ -48,7 +48,8 @@ const I18N = {
     inputWatermark:
       "AI systems can extract hidden text-layer data.\nAll processing runs locally. Nothing is stored or transmitted.",
 
-    btnUpload: "Upload",
+    // ✅ FIX: Upload label should not be Chinese on mobile/desktop
+    btnUpload: "Choose file",
 
     btnGenerate: "Filter",
     btnCopy: "Copy",
@@ -65,11 +66,14 @@ const I18N = {
 
     foot: "Filtering and edits are suggestions only. No legal commitment.",
 
+    // ✅ Mobile tabs
     tabIn: "Input",
     tabOut: "Output",
 
-    btnRedactPdf: "PDF",
+    // ✅ Output action (PDF)
+    btnRedactPdf: "Redact PDF",
 
+    // ✅ Manual terms card
     manualTitle: "Manual input",
     manualHint: "Separate by commas/new lines. Only masks terms that actually appear in the PDF text.",
     manualPlaceholder: "e.g. Alice, Bob, Bei.de Tech GmbH"
@@ -83,7 +87,8 @@ const I18N = {
     inputWatermark:
       "KI-Systeme lesen auch verborgene Textlayer-Daten.\nVerarbeitung erfolgt ausschließlich lokal. Keine Speicherung.",
 
-    btnUpload: "Upload",
+    // ✅ FIX: Upload label should not be Chinese on mobile/desktop
+    btnUpload: "Datei auswählen",
 
     btnGenerate: "Filtern",
     btnCopy: "Kopieren",
@@ -100,13 +105,16 @@ const I18N = {
 
     foot: "Filterung und Änderungen sind nur Vorschläge. Keine rechtliche Zusage.",
 
+    // ✅ Mobile tabs
     tabIn: "Eingabe",
     tabOut: "Ausgabe",
 
-    btnRedactPdf: "PDF",
+    // ✅ Output action (PDF)
+    btnRedactPdf: "PDF schwärzen",
 
+    // ✅ Manual terms card
     manualTitle: "Manuelle Eingabe",
-    manualHint: "Trennung per Komma/Zeilenumbruch. Es wird nur maskiert, was im PDF-Text wirklich vorkommt.",
+    manualHint: "Trennung per Komma/Zeilenumbruch. Es wird nur maskiert, was im PDF-Text wirklich vorkommt。",
     manualPlaceholder: "z.B. Max Mustermann, Erika, Bei.de Tech GmbH"
   }
 };
