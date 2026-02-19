@@ -75,7 +75,13 @@
 
           <div class="fold-body">
             <div style="display:flex;flex-direction:column;gap:10px;">
-              <input id="manualTerms" type="text" placeholder="例如：张三, 李四, Bei.de Tech GmbH" autocomplete="off" />
+              <textarea
+                id="manualTerms"
+                class="manual-terms-input"
+                placeholder="例如：张三, 李四, Bei.de Tech GmbH"
+                autocomplete="off"
+                spellcheck="false"
+              ></textarea>
 
               <div class="links">
                 <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
@@ -85,14 +91,6 @@
             </div>
           </div>
         </details>
-
-        <div class="controlbar controlbar-eq" id="leftControlBar">
-          <div class="ctl-actions">
-            <button class="btn secondary btn-s" id="btnManualRedact" style="display:none;"></button>
-          </div>
-        </div>
-
-        <div class="bottom-fixed tiny footnote accent-link" id="ui-foot"></div>
       </section>
 
       <!-- MIDDLE -->
@@ -145,6 +143,9 @@
             <div class="risk" id="riskBox"></div>
           </div>
         </details>
+
+        <!-- ✅ Footnote moved under Risk -->
+        <div class="right-foot tiny footnote accent-link" id="ui-foot"></div>
       </section>
     </div>
   </div>
