@@ -4,6 +4,8 @@
 //   so company/person rules actually participate in PDF redaction.
 // - Keep everything else the same (no UI rewiring).
 
+console.log("[APP] loaded v20260219a");
+
 let currentLang = "zh";
 window.currentLang = currentLang;
 
