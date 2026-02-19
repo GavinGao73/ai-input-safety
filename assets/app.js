@@ -1,14 +1,14 @@
-// assets/app.js
-// ✅ Personal build (2026-02-19)
-// Goals:
-// - NO auto person-name detection: only manual terms list OR manual redaction.
-// - Money protection always ON (default M1). Remove money selector UI.
-// - Replace "money" control area with manual terms UI (handled in HTML).
-// - Manual terms can be person names / company names / any exact terms that appear in PDF text-layer.
-// - Manual terms are masked with neutral placeholder: TERM => "【遮盖】" / "[REDACTED]" (no "姓名").
-// - PDF raster export receives manualTerms (raster-export.js will consume it next step).
+// =========================
+// assets/app.js (FULL)
+// ✅ Personal build (2026-02-19b)
+// Changes (this revision):
+// - Remove "Filter" button behavior (btnGenerate): UI becomes fully auto.
+// - Textarea typing now auto-filters (debounced) to match PDF auto mode.
+// - Manual terms already auto-re-filter; keep as-is.
+// - If legacy btnGenerate exists in HTML, hide it safely.
+// =========================
 
-console.log("[APP] loaded v20260219-personal");
+console.log("[APP] loaded v20260219b-personal-auto");
 
 let currentLang = "zh";
 window.currentLang = currentLang;
@@ -194,7 +194,7 @@ function applyManualTermsMask(out, addHit){
     const hasCjk = /[\u4E00-\u9FFF]/.test(tm);
     if (hasCjk) {
       const re = makeCjkTermRegex(tm);
-      s = s.replace(re, (m, p1, p2) => {
+      s = s.replace(re, (m, p1) => {
         if (typeof addHit === "function") addHit("manual_term");
         return `${p1}${placeholder("TERM")}`;
       });
@@ -613,7 +613,7 @@ function setText() {
 
   // ✅ Manual terms UI (new i18n keys; safe fallback)
   if ($("ui-manual-terms-title")) $("ui-manual-terms-title").textContent = t.manualTitle || "手工输入";
-  if ($("ui-manual-terms-hint"))  $("ui-manual-terms-hint").textContent  = t.manualHint  || "输入要遮盖的词（逗号/换行分隔）。只遮盖 PDF 原文中真实出现的内容。";
+  if ($("ui-manual-terms-hint"))  $("ui-manual-terms-hint").textContent  = t.manualHint  || "支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。";
   if ($("manualTerms")) $("manualTerms").placeholder = t.manualPlaceholder || "例如：张三, 李四, Bei.de Tech GmbH";
 
   // ✅ Money UI removed in personal build; but keep label safely if exists
@@ -621,7 +621,13 @@ function setText() {
   const sel = $("moneyMode");
   if (sel) sel.style.display = "none"; // if HTML still has it, hide
 
-  if ($("btnGenerate")) $("btnGenerate").textContent = t.btnGenerate;
+  // ✅ "Filter" button removed: if legacy exists, hide it (prevents empty primary button)
+  const btnGenerate = $("btnGenerate");
+  if (btnGenerate) {
+    btnGenerate.textContent = "";
+    btnGenerate.style.display = "none";
+  }
+
   if ($("btnCopy")) $("btnCopy").textContent = t.btnCopy;
   if ($("btnClear")) $("btnClear").textContent = t.btnClear;
 
@@ -907,15 +913,11 @@ function bind() {
     window.__export_snapshot.manualTerms = manualTerms.slice(0);
   }
 
+  // ✅ btnGenerate removed: if legacy exists, disable/hide safely
   const btnGenerate = $("btnGenerate");
   if (btnGenerate) {
-    btnGenerate.onclick = (e) => {
-      if (e) { e.preventDefault(); e.stopPropagation(); }
-      const wrap = $("inputWrap");
-      if (wrap) wrap.classList.remove("pdf-overlay-on");
-      if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
-      applyRules(($("inputText") && $("inputText").value) || "");
-    };
+    btnGenerate.onclick = null;
+    btnGenerate.style.display = "none";
   }
 
   const btnClear = $("btnClear");
@@ -990,11 +992,33 @@ function bind() {
     $("downCount").textContent = String(n);
   };
 
+  // ✅ Auto-filter on typing (debounced)
+  let autoTimer = null;
+  const AUTO_DELAY = 220;
+
   const ta = $("inputText");
   if (ta) {
     ta.addEventListener("input", () => {
       updateInputWatermarkVisibility();
+
+      // keep PDF overlay sync while typing
       if (lastRunMeta.fromPdf) renderInputOverlayForPdf(ta.value || "");
+
+      // debounced auto filtering for any typed/pasted text
+      const v = String(ta.value || "");
+      clearTimeout(autoTimer);
+      autoTimer = setTimeout(() => {
+        // avoid noisy recompute on empty
+        if (v.trim()) applyRules(v);
+        else {
+          renderOutput("");
+          const rb = $("riskBox");
+          if (rb) rb.innerHTML = "";
+          const rd = $("riskDetails");
+          if (rd) rd.open = false;
+          window.dispatchEvent(new Event("safe:updated"));
+        }
+      }, AUTO_DELAY);
     });
 
     ta.addEventListener("scroll", () => {
