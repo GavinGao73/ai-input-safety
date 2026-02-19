@@ -1,10 +1,10 @@
 <!-- =========================
-     index.html (FULL) — STRUCTURE REFACTOR (Control Panel in middle)
-     Key changes:
-     - Layout becomes: INPUT -> CONTROL PANEL -> OUTPUT (vertical stack)
-     - Manual + Risk moved into unified Control Panel (3:1 dual pane)
-     - Default: both panes collapsed (only 2 toggle rows visible)
-     - Keep all critical ids for app.js compatibility
+     index.html (FULL) — btnGenerate removed (auto filtering)
+     Layout refactor (this revision):
+     - Keep LEFT/RIGHT cards + middle logo unchanged
+     - Move titles ("手工输入" / "风险评分") OUTSIDE fold bodies (as first-class rows)
+     - Replace details with title-button + hidden panel
+     - Default collapsed (panels hidden)
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -50,13 +50,9 @@
       </div>
     </header>
 
-    <!-- =========================
-         NEW: IO vertical stack
-         INPUT -> CONTROL PANEL -> OUTPUT
-         ========================= -->
-    <main class="io-stack" id="ioStack">
-      <!-- ================= INPUT ================= -->
-      <section class="card card-col io-zone io-input" id="leftCard">
+    <div class="grid">
+      <!-- LEFT: INPUT -->
+      <section class="card card-col" id="leftCard">
         <h3 id="ui-in-title"></h3>
 
         <div class="barcard barcard-top">
@@ -75,7 +71,46 @@
           </div>
         </div>
 
-        <!-- ✅ Links stay with input zone (always visible) -->
+        <!-- =========================
+             NEW: Manual control region
+             - Title row OUTSIDE body (first-class row on big card)
+             - Body is 3:1 paired cards, default hidden
+             ========================= -->
+        <div class="ctl-region ctl-region-left" aria-label="Manual input area">
+          <!-- Title: switch/link only (no right hint text) -->
+          <button class="ctl-title" id="toggleManual" type="button" aria-expanded="false">
+            <span id="ui-manual-terms-title">手工输入</span>
+          </button>
+
+          <!-- Body: default collapsed -->
+          <div class="ctl-body" id="manualPanel" hidden>
+            <div class="ctl-grid" aria-label="Manual input cards">
+              <!-- Left wide: manual terms -->
+              <div class="ctl-card">
+                <textarea
+                  id="manualTerms"
+                  class="manual-terms-textarea"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="例如：张三, 李四, Bei.de Tech GmbH"
+                ></textarea>
+              </div>
+
+              <!-- Right narrow: explanation + actions -->
+              <div class="ctl-card ctl-card-narrow">
+                <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
+                  支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。
+                </div>
+
+                <div class="side-rail-actions">
+                  <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ Left bottom links (always visible) -->
         <div class="left-footer">
           <div class="links">
             <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
@@ -85,69 +120,26 @@
         </div>
       </section>
 
-      <!-- ================= CONTROL PANEL (NEW) ================= -->
-      <section class="card card-col control-panel" id="controlPanel" data-open="">
-        <!-- Top: ONLY two clickable titles (toggles) -->
-        <div class="cp-toggles" aria-label="Control Panel Toggles">
-          <button class="cp-toggle" type="button" data-toggle="manual" aria-expanded="false">
-            <span class="cp-toggle-title" id="ui-manual-terms-title">手工输入</span>
-            <span class="tiny muted cp-toggle-hint" id="ui-manual-terms-hint"></span>
-          </button>
+      <!-- MIDDLE (UNCHANGED) -->
+      <div class="mid-filter" aria-hidden="true">
+        <div class="flow-line"></div>
 
-          <button class="cp-toggle" type="button" data-toggle="risk" aria-expanded="false">
-            <span class="cp-toggle-title" id="ui-risk-title"></span>
-          </button>
+        <div class="filter-badge filter-badge-plain">
+          <img
+            src="./assets/logo-filter-icon.png"
+            class="filter-icon-mid"
+            alt="Filter"
+            loading="eager"
+            decoding="async"
+          />
         </div>
 
-        <!-- Body: fixed inner layout, 3:1 (left wide, right narrow) -->
-        <div class="cp-body" aria-label="Control Panel Body">
-          <div class="cp-grid">
-            <!-- LEFT 3 -->
-            <div class="cp-left">
-              <!-- MANUAL (left) -->
-              <div class="cp-pane cp-manual" data-pane="manual" aria-hidden="true">
-                <textarea
-                  id="manualTerms"
-                  class="manual-terms-textarea"
-                  spellcheck="false"
-                  autocomplete="off"
-                  placeholder="例如：张三, 李四, Bei.de Tech GmbH"
-                ></textarea>
+        <div class="flow-line"></div>
+        <div class="mid-title" id="ui-mid-title">Filter</div>
+      </div>
 
-                <!-- keep legacy manual button id for compatibility (still hidden if you want) -->
-                <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
-              </div>
-
-              <!-- RISK (left) -->
-              <div class="cp-pane cp-risk" data-pane="risk" aria-hidden="true">
-                <div class="risk" id="riskBox"></div>
-              </div>
-            </div>
-
-            <!-- RIGHT 1 -->
-            <div class="cp-right">
-              <!-- MANUAL HELP (right) -->
-              <div class="cp-pane cp-manual-help" data-pane="manual" aria-hidden="true">
-                <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
-                  支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。
-                </div>
-              </div>
-
-              <!-- RISK FEEDBACK (right) -->
-              <div class="cp-pane cp-risk-feedback" data-pane="risk" aria-hidden="true">
-                <div class="fbq" id="ui-fb-q"></div>
-                <div class="fb-buttons">
-                  <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
-                  <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ================= OUTPUT ================= -->
-      <section class="card card-col right io-zone io-output" id="rightCard">
+      <!-- RIGHT: OUTPUT -->
+      <section class="card card-col right" id="rightCard">
         <h3 id="ui-out-title"></h3>
 
         <div class="barcard barcard-top">
@@ -162,12 +154,44 @@
           <div class="output output-scroll" id="outputText"></div>
         </div>
 
-        <!-- ✅ Disclaimer stays at bottom of output zone -->
+        <!-- =========================
+             NEW: Risk control region
+             - Title row OUTSIDE body (first-class row on big card)
+             - Body is 3:1 paired cards, default hidden
+             ========================= -->
+        <div class="ctl-region ctl-region-right" aria-label="Risk and feedback area">
+          <!-- Title: switch/link only -->
+          <button class="ctl-title" id="toggleRisk" type="button" aria-expanded="false">
+            <span id="ui-risk-title"></span>
+          </button>
+
+          <!-- Body: default collapsed -->
+          <div class="ctl-body" id="riskPanel" hidden>
+            <div class="ctl-grid" aria-label="Risk cards">
+              <!-- Left wide: risk box -->
+              <div class="ctl-card">
+                <div class="risk" id="riskBox"></div>
+              </div>
+
+              <!-- Right narrow: feedback -->
+              <div class="ctl-card ctl-card-narrow">
+                <div class="fbq" id="ui-fb-q"></div>
+
+                <div class="fb-buttons">
+                  <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
+                  <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ Right bottom disclaimer (always at bottom) -->
         <div class="right-footer">
           <div class="tiny footnote accent-link" id="ui-foot"></div>
         </div>
       </section>
-    </main>
+    </div>
   </div>
 
   <!-- JS（顺序非常重要，不要改） -->
