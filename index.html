@@ -1,5 +1,8 @@
 <!-- =========================
      index.html (FULL) — btnGenerate removed (auto filtering)
+     Modified:
+     - Remove btnExportText button (duplicate with Copy)
+     - Bottom details default collapsed (manualDetails + riskDetails)
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -133,7 +136,7 @@
 
         <div class="barcard barcard-top">
           <div class="top-actions">
-            <button class="btn secondary btn-s btn-mini" id="btnExportText" style="display:none;"></button>
+            <!-- ✅ removed btnExportText -->
             <button class="btn primary btn-s btn-mini" id="btnExportRasterPdf" style="display:none;"></button>
             <button class="btn primary btn-s btn-mini" id="btnCopy"></button>
             <button class="btn secondary btn-s btn-mini" id="btnClear"></button>
@@ -146,8 +149,8 @@
 
         <!-- ===== Bottom layout (matches sketch) ===== -->
         <div class="io-bottom-grid io-bottom-grid-right" aria-label="Risk and feedback area">
-          <!-- Left: Risk (expandable) -->
-          <details class="fold fold-tight" id="riskDetails" open>
+          <!-- Left: Risk (expandable) — default collapsed -->
+          <details class="fold fold-tight" id="riskDetails">
             <summary class="fold-sum" id="ui-risk-title"></summary>
             <div class="fold-body risk-body">
               <div class="risk" id="riskBox"></div>
