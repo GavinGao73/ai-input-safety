@@ -176,7 +176,7 @@ h3{
 .btn.secondary{ background:rgba(255,255,255,.05); }
 .btn-s{ padding:8px 12px; border-radius:12px; }
 .btn-mini{ width:88px; min-width:88px; text-align:center; }
-.btn-fixed{ width:88px; min-width:88px; text-align:center; }
+.btn-fixed{ width:92px; min-width:92px; text-align:center; }
 
 .top-actions{
   display:flex;
@@ -225,27 +225,6 @@ textarea{
   min-width:0;
 }
 
-/* ✅ Manual terms input/textarea sizing (more space) */
-input#manualTerms{
-  height:42px;
-  background:var(--box-bg);
-  border:1px solid var(--box-bd);
-  border-radius:12px;
-  color:rgba(255,255,255,.92);
-  padding:10px 12px;
-}
-textarea#manualTerms{
-  width:100%;
-  min-height:120px;
-  max-height:220px;
-  resize:vertical;
-  background:var(--box-bg);
-  border:1px solid var(--box-bd);
-  border-radius:12px;
-  color:rgba(255,255,255,.92);
-  padding:12px;
-}
-
 /* highlights */
 .hl{
   background: rgba(255, 92, 92, 0.14);
@@ -256,58 +235,22 @@ textarea#manualTerms{
 }
 
 /* =========================
-   Controlbar / Feedback
-   ========================= */
-
-.controlbar{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  margin-top:10px;
-  padding:10px 10px;
-  border:1px solid var(--panel-bd);
-  border-radius:14px;
-  background:var(--panel-bg);
-  min-width:0;
-}
-.controlbar-eq{ min-height:56px; }
-
-.feedback{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  width:100%;
-  min-width:0;
-}
-.feedback-right{ justify-content:flex-end; }
-.feedback-inline .fbq{
-  color:var(--muted);
-  font-size:12px;
-  white-space:nowrap;
-  margin-right:6px;
-}
-.iconbtn{
-  border:1px solid var(--line);
-  background:rgba(255,255,255,.05);
-  color:var(--text);
-  border-radius:12px;
-  padding:7px 12px;
-  cursor:pointer;
-}
-
-/* =========================
    Fold blocks
    ========================= */
 
 .fold{
-  margin-top:10px;
   border:1px solid var(--panel-bd);
   border-radius:14px;
   background:var(--panel-bg);
   overflow:hidden;
+  min-width:0;
 }
-.fold-eq{ min-height:56px; }
+
+/* ✅ Tight: folded state has NO forced empty height */
+.fold-tight{
+  margin-top:10px;
+}
+
 .fold-sum{
   list-style:none;
   cursor:pointer;
@@ -318,32 +261,117 @@ textarea#manualTerms{
   display:flex;
   align-items:center;
   justify-content:space-between;
+  gap:12px;
 }
 .fold summary::-webkit-details-marker{ display:none; }
+
 .fold-body{
-  padding:14px 12px 12px;
-  max-height: 340px; /* ✅ more room for Manual terms */
+  padding:12px 12px 12px;
+  max-height: 320px;
   overflow:auto;
 }
 
-/* ✅ Manual card header layout */
-.manual-sum{ gap:12px; }
-.manual-sum-title{ flex:1 1 auto; min-width:0; }
-.manual-sum-right{
-  flex:0 0 auto;
-  display:flex;
-  flex-direction:column;
-  align-items:flex-end;
-  gap:6px;
-}
-.manual-sum-right .btn{ width:92px; min-width:92px; }
-.manual-sum-hint{
-  max-width: 220px;
-  text-align:right;
-  line-height:1.25;
+/* =========================
+   Manual / Risk bottom layout (matches sketch)
+   ========================= */
+
+.io-bottom-grid{
+  margin-top:10px;
+  display:grid;
+  grid-template-columns: 1fr 180px;
+  gap:12px;
+  align-items:stretch;
+  min-width:0;
 }
 
-/* risk */
+/* Ensure left/right bottom zones feel balanced */
+.io-bottom-grid-left{
+  /* under input */
+}
+.io-bottom-grid-right{
+  /* under output */
+}
+
+.side-rail{
+  border:1px solid var(--panel-bd);
+  border-radius:14px;
+  background:var(--panel-bg);
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-width:0;
+}
+
+.side-rail-note{
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.35;
+  opacity:.9;
+}
+
+.side-rail-actions{
+  margin-top:auto;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+/* Manual summary: title left, hint right (same row) */
+.manual-sum-title{ flex:1 1 auto; min-width:0; }
+
+/* Manual textarea inside fold */
+.manual-body{
+  padding-top:10px;
+}
+.manual-terms-textarea{
+  width:100%;
+  min-height: 220px;            /* ✅ gives real space */
+  height: 220px;
+  max-height: none;
+  resize: vertical;
+  background:var(--box-bg);
+  border:1px solid var(--box-bd);
+  border-radius:12px;
+  color:rgba(255,255,255,.92);
+  padding:12px;
+  outline:none;
+}
+
+/* Risk body */
+.risk-body{
+  padding-top:10px;
+}
+
+/* =========================
+   Feedback (right rail)
+   ========================= */
+
+.fbq{
+  color:var(--muted);
+  font-size:12px;
+  white-space:nowrap;
+}
+
+.fb-buttons{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.iconbtn{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.05);
+  color:var(--text);
+  border-radius:12px;
+  padding:8px 12px;
+  cursor:pointer;
+}
+
+/* =========================
+   Risk internal blocks (kept)
+   ========================= */
+
 .risk{ padding:0; border:0; background:transparent; }
 .riskhead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
 .riskmeta{ margin-top:2px; color:var(--muted); font-size:12px; }
@@ -373,14 +401,27 @@ textarea#manualTerms{
 .riskitem .rv{ font-size:12px; color:var(--muted); }
 .riskadvice{ font-size:12px; line-height:1.5; color:rgba(255,255,255,.82); }
 
-/* footer */
-.bottom-fixed{ margin-top:auto; padding-top:12px; }
+/* =========================
+   Footer areas (left links + right disclaimer)
+   ========================= */
+
+.left-footer{
+  margin-top:auto;
+  padding-top:12px;
+}
+
+.right-footer{
+  margin-top:auto;
+  padding-top:12px;
+}
+
 .accent-link{ color: rgba(120,255,240,.80); }
 
 .links{
   display:flex;
   gap:12px;
   font-size:12px;
+  flex-wrap:wrap;
 }
 .links a{
   color:rgba(120,255,240,.80);
@@ -391,14 +432,6 @@ textarea#manualTerms{
 #ui-foot{
   font-size:12px;
   line-height:1.45;
-}
-
-/* ✅ When footnote is placed under Risk in RIGHT card */
-#rightCard #ui-foot{
-  margin-top:10px;
-  padding-top:10px;
-  border-top:1px solid var(--panel-bd);
-  color: rgba(120,255,240,.80);
 }
 
 /* =========================
@@ -530,89 +563,12 @@ textarea#manualTerms{
 
   .card{ padding:10px; border-radius:14px; }
   .barcard{ padding:8px; border-radius:14px; }
-  .controlbar{ padding:8px; gap:8px; border-radius:14px; }
 
   h3{ font-size:12px; margin:4px 0 6px; }
 
-  .wrap-mobile{
-    min-height: 100dvh;
-    display:flex;
-    flex-direction:column;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom));
-  }
-  @supports not (height: 1dvh){
-    .wrap-mobile{ min-height: 100vh; }
-  }
-
-  .io-tabs{
-    display:flex;
-    gap:8px;
-    margin: 8px 0 10px;
-    flex: 0 0 auto;
-  }
-  .io-tabs .btn{
-    flex:1 1 0;
-    min-height:38px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
-
-  #tab-in:checked ~ .io-tabs label[for="tab-in"],
-  #tab-out:checked ~ .io-tabs label[for="tab-out"]{
-    background: rgba(43,144,255,.20);
-    border-color: rgba(43,144,255,.35);
-    color: rgba(255,255,255,.92);
-  }
-
-  .grid-mobile-one{
-    flex: 1 1 auto;
-    display:flex;
-    flex-direction:column;
-    min-height:0;
-  }
-
-  .io-panel{ display:none; }
-  #tab-in:checked ~ .grid-mobile-one .io-in{ display:flex; }
-  #tab-out:checked ~ .grid-mobile-one .io-out{ display:flex; }
-
-  .io-panel{
-    flex: 1 1 auto;
-    flex-direction:column;
-    min-height:0;
-  }
-  .io-panel.card-col{ min-height:0 !important; }
-
-  .io-panel .outbox{
-    flex:1 1 auto;
-    min-height:0;
-    display:flex;
-    flex-direction:column;
-  }
-  .io-panel .textarea-wrap{
-    flex:1 1 auto;
-    min-height:0;
-    display:flex;
-    flex-direction:column;
-  }
-
-  .io-panel textarea{
-    flex:1 1 auto;
-    height:auto !important;
-    max-height:none !important;
-    min-height:0 !important;
-    overflow:auto !important;
-    padding:10px;
-  }
-
-  .io-panel .output{
-    flex:1 1 auto;
-    height:auto !important;
-    max-height:none !important;
-    min-height:0 !important;
-    overflow:auto !important;
-    padding:10px;
-  }
+  /* Do not apply desktop bottom grid on mobile */
+  .io-bottom-grid{ display:block; }
+  .side-rail{ margin-top:10px; }
 
   textarea, .output, .input-overlay{
     font-size: 11.5px;
@@ -620,6 +576,7 @@ textarea#manualTerms{
   }
 
   .filebar{ gap:8px; }
+
   #pdfName.filename{
     text-align:center;
     flex:1 1 auto;
@@ -628,20 +585,13 @@ textarea#manualTerms{
     opacity:.75;
     padding:0 6px;
   }
-  #btnClear{ margin-left:auto; }
 
   .top-actions{ gap:10px; }
   .top-actions .btn{ flex:1 1 0; min-width:0; }
 
   #btnExportText{ display:none !important; }
 
-  .mobile-footer{
-    margin-top:10px;
-    padding-top:8px;
-    flex:0 0 auto;
-  }
-
-  .grid, .card, .card-col, .filebar, .top-actions, .controlbar, .filename{ min-width:0; }
+  .grid, .card, .card-col, .filebar, .top-actions, .filename{ min-width:0; }
   textarea, .output{
     width:100%;
     max-width:100%;
@@ -680,4 +630,3 @@ textarea#manualTerms{
   max-height: none !important;
   overflow: auto !important;
 }
-
