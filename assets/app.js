@@ -1,14 +1,13 @@
 // =========================
 // assets/app.js (FULL)
 // ✅ Personal build (2026-02-19b)
-// Changes (this revision):
-// - Remove "Filter" button behavior (btnGenerate): UI becomes fully auto.
-// - Textarea typing now auto-filters (debounced) to match PDF auto mode.
-// - Manual terms already auto-re-filter; keep as-is.
-// - If legacy btnGenerate exists in HTML, hide it safely.
+// ✅ Control Panel refactor (2026-02-19c):
+// - New unified Control Panel (manual/risk) with paired panes
+// - No details nesting; default collapsed; no auto-open on output
+// - btnClear hard clears + forces both panels collapsed
 // =========================
 
-console.log("[APP] loaded v20260219b-personal-auto");
+console.log("[APP] loaded v20260219c-personal-auto-controlpanel");
 
 let currentLang = "zh";
 window.currentLang = currentLang;
@@ -585,6 +584,36 @@ function setStage3Ui(mode){
   if (btnMan)  btnMan.textContent  = stage3Text("btnManual");
 }
 
+/* ================= Control Panel: open/close model ================= */
+function getControlPanel() {
+  return $("controlPanel");
+}
+
+function setControlPanelOpen(which){
+  const cp = getControlPanel();
+  if (!cp) return;
+
+  const next = (cp.dataset.open === which) ? "" : (which || "");
+  cp.dataset.open = next;
+
+  // sync aria-expanded
+  document.querySelectorAll(".cp-toggle").forEach(btn => {
+    const isOn = (btn.dataset.toggle === next);
+    btn.setAttribute("aria-expanded", isOn ? "true" : "false");
+  });
+
+  // sync aria-hidden (paired panes rely on CSS display, aria improves accessibility)
+  document.querySelectorAll(".cp-pane").forEach(p => {
+    const k = p.dataset.pane || "";
+    const on = (k === next);
+    p.setAttribute("aria-hidden", on ? "false" : "true");
+  });
+}
+
+function collapseControlPanel(){
+  setControlPanelOpen("");
+}
+
 /* ================= UI text ================= */
 function setText() {
   const t = window.I18N && window.I18N[currentLang];
@@ -600,18 +629,17 @@ function setText() {
 
   if ($("ui-upload-btn")) $("ui-upload-btn").textContent = t.btnUpload;
 
-  // Mobile tabs
+  // Mobile tabs (legacy, m.html old) — keep safe
   if ($("ui-tab-in")) $("ui-tab-in").textContent = t.tabIn || "";
   if ($("ui-tab-out")) $("ui-tab-out").textContent = t.tabOut || "";
 
-  // Risk title (details/label dual-use)
+  // Risk title (now used inside cp-toggle span)
   const riskEl = $("ui-risk-title");
   if (riskEl) {
-    const isLabel = (riskEl.tagName && riskEl.tagName.toUpperCase() === "LABEL") || riskEl.hasAttribute("for");
-    riskEl.textContent = isLabel ? (t.panelRisk || t.riskTitle) : (t.riskTitle || "");
+    riskEl.textContent = (t.riskTitle || t.panelRisk || "");
   }
 
-  // ✅ Manual terms UI (new i18n keys; safe fallback)
+  // ✅ Manual terms UI
   if ($("ui-manual-terms-title")) $("ui-manual-terms-title").textContent = t.manualTitle || "手工输入";
   if ($("ui-manual-terms-hint"))  $("ui-manual-terms-hint").textContent  = t.manualHint  || "支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。";
   if ($("manualTerms")) $("manualTerms").placeholder = t.manualPlaceholder || "例如：张三, 李四, Bei.de Tech GmbH";
@@ -619,9 +647,9 @@ function setText() {
   // ✅ Money UI removed in personal build; but keep label safely if exists
   if ($("ui-money-label")) $("ui-money-label").textContent = "";
   const sel = $("moneyMode");
-  if (sel) sel.style.display = "none"; // if HTML still has it, hide
+  if (sel) sel.style.display = "none";
 
-  // ✅ "Filter" button removed: if legacy exists, hide it (prevents empty primary button)
+  // ✅ "Filter" button removed: if legacy exists, hide it
   const btnGenerate = $("btnGenerate");
   if (btnGenerate) {
     btnGenerate.textContent = "";
@@ -773,10 +801,7 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
-  const hasOut = String(out || "").trim().length > 0;
-  const rd = $("riskDetails");
-  if (rd) rd.open = hasOut;
-
+  // ✅ DO NOT auto-open risk panel (spec: default collapsed; user toggles)
   updateInputWatermarkVisibility();
   const ta = $("inputText");
   if (ta) renderInputOverlayForPdf(ta.value || "");
@@ -871,6 +896,14 @@ function bindPdfUI() {
 
 /* ================= bind ================= */
 function bind() {
+  // ✅ Control Panel toggles (paired open/close)
+  document.querySelectorAll(".cp-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const which = btn.dataset.toggle || "";
+      setControlPanelOpen(which);
+    });
+  });
+
   // language buttons
   document.querySelectorAll(".lang button").forEach(b => {
     b.onclick = () => {
@@ -891,13 +924,13 @@ function bind() {
     };
   });
 
-  // ✅ Manual terms input (HTML id="manualTerms" OR fallback id="nameList")
+  // ✅ Manual terms input
   const termInput = $("manualTerms") || $("nameList");
   if (termInput) {
     termInput.addEventListener("input", () => {
       setManualTermsFromText(termInput.value || "");
 
-      // ✅ keep snapshot ALWAYS in sync (prevents raster export missing manual terms)
+      // ✅ keep snapshot ALWAYS in sync
       if (!window.__export_snapshot) window.__export_snapshot = {};
       window.__export_snapshot.manualTerms = manualTerms.slice(0);
 
@@ -923,25 +956,22 @@ function bind() {
   const btnClear = $("btnClear");
   if (btnClear) {
     btnClear.onclick = () => {
+      // 1) clear input + output
       if ($("inputText")) $("inputText").value = "";
       renderOutput("");
 
+      // 2) reset risk rendering
       window.__safe_hits = 0;
       window.__safe_breakdown = {};
       window.__safe_score = 0;
       window.__safe_level = "low";
       window.__safe_report = null;
 
-      lastRunMeta.fromPdf = false;
-      
-      const md = $("manualDetails");
-      if (md) md.open = false;   // ✅ 清空后强制折叠“手工输入”
-
       const rb = $("riskBox");
       if (rb) rb.innerHTML = "";
 
-      const rd = $("riskDetails");
-      if (rd) rd.open = false;
+      // 3) reset PDF overlay state
+      lastRunMeta.fromPdf = false;
 
       if ($("pdfName")) $("pdfName").textContent = "";
 
@@ -952,17 +982,22 @@ function bind() {
       }
       if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
 
-      // reset manual terms
+      // 4) reset manual terms
       manualTerms = [];
       const termInput2 = $("manualTerms") || $("nameList");
       if (termInput2) termInput2.value = "";
 
+      // 5) stage3 state reset
       lastUploadedFile = null;
       lastFileKind = "";
       lastProbe = null;
       lastPdfOriginalText = "";
       setStage3Ui("none");
 
+      // 6) ✅ FORCE collapse both panels (spec)
+      collapseControlPanel();
+
+      // 7) export snapshot reset
       window.__export_snapshot = null;
 
       window.dispatchEvent(new Event("safe:updated"));
@@ -1007,18 +1042,14 @@ function bind() {
       // keep PDF overlay sync while typing
       if (lastRunMeta.fromPdf) renderInputOverlayForPdf(ta.value || "");
 
-      // debounced auto filtering for any typed/pasted text
       const v = String(ta.value || "");
       clearTimeout(autoTimer);
       autoTimer = setTimeout(() => {
-        // avoid noisy recompute on empty
         if (v.trim()) applyRules(v);
         else {
           renderOutput("");
           const rb = $("riskBox");
           if (rb) rb.innerHTML = "";
-          const rd = $("riskDetails");
-          if (rd) rd.open = false;
           window.dispatchEvent(new Event("safe:updated"));
         }
       }, AUTO_DELAY);
@@ -1053,9 +1084,8 @@ function bind() {
   const btnExportRasterPdf = $("btnExportRasterPdf");
   if (btnExportRasterPdf) {
     btnExportRasterPdf.onclick = async () => {
+      // NOTE: no longer auto-open panel; just render progress into riskBox
       const rb = $("riskBox");
-      const rd = $("riskDetails");
-      if (rd) rd.open = true;
 
       const say = (html) => {
         if (rb) rb.innerHTML = `<div class="tiny" style="white-space:pre-wrap;line-height:1.6;">${html}</div>`;
@@ -1122,6 +1152,9 @@ function bind() {
 /* ================= boot ================= */
 initEnabled();
 setText();
+
+// ✅ Default: both groups collapsed
+collapseControlPanel();
+
 bind();
 updateInputWatermarkVisibility();
-
