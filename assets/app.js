@@ -763,15 +763,16 @@ function bind() {
   }
 
   const btnGenerate = $("btnGenerate");
-  if (btnGenerate) {
-    btnGenerate.onclick = () => {
-      lastRunMeta.fromPdf = false;
-      const wrap = $("inputWrap");
-      if (wrap) wrap.classList.remove("pdf-overlay-on");
-      if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
-      applyRules(($("inputText") && $("inputText").value) || "");
-    };
-  }
+if (btnGenerate) {
+  btnGenerate.onclick = (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); } // ✅ prevent <summary> toggling
+    lastRunMeta.fromPdf = false;
+    const wrap = $("inputWrap");
+    if (wrap) wrap.classList.remove("pdf-overlay-on");
+    if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
+    applyRules(($("inputText") && $("inputText").value) || "");
+  };
+}
 
   const btnClear = $("btnClear");
   if (btnClear) {
