@@ -1,5 +1,8 @@
 <!-- =========================
      m.html (FULL) — btnGenerate removed (auto filtering)
+     Modified:
+     - Remove btnExportText button (duplicate with Copy)
+     - Bottom details default collapsed (manualDetails + riskDetails)
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -130,7 +133,7 @@
           </div>
         </div>
 
-        <!-- ✅ Manual input card (AUTO): no filter button -->
+        <!-- ✅ Manual input card (AUTO): no filter button — default collapsed -->
         <details class="fold fold-eq" id="manualDetails">
           <summary class="fold-sum manual-sum" id="ui-manual-terms-sum">
             <span class="manual-sum-title" id="ui-manual-terms-title">手工输入</span>
@@ -167,7 +170,7 @@
 
         <div class="barcard barcard-top">
           <div class="top-actions">
-            <button class="btn secondary btn-s btn-mini btn-slim" id="btnExportText" style="display:none;"></button>
+            <!-- ✅ removed btnExportText -->
             <button class="btn primary btn-s btn-mini btn-slim" id="btnExportRasterPdf" style="display:none;"></button>
             <button class="btn primary btn-s btn-mini btn-slim" id="btnCopy"></button>
           </div>
@@ -185,7 +188,7 @@
           </div>
         </div>
 
-        <!-- ✅ Risk here -->
+        <!-- ✅ Risk here — default collapsed -->
         <details class="fold fold-eq" id="riskDetails">
           <summary class="fold-sum" id="ui-risk-title"></summary>
           <div class="fold-body">
