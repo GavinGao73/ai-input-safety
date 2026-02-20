@@ -12,11 +12,13 @@ const I18N = {
 
     btnUpload: "上传文件",
 
+    // legacy (btnGenerate removed in app.js, but keep for compatibility)
     btnGenerate: "过滤",
     btnCopy: "复制",
     btnCopied: "✔ 已复制",
     btnClear: "清空",
 
+    // toggle titles
     riskTitle: "风险评分",
 
     fbQ: "有帮助吗？",
@@ -27,17 +29,31 @@ const I18N = {
 
     foot: "过滤和修改仅为建议，不构成法律承诺",
 
-    // ✅ Mobile tabs
+    // Mobile tabs
     tabIn: "输入",
     tabOut: "输出",
 
-    // ✅ Output action (PDF)
+    // Output action (PDF)
     btnRedactPdf: "红删PDF",
 
-    // ✅ Manual terms card
+    // Manual terms card
     manualTitle: "手工输入",
     manualHint: "支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。",
-    manualPlaceholder: "例如：张三, 李四, Bei.de Tech GmbH"
+    manualPlaceholder: "例如：张三, 李四, Bei.de Tech GmbH",
+
+    // ✅ NEW: right rail “Input tips”
+    manualRailTitle: "输入提示",
+    manualRailText:
+      "支持逗号/换行分隔。\n只会遮盖：① 你上传的 PDF 原文里真实出现的词；② 你在输入框里粘贴的文本里出现的词。\n建议把姓名/公司/邮箱前缀/项目代号等高风险关键词补充进来。",
+
+    // ✅ NEW: export/progress messages (for RasterExport status area)
+    progressWorking: "处理中…",
+    progressDone: "完成 ✅ 已开始下载。",
+    progressNoFile: "未检测到文件，请先上传 PDF。",
+    progressNotPdf: "当前不是 PDF 文件。",
+    progressNotReadable: "PDF 不可读（Mode B），请使用人工处理。",
+    progressExportMissing: "导出模块未加载",
+    progressFailed: "导出失败："
   },
 
   en: {
@@ -48,7 +64,6 @@ const I18N = {
     inputWatermark:
       "AI systems can extract hidden text-layer data.\nAll processing runs locally. Nothing is stored or transmitted.",
 
-    // ✅ FIX: Upload label should not be Chinese on mobile/desktop
     btnUpload: "Choose file",
 
     btnGenerate: "Filter",
@@ -66,17 +81,27 @@ const I18N = {
 
     foot: "Filtering and edits are suggestions only. No legal commitment.",
 
-    // ✅ Mobile tabs
     tabIn: "Input",
     tabOut: "Output",
 
-    // ✅ Output action (PDF)
     btnRedactPdf: "Redact PDF",
 
-    // ✅ Manual terms card
     manualTitle: "Manual input",
     manualHint: "Separate by commas/new lines. Only masks terms that actually appear in the PDF text.",
-    manualPlaceholder: "e.g. Alice, Bob, Bei.de Tech GmbH"
+    manualPlaceholder: "e.g. Alice, Bob, Bei.de Tech GmbH",
+
+    // ✅ NEW
+    manualRailTitle: "Input tips",
+    manualRailText:
+      "Separate by commas or new lines.\nOnly masks: (1) terms that actually appear in the uploaded PDF text; (2) terms that appear in your pasted input.\nTip: add names, companies, email prefixes, project codes, or other high-risk keywords here.",
+
+    progressWorking: "Working…",
+    progressDone: "Done ✅ Download started.",
+    progressNoFile: "No file detected. Please upload a PDF first.",
+    progressNotPdf: "This is not a PDF file.",
+    progressNotReadable: "PDF not readable (Mode B). Use Manual.",
+    progressExportMissing: "Export module not loaded",
+    progressFailed: "Export failed:"
   },
 
   de: {
@@ -87,7 +112,6 @@ const I18N = {
     inputWatermark:
       "KI-Systeme lesen auch verborgene Textlayer-Daten.\nVerarbeitung erfolgt ausschließlich lokal. Keine Speicherung.",
 
-    // ✅ FIX: Upload label should not be Chinese on mobile/desktop
     btnUpload: "Datei auswählen",
 
     btnGenerate: "Filtern",
@@ -105,17 +129,27 @@ const I18N = {
 
     foot: "Filterung und Änderungen sind nur Vorschläge. Keine rechtliche Zusage.",
 
-    // ✅ Mobile tabs
     tabIn: "Eingabe",
     tabOut: "Ausgabe",
 
-    // ✅ Output action (PDF)
     btnRedactPdf: "PDF schwärzen",
 
-    // ✅ Manual terms card
     manualTitle: "Manuelle Eingabe",
     manualHint: "Trennung per Komma/Zeilenumbruch. Es wird nur maskiert, was im PDF-Text wirklich vorkommt。",
-    manualPlaceholder: "z.B. Max Mustermann, Erika, Bei.de Tech GmbH"
+    manualPlaceholder: "z.B. Max Mustermann, Erika, Bei.de Tech GmbH",
+
+    // ✅ NEW
+    manualRailTitle: "Eingabe-Hinweise",
+    manualRailText:
+      "Trennung per Komma oder Zeilenumbruch.\nMaskiert wird nur: (1) was im hochgeladenen PDF-Text wirklich vorkommt; (2) was in deinem eingefügten Text vorkommt.\nTipp: Namen, Firmen, E-Mail-Präfixe, Projektcodes und andere Risiko-Keywords ergänzen.",
+
+    progressWorking: "Wird verarbeitet…",
+    progressDone: "Fertig ✅ Download gestartet.",
+    progressNoFile: "Keine Datei erkannt. Bitte zuerst ein PDF hochladen.",
+    progressNotPdf: "Keine PDF-Datei.",
+    progressNotReadable: "PDF nicht lesbar (Mode B). Bitte Manuell verwenden.",
+    progressExportMissing: "Export-Modul nicht geladen",
+    progressFailed: "Export fehlgeschlagen:"
   }
 };
 
