@@ -3,8 +3,11 @@
    (UPDATED)
    - FIX textarea horizontal scroll + remove double-scroll feeling
    - FIX PDF overlay inset so scrollbar drag works
-   - Add rail title/divider + export/progress area helpers
-   - Keep your unified toggle (.ctlbar/.ctlbtn + .io-body.open)
+   - FIX double scrollbar in PDF overlay mode (overlay no longer scrolls)
+   - FIX collapsed area no blank: footer no longer uses margin-top:auto (Option B)
+   - CHANGE expanded card ratio to 3:2
+   - Shrink ctlbar height to match upload barcard
+   - Add rail title/divider + rail text helpers
    ========================= */
 
 :root{
@@ -114,7 +117,7 @@ header{
 .card-col{
   display:flex;
   flex-direction:column;
-  min-height: 680px;
+  min-height: 680px; /* keep */
   min-width:0;
 }
 
@@ -216,7 +219,7 @@ textarea{
   color:rgba(255,255,255,.92);
   padding:12px;
 
-  white-space:pre;           /* no soft wrap */
+  white-space:pre;
   overflow-wrap:normal;
   word-break:normal;
 
@@ -409,14 +412,16 @@ textarea{
 }
 #inputWrap.has-content .input-watermark{ display:none; }
 
-/* ✅ overlay inset so it NEVER blocks scrollbar drag area */
+/* ✅ overlay inset so it NEVER blocks scrollbar drag area
+   ✅ overlay must NOT have its own scrollbars (prevents double scrollbar) */
 .input-overlay{
   display:none;
   position:absolute;
   left:12px; right:12px; top:12px; bottom:12px;
   padding:0;
   border-radius:10px;
-  overflow:auto;
+
+  overflow:hidden; /* ✅关键：不产生第二套滚动条 */
 
   white-space:pre;
   overflow-wrap:normal;
@@ -528,7 +533,7 @@ textarea{
 }
 .ctl-grid{
   display:grid;
-  grid-template-columns: 3fr 1fr;
+  grid-template-columns: 3fr 2fr; /* ✅ 3:2 */
   gap:12px;
   align-items:stretch;
   min-width:0;
@@ -553,7 +558,7 @@ textarea{
 
 .io-bottom-grid{
   display:grid;
-  grid-template-columns: 3fr 1fr;
+  grid-template-columns: 3fr 2fr; /* ✅ 3:2 */
   gap:12px;
   margin-top:10px;
   align-items:stretch;
@@ -614,13 +619,13 @@ textarea{
   min-width:0;
 }
 
-/* footers */
+/* footers (Option B: no auto push) */
 .left-footer{
-  margin-top:auto;
+  margin-top:0;
   padding-top:12px;
 }
 .right-footer{
-  margin-top:auto;
+  margin-top:0;
   padding-top:12px;
 }
 
@@ -762,7 +767,7 @@ textarea{
     word-break:break-word;
   }
 
-  /* stack 3:1 cards on mobile */
+  /* stack cards on mobile */
   .ctl-grid{ grid-template-columns: 1fr; }
 }
 
@@ -803,6 +808,9 @@ textarea{
 
 .ctlbar{ margin-top:10px; }
 
+/* ✅ shrink ctlbar height to match upload barcard */
+.barcard.ctlbar{ padding:0; }
+
 .ctlbtn{
   width:100%;
   border:0;
@@ -814,8 +822,9 @@ textarea{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:12px 12px;
-  min-height:56px;
+
+  padding:10px 12px;   /* smaller */
+  min-height:46px;     /* smaller */
   text-align:left;
 }
 .ctlbtn::after{
@@ -829,7 +838,7 @@ textarea{
 
 .io-body{
   margin-top:10px;
-  display:none; /* default collapsed */
+  display:none;
 }
 .io-body.open{
   display:block;
@@ -837,7 +846,7 @@ textarea{
 
 .io-bottom-grid{
   display:grid;
-  grid-template-columns: 3fr 1fr;
+  grid-template-columns: 3fr 2fr; /* ✅ 3:2 */
   gap:12px;
   align-items:stretch;
   min-width:0;
@@ -869,12 +878,18 @@ textarea{
   color: rgba(255,255,255,.88);
   letter-spacing:.2px;
 }
-
 .rail-divider{
   height:1px;
   width:100%;
   background: rgba(255,255,255,.08);
   margin:4px 0;
+}
+/* ✅ body text must NOT be larger than title */
+.rail-text{
+  font-size:11px;
+  line-height:1.45;
+  color:rgba(255,255,255,.72);
+  white-space:pre-line;
 }
 
 .railcard .fbq{
@@ -892,8 +907,7 @@ textarea{
   justify-content:center;
 }
 
-/* Mobile: 3:1 becomes 1 column */
+/* Mobile: stack */
 @media (max-width: 560px){
   .io-bottom-grid{ grid-template-columns: 1fr; }
 }
-
