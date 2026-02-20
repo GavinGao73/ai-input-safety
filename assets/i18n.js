@@ -19,7 +19,8 @@ const I18N = {
 
     // toggle titles
     riskTitle: "风险评分",
-    manualTitle: "手工输入",
+    // ✅ 更通用：Mode A=手工词条；Mode B=人工处理（框选）
+    manualTitle: "手工处理",
 
     fbQ: "有帮助吗？",
 
@@ -36,14 +37,15 @@ const I18N = {
     // Output action (PDF)
     btnRedactPdf: "红删PDF",
 
-    // Manual terms card
+    // Manual terms card (Mode A)
     manualHint: "支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。",
     manualPlaceholder: "例如：张三, 李四, Bei.de Tech GmbH",
 
-    // ✅ rail titles + text
-    manualRailTitle: "输入提示",
+    // ✅ rail titles + text (cover Mode A + Mode B)
+    manualRailTitle: "使用说明",
     manualRailText:
-      "支持逗号或换行分隔。\n只会遮盖：\n① 你上传的 PDF 原文里真实出现的词；\n② 你在输入框里粘贴的文本里出现的词。\n建议把姓名/公司/邮箱/及其他个人认为有风险关键词补充进来。",
+      "若 PDF 可读（Mode A）：\n- 在此输入需要额外遮盖的关键词（逗号或换行分隔）。\n- 只会遮盖：① 你上传的 PDF 原文里真实出现的词；② 你在输入框里粘贴的文本里出现的词。\n\n若 PDF 不可读/图片（Mode B）：\n- 点击「人工处理」进入框选遮盖。\n- 可多次框选，支持清空本页/全部，导出红删 PDF。",
+
     exportTitle: "生成进程",
 
     // progress messages
@@ -72,7 +74,8 @@ const I18N = {
     btnClear: "Clear",
 
     riskTitle: "Risk score",
-    manualTitle: "Manual input",
+    // ✅ more general
+    manualTitle: "Manual",
 
     fbQ: "Helpful?",
 
@@ -87,12 +90,15 @@ const I18N = {
 
     btnRedactPdf: "Redact PDF",
 
+    // Manual terms card (Mode A)
     manualHint: "Separate by commas/new lines. Only masks terms that actually appear in the PDF text.",
     manualPlaceholder: "e.g. Alice, Bob, Bei.de Tech GmbH",
 
-    manualRailTitle: "Input tips",
+    // ✅ rail titles + text (Mode A + Mode B)
+    manualRailTitle: "How it works",
     manualRailText:
-      "Separate by commas or new lines.\nOnly masks:\n① terms that actually appear in the uploaded PDF text;\n② terms that appear in your pasted input.\nTip: add names, companies, emails, or any keywords you consider risky here.",
+      "If the PDF is readable (Mode A):\n- Enter extra terms to mask (comma/new-line separated).\n- Only masks: ① terms that actually appear in the uploaded PDF text; ② terms that appear in your pasted input.\n\nIf the PDF is not readable / image (Mode B):\n- Click “Manual” to mark areas with rectangles.\n- You can add multiple boxes, clear page/all, and export a redacted raster PDF.",
+
     exportTitle: "Progress",
 
     progressWorking: "Working…",
@@ -120,7 +126,8 @@ const I18N = {
     btnClear: "Leeren",
 
     riskTitle: "Risikowert",
-    manualTitle: "Manuelle Eingabe",
+    // ✅ more general
+    manualTitle: "Manuell",
 
     fbQ: "Hilfreich?",
 
@@ -135,12 +142,15 @@ const I18N = {
 
     btnRedactPdf: "PDF schwärzen",
 
+    // Manual terms card (Mode A)
     manualHint: "Trennung per Komma/Zeilenumbruch. Es wird nur maskiert, was im PDF-Text wirklich vorkommt.",
     manualPlaceholder: "z.B. Max Mustermann, Erika, Bei.de Tech GmbH",
 
-    manualRailTitle: "Eingabe-Hinweise",
+    // ✅ rail titles + text (Mode A + Mode B)
+    manualRailTitle: "So funktioniert’s",
     manualRailText:
-      "Trennung per Komma oder Zeilenumbruch.\nMaskiert wird nur:\n① was im hochgeladenen PDF-Text wirklich vorkommt;\n② was in deinem eingefügten Text vorkommt.\nTipp: Namen/Firmen/E-Mails und andere Risiko-Keywords ergänzen.",
+      "Wenn das PDF lesbar ist (Mode A):\n- Zusätzliche Begriffe zum Maskieren eingeben (Komma/Zeilenumbruch).\n- Maskiert wird nur: ① was im hochgeladenen PDF-Text wirklich vorkommt; ② was in deinem eingefügten Text vorkommt.\n\nWenn das PDF nicht lesbar ist / Bild (Mode B):\n- „Manuell“ klicken und Bereiche per Rechteck markieren.\n- Mehrfach markieren, Seite/Alles löschen und als Raster-PDF exportieren.",
+
     exportTitle: "Fortschritt",
 
     progressWorking: "Wird verarbeitet…",
