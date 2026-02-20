@@ -1,13 +1,12 @@
 /* =========================
    assets/styles.css (FULL, consolidated)
-   (UPDATED)
-   - FIX textarea horizontal scroll + remove double-scroll feeling
-   - FIX PDF overlay inset so scrollbar drag works
-   - FIX double scrollbar in PDF overlay mode (overlay no longer scrolls)
-   - FIX collapsed area no blank: footer no longer uses margin-top:auto (Option B)
-   - CHANGE expanded card ratio to 3:2
-   - Shrink ctlbar height to match upload barcard
-   - Add rail title/divider + rail text helpers
+   (UPDATED — Plan A)
+   - REMOVE .card-col min-height so cards follow content (no blank space when collapsed)
+   - KEEP left textarea & right output EXACT same size/position
+   - FIX hint text: smaller font + wrap + supports line breaks
+   - KEEP: overlay inset + no overlay scrollbars (no double-scroll)
+   - KEEP: ctlbar compact height
+   - KEEP: expanded ratio 3:2
    ========================= */
 
 :root{
@@ -114,10 +113,11 @@ header{
   min-width:0;
 }
 
+/* ✅ Plan A: cards follow content (no forced tall blank area) */
 .card-col{
   display:flex;
   flex-direction:column;
-  min-height: 680px; /* keep */
+  min-height:0;     /* was 680px */
   min-width:0;
 }
 
@@ -196,6 +196,7 @@ h3{
 
 /* =========================
    Input / Output
+   (✅ keep both EXACT same sizing)
    ========================= */
 
 .outbox{ width:100%; min-width:0; }
@@ -208,7 +209,7 @@ textarea,
   font-family:var(--sans);
 }
 
-/* ✅ textareas: true horizontal scroll, draggable bar */
+/* ✅ input textarea */
 textarea{
   width:100%;
   height:320px;
@@ -229,20 +230,22 @@ textarea{
   min-width:0;
 }
 
-/* ✅ output: wrap as before */
+/* ✅ output area (same box model + same height as textarea) */
 .output{
+  width:100%;
   height:320px;
   max-height:320px;
   background:var(--box-bg);
   border:1px solid var(--box-bd);
   border-radius:12px;
   padding:12px;
+
   white-space:pre-wrap;
   overflow:auto;
+
   min-width:0;
 }
 
-/* highlights */
 .hl{
   background: rgba(255, 92, 92, 0.14);
   border: 1px solid rgba(255, 92, 92, 0.35);
@@ -252,142 +255,11 @@ textarea{
 }
 
 /* =========================
-   Controlbar / Feedback
+   Helpers: tiny / muted (for hint text)
    ========================= */
 
-.controlbar{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  margin-top:10px;
-  padding:10px 10px;
-  border:1px solid var(--panel-bd);
-  border-radius:14px;
-  background:var(--panel-bg);
-  min-width:0;
-}
-.controlbar-eq{ min-height:56px; }
-
-.feedback{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  width:100%;
-  min-width:0;
-}
-.feedback-right{ justify-content:flex-end; }
-.feedback-inline .fbq{
-  color:var(--muted);
-  font-size:12px;
-  white-space:nowrap;
-  margin-right:6px;
-}
-.iconbtn{
-  border:1px solid var(--line);
-  background:rgba(255,255,255,.05);
-  color:var(--text);
-  border-radius:12px;
-  padding:7px 12px;
-  cursor:pointer;
-}
-
-/* =========================
-   Fold blocks (legacy, harmless to keep)
-   ========================= */
-
-.fold{
-  margin-top:10px;
-  border:1px solid var(--panel-bd);
-  border-radius:14px;
-  background:var(--panel-bg);
-  overflow:hidden;
-}
-.fold-eq{ min-height:56px; }
-.fold-sum{
-  list-style:none;
-  cursor:pointer;
-  padding:12px 12px;
-  font-weight:900;
-  font-size:13px;
-  color:rgba(255,255,255,.92);
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-}
-.fold summary::-webkit-details-marker{ display:none; }
-.fold-body{
-  padding:14px 12px 12px;
-  max-height: 260px;
-  overflow:auto;
-}
-
-/* legacy manual header */
-.manual-sum{ gap:12px; }
-.manual-sum-title{ flex:1 1 auto; min-width:0; }
-.manual-sum-right{
-  flex:0 0 auto;
-  display:flex;
-  flex-direction:column;
-  align-items:flex-end;
-  gap:6px;
-}
-.manual-sum-right .btn{ width:92px; min-width:92px; }
-.manual-sum-hint{
-  max-width: 220px;
-  text-align:right;
-  line-height:1.25;
-}
-
-/* risk */
-.risk{ padding:0; border:0; background:transparent; }
-.riskhead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
-.riskmeta{ margin-top:2px; color:var(--muted); font-size:12px; }
-.riskscore{
-  min-width:96px;
-  text-align:center;
-  padding:10px 10px 8px;
-  border-radius:14px;
-  border:1px solid rgba(255,255,255,.12);
-  background:rgba(10,14,20,.35);
-}
-.riskscore .n{ font-size:26px; font-weight:900; line-height:1; }
-.riskscore .l{ font-size:12px; opacity:.9; margin-top:4px; color:rgba(255,255,255,.86); }
-.risksec{ margin-top:10px; }
-.risklabel{ font-size:12px; color:var(--muted); margin-bottom:6px; }
-.risklist{ display:flex; flex-direction:column; gap:6px; }
-.riskitem{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:7px 10px;
-  border-radius:12px;
-  background:rgba(255,255,255,.03);
-  border:1px solid rgba(255,255,255,.06);
-}
-.riskitem .rk{ font-size:12px; color:rgba(255,255,255,.90); }
-.riskitem .rv{ font-size:12px; color:var(--muted); }
-.riskadvice{ font-size:12px; line-height:1.5; color:rgba(255,255,255,.82); }
-
-/* footer */
-.bottom-fixed{ margin-top:auto; padding-top:12px; }
-.accent-link{ color: rgba(120,255,240,.80); }
-
-.links{
-  display:flex;
-  gap:12px;
-  font-size:12px;
-}
-.links a{
-  color:rgba(120,255,240,.80);
-  text-decoration:none;
-}
-.links a:hover{ text-decoration:underline; }
-
-#ui-foot{
-  font-size:12px;
-  line-height:1.45;
-}
+.tiny{ font-size:11px; line-height:1.45; }
+.muted{ color:var(--muted); }
 
 /* =========================
    Watermark / Overlay
@@ -421,7 +293,7 @@ textarea{
   padding:0;
   border-radius:10px;
 
-  overflow:hidden; /* ✅关键：不产生第二套滚动条 */
+  overflow:hidden; /* no second scrollbar */
 
   white-space:pre;
   overflow-wrap:normal;
@@ -432,7 +304,6 @@ textarea{
 }
 #inputWrap.pdf-overlay-on .input-overlay{ display:block; }
 
-/* overlay mode: keep caret, hide text */
 #inputWrap.pdf-overlay-on textarea{
   color: transparent;
   caret-color: rgba(255,255,255,.88);
@@ -499,116 +370,98 @@ textarea{
 }
 
 /* =========================
-   NEW: Control regions (older alternative; kept)
+   Footer / Links
+   (✅ normal flow — no pushing to bottom)
    ========================= */
 
-.ctl-region{
-  margin-top:10px;
-  min-width:0;
+.links{
+  display:flex;
+  gap:12px;
+  font-size:12px;
 }
-.ctl-title{
+.links a{
+  color:rgba(120,255,240,.80);
+  text-decoration:none;
+}
+.links a:hover{ text-decoration:underline; }
+
+.left-footer{
+  margin-top:12px;   /* normal flow spacing */
+  padding-top:0;
+}
+.right-footer{
+  margin-top:12px;   /* normal flow spacing */
+  padding-top:0;
+}
+
+.accent-link{ color: rgba(120,255,240,.80); }
+
+#ui-foot{
+  font-size:12px;
+  line-height:1.45;
+}
+
+/* =========================
+   Unified control title row + body
+   ========================= */
+
+.ctlbar{ margin-top:10px; }
+
+/* ✅ compact like upload barcard */
+.barcard.ctlbar{ padding:0; }
+
+.ctlbtn{
   width:100%;
-  border:1px solid var(--panel-bd);
-  background:var(--panel-bg);
-  border-radius:14px;
-  padding:12px 12px;
-  cursor:pointer;
+  border:0;
+  background:transparent;
+  color:rgba(255,255,255,.92);
   font-weight:900;
   font-size:13px;
-  color:rgba(255,255,255,.92);
+  cursor:pointer;
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:12px;
+
+  padding:10px 12px;
+  min-height:46px;
   text-align:left;
 }
-.ctl-title:hover{ border-color: rgba(43,144,255,.35); }
-.ctl-title[aria-expanded="true"]{
-  border-color: rgba(43,144,255,.35);
-  background: rgba(43,144,255,.12);
+.ctlbtn::after{
+  content:"▾";
+  opacity:.65;
+  transform: translateY(-1px);
 }
-.ctl-body{
+.ctlbtn[aria-expanded="true"]::after{
+  content:"▴";
+}
+
+.io-body{
   margin-top:10px;
-  min-width:0;
+  display:none;
 }
-.ctl-grid{
-  display:grid;
-  grid-template-columns: 3fr 2fr; /* ✅ 3:2 */
-  gap:12px;
-  align-items:stretch;
-  min-width:0;
-}
-.ctl-card{
-  border:1px solid var(--panel-bd);
-  border-radius:14px;
-  background:var(--panel-bg);
-  padding:12px;
-  min-width:0;
-}
-.ctl-card-narrow{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  min-width:0;
+.io-body.open{
+  display:block;
 }
 
-/* =========================
-   Desktop bottom layout (legacy)
-   ========================= */
-
+/* ✅ 3:2 ratio */
 .io-bottom-grid{
   display:grid;
-  grid-template-columns: 3fr 2fr; /* ✅ 3:2 */
+  grid-template-columns: 3fr 2fr;
   gap:12px;
-  margin-top:10px;
   align-items:stretch;
   min-width:0;
 }
+.io-bottom-grid > *{ height:100%; }
 
-.fold-tight{
-  margin-top:0;
+.subcard{
   border:1px solid var(--panel-bd);
   border-radius:14px;
   background:var(--panel-bg);
-  overflow:hidden;
-}
-.fold-eq{ min-height: 0 !important; }
-.fold-eq > summary{ min-height:56px; }
-.fold-tight > summary{
-  min-height:56px;
-  padding:12px 12px;
-}
-.fold-tight:not([open]) > summary{
-  padding-top:10px;
-  padding-bottom:10px;
-}
-.manual-body{ padding:12px; }
-.risk-body{ padding:12px; }
-
-/* =========================
-   Manual textarea (shared)
-   ========================= */
-
-.manual-terms-textarea{
-  width:100%;
-  min-height:160px;
-  resize:vertical;
-  background:var(--box-bg);
-  border:1px solid var(--box-bd);
-  border-radius:12px;
-  color:rgba(255,255,255,.92);
   padding:12px;
-  font-size:var(--fs-body);
-  line-height:var(--lh-body);
-
-  white-space:pre;
-  overflow-wrap:normal;
-  word-break:normal;
-  overflow:auto;
+  min-width:0;
 }
 
-/* side rails (legacy) */
-.side-rail{
+.railcard{
   border:1px solid var(--panel-bd);
   border-radius:14px;
   background:var(--panel-bg);
@@ -619,14 +472,43 @@ textarea{
   min-width:0;
 }
 
-/* footers (Option B: no auto push) */
-.left-footer{
-  margin-top:0;
-  padding-top:12px;
+/* ✅ hint title + body formatting */
+.rail-title{
+  font-weight:900;
+  font-size:12px;             /* title */
+  color: rgba(255,255,255,.88);
+  letter-spacing:.2px;
 }
-.right-footer{
-  margin-top:0;
-  padding-top:12px;
+.rail-divider{
+  height:1px;
+  width:100%;
+  background: rgba(255,255,255,.08);
+  margin:4px 0;
+}
+.rail-text,
+.side-rail-note{
+  font-size:11px;             /* body <= title */
+  line-height:1.45;
+  color:rgba(255,255,255,.72);
+  white-space:pre-line;        /* supports \n line breaks */
+  overflow-wrap:anywhere;      /* wraps long tokens */
+  word-break:break-word;
+}
+
+/* feedback */
+.railcard .fbq{
+  color:var(--muted);
+  font-size:12px;
+  white-space:nowrap;
+}
+.fb-buttons{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.fb-buttons .iconbtn{
+  width:100%;
+  justify-content:center;
 }
 
 /* =========================
@@ -656,7 +538,6 @@ textarea{
 
   .card{ padding:10px; border-radius:14px; }
   .barcard{ padding:8px; border-radius:14px; }
-  .controlbar{ padding:8px; gap:8px; border-radius:14px; }
 
   h3{ font-size:12px; margin:4px 0 6px; }
 
@@ -759,16 +640,10 @@ textarea{
   .top-actions{ gap:10px; }
   .top-actions .btn{ flex:1 1 0; min-width:0; }
 
-  .grid, .card, .card-col, .filebar, .top-actions, .controlbar, .filename{ min-width:0; }
-  textarea, .output{
-    width:100%;
-    max-width:100%;
-    overflow-wrap:anywhere;
-    word-break:break-word;
-  }
+  .grid, .card, .card-col, .filebar, .top-actions, .filename{ min-width:0; }
 
-  /* stack cards on mobile */
-  .ctl-grid{ grid-template-columns: 1fr; }
+  /* stack 3:2 cards on mobile */
+  .io-bottom-grid{ grid-template-columns: 1fr; }
 }
 
 /* FORCE: wrap-mobile does not grow */
@@ -800,114 +675,4 @@ textarea{
   height: auto !important;
   max-height: none !important;
   overflow: auto !important;
-}
-
-/* =========================
-   Unified control title row + body
-   ========================= */
-
-.ctlbar{ margin-top:10px; }
-
-/* ✅ shrink ctlbar height to match upload barcard */
-.barcard.ctlbar{ padding:0; }
-
-.ctlbtn{
-  width:100%;
-  border:0;
-  background:transparent;
-  color:rgba(255,255,255,.92);
-  font-weight:900;
-  font-size:13px;
-  cursor:pointer;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-
-  padding:10px 12px;   /* smaller */
-  min-height:46px;     /* smaller */
-  text-align:left;
-}
-.ctlbtn::after{
-  content:"▾";
-  opacity:.65;
-  transform: translateY(-1px);
-}
-.ctlbtn[aria-expanded="true"]::after{
-  content:"▴";
-}
-
-.io-body{
-  margin-top:10px;
-  display:none;
-}
-.io-body.open{
-  display:block;
-}
-
-.io-bottom-grid{
-  display:grid;
-  grid-template-columns: 3fr 2fr; /* ✅ 3:2 */
-  gap:12px;
-  align-items:stretch;
-  min-width:0;
-}
-.io-bottom-grid > *{ height:100%; }
-
-.subcard{
-  border:1px solid var(--panel-bd);
-  border-radius:14px;
-  background:var(--panel-bg);
-  padding:12px;
-  min-width:0;
-}
-
-.railcard{
-  border:1px solid var(--panel-bd);
-  border-radius:14px;
-  background:var(--panel-bg);
-  padding:10px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  min-width:0;
-}
-
-.rail-title{
-  font-weight:900;
-  font-size:12px;
-  color: rgba(255,255,255,.88);
-  letter-spacing:.2px;
-}
-.rail-divider{
-  height:1px;
-  width:100%;
-  background: rgba(255,255,255,.08);
-  margin:4px 0;
-}
-/* ✅ body text must NOT be larger than title */
-.rail-text{
-  font-size:11px;
-  line-height:1.45;
-  color:rgba(255,255,255,.72);
-  white-space:pre-line;
-}
-
-.railcard .fbq{
-  color:var(--muted);
-  font-size:12px;
-  white-space:nowrap;
-}
-.fb-buttons{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.fb-buttons .iconbtn{
-  width:100%;
-  justify-content:center;
-}
-
-/* Mobile: stack */
-@media (max-width: 560px){
-  .io-bottom-grid{ grid-template-columns: 1fr; }
 }
