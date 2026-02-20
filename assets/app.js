@@ -1,18 +1,20 @@
 // =========================
 // assets/app.js (FULL)
-// ✅ Personal build (2026-02-19d1)
+// ✅ Personal build (2026-02-19d2)
 // This revision:
+// - REMOVE: "Helpful? / Like" UI + counters (desktop & mobile).
+// - Desktop: railcard becomes PURE progress card.
+// - Mobile: riskBody shows ONLY riskBox (no rail/progress).
 // - FIX: avoid "blank risk card flash" by delaying expand until AFTER riskBox rendered.
 // - FIX: keep left/right expanded heights aligned (manual follows risk; manual scrolls if needed).
+// - FIX: live sync via ResizeObserver (riskBody height changes => manualBody follows).
 // - Keep: auto expand after file upload (pdf/image).
 // - Keep: collapse on Clear.
-// - Keep: progress uses existing HTML slot #exportStatus (index.html/m.html) first.
-// - Keep: clearProgress clears BOTH #exportStatus and injected #progressBox.
-// - Progress texts follow i18n (with safe fallbacks).
+// - Keep: progress uses existing HTML slot #exportStatus (index.html) first.
 // - Backward-compatible with legacy <details> if present.
 // =========================
 
-console.log("[APP] loaded v20260219d1-personal-auto-ctl-progress-syncheight");
+console.log("[APP] loaded v20260219d2-progress-only-syncheight-ro");
 
 let currentLang = "zh";
 window.currentLang = currentLang;
@@ -544,6 +546,21 @@ function resetManualHeightLock(){
   manualBody.style.overflow = "";
 }
 
+/* ✅ live observer: riskBody resize => manualBody sync */
+let __riskResizeObs = null;
+function initRiskResizeObserver(){
+  const riskBody = $("riskBody");
+  if (!riskBody || !("ResizeObserver" in window)) return;
+
+  if (__riskResizeObs) __riskResizeObs.disconnect();
+
+  __riskResizeObs = new ResizeObserver(() => {
+    requestAnimationFrame(syncManualToRiskHeight);
+  });
+
+  __riskResizeObs.observe(riskBody);
+}
+
 function expandManualArea(){
   const btn = $("btnToggleManual");
   const body = $("manualBody");
@@ -575,7 +592,7 @@ function collapseRiskArea(){
 
 /* ================= Progress area (prefer HTML slot #exportStatus) ================= */
 function ensureProgressBox(){
-  // ✅ Prefer index.html/m.html slot
+  // ✅ Prefer index.html slot
   const slot = $("exportStatus");
   if (slot) return slot;
 
@@ -583,7 +600,7 @@ function ensureProgressBox(){
   const existing = $("progressBox");
   if (existing) return existing;
 
-  // inject under risk railcard
+  // inject under risk railcard (desktop only)
   const riskBody = $("riskBody");
   if (riskBody) {
     const rails = riskBody.querySelectorAll(".railcard");
@@ -654,7 +671,7 @@ function setText() {
   if ($("ui-tab-in")) $("ui-tab-in").textContent = t.tabIn || "";
   if ($("ui-tab-out")) $("ui-tab-out").textContent = t.tabOut || "";
 
-  // control titles (button spans) — DO NOT overwrite button DOM
+  // control titles (button spans)
   const spMan = document.getElementById("ui-manual-toggle-title");
   const spRisk = document.getElementById("ui-risk-toggle-title");
 
@@ -671,6 +688,7 @@ function setText() {
   const railManNote = document.getElementById("ui-manual-rail-note");
   if (railManNote) railManNote.textContent = t.manualRailText || "";
 
+  // ✅ Progress title (desktop)
   const exportTitle = document.getElementById("ui-export-title");
   if (exportTitle) exportTitle.textContent = t.exportTitle || exportTitleFallback();
 
@@ -691,8 +709,6 @@ function setText() {
 
   if ($("btnCopy")) $("btnCopy").textContent = t.btnCopy;
   if ($("btnClear")) $("btnClear").textContent = t.btnClear;
-
-  if ($("ui-fb-q")) $("ui-fb-q").textContent = t.fbQ;
 
   if ($("linkLearn")) $("linkLearn").textContent = t.learn;
   if ($("linkPrivacy")) $("linkPrivacy").textContent = t.privacy;
@@ -995,7 +1011,6 @@ function bind() {
 
       if (ta) renderInputOverlayForPdf(ta.value || "");
 
-      // language switch might change risk content height slightly
       requestAnimationFrame(syncManualToRiskHeight);
     };
   });
@@ -1114,17 +1129,6 @@ function bind() {
       } catch (e) {}
     };
   }
-
-  const up = $("btnUp");
-  const down = $("btnDown");
-  if (up) up.onclick = () => {
-    const n = Number($("upCount")?.textContent || "0") + 1;
-    if ($("upCount")) $("upCount").textContent = String(n);
-  };
-  if (down) down.onclick = () => {
-    const n = Number($("downCount")?.textContent || "0") + 1;
-    if ($("downCount")) $("downCount").textContent = String(n);
-  };
 
   // Auto-filter on typing (debounced)
   let autoTimer = null;
@@ -1255,3 +1259,4 @@ initEnabled();
 setText();
 bind();
 updateInputWatermarkVisibility();
+initRiskResizeObserver();
