@@ -1,10 +1,8 @@
 <!-- =========================
-     m.html (FULL) — unified title-row toggles (mobile) (UPDATED)
-     Fix targets in this file:
-     - manualBody / riskBody default collapsed (display:none; aria-expanded=false)
-     - add “输入提示” title + clearer hint text (i18n-ready ids)
-     - add export/progress area under feedback (exportStatus) to avoid overwriting riskBox
-     - keep textarea wrap=off
+     m.html (FULL)
+     - IO tab switch (distinct style)
+     - manual/risk bodies default collapsed
+     - titles i18n-ready (ui-manual-rail-title / ui-export-title)
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -23,16 +21,9 @@
       pointer-events:none;
     }
 
-    /* ===== IO tabs: only one panel visible ===== */
+    /* Only one panel visible */
     #tab-in:checked  ~ .grid-mobile-one .io-out{ display:none !important; }
     #tab-out:checked ~ .grid-mobile-one .io-in { display:none !important; }
-
-    #tab-in:checked  ~ .io-tabs label[for="tab-in"],
-    #tab-out:checked ~ .io-tabs label[for="tab-out"]{
-      background: rgba(43,144,255,.20);
-      border-color: rgba(43,144,255,.35);
-      color: rgba(255,255,255,.92);
-    }
 
     /* Filebar alignment helper */
     .filebar{ display:flex; align-items:center; gap:10px; }
@@ -74,8 +65,8 @@
     <input class="panel-radio" type="radio" name="io" id="tab-out" />
 
     <div class="io-tabs" role="tablist" aria-label="Input Output Tabs">
-      <label class="btn secondary btn-s btn-slim" for="tab-in" role="tab" id="ui-tab-in"></label>
-      <label class="btn secondary btn-s btn-slim" for="tab-out" role="tab" id="ui-tab-out"></label>
+      <label for="tab-in" role="tab" id="ui-tab-in"></label>
+      <label for="tab-out" role="tab" id="ui-tab-out"></label>
     </div>
 
     <div class="grid grid-mobile-one">
@@ -86,11 +77,11 @@
         <div class="barcard barcard-top">
           <div class="filebar filebar-flat">
             <input id="pdfFile" type="file" accept="application/pdf,image/*" capture="none" />
-            <label class="btn primary btn-s btn-slim" for="pdfFile" id="ui-upload-btn"></label>
+            <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn"></label>
 
             <div class="filename" id="pdfName" aria-hidden="true"></div>
 
-            <button class="btn secondary btn-s btn-slim" id="btnClear"></button>
+            <button class="btn secondary btn-s" id="btnClear"></button>
           </div>
         </div>
 
@@ -105,41 +96,37 @@
         <!-- Manual redact button (image/manual mode only) -->
         <div class="controlbar controlbar-eq" id="leftControlBar">
           <div class="ctl-actions">
-            <button class="btn secondary btn-s btn-slim" id="btnManualRedact" style="display:none;"></button>
+            <button class="btn secondary btn-s" id="btnManualRedact" style="display:none;"></button>
           </div>
         </div>
 
-        <!-- ✅ Title row toggle -->
         <div class="barcard ctlbar" aria-label="Manual toggle bar">
           <button class="ctlbtn" id="btnToggleManual" type="button" aria-expanded="false">
             <span id="ui-manual-toggle-title">手工输入</span>
           </button>
         </div>
 
-        <!-- ✅ Expand body (default collapsed) -->
         <div class="io-body" id="manualBody" aria-label="Manual body" style="display:none;">
           <div class="io-bottom-grid">
             <div class="subcard">
               <textarea
                 id="manualTerms"
                 class="manual-terms-textarea"
-                placeholder="例如：张三, 李四, Bei.de Tech GmbH"
                 autocomplete="off"
                 spellcheck="false"
                 wrap="off"
+                placeholder="例如：张三, 李四, Bei.de Tech GmbH"
               ></textarea>
             </div>
 
             <div class="railcard">
-              <div class="rail-title" id="ui-manual-rail-title">输入提示</div>
-              <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
-                支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。建议仅输入需要额外遮盖的姓名、公司名、编号或地址关键词。
-              </div>
+              <div class="rail-title" id="ui-manual-rail-title"></div>
+              <div class="side-rail-note" id="ui-manual-rail-note"></div>
 
               <div class="links" style="margin-top:auto; flex-wrap:wrap;">
-                <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
-                <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
-                <a id="linkScope" href="./docs/mvp-scope.md" target="_blank"></a>
+                <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
+                <a id="linkPrivacy" href="./PRIVACY.md" target="_blank" rel="noopener"></a>
+                <a id="linkScope" href="./docs/mvp-scope.md" target="_blank" rel="noopener"></a>
               </div>
             </div>
           </div>
@@ -152,8 +139,8 @@
 
         <div class="barcard barcard-top">
           <div class="top-actions">
-            <button class="btn primary btn-s btn-mini btn-slim" id="btnExportRasterPdf" style="display:none;"></button>
-            <button class="btn primary btn-s btn-mini btn-slim" id="btnCopy"></button>
+            <button class="btn primary btn-s btn-mini" id="btnExportRasterPdf" style="display:none;"></button>
+            <button class="btn primary btn-s btn-mini" id="btnCopy"></button>
           </div>
         </div>
 
@@ -161,14 +148,12 @@
           <div class="output output-scroll" id="outputText"></div>
         </div>
 
-        <!-- ✅ Title row toggle -->
         <div class="barcard ctlbar" aria-label="Risk toggle bar">
           <button class="ctlbtn" id="btnToggleRisk" type="button" aria-expanded="false">
             <span id="ui-risk-toggle-title">风险评分</span>
           </button>
         </div>
 
-        <!-- ✅ Expand body (default collapsed) -->
         <div class="io-body" id="riskBody" aria-label="Risk body" style="display:none;">
           <div class="io-bottom-grid">
             <div class="subcard">
@@ -176,16 +161,17 @@
             </div>
 
             <div class="railcard">
-              <div class="fbq" id="ui-fb-q"></div>
-              <div class="fb-buttons">
-                <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
-                <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
+              <div class="fb-area" aria-label="feedback">
+                <div class="fbq" id="ui-fb-q"></div>
+                <div class="fb-row" aria-label="feedback buttons">
+                  <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
+                  <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
+                </div>
               </div>
 
-              <!-- ✅ Export/progress area -->
               <div class="rail-divider" aria-hidden="true"></div>
-              <div class="rail-title" id="ui-export-title">生成进程</div>
-              <div class="tiny muted" id="exportStatus" style="white-space:pre-wrap; line-height:1.6;"></div>
+              <div class="rail-title" id="ui-export-title"></div>
+              <div class="tiny muted" id="exportStatus"></div>
             </div>
           </div>
         </div>
@@ -193,10 +179,8 @@
         <div class="tiny footnote accent-link" id="ui-foot"></div>
       </section>
     </div>
-
   </div>
 
-  <!-- JS（顺序非常重要，不要改） -->
   <script src="./assets/i18n.js" defer></script>
   <script src="./assets/catalog.js" defer></script>
   <script src="./assets/rules.js" defer></script>
