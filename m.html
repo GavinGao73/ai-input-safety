@@ -126,34 +126,52 @@
         </div>
 
         <div class="io-body" id="manualBody" aria-label="Manual body" style="display:none;">
-          <div class="io-bottom-grid">
-            <div class="subcard">
-              <textarea
-                id="manualTerms"
-                class="manual-terms-textarea"
-                autocomplete="off"
-                spellcheck="false"
-                wrap="off"
-                placeholder="例如：张三, 李四, Bei.de Tech GmbH"
-              ></textarea>
-            </div>
+  <div class="io-bottom-grid">
 
-            <div class="railcard">
-              <div class="rail-title" id="ui-manual-rail-title"></div>
-              <div class="side-rail-note" id="ui-manual-rail-note"></div>
-            </div>
-          </div>
-        </div>
+    <!-- Pane A: manual terms (Mode A only) -->
+    <div class="subcard manual-pane" id="manualTermsPane">
+      <textarea
+        id="manualTerms"
+        class="manual-terms-textarea"
+        autocomplete="off"
+        spellcheck="false"
+        wrap="off"
+        placeholder="例如：张三, 李四, Bei.de Tech GmbH"
+      ></textarea>
+    </div>
 
-        <!-- ✅ Links ALWAYS visible (not inside collapsed manualBody) -->
-        <div class="left-footer">
-          <div class="links" style="flex-wrap:wrap;">
-            <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
-            <a id="linkPrivacy" href="./PRIVACY.md" target="_blank" rel="noopener"></a>
-            <a id="linkScope" href="./docs/mvp-scope.md" target="_blank" rel="noopener"></a>
-          </div>
-        </div>
-      </section>
+    <!-- Pane B: manual visual redaction (Mode B only) -->
+    <div class="subcard manual-pane" id="manualRedactPane" style="display:none;">
+      <div class="manual-redact-title" id="ui-manual-redact-title">人工涂抹</div>
+      <div class="manual-redact-note" id="ui-manual-redact-note">
+        当前文件无法读取文字层（图片或扫描版 PDF）。请点击下方按钮进入框选遮盖模式。
+      </div>
+
+      <div class="manual-redact-actions">
+        <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
+      </div>
+
+      <div class="links" style="margin-top:auto; flex-wrap:wrap;">
+        <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
+        <a id="linkPrivacy" href="./PRIVACY.md" target="_blank" rel="noopener"></a>
+        <a id="linkScope" href="./docs/mvp-scope.md" target="_blank" rel="noopener"></a>
+      </div>
+    </div>
+
+    <!-- Keep hint railcard (Mode A/B) -->
+    <div class="railcard">
+      <div class="rail-title" id="ui-manual-rail-title"></div>
+      <div class="side-rail-note" id="ui-manual-rail-note"></div>
+
+      <div class="links" style="margin-top:auto; flex-wrap:wrap;">
+        <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
+        <a id="linkPrivacy" href="./PRIVACY.md" target="_blank" rel="noopener"></a>
+        <a id="linkScope" href="./docs/mvp-scope.md" target="_blank" rel="noopener"></a>
+      </div>
+    </div>
+
+  </div>
+</div>
 
       <!-- ================= OUTPUT PANEL ================= -->
       <section class="card card-col right io-panel io-out" id="rightCard">
