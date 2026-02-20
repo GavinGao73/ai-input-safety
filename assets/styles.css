@@ -1,12 +1,15 @@
 /* =========================
    assets/styles.css (FULL, consolidated)
-   (UPDATED — Plan A)
-   - REMOVE .card-col min-height so cards follow content (no blank space when collapsed)
-   - KEEP left textarea & right output EXACT same size/position
-   - FIX hint text: smaller font + wrap + supports line breaks
-   - KEEP: overlay inset + no overlay scrollbars (no double-scroll)
-   - KEEP: ctlbar compact height
-   - KEEP: expanded ratio 3:2
+   (UPDATED)
+   - Plan A: cards follow content (no forced tall blanks)
+   - Keep left textarea & right output EXACT same sizing
+   - Restore Risk card aesthetics (riskhead/score/list/advice)
+   - Feedback card: centered question + small buttons inline
+   - Right column: stack two small cards (feedback + progress),
+     progress takes remaining height
+   - Manual hint: title + smaller text + line breaks
+   - Keep overlay inset + remove overlay scrollbars (no double-scroll)
+   - Expanded ratio: 3:2
    ========================= */
 
 :root{
@@ -113,11 +116,11 @@ header{
   min-width:0;
 }
 
-/* ✅ Plan A: cards follow content (no forced tall blank area) */
+/* ✅ Plan A: follow content (no tall blank area when collapsed) */
 .card-col{
   display:flex;
   flex-direction:column;
-  min-height:0;     /* was 680px */
+  min-height:0;
   min-width:0;
 }
 
@@ -209,7 +212,6 @@ textarea,
   font-family:var(--sans);
 }
 
-/* ✅ input textarea */
 textarea{
   width:100%;
   height:320px;
@@ -230,7 +232,6 @@ textarea{
   min-width:0;
 }
 
-/* ✅ output area (same box model + same height as textarea) */
 .output{
   width:100%;
   height:320px;
@@ -242,7 +243,6 @@ textarea{
 
   white-space:pre-wrap;
   overflow:auto;
-
   min-width:0;
 }
 
@@ -253,10 +253,6 @@ textarea{
   padding: 1px 6px;
   border-radius: 999px;
 }
-
-/* =========================
-   Helpers: tiny / muted (for hint text)
-   ========================= */
 
 .tiny{ font-size:11px; line-height:1.45; }
 .muted{ color:var(--muted); }
@@ -284,8 +280,7 @@ textarea{
 }
 #inputWrap.has-content .input-watermark{ display:none; }
 
-/* ✅ overlay inset so it NEVER blocks scrollbar drag area
-   ✅ overlay must NOT have its own scrollbars (prevents double scrollbar) */
+/* ✅ overlay inset; ✅ no overlay scrollbars (remove double-scroll) */
 .input-overlay{
   display:none;
   position:absolute;
@@ -293,7 +288,7 @@ textarea{
   padding:0;
   border-radius:10px;
 
-  overflow:hidden; /* no second scrollbar */
+  overflow:hidden;
 
   white-space:pre;
   overflow-wrap:normal;
@@ -370,8 +365,7 @@ textarea{
 }
 
 /* =========================
-   Footer / Links
-   (✅ normal flow — no pushing to bottom)
+   Footer / Links (normal flow)
    ========================= */
 
 .links{
@@ -386,11 +380,11 @@ textarea{
 .links a:hover{ text-decoration:underline; }
 
 .left-footer{
-  margin-top:12px;   /* normal flow spacing */
+  margin-top:12px;
   padding-top:0;
 }
 .right-footer{
-  margin-top:12px;   /* normal flow spacing */
+  margin-top:12px;
   padding-top:0;
 }
 
@@ -407,7 +401,7 @@ textarea{
 
 .ctlbar{ margin-top:10px; }
 
-/* ✅ compact like upload barcard */
+/* compact like upload barcard */
 .barcard.ctlbar{ padding:0; }
 
 .ctlbtn{
@@ -461,6 +455,15 @@ textarea{
   min-width:0;
 }
 
+/* Right column stack (feedback + progress) */
+.railstack{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  min-width:0;
+  height:100%;
+}
+
 .railcard{
   border:1px solid var(--panel-bd);
   border-radius:14px;
@@ -472,43 +475,133 @@ textarea{
   min-width:0;
 }
 
-/* ✅ hint title + body formatting */
+/* progress card takes remaining height */
+.railcard-progress{ flex:1 1 auto; min-height:0; }
+.railcard-fb{ flex:0 0 auto; }
+
 .rail-title{
   font-weight:900;
-  font-size:12px;             /* title */
+  font-size:12px;
   color: rgba(255,255,255,.88);
   letter-spacing:.2px;
 }
+
 .rail-divider{
   height:1px;
   width:100%;
   background: rgba(255,255,255,.08);
   margin:4px 0;
 }
+
+/* ✅ hint text (smaller, wraps, line breaks) */
 .rail-text,
 .side-rail-note{
-  font-size:11px;             /* body <= title */
+  font-size:11px;
   line-height:1.45;
   color:rgba(255,255,255,.72);
-  white-space:pre-line;        /* supports \n line breaks */
-  overflow-wrap:anywhere;      /* wraps long tokens */
+  white-space:pre-line;
+  overflow-wrap:anywhere;
   word-break:break-word;
 }
 
-/* feedback */
-.railcard .fbq{
-  color:var(--muted);
-  font-size:12px;
-  white-space:nowrap;
+/* =========================
+   Manual textarea (shared)
+   ========================= */
+
+.manual-terms-textarea{
+  width:100%;
+  min-height:160px;
+  resize:vertical;
+  background:var(--box-bg);
+  border:1px solid var(--box-bd);
+  border-radius:12px;
+  color:rgba(255,255,255,.92);
+  padding:12px;
+  font-size:var(--fs-body);
+  line-height:var(--lh-body);
+
+  white-space:pre;
+  overflow-wrap:normal;
+  word-break:normal;
+  overflow:auto;
 }
+
+/* =========================
+   Risk card (RESTORE aesthetic)
+   ========================= */
+
+.risk{ padding:0; border:0; background:transparent; }
+.riskhead{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.riskmeta{ margin-top:2px; color:var(--muted); font-size:12px; }
+
+.riskscore{
+  min-width:96px;
+  text-align:center;
+  padding:10px 10px 8px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(10,14,20,.35);
+}
+.riskscore .n{ font-size:26px; font-weight:900; line-height:1; }
+.riskscore .l{ font-size:12px; opacity:.9; margin-top:4px; color:rgba(255,255,255,.86); }
+
+.risksec{ margin-top:10px; }
+.risklabel{ font-size:12px; color:var(--muted); margin-bottom:6px; }
+
+.risklist{ display:flex; flex-direction:column; gap:6px; }
+.riskitem{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:7px 10px;
+  border-radius:12px;
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.06);
+}
+.riskitem .rk{ font-size:12px; color:rgba(255,255,255,.90); }
+.riskitem .rv{ font-size:12px; color:var(--muted); }
+
+.riskadvice{ font-size:12px; line-height:1.5; color:rgba(255,255,255,.82); }
+
+/* =========================
+   Feedback card (center + small inline buttons)
+   ========================= */
+
+.railcard-fb .fbq{
+  color:rgba(255,255,255,.82);
+  font-size:12px;
+  font-weight:900;
+  text-align:center;
+  white-space:normal;
+}
+
 .fb-buttons{
   display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.fb-buttons .iconbtn{
-  width:100%;
+  flex-direction:row;
+  gap:8px;
   justify-content:center;
+  align-items:center;
+}
+
+.iconbtn{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.05);
+  color:var(--text);
+  border-radius:10px;
+  padding:5px 10px;     /* smaller */
+  cursor:pointer;
+  font-size:12px;       /* smaller */
+  line-height:1;
+}
+
+/* Progress output (text) */
+.export-status{
+  font-size:11px;
+  line-height:1.55;
+  color:rgba(255,255,255,.80);
+  white-space:pre-wrap;
+  overflow:auto;
+  min-height:0;
 }
 
 /* =========================
@@ -642,7 +735,7 @@ textarea{
 
   .grid, .card, .card-col, .filebar, .top-actions, .filename{ min-width:0; }
 
-  /* stack 3:2 cards on mobile */
+  /* mobile: stack columns */
   .io-bottom-grid{ grid-template-columns: 1fr; }
 }
 
