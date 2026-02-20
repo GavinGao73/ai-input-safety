@@ -1,11 +1,11 @@
 <!-- =========================
      index.html (FULL) — unified title-row toggles (UPDATED)
      Fix targets in this file:
-     - Add “输入提示” title + clearer hint area structure (i18n-ready ids)
-     - Add export/progress area BELOW “有用吗” rail (so it won’t overwrite riskBox)
-     - Ensure manual/risk bodies default collapsed (display:none; aria-expanded=false)
-     - Keep toggles at barcard level (same visual tier)
-     - Keep input textarea wrap=off for true horizontal scroll
+     - Keep railcard ONE card (feedback + progress)
+     - Feedback: centered text, buttons in ONE row (size handled in CSS)
+     - Progress area lives UNDER feedback (no overwrite riskBox)
+     - Manual hint: structured multiline (i18n-ready ids), easier to style smaller + line breaks
+     - Bodies default collapsed (display:none; aria-expanded=false)
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -95,11 +95,17 @@
               ></textarea>
             </div>
 
-            <!-- Right narrow: hint + actions -->
+            <!-- Right rail: hint + actions -->
             <div class="railcard">
               <div class="rail-title" id="ui-manual-rail-title">输入提示</div>
+
+              <!-- ✅ Structured hint for easy line-break + small font via CSS -->
               <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
-                支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。建议仅输入需要额外遮盖的姓名、公司名、编号或地址关键词。
+                <div id="ui-manual-hint-line-1">支持逗号或换行分隔。</div>
+                <div id="ui-manual-hint-line-2" style="margin-top:6px;">只会遮盖：</div>
+                <div id="ui-manual-hint-line-3">① 你上传的 PDF 原文里真实出现的词；</div>
+                <div id="ui-manual-hint-line-4">② 你在输入框里粘贴的文本里出现的词。</div>
+                <div id="ui-manual-hint-line-5" style="margin-top:6px;">建议把姓名/公司/邮箱/及其他个人认为有风险关键词补充进来。</div>
               </div>
 
               <div class="side-rail-actions">
@@ -168,19 +174,22 @@
               <div class="risk" id="riskBox"></div>
             </div>
 
-            <!-- Right narrow: feedback + export status (under feedback) -->
+            <!-- Right rail: ONE card (feedback + progress) -->
             <div class="railcard">
-              <div class="fbq" id="ui-fb-q"></div>
+              <!-- ✅ Feedback block (centered text + one-row buttons) -->
+              <div class="fb-area" aria-label="feedback">
+                <div class="fbq" id="ui-fb-q"></div>
 
-              <div class="fb-buttons">
-                <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
-                <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
+                <div class="fb-row" aria-label="feedback buttons">
+                  <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
+                  <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
+                </div>
               </div>
 
-              <!-- ✅ Export/progress area: DO NOT overwrite riskBox -->
+              <!-- ✅ Progress area stays in railcard, under feedback -->
               <div class="rail-divider" aria-hidden="true"></div>
               <div class="rail-title" id="ui-export-title">生成进程</div>
-              <div class="tiny muted" id="exportStatus" style="white-space:pre-wrap; line-height:1.6;"></div>
+              <div class="tiny muted export-status" id="exportStatus" style="white-space:pre-wrap; line-height:1.6;"></div>
             </div>
           </div>
         </div>
