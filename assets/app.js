@@ -1,17 +1,18 @@
 // =========================
 // assets/app.js (FULL)
-// ✅ Personal build (2026-02-19d+slotfix)
+// ✅ Personal build (2026-02-19d1)
 // This revision:
-// - Auto expand "手工输入" + "风险评分" after file upload (pdf/image).
-// - Collapse them on Clear.
-// - Export progress NEVER overwrites riskBox: it renders in a dedicated progress slot.
-// - ✅ FIX: Prefer existing HTML slot #exportStatus (index.html) over injected #progressBox.
-// - ✅ FIX: clearProgress clears BOTH #exportStatus and injected #progressBox.
+// - FIX: avoid "blank risk card flash" by delaying expand until AFTER riskBox rendered.
+// - FIX: keep left/right expanded heights aligned (manual follows risk; manual scrolls if needed).
+// - Keep: auto expand after file upload (pdf/image).
+// - Keep: collapse on Clear.
+// - Keep: progress uses existing HTML slot #exportStatus (index.html/m.html) first.
+// - Keep: clearProgress clears BOTH #exportStatus and injected #progressBox.
 // - Progress texts follow i18n (with safe fallbacks).
 // - Backward-compatible with legacy <details> if present.
 // =========================
 
-console.log("[APP] loaded v20260219d-slotfix-personal-auto-ctl-progress");
+console.log("[APP] loaded v20260219d1-personal-auto-ctl-progress-syncheight");
 
 let currentLang = "zh";
 window.currentLang = currentLang;
@@ -275,11 +276,6 @@ function markHitsInOriginal(text){
     const r = window.RULES_BY_KEY && window.RULES_BY_KEY[key];
     if (!r || !r.pattern) continue;
 
-    if (key === "money") {
-      s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
-      continue;
-    }
-
     s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
   }
 
@@ -522,6 +518,32 @@ function toggleCtl(btn, body){
   setCtlExpanded(btn, body, !cur);
 }
 
+/* ================= Height sync: manual follows risk ================= */
+function syncManualToRiskHeight(){
+  const riskBody = $("riskBody");
+  const manualBody = $("manualBody");
+  if (!riskBody || !manualBody) return;
+
+  const riskOpen = $("btnToggleRisk")?.getAttribute("aria-expanded") === "true";
+  const manOpen  = $("btnToggleManual")?.getAttribute("aria-expanded") === "true";
+  if (!riskOpen || !manOpen) return;
+
+  const riskH = riskBody.getBoundingClientRect().height;
+  if (!riskH || riskH < 40) return;
+
+  manualBody.style.height = `${Math.ceil(riskH)}px`;
+  manualBody.style.maxHeight = `${Math.ceil(riskH)}px`;
+  manualBody.style.overflow = "auto";
+}
+
+function resetManualHeightLock(){
+  const manualBody = $("manualBody");
+  if (!manualBody) return;
+  manualBody.style.height = "";
+  manualBody.style.maxHeight = "";
+  manualBody.style.overflow = "";
+}
+
 function expandManualArea(){
   const btn = $("btnToggleManual");
   const body = $("manualBody");
@@ -553,15 +575,15 @@ function collapseRiskArea(){
 
 /* ================= Progress area (prefer HTML slot #exportStatus) ================= */
 function ensureProgressBox(){
-  // ✅ Prefer index.html slot
+  // ✅ Prefer index.html/m.html slot
   const slot = $("exportStatus");
   if (slot) return slot;
 
-  // If someone already injected progressBox earlier, reuse it
+  // reuse injected
   const existing = $("progressBox");
   if (existing) return existing;
 
-  // Try to inject under risk railcard (new layout)
+  // inject under risk railcard
   const riskBody = $("riskBody");
   if (riskBody) {
     const rails = riskBody.querySelectorAll(".railcard");
@@ -581,12 +603,11 @@ function ensureProgressBox(){
     }
   }
 
-  // fallback: use riskBox (legacy)
+  // fallback
   return $("riskBox");
 }
 
 function setProgressText(lines, isError){
-  const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : null;
   const box = ensureProgressBox();
   if (!box) return;
 
@@ -594,10 +615,8 @@ function setProgressText(lines, isError){
   const html = escapeHTML(s);
 
   if (box.id === "riskBox") {
-    // legacy fallback: render as boxed tiny text
     box.innerHTML = `<div class="tiny" style="white-space:pre-wrap;line-height:1.6;${isError ? "color:#ffb4b4;" : ""}">${html}</div>`;
   } else {
-    // ✅ slot or injected box: pure text
     box.style.color = isError ? "#ffb4b4" : "";
     box.textContent = s;
   }
@@ -611,6 +630,12 @@ function clearProgress(){
 }
 
 /* ================= UI text ================= */
+function exportTitleFallback(){
+  if (currentLang === "de") return "Fortschritt";
+  if (currentLang === "en") return "Progress";
+  return "生成进程";
+}
+
 function setText() {
   const t = window.I18N && window.I18N[currentLang];
   if (!t) return;
@@ -647,17 +672,10 @@ function setText() {
   if (railManNote) railManNote.textContent = t.manualRailText || "";
 
   const exportTitle = document.getElementById("ui-export-title");
-  if (exportTitle) exportTitle.textContent = t.exportTitle || "";
+  if (exportTitle) exportTitle.textContent = t.exportTitle || exportTitleFallback();
+
   // Manual terms placeholder
   if ($("manualTerms")) $("manualTerms").placeholder = t.manualPlaceholder || "例如：张三, 李四, Bei.de Tech GmbH";
-
-  // Rail note (manual) — keep note in its own slot; title is separate in HTML
-  const railNote = $("ui-manual-rail-note");
-  if (railNote) {
-    // prefer manualRailText, else manualHint
-    const text = t.manualRailText || t.manualHint || "";
-    railNote.textContent = text;
-  }
 
   // Money UI removed
   if ($("ui-money-label")) $("ui-money-label").textContent = "";
@@ -754,6 +772,15 @@ function applyRules(text) {
       manualTerms: manualTerms.slice(0)
     };
 
+    // ✅ Expand AFTER render (avoid blank flash) + sync heights
+    requestAnimationFrame(() => {
+      if (lastUploadedFile) {
+        expandRiskArea();
+        expandManualArea();
+        syncManualToRiskHeight();
+      }
+    });
+
     window.dispatchEvent(new Event("safe:updated"));
     return out;
   }
@@ -826,6 +853,15 @@ function applyRules(text) {
     manualTerms: manualTerms.slice(0)
   };
 
+  // ✅ Expand AFTER render (avoid blank flash) + sync heights
+  requestAnimationFrame(() => {
+    if (lastUploadedFile) {
+      expandRiskArea();
+      expandManualArea();
+      syncManualToRiskHeight();
+    }
+  });
+
   window.dispatchEvent(new Event("safe:updated"));
   return out;
 }
@@ -834,9 +870,8 @@ function applyRules(text) {
 async function handleFile(file) {
   if (!file) return;
 
-  // ✅ auto expand both areas on upload
-  expandManualArea();
-  expandRiskArea();
+  // ✅ IMPORTANT: DO NOT expand here (prevents blank flash on right)
+  // We expand after riskBox has content (in applyRules rAF) or in Mode B rAF.
 
   lastUploadedFile = file;
   lastProbe = null;
@@ -845,10 +880,15 @@ async function handleFile(file) {
 
   setStage3Ui("none");
 
-  // Image => manual mode button
+  // Image => manual mode button; open panels without waiting for risk render
   if (lastFileKind === "image") {
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
+    requestAnimationFrame(() => {
+      expandManualArea();
+      expandRiskArea();
+      syncManualToRiskHeight();
+    });
     return;
   }
 
@@ -859,6 +899,11 @@ async function handleFile(file) {
       console.error("[handleFile] probePdfTextLayer missing");
       lastRunMeta.fromPdf = false;
       setStage3Ui("B");
+      requestAnimationFrame(() => {
+        expandManualArea();
+        expandRiskArea();
+        syncManualToRiskHeight();
+      });
       return;
     }
 
@@ -866,8 +911,14 @@ async function handleFile(file) {
     lastProbe = probe || null;
 
     if (!probe || !probe.hasTextLayer) {
+      // Mode B
       lastRunMeta.fromPdf = false;
       setStage3Ui("B");
+      requestAnimationFrame(() => {
+        expandManualArea();
+        expandRiskArea();
+        syncManualToRiskHeight();
+      });
       return;
     }
 
@@ -877,7 +928,14 @@ async function handleFile(file) {
     const text = String(probe.text || "").trim();
     lastPdfOriginalText = text;
 
-    if (!text) return;
+    if (!text) {
+      requestAnimationFrame(() => {
+        expandManualArea();
+        expandRiskArea();
+        syncManualToRiskHeight();
+      });
+      return;
+    }
 
     const ta = $("inputText");
     if (ta) {
@@ -887,6 +945,7 @@ async function handleFile(file) {
 
     updateInputWatermarkVisibility();
 
+    // applyRules() will render riskBox then expand + sync in rAF
     applyRules(text);
     renderInputOverlayForPdf(text);
 
@@ -895,6 +954,11 @@ async function handleFile(file) {
     console.error("[handleFile] ERROR:", e);
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
+    requestAnimationFrame(() => {
+      expandManualArea();
+      expandRiskArea();
+      syncManualToRiskHeight();
+    });
   }
 }
 
@@ -930,6 +994,9 @@ function bind() {
       else window.dispatchEvent(new Event("safe:updated"));
 
       if (ta) renderInputOverlayForPdf(ta.value || "");
+
+      // language switch might change risk content height slightly
+      requestAnimationFrame(syncManualToRiskHeight);
     };
   });
 
@@ -938,14 +1005,20 @@ function bind() {
   const manualBody = $("manualBody");
   if (btnToggleManual && manualBody) {
     setCtlExpanded(btnToggleManual, manualBody, false);
-    btnToggleManual.onclick = () => toggleCtl(btnToggleManual, manualBody);
+    btnToggleManual.onclick = () => {
+      toggleCtl(btnToggleManual, manualBody);
+      requestAnimationFrame(syncManualToRiskHeight);
+    };
   }
 
   const btnToggleRisk = $("btnToggleRisk");
   const riskBody = $("riskBody");
   if (btnToggleRisk && riskBody) {
     setCtlExpanded(btnToggleRisk, riskBody, false);
-    btnToggleRisk.onclick = () => toggleCtl(btnToggleRisk, riskBody);
+    btnToggleRisk.onclick = () => {
+      toggleCtl(btnToggleRisk, riskBody);
+      requestAnimationFrame(syncManualToRiskHeight);
+    };
   }
 
   // Manual terms input
@@ -960,7 +1033,9 @@ function bind() {
       const inTxt = (($("inputText") && $("inputText").value) || "").trim();
       if (inTxt) applyRules(inTxt);
       else window.dispatchEvent(new Event("safe:updated"));
+
       renderInputOverlayForPdf(($("inputText") && $("inputText").value) || "");
+      requestAnimationFrame(syncManualToRiskHeight);
     });
 
     // init
@@ -994,6 +1069,7 @@ function bind() {
       collapseManualArea();
       collapseRiskArea();
       clearProgress();
+      resetManualHeightLock();
 
       const rb = $("riskBox");
       if (rb) rb.innerHTML = "";
@@ -1042,12 +1118,12 @@ function bind() {
   const up = $("btnUp");
   const down = $("btnDown");
   if (up) up.onclick = () => {
-    const n = Number($("upCount").textContent || "0") + 1;
-    $("upCount").textContent = String(n);
+    const n = Number($("upCount")?.textContent || "0") + 1;
+    if ($("upCount")) $("upCount").textContent = String(n);
   };
   if (down) down.onclick = () => {
-    const n = Number($("downCount").textContent || "0") + 1;
-    $("downCount").textContent = String(n);
+    const n = Number($("downCount")?.textContent || "0") + 1;
+    if ($("downCount")) $("downCount").textContent = String(n);
   };
 
   // Auto-filter on typing (debounced)
@@ -1103,8 +1179,10 @@ function bind() {
   const btnExportRasterPdf = $("btnExportRasterPdf");
   if (btnExportRasterPdf) {
     btnExportRasterPdf.onclick = async () => {
-      // show area + progress under "生成进程" slot
+      // show area + progress under slot
       expandRiskArea();
+      requestAnimationFrame(syncManualToRiskHeight);
+
       const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
 
       try {
@@ -1144,10 +1222,12 @@ function bind() {
         });
 
         setProgressText(t.progressDone || "Done ✅ Download started.", false);
+        requestAnimationFrame(syncManualToRiskHeight);
       } catch (e) {
         const msg = (e && (e.message || String(e))) || "Unknown error";
         const t2 = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
         setProgressText(`${t2.progressFailed || "Export failed:"}\n${msg}`, true);
+        requestAnimationFrame(syncManualToRiskHeight);
       }
     };
   }
