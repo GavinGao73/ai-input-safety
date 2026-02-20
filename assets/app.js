@@ -510,7 +510,10 @@ function setStage3Ui(mode){
 /* ================= NEW: unified control toggles (button + body) ================= */
 function setCtlExpanded(btn, body, expanded){
   if (btn) btn.setAttribute("aria-expanded", expanded ? "true" : "false");
-  if (body) body.style.display = expanded ? "" : "none";
+  if (body) {
+    body.classList.toggle("open", !!expanded);
+    body.style.display = expanded ? "" : "none";
+  }
 }
 
 function toggleCtl(btn, body){
