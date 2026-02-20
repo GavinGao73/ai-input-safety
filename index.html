@@ -1,6 +1,7 @@
 <!-- =========================
      index.html (FULL)
-     - ONE railcard (feedback + progress)
+     - REMOVE feedback/like UI
+     - Right railcard becomes PURE progress card (ui-export-title + exportStatus)
      - Titles i18n-ready (ui-manual-rail-title / ui-export-title)
      - Hint note is plain container (text set by i18n via app.js)
      ========================= -->
@@ -154,18 +155,10 @@
               <div class="risk" id="riskBox"></div>
             </div>
 
-            <div class="railcard">
-              <div class="fb-area" aria-label="feedback">
-                <div class="fbq" id="ui-fb-q"></div>
-                <div class="fb-row" aria-label="feedback buttons">
-                  <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
-                  <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
-                </div>
-              </div>
-
-              <div class="rail-divider" aria-hidden="true"></div>
+            <!-- PURE progress railcard -->
+            <div class="railcard railcard-progress-only">
               <div class="rail-title" id="ui-export-title"></div>
-              <div class="tiny muted" id="exportStatus"></div>
+              <div class="tiny muted export-status" id="exportStatus" style="white-space:pre-wrap; line-height:1.6;"></div>
             </div>
           </div>
         </div>
@@ -183,6 +176,6 @@
   <script src="./assets/pdf.js" defer></script>
   <script src="./assets/raster-export.js" defer></script>
   <script src="./assets/redact-ui.js" defer></script>
-  <script src="./assets/app.js?v=20260219d1" defer></script>
+  <script src="./assets/app.js?v=20260219d2" defer></script>
 </body>
 </html>
