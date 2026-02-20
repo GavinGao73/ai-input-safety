@@ -835,3 +835,126 @@ textarea{
   max-height: none !important;
   overflow: auto !important;
 }
+
+/* =========================
+   NEW: Unified control title row + body (desktop)
+   - Title row is a barcard-level button (same level as Filter flow)
+   - Body expands to a 3:1 grid with equal height cards
+   ========================= */
+
+.ctlbar{
+  margin-top:10px;
+}
+
+.ctlbtn{
+  width:100%;
+  border:0;
+  background:transparent;
+  color:rgba(255,255,255,.92);
+  font-weight:900;
+  font-size:13px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 12px;
+  min-height:56px;
+}
+.ctlbtn::after{
+  content:"▾";
+  opacity:.65;
+  transform: translateY(-1px);
+}
+.ctlbtn[aria-expanded="true"]::after{
+  content:"▴";
+}
+
+/* body wrapper */
+.io-body{
+  margin-top:10px;
+  display:none; /* default collapsed */
+}
+
+/* The opened body uses the same grid ratio 3:1 */
+.io-body.open{
+  display:block;
+}
+
+/* inner grid (same as your previous io-bottom-grid but now under toggle) */
+.io-bottom-grid{
+  display:grid;
+  grid-template-columns: 3fr 1fr;
+  gap:12px;
+  align-items:stretch;
+  min-width:0;
+}
+
+/* Ensure equal height when expanded (both columns stretch) */
+.io-bottom-grid > *{
+  height:100%;
+}
+
+/* The content cards inside the body */
+.subcard{
+  border:1px solid var(--panel-bd);
+  border-radius:14px;
+  background:var(--panel-bg);
+  padding:12px;
+  min-width:0;
+}
+
+/* Right rail subcard */
+.railcard{
+  border:1px solid var(--panel-bd);
+  border-radius:14px;
+  background:var(--panel-bg);
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-width:0;
+}
+
+/* Manual textarea inside subcard */
+.manual-terms-textarea{
+  width:100%;
+  min-height:160px;
+  resize:vertical;
+  background:var(--box-bg);
+  border:1px solid var(--box-bd);
+  border-radius:12px;
+  color:rgba(255,255,255,.92);
+  padding:12px;
+  font-size:var(--fs-body);
+  line-height:var(--lh-body);
+
+  /* keep consistent with input: allow horizontal */
+  white-space:pre;
+  overflow-wrap:normal;
+  word-break:normal;
+  overflow:auto;
+}
+
+/* Feedback rail layout */
+.railcard .fbq{
+  color:var(--muted);
+  font-size:12px;
+  white-space:nowrap;
+}
+.fb-buttons{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.fb-buttons .iconbtn{
+  width:100%;
+  justify-content:center;
+}
+
+/* Mobile: 3:1 becomes 1 column for readability */
+@media (max-width: 560px){
+  .io-bottom-grid{
+    grid-template-columns: 1fr;
+  }
+}
+
