@@ -629,12 +629,25 @@ function setText() {
   if ($("ui-tab-in")) $("ui-tab-in").textContent = t.tabIn || "";
   if ($("ui-tab-out")) $("ui-tab-out").textContent = t.tabOut || "";
 
-  // control titles (button)
-  const btnMan = $("btnToggleManual");
-  const btnRisk = $("btnToggleRisk");
-  if (btnMan) btnMan.textContent = t.manualTitle || "手工输入";
-  if (btnRisk) btnRisk.textContent = (t.riskTitle || "风险评分");
+  // control titles (button spans) — DO NOT overwrite button DOM
+  const spMan = document.getElementById("ui-manual-toggle-title");
+  const spRisk = document.getElementById("ui-risk-toggle-title");
 
+  if (spMan) spMan.textContent = t.manualTitle || "手工输入";
+  else if ($("btnToggleManual")) $("btnToggleManual").textContent = t.manualTitle || "手工输入"; // fallback
+
+  if (spRisk) spRisk.textContent = t.riskTitle || "风险评分";
+  else if ($("btnToggleRisk")) $("btnToggleRisk").textContent = t.riskTitle || "风险评分"; // fallback
+
+  // rail titles + note (i18n)
+  const railManTitle = document.getElementById("ui-manual-rail-title");
+  if (railManTitle) railManTitle.textContent = t.manualRailTitle || "";
+
+  const railManNote = document.getElementById("ui-manual-rail-note");
+  if (railManNote) railManNote.textContent = t.manualRailText || "";
+
+  const exportTitle = document.getElementById("ui-export-title");
+  if (exportTitle) exportTitle.textContent = t.exportTitle || "";
   // Manual terms placeholder
   if ($("manualTerms")) $("manualTerms").placeholder = t.manualPlaceholder || "例如：张三, 李四, Bei.de Tech GmbH";
 
