@@ -1,6 +1,10 @@
 /* =========================
    assets/styles.css (FULL, consolidated)
-   + NEW ctl-region / ctl-title / ctl-body / ctl-grid
+   (UPDATED)
+   - FIX textarea horizontal scroll + remove double-scroll feeling
+   - FIX PDF overlay inset so scrollbar drag works
+   - Add rail title/divider + export/progress area helpers
+   - Keep your unified toggle (.ctlbar/.ctlbtn + .io-body.open)
    ========================= */
 
 :root{
@@ -188,7 +192,7 @@ h3{
 }
 
 /* =========================
-   Input / Output  (REPLACE this whole section)
+   Input / Output
    ========================= */
 
 .outbox{ width:100%; min-width:0; }
@@ -201,6 +205,7 @@ textarea,
   font-family:var(--sans);
 }
 
+/* ✅ textareas: true horizontal scroll, draggable bar */
 textarea{
   width:100%;
   height:320px;
@@ -211,16 +216,17 @@ textarea{
   color:rgba(255,255,255,.92);
   padding:12px;
 
-  /* ✅ FIX #1: allow true horizontal scroll + draggable bar */
   white-space:pre;           /* no soft wrap */
   overflow-wrap:normal;
   word-break:normal;
+
   overflow-x:auto;
   overflow-y:auto;
 
   min-width:0;
 }
 
+/* ✅ output: wrap as before */
 .output{
   height:320px;
   max-height:320px;
@@ -228,8 +234,6 @@ textarea{
   border:1px solid var(--box-bd);
   border-radius:12px;
   padding:12px;
-
-  /* output still wraps (as before) */
   white-space:pre-wrap;
   overflow:auto;
   min-width:0;
@@ -243,6 +247,7 @@ textarea{
   padding: 1px 6px;
   border-radius: 999px;
 }
+
 /* =========================
    Controlbar / Feedback
    ========================= */
@@ -314,7 +319,7 @@ textarea{
   overflow:auto;
 }
 
-/* ✅ Manual card header layout (legacy) */
+/* legacy manual header */
 .manual-sum{ gap:12px; }
 .manual-sum-title{ flex:1 1 auto; min-width:0; }
 .manual-sum-right{
@@ -382,7 +387,7 @@ textarea{
 }
 
 /* =========================
-   Watermark / Overlay (REPLACE this whole section)
+   Watermark / Overlay
    ========================= */
 
 .textarea-wrap{ position:relative; min-width:0; }
@@ -404,20 +409,15 @@ textarea{
 }
 #inputWrap.has-content .input-watermark{ display:none; }
 
-/* ✅ KEY FIX #1:
-   overlay no longer covers scrollbar area (inset=12px), so scrollbar drag works reliably */
+/* ✅ overlay inset so it NEVER blocks scrollbar drag area */
 .input-overlay{
   display:none;
   position:absolute;
-
-  /* was: left:0; right:0; top:0; bottom:0; */
   left:12px; right:12px; top:12px; bottom:12px;
-
-  padding:0;                 /* padding already comes from inset */
+  padding:0;
   border-radius:10px;
   overflow:auto;
 
-  /* match textarea horizontal behavior */
   white-space:pre;
   overflow-wrap:normal;
   word-break:normal;
@@ -427,7 +427,7 @@ textarea{
 }
 #inputWrap.pdf-overlay-on .input-overlay{ display:block; }
 
-/* ✅ overlay mode: keep textarea caret, but text invisible */
+/* overlay mode: keep caret, hide text */
 #inputWrap.pdf-overlay-on textarea{
   color: transparent;
   caret-color: rgba(255,255,255,.88);
@@ -494,18 +494,13 @@ textarea{
 }
 
 /* =========================
-   NEW: Control regions (title row OUTSIDE body)
-   - used by updated index.html / m.html
-   - title is first-class row on big card
-   - body contains 3:1 paired cards, equal-height by stretch
+   NEW: Control regions (older alternative; kept)
    ========================= */
 
 .ctl-region{
   margin-top:10px;
   min-width:0;
 }
-
-/* Title row: looks like a module row, not a details summary */
 .ctl-title{
   width:100%;
   border:1px solid var(--panel-bd);
@@ -522,29 +517,22 @@ textarea{
   gap:12px;
   text-align:left;
 }
-.ctl-title:hover{
-  border-color: rgba(43,144,255,.35);
-}
+.ctl-title:hover{ border-color: rgba(43,144,255,.35); }
 .ctl-title[aria-expanded="true"]{
   border-color: rgba(43,144,255,.35);
   background: rgba(43,144,255,.12);
 }
-
-/* Body container */
 .ctl-body{
   margin-top:10px;
   min-width:0;
 }
-
-/* Paired cards (3:1), equal height */
 .ctl-grid{
   display:grid;
-  grid-template-columns: 3fr 1fr; /* ✅ 3:1 */
+  grid-template-columns: 3fr 1fr;
   gap:12px;
   align-items:stretch;
   min-width:0;
 }
-
 .ctl-card{
   border:1px solid var(--panel-bd);
   border-radius:14px;
@@ -552,8 +540,6 @@ textarea{
   padding:12px;
   min-width:0;
 }
-
-/* narrow column helper */
 .ctl-card-narrow{
   display:flex;
   flex-direction:column;
@@ -561,42 +547,19 @@ textarea{
   min-width:0;
 }
 
-/* Reuse existing rail helpers inside ctl-card */
-.side-rail-note{ line-height:1.4; }
-.side-rail-actions{
-  margin-top:auto;
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-}
-
-/* feedback buttons (inside ctl-card-narrow) */
-.fb-buttons{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.fb-buttons .iconbtn{
-  width:100%;
-  justify-content:center;
-}
-.ctl-card-narrow .fb-buttons{ margin-top:auto; }
-
 /* =========================
    Desktop bottom layout (legacy)
-   - kept for compatibility; not used by new HTML
    ========================= */
 
 .io-bottom-grid{
   display:grid;
-  grid-template-columns: 3fr 1fr; /* ✅ 3:1 */
+  grid-template-columns: 3fr 1fr;
   gap:12px;
   margin-top:10px;
   align-items:stretch;
   min-width:0;
 }
 
-/* tighter fold used in bottom area */
 .fold-tight{
   margin-top:0;
   border:1px solid var(--panel-bd);
@@ -604,28 +567,23 @@ textarea{
   background:var(--panel-bg);
   overflow:hidden;
 }
-
-/* ✅ fix: details closed should NOT reserve blank height */
 .fold-eq{ min-height: 0 !important; }
 .fold-eq > summary{ min-height:56px; }
-
-/* fold-tight header fixed height too */
 .fold-tight > summary{
   min-height:56px;
   padding:12px 12px;
 }
-
-/* folded: header only; no extra bottom border feel */
 .fold-tight:not([open]) > summary{
   padding-top:10px;
   padding-bottom:10px;
 }
-
-/* bottom fold bodies: give a little more room */
 .manual-body{ padding:12px; }
 .risk-body{ padding:12px; }
 
-/* manual textarea in bottom fold (also reused in ctl-card) */
+/* =========================
+   Manual textarea (shared)
+   ========================= */
+
 .manual-terms-textarea{
   width:100%;
   min-height:160px;
@@ -637,6 +595,11 @@ textarea{
   padding:12px;
   font-size:var(--fs-body);
   line-height:var(--lh-body);
+
+  white-space:pre;
+  overflow-wrap:normal;
+  word-break:normal;
+  overflow:auto;
 }
 
 /* side rails (legacy) */
@@ -662,7 +625,7 @@ textarea{
 }
 
 /* =========================
-   Mobile (kept from your version)
+   Mobile
    ========================= */
 
 .panel-radio{
@@ -799,10 +762,8 @@ textarea{
     word-break:break-word;
   }
 
-  /* ✅ Mobile usability: stack the 3:1 cards */
-  .ctl-grid{
-    grid-template-columns: 1fr;
-  }
+  /* stack 3:1 cards on mobile */
+  .ctl-grid{ grid-template-columns: 1fr; }
 }
 
 /* FORCE: wrap-mobile does not grow */
@@ -837,14 +798,10 @@ textarea{
 }
 
 /* =========================
-   NEW: Unified control title row + body (desktop)
-   - Title row is a barcard-level button (same level as Filter flow)
-   - Body expands to a 3:1 grid with equal height cards
+   Unified control title row + body
    ========================= */
 
-.ctlbar{
-  margin-top:10px;
-}
+.ctlbar{ margin-top:10px; }
 
 .ctlbtn{
   width:100%;
@@ -859,6 +816,7 @@ textarea{
   justify-content:space-between;
   padding:12px 12px;
   min-height:56px;
+  text-align:left;
 }
 .ctlbtn::after{
   content:"▾";
@@ -869,18 +827,14 @@ textarea{
   content:"▴";
 }
 
-/* body wrapper */
 .io-body{
   margin-top:10px;
   display:none; /* default collapsed */
 }
-
-/* The opened body uses the same grid ratio 3:1 */
 .io-body.open{
   display:block;
 }
 
-/* inner grid (same as your previous io-bottom-grid but now under toggle) */
 .io-bottom-grid{
   display:grid;
   grid-template-columns: 3fr 1fr;
@@ -888,13 +842,8 @@ textarea{
   align-items:stretch;
   min-width:0;
 }
+.io-bottom-grid > *{ height:100%; }
 
-/* Ensure equal height when expanded (both columns stretch) */
-.io-bottom-grid > *{
-  height:100%;
-}
-
-/* The content cards inside the body */
 .subcard{
   border:1px solid var(--panel-bd);
   border-radius:14px;
@@ -903,7 +852,6 @@ textarea{
   min-width:0;
 }
 
-/* Right rail subcard */
 .railcard{
   border:1px solid var(--panel-bd);
   border-radius:14px;
@@ -915,27 +863,20 @@ textarea{
   min-width:0;
 }
 
-/* Manual textarea inside subcard */
-.manual-terms-textarea{
-  width:100%;
-  min-height:160px;
-  resize:vertical;
-  background:var(--box-bg);
-  border:1px solid var(--box-bd);
-  border-radius:12px;
-  color:rgba(255,255,255,.92);
-  padding:12px;
-  font-size:var(--fs-body);
-  line-height:var(--lh-body);
-
-  /* keep consistent with input: allow horizontal */
-  white-space:pre;
-  overflow-wrap:normal;
-  word-break:normal;
-  overflow:auto;
+.rail-title{
+  font-weight:900;
+  font-size:12px;
+  color: rgba(255,255,255,.88);
+  letter-spacing:.2px;
 }
 
-/* Feedback rail layout */
+.rail-divider{
+  height:1px;
+  width:100%;
+  background: rgba(255,255,255,.08);
+  margin:4px 0;
+}
+
 .railcard .fbq{
   color:var(--muted);
   font-size:12px;
@@ -951,10 +892,8 @@ textarea{
   justify-content:center;
 }
 
-/* Mobile: 3:1 becomes 1 column for readability */
+/* Mobile: 3:1 becomes 1 column */
 @media (max-width: 560px){
-  .io-bottom-grid{
-    grid-template-columns: 1fr;
-  }
+  .io-bottom-grid{ grid-template-columns: 1fr; }
 }
 
