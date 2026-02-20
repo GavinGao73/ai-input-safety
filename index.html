@@ -1,10 +1,5 @@
 <!-- =========================
-     index.html (FULL) — btnGenerate removed (auto filtering)
-     Layout refactor (this revision):
-     - Keep LEFT/RIGHT cards + middle logo unchanged
-     - Move titles ("手工输入" / "风险评分") OUTSIDE fold bodies (as first-class rows)
-     - Replace details with title-button + hidden panel
-     - Default collapsed (panels hidden)
+     index.html (FULL) — unified title-row toggles
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -65,46 +60,41 @@
 
         <div class="outbox outbox-input">
           <div class="textarea-wrap" id="inputWrap">
-            <textarea id="inputText" spellcheck="false"></textarea>
+            <!-- ✅ wrap=off is important for true horizontal scroll -->
+            <textarea id="inputText" spellcheck="false" wrap="off"></textarea>
             <div class="input-overlay" id="inputOverlay" aria-hidden="true"></div>
             <div class="input-watermark" id="ui-input-watermark" aria-hidden="true"></div>
           </div>
         </div>
 
-        <!-- =========================
-             NEW: Manual control region
-             - Title row OUTSIDE body (first-class row on big card)
-             - Body is 3:1 paired cards, default hidden
-             ========================= -->
-        <div class="ctl-region ctl-region-left" aria-label="Manual input area">
-          <!-- Title: switch/link only (no right hint text) -->
-          <button class="ctl-title" id="toggleManual" type="button" aria-expanded="false">
-            <span id="ui-manual-terms-title">手工输入</span>
-          </button>
+        <!-- ✅ Title row: same level card as "Filter" flow (NOT inside small cards) -->
+        <div class="barcard ctlbar" aria-label="Manual toggle bar">
+          <button class="ctlbtn" id="btnToggleManual" type="button" aria-expanded="false">手工输入</button>
+        </div>
 
-          <!-- Body: default collapsed -->
-          <div class="ctl-body" id="manualPanel" hidden>
-            <div class="ctl-grid" aria-label="Manual input cards">
-              <!-- Left wide: manual terms -->
-              <div class="ctl-card">
-                <textarea
-                  id="manualTerms"
-                  class="manual-terms-textarea"
-                  spellcheck="false"
-                  autocomplete="off"
-                  placeholder="例如：张三, 李四, Bei.de Tech GmbH"
-                ></textarea>
+        <!-- ✅ Expand body: 3:1 (manual input card + manual hint card) -->
+        <div class="io-body" id="manualBody" aria-label="Manual body">
+          <div class="io-bottom-grid io-bottom-grid-left">
+            <!-- Left wide: manual input card -->
+            <div class="subcard">
+              <textarea
+                id="manualTerms"
+                class="manual-terms-textarea"
+                spellcheck="false"
+                autocomplete="off"
+                wrap="off"
+                placeholder="例如：张三, 李四, Bei.de Tech GmbH"
+              ></textarea>
+            </div>
+
+            <!-- Right narrow: hint + actions -->
+            <div class="railcard">
+              <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
+                支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。
               </div>
 
-              <!-- Right narrow: explanation + actions -->
-              <div class="ctl-card ctl-card-narrow">
-                <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
-                  支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。
-                </div>
-
-                <div class="side-rail-actions">
-                  <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
-                </div>
+              <div class="side-rail-actions">
+                <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
               </div>
             </div>
           </div>
@@ -120,7 +110,7 @@
         </div>
       </section>
 
-      <!-- MIDDLE (UNCHANGED) -->
+      <!-- MIDDLE -->
       <div class="mid-filter" aria-hidden="true">
         <div class="flow-line"></div>
 
@@ -154,39 +144,32 @@
           <div class="output output-scroll" id="outputText"></div>
         </div>
 
-        <!-- =========================
-             NEW: Risk control region
-             - Title row OUTSIDE body (first-class row on big card)
-             - Body is 3:1 paired cards, default hidden
-             ========================= -->
-        <div class="ctl-region ctl-region-right" aria-label="Risk and feedback area">
-          <!-- Title: switch/link only -->
-          <button class="ctl-title" id="toggleRisk" type="button" aria-expanded="false">
-            <span id="ui-risk-title"></span>
-          </button>
+        <!-- ✅ Title row: same level card as "Filter" flow -->
+        <div class="barcard ctlbar" aria-label="Risk toggle bar">
+          <button class="ctlbtn" id="btnToggleRisk" type="button" aria-expanded="false">风险评分</button>
+        </div>
 
-          <!-- Body: default collapsed -->
-          <div class="ctl-body" id="riskPanel" hidden>
-            <div class="ctl-grid" aria-label="Risk cards">
-              <!-- Left wide: risk box -->
-              <div class="ctl-card">
-                <div class="risk" id="riskBox"></div>
-              </div>
+        <!-- ✅ Expand body: 3:1 (risk card + feedback card) -->
+        <div class="io-body" id="riskBody" aria-label="Risk body">
+          <div class="io-bottom-grid io-bottom-grid-right">
+            <!-- Left wide: risk content card -->
+            <div class="subcard">
+              <div class="risk" id="riskBox"></div>
+            </div>
 
-              <!-- Right narrow: feedback -->
-              <div class="ctl-card ctl-card-narrow">
-                <div class="fbq" id="ui-fb-q"></div>
+            <!-- Right narrow: feedback -->
+            <div class="railcard">
+              <div class="fbq" id="ui-fb-q"></div>
 
-                <div class="fb-buttons">
-                  <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
-                  <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
-                </div>
+              <div class="fb-buttons">
+                <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
+                <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- ✅ Right bottom disclaimer (always at bottom) -->
+        <!-- ✅ Right bottom disclaimer -->
         <div class="right-footer">
           <div class="tiny footnote accent-link" id="ui-foot"></div>
         </div>
@@ -201,6 +184,6 @@
   <script src="./assets/pdf.js" defer></script>
   <script src="./assets/raster-export.js" defer></script>
   <script src="./assets/redact-ui.js" defer></script>
-  <script src="./assets/app.js?v=20260219b" defer></script>
+  <script src="./assets/app.js?v=20260219c" defer></script>
 </body>
 </html>
