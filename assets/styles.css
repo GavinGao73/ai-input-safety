@@ -4,11 +4,10 @@
    - Plan A: cards follow content (no forced tall blanks)
    - Keep left textarea & right output EXACT same sizing
    - Restore Risk card aesthetics (riskhead/score/list/advice)
-   - Feedback card: centered question + small buttons inline
-   - Right column: stack two small cards (feedback + progress),
-     progress takes remaining height
+   - Feedback rail: centered question + small buttons inline (ONE row)
+   - Progress area lives UNDER feedback in SAME railcard, and takes remaining height
    - Manual hint: title + smaller text + line breaks
-   - Keep overlay inset + remove overlay scrollbars (no double-scroll)
+   - Overlay inset + hide overlay scrollbars (no double-scroll) BUT still scroll-syncable
    - Expanded ratio: 3:2
    ========================= */
 
@@ -280,7 +279,7 @@ textarea{
 }
 #inputWrap.has-content .input-watermark{ display:none; }
 
-/* ✅ overlay inset; ✅ no overlay scrollbars (remove double-scroll) */
+/* ✅ overlay inset; ✅ hide overlay scrollbars (no double-scroll), but keep scrollable for sync */
 .input-overlay{
   display:none;
   position:absolute;
@@ -288,7 +287,9 @@ textarea{
   padding:0;
   border-radius:10px;
 
-  overflow:hidden;
+  overflow:auto;               /* keep scrollTop/Left sync working */
+  scrollbar-width:none;        /* Firefox */
+  -ms-overflow-style:none;     /* IE/Edge legacy */
 
   white-space:pre;
   overflow-wrap:normal;
@@ -296,6 +297,10 @@ textarea{
 
   pointer-events:none;
   color: rgba(255,255,255,.92);
+}
+.input-overlay::-webkit-scrollbar{
+  width:0;
+  height:0;
 }
 #inputWrap.pdf-overlay-on .input-overlay{ display:block; }
 
@@ -455,14 +460,9 @@ textarea{
   min-width:0;
 }
 
-/* Right column stack (feedback + progress) */
-.railstack{
-  display:flex;
-  flex-direction:column;
-  gap:12px;
-  min-width:0;
-  height:100%;
-}
+/* =========================
+   Rail card (ONE card: feedback + progress)
+   ========================= */
 
 .railcard{
   border:1px solid var(--panel-bd);
@@ -473,11 +473,9 @@ textarea{
   flex-direction:column;
   gap:10px;
   min-width:0;
+  height:100%;
+  min-height:0; /* allow inner overflow areas */
 }
-
-/* progress card takes remaining height */
-.railcard-progress{ flex:1 1 auto; min-height:0; }
-.railcard-fb{ flex:0 0 auto; }
 
 .rail-title{
   font-weight:900;
@@ -564,10 +562,18 @@ textarea{
 .riskadvice{ font-size:12px; line-height:1.5; color:rgba(255,255,255,.82); }
 
 /* =========================
-   Feedback card (center + small inline buttons)
+   Feedback (center + small inline buttons)
    ========================= */
 
-.railcard-fb .fbq{
+.fb-area{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  align-items:center;
+  justify-content:flex-start;
+}
+
+.fb-area .fbq{
   color:rgba(255,255,255,.82);
   font-size:12px;
   font-weight:900;
@@ -575,12 +581,13 @@ textarea{
   white-space:normal;
 }
 
-.fb-buttons{
+.fb-row{
   display:flex;
   flex-direction:row;
   gap:8px;
   justify-content:center;
   align-items:center;
+  width:100%;
 }
 
 .iconbtn{
@@ -594,14 +601,19 @@ textarea{
   line-height:1;
 }
 
-/* Progress output (text) */
-.export-status{
+/* =========================
+   Progress output (text) — takes remaining height
+   ========================= */
+
+.export-status,
+#exportStatus{
+  flex:1 1 auto;
+  min-height:0;
   font-size:11px;
   line-height:1.55;
   color:rgba(255,255,255,.80);
   white-space:pre-wrap;
   overflow:auto;
-  min-height:0;
 }
 
 /* =========================
