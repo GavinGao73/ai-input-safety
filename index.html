@@ -1,11 +1,8 @@
 <!-- =========================
-     index.html (FULL) — unified title-row toggles (UPDATED)
-     Fix targets in this file:
-     - Keep railcard ONE card (feedback + progress)
-     - Feedback: centered text, buttons in ONE row (size handled in CSS)
-     - Progress area lives UNDER feedback (no overwrite riskBox)
-     - Manual hint: structured multiline (i18n-ready ids), easier to style smaller + line breaks
-     - Bodies default collapsed (display:none; aria-expanded=false)
+     index.html (FULL)
+     - ONE railcard (feedback + progress)
+     - Titles i18n-ready (ui-manual-rail-title / ui-export-title)
+     - Hint note is plain container (text set by i18n via app.js)
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -66,24 +63,20 @@
 
         <div class="outbox outbox-input">
           <div class="textarea-wrap" id="inputWrap">
-            <!-- ✅ wrap=off is important for true horizontal scroll -->
             <textarea id="inputText" spellcheck="false" wrap="off"></textarea>
             <div class="input-overlay" id="inputOverlay" aria-hidden="true"></div>
             <div class="input-watermark" id="ui-input-watermark" aria-hidden="true"></div>
           </div>
         </div>
 
-        <!-- ✅ Title row: same tier as barcard (NOT a separate small card) -->
         <div class="barcard ctlbar" aria-label="Manual toggle bar">
           <button class="ctlbtn" id="btnToggleManual" type="button" aria-expanded="false">
             <span id="ui-manual-toggle-title">手工输入</span>
           </button>
         </div>
 
-        <!-- ✅ Expand body: default collapsed (JS will open/close) -->
         <div class="io-body" id="manualBody" aria-label="Manual body" style="display:none;">
           <div class="io-bottom-grid io-bottom-grid-left">
-            <!-- Left wide: manual input card -->
             <div class="subcard">
               <textarea
                 id="manualTerms"
@@ -95,18 +88,9 @@
               ></textarea>
             </div>
 
-            <!-- Right rail: hint + actions -->
             <div class="railcard">
-              <div class="rail-title" id="ui-manual-rail-title">输入提示</div>
-
-              <!-- ✅ Structured hint for easy line-break + small font via CSS -->
-              <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
-                <div id="ui-manual-hint-line-1">支持逗号或换行分隔。</div>
-                <div id="ui-manual-hint-line-2" style="margin-top:6px;">只会遮盖：</div>
-                <div id="ui-manual-hint-line-3">① 你上传的 PDF 原文里真实出现的词；</div>
-                <div id="ui-manual-hint-line-4">② 你在输入框里粘贴的文本里出现的词。</div>
-                <div id="ui-manual-hint-line-5" style="margin-top:6px;">建议把姓名/公司/邮箱/及其他个人认为有风险关键词补充进来。</div>
-              </div>
+              <div class="rail-title" id="ui-manual-rail-title"></div>
+              <div class="side-rail-note" id="ui-manual-rail-note"></div>
 
               <div class="side-rail-actions">
                 <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
@@ -115,7 +99,6 @@
           </div>
         </div>
 
-        <!-- ✅ Left bottom links (always visible) -->
         <div class="left-footer">
           <div class="links">
             <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
@@ -159,42 +142,34 @@
           <div class="output output-scroll" id="outputText"></div>
         </div>
 
-        <!-- ✅ Title row: same tier as barcard -->
         <div class="barcard ctlbar" aria-label="Risk toggle bar">
           <button class="ctlbtn" id="btnToggleRisk" type="button" aria-expanded="false">
             <span id="ui-risk-toggle-title">风险评分</span>
           </button>
         </div>
 
-        <!-- ✅ Expand body: default collapsed (JS will open/close) -->
         <div class="io-body" id="riskBody" aria-label="Risk body" style="display:none;">
           <div class="io-bottom-grid io-bottom-grid-right">
-            <!-- Left wide: risk content card -->
             <div class="subcard">
               <div class="risk" id="riskBox"></div>
             </div>
 
-            <!-- Right rail: ONE card (feedback + progress) -->
             <div class="railcard">
-              <!-- ✅ Feedback block (centered text + one-row buttons) -->
               <div class="fb-area" aria-label="feedback">
                 <div class="fbq" id="ui-fb-q"></div>
-
                 <div class="fb-row" aria-label="feedback buttons">
                   <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
                   <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
                 </div>
               </div>
 
-              <!-- ✅ Progress area stays in railcard, under feedback -->
               <div class="rail-divider" aria-hidden="true"></div>
-              <div class="rail-title" id="ui-export-title">生成进程</div>
-              <div class="tiny muted export-status" id="exportStatus" style="white-space:pre-wrap; line-height:1.6;"></div>
+              <div class="rail-title" id="ui-export-title"></div>
+              <div class="tiny muted" id="exportStatus"></div>
             </div>
           </div>
         </div>
 
-        <!-- ✅ Right bottom disclaimer -->
         <div class="right-footer">
           <div class="tiny footnote accent-link" id="ui-foot"></div>
         </div>
@@ -202,7 +177,6 @@
     </div>
   </div>
 
-  <!-- JS（顺序非常重要，不要改） -->
   <script src="./assets/i18n.js" defer></script>
   <script src="./assets/catalog.js" defer></script>
   <script src="./assets/rules.js" defer></script>
