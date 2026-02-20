@@ -752,3 +752,38 @@ textarea{
   max-height: none !important;
   overflow: auto !important;
 }
+
+/* =========================
+   Manual panes (Mode A/B switch)
+   ========================= */
+
+.manual-pane{
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+  height:100%;
+}
+
+.manual-redact-title{
+  font-weight:900;
+  font-size:13px;
+  color: rgba(255,255,255,.92);
+  text-align:center;
+  margin-bottom:8px;
+}
+
+.manual-redact-note{
+  font-size:11px;
+  line-height:1.55;
+  color: rgba(255,255,255,.72);
+  white-space:pre-line;
+  overflow-wrap:anywhere;
+  text-align:left;
+}
+
+.manual-redact-actions{
+  margin-top:12px;
+  display:flex;
+  justify-content:center;
+}
+
