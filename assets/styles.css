@@ -2,9 +2,10 @@
    assets/styles.css (FULL, consolidated)
    (UPDATED)
    - Titles "输入提示"/"生成进程" centered + i18n-ready
+   - ✅ FIX: manualBody/riskBody inner grid fills parent's height (for JS height-lock sync)
    - Expanded: left manual area height follows right risk area; manual textarea scrolls inside
    - Keep left textarea & right output EXACT same sizing
-   - Railcard: ONE card (feedback + progress), progress takes remaining height
+   - Railcard: progress-only (feedback removed)
    - Mobile: IO tabs have distinct style (NOT same as main buttons)
    ========================= */
 
@@ -414,6 +415,16 @@ textarea{
 .io-body{ margin-top:10px; display:none; }
 .io-body.open{ display:block; }
 
+/* ✅ FIX: when JS locks manualBody height, ensure inner grid fills it */
+#manualBody.open .io-bottom-grid,
+#riskBody.open .io-bottom-grid{
+  height:100%;
+}
+#manualBody.open .io-bottom-grid-left,
+#riskBody.open .io-bottom-grid-right{
+  height:100%;
+}
+
 /* ✅ 3:2 ratio */
 .io-bottom-grid{
   display:grid;
@@ -442,7 +453,7 @@ textarea{
 }
 
 /* =========================
-   Rail card (ONE card: feedback + progress)
+   Rail card (progress only)
    ========================= */
 
 .railcard{
@@ -460,14 +471,17 @@ textarea{
   min-height:0;
 }
 
+/* optional: make progress-only slightly tighter */
+.railcard-progress-only{
+  gap:8px;
+}
+
 .rail-title{
   font-weight:900;
   font-size:12px;
   color: rgba(255,255,255,.88);
   letter-spacing:.2px;
-
-  /* ✅ center in card */
-  text-align:center;
+  text-align:center; /* ✅ center in card */
 }
 
 .rail-divider{
@@ -549,46 +563,6 @@ textarea{
 .riskitem .rv{ font-size:12px; color:var(--muted); }
 
 .riskadvice{ font-size:12px; line-height:1.5; color:rgba(255,255,255,.82); }
-
-/* =========================
-   Feedback (center + small inline buttons)
-   ========================= */
-
-.fb-area{
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  align-items:center;
-  justify-content:flex-start;
-}
-
-.fb-area .fbq{
-  color:rgba(255,255,255,.82);
-  font-size:12px;
-  font-weight:900;
-  text-align:center;
-  white-space:normal;
-}
-
-.fb-row{
-  display:flex;
-  flex-direction:row;
-  gap:8px;
-  justify-content:center;
-  align-items:center;
-  width:100%;
-}
-
-.iconbtn{
-  border:1px solid var(--line);
-  background:rgba(255,255,255,.05);
-  color:var(--text);
-  border-radius:10px;
-  padding:5px 10px;
-  cursor:pointer;
-  font-size:12px;
-  line-height:1;
-}
 
 /* =========================
    Progress output — takes remaining height and scrolls
