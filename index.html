@@ -1,5 +1,11 @@
 <!-- =========================
-     index.html (FULL) — unified title-row toggles
+     index.html (FULL) — unified title-row toggles (UPDATED)
+     Fix targets in this file:
+     - Add “输入提示” title + clearer hint area structure (i18n-ready ids)
+     - Add export/progress area BELOW “有用吗” rail (so it won’t overwrite riskBox)
+     - Ensure manual/risk bodies default collapsed (display:none; aria-expanded=false)
+     - Keep toggles at barcard level (same visual tier)
+     - Keep input textarea wrap=off for true horizontal scroll
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -67,13 +73,15 @@
           </div>
         </div>
 
-        <!-- ✅ Title row: same level card as "Filter" flow (NOT inside small cards) -->
+        <!-- ✅ Title row: same tier as barcard (NOT a separate small card) -->
         <div class="barcard ctlbar" aria-label="Manual toggle bar">
-          <button class="ctlbtn" id="btnToggleManual" type="button" aria-expanded="false">手工输入</button>
+          <button class="ctlbtn" id="btnToggleManual" type="button" aria-expanded="false">
+            <span id="ui-manual-toggle-title">手工输入</span>
+          </button>
         </div>
 
-        <!-- ✅ Expand body: 3:1 (manual input card + manual hint card) -->
-        <div class="io-body" id="manualBody" aria-label="Manual body">
+        <!-- ✅ Expand body: default collapsed (JS will open/close) -->
+        <div class="io-body" id="manualBody" aria-label="Manual body" style="display:none;">
           <div class="io-bottom-grid io-bottom-grid-left">
             <!-- Left wide: manual input card -->
             <div class="subcard">
@@ -89,8 +97,9 @@
 
             <!-- Right narrow: hint + actions -->
             <div class="railcard">
+              <div class="rail-title" id="ui-manual-rail-title">输入提示</div>
               <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
-                支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。
+                支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。建议仅输入需要额外遮盖的姓名、公司名、编号或地址关键词。
               </div>
 
               <div class="side-rail-actions">
@@ -144,20 +153,22 @@
           <div class="output output-scroll" id="outputText"></div>
         </div>
 
-        <!-- ✅ Title row: same level card as "Filter" flow -->
+        <!-- ✅ Title row: same tier as barcard -->
         <div class="barcard ctlbar" aria-label="Risk toggle bar">
-          <button class="ctlbtn" id="btnToggleRisk" type="button" aria-expanded="false">风险评分</button>
+          <button class="ctlbtn" id="btnToggleRisk" type="button" aria-expanded="false">
+            <span id="ui-risk-toggle-title">风险评分</span>
+          </button>
         </div>
 
-        <!-- ✅ Expand body: 3:1 (risk card + feedback card) -->
-        <div class="io-body" id="riskBody" aria-label="Risk body">
+        <!-- ✅ Expand body: default collapsed (JS will open/close) -->
+        <div class="io-body" id="riskBody" aria-label="Risk body" style="display:none;">
           <div class="io-bottom-grid io-bottom-grid-right">
             <!-- Left wide: risk content card -->
             <div class="subcard">
               <div class="risk" id="riskBox"></div>
             </div>
 
-            <!-- Right narrow: feedback -->
+            <!-- Right narrow: feedback + export status (under feedback) -->
             <div class="railcard">
               <div class="fbq" id="ui-fb-q"></div>
 
@@ -165,6 +176,11 @@
                 <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
                 <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
               </div>
+
+              <!-- ✅ Export/progress area: DO NOT overwrite riskBox -->
+              <div class="rail-divider" aria-hidden="true"></div>
+              <div class="rail-title" id="ui-export-title">生成进程</div>
+              <div class="tiny muted" id="exportStatus" style="white-space:pre-wrap; line-height:1.6;"></div>
             </div>
           </div>
         </div>
