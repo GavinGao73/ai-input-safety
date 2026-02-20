@@ -188,7 +188,7 @@ h3{
 }
 
 /* =========================
-   Input / Output
+   Input / Output  (REPLACE this whole section)
    ========================= */
 
 .outbox{ width:100%; min-width:0; }
@@ -210,7 +210,14 @@ textarea{
   border-radius:12px;
   color:rgba(255,255,255,.92);
   padding:12px;
-  overflow:auto;
+
+  /* ✅ FIX #1: allow true horizontal scroll + draggable bar */
+  white-space:pre;           /* no soft wrap */
+  overflow-wrap:normal;
+  word-break:normal;
+  overflow-x:auto;
+  overflow-y:auto;
+
   min-width:0;
 }
 
@@ -221,6 +228,8 @@ textarea{
   border:1px solid var(--box-bd);
   border-radius:12px;
   padding:12px;
+
+  /* output still wraps (as before) */
   white-space:pre-wrap;
   overflow:auto;
   min-width:0;
@@ -234,7 +243,6 @@ textarea{
   padding: 1px 6px;
   border-radius: 999px;
 }
-
 /* =========================
    Controlbar / Feedback
    ========================= */
@@ -374,7 +382,7 @@ textarea{
 }
 
 /* =========================
-   Watermark / Overlay
+   Watermark / Overlay (REPLACE this whole section)
    ========================= */
 
 .textarea-wrap{ position:relative; min-width:0; }
@@ -396,20 +404,30 @@ textarea{
 }
 #inputWrap.has-content .input-watermark{ display:none; }
 
+/* ✅ KEY FIX #1:
+   overlay no longer covers scrollbar area (inset=12px), so scrollbar drag works reliably */
 .input-overlay{
   display:none;
   position:absolute;
-  left:0; right:0; top:0; bottom:0;
-  padding:12px;
-  border-radius:12px;
+
+  /* was: left:0; right:0; top:0; bottom:0; */
+  left:12px; right:12px; top:12px; bottom:12px;
+
+  padding:0;                 /* padding already comes from inset */
+  border-radius:10px;
   overflow:auto;
-  white-space:pre-wrap;
+
+  /* match textarea horizontal behavior */
+  white-space:pre;
+  overflow-wrap:normal;
+  word-break:normal;
+
   pointer-events:none;
   color: rgba(255,255,255,.92);
 }
 #inputWrap.pdf-overlay-on .input-overlay{ display:block; }
 
-/* ✅ Fix “two layers while selecting”: force textarea fill fully transparent + selection transparent */
+/* ✅ overlay mode: keep textarea caret, but text invisible */
 #inputWrap.pdf-overlay-on textarea{
   color: transparent;
   caret-color: rgba(255,255,255,.88);
