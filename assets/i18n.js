@@ -12,7 +12,6 @@ const I18N = {
 
     btnUpload: "上传文件",
 
-    // legacy (btnGenerate removed in app.js, but keep for compatibility)
     btnGenerate: "过滤",
     btnCopy: "复制",
     btnCopied: "✔ 已复制",
@@ -20,6 +19,7 @@ const I18N = {
 
     // toggle titles
     riskTitle: "风险评分",
+    manualTitle: "手工输入",
 
     fbQ: "有帮助吗？",
 
@@ -37,16 +37,16 @@ const I18N = {
     btnRedactPdf: "红删PDF",
 
     // Manual terms card
-    manualTitle: "手工输入",
     manualHint: "支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。",
     manualPlaceholder: "例如：张三, 李四, Bei.de Tech GmbH",
 
-    // ✅ NEW: right rail “Input tips”
+    // ✅ rail titles + text
     manualRailTitle: "输入提示",
     manualRailText:
-      "支持逗号/换行分隔。\n只会遮盖：① 你上传的 PDF 原文里真实出现的词；② 你在输入框里粘贴的文本里出现的词。\n建议把姓名/公司/邮箱前缀/项目代号等高风险关键词补充进来。",
+      "支持逗号或换行分隔。\n只会遮盖：\n① 你上传的 PDF 原文里真实出现的词；\n② 你在输入框里粘贴的文本里出现的词。\n建议把姓名/公司/邮箱/及其他个人认为有风险关键词补充进来。",
+    exportTitle: "生成进程",
 
-    // ✅ NEW: export/progress messages (for RasterExport status area)
+    // progress messages
     progressWorking: "处理中…",
     progressDone: "完成 ✅ 已开始下载。",
     progressNoFile: "未检测到文件，请先上传 PDF。",
@@ -72,6 +72,7 @@ const I18N = {
     btnClear: "Clear",
 
     riskTitle: "Risk score",
+    manualTitle: "Manual input",
 
     fbQ: "Helpful?",
 
@@ -86,14 +87,13 @@ const I18N = {
 
     btnRedactPdf: "Redact PDF",
 
-    manualTitle: "Manual input",
     manualHint: "Separate by commas/new lines. Only masks terms that actually appear in the PDF text.",
     manualPlaceholder: "e.g. Alice, Bob, Bei.de Tech GmbH",
 
-    // ✅ NEW
     manualRailTitle: "Input tips",
     manualRailText:
-      "Separate by commas or new lines.\nOnly masks: (1) terms that actually appear in the uploaded PDF text; (2) terms that appear in your pasted input.\nTip: add names, companies, email prefixes, project codes, or other high-risk keywords here.",
+      "Separate by commas or new lines.\nOnly masks:\n① terms that actually appear in the uploaded PDF text;\n② terms that appear in your pasted input.\nTip: add names, companies, emails, or any keywords you consider risky here.",
+    exportTitle: "Progress",
 
     progressWorking: "Working…",
     progressDone: "Done ✅ Download started.",
@@ -120,6 +120,7 @@ const I18N = {
     btnClear: "Leeren",
 
     riskTitle: "Risikowert",
+    manualTitle: "Manuelle Eingabe",
 
     fbQ: "Hilfreich?",
 
@@ -134,14 +135,13 @@ const I18N = {
 
     btnRedactPdf: "PDF schwärzen",
 
-    manualTitle: "Manuelle Eingabe",
-    manualHint: "Trennung per Komma/Zeilenumbruch. Es wird nur maskiert, was im PDF-Text wirklich vorkommt。",
+    manualHint: "Trennung per Komma/Zeilenumbruch. Es wird nur maskiert, was im PDF-Text wirklich vorkommt.",
     manualPlaceholder: "z.B. Max Mustermann, Erika, Bei.de Tech GmbH",
 
-    // ✅ NEW
     manualRailTitle: "Eingabe-Hinweise",
     manualRailText:
-      "Trennung per Komma oder Zeilenumbruch.\nMaskiert wird nur: (1) was im hochgeladenen PDF-Text wirklich vorkommt; (2) was in deinem eingefügten Text vorkommt.\nTipp: Namen, Firmen, E-Mail-Präfixe, Projektcodes und andere Risiko-Keywords ergänzen.",
+      "Trennung per Komma oder Zeilenumbruch.\nMaskiert wird nur:\n① was im hochgeladenen PDF-Text wirklich vorkommt;\n② was in deinem eingefügten Text vorkommt.\nTipp: Namen/Firmen/E-Mails und andere Risiko-Keywords ergänzen.",
+    exportTitle: "Fortschritt",
 
     progressWorking: "Wird verarbeitet…",
     progressDone: "Fertig ✅ Download gestartet.",
