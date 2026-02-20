@@ -210,6 +210,38 @@ function applyManualTermsMask(out, addHit){
   return s;
 }
 
+/* ================= Manual pane mode switch (Mode A / Mode B) =================
+   - Mode A: show manual terms pane
+   - Mode B: show manual redaction pane
+   NOTE: panes are in HTML; this is a no-op if panes not present (backward-compatible)
+*/
+function setManualPaneMode(mode){
+  const termsPane = $("manualTermsPane");
+  const redactPane = $("manualRedactPane");
+
+  if (termsPane) termsPane.style.display = (mode === "terms") ? "" : "none";
+  if (redactPane) redactPane.style.display = (mode === "redact") ? "" : "none";
+
+  // In Mode B we want the button visible
+  if (mode === "redact") {
+    const btn = $("btnManualRedact");
+    if (btn) btn.style.display = "";
+  }
+}
+
+/* ================= file kind detection (fix: file.type may be empty) ================= */
+function detectFileKind(file){
+  const t = (file && file.type) ? String(file.type) : "";
+  if (t === "application/pdf") return "pdf";
+  if (t && t.startsWith("image/")) return "image";
+
+  const name = (file && file.name) ? String(file.name).toLowerCase() : "";
+  if (name.endsWith(".pdf")) return "pdf";
+  if (/\.(png|jpg|jpeg|webp|heic|bmp|gif)$/i.test(name)) return "image";
+
+  return "";
+}
+
 /* ================= PDF input overlay highlight (only for PDF) ================= */
 function renderInputOverlayForPdf(originalText){
   const overlay = $("inputOverlay");
@@ -892,7 +924,7 @@ async function handleFile(file) {
   lastUploadedFile = file;
   lastProbe = null;
   lastPdfOriginalText = "";
-  lastFileKind = (file.type === "application/pdf") ? "pdf" : (file.type && file.type.startsWith("image/") ? "image" : "");
+  lastFileKind = detectFileKind(file); // ✅ fix: file.type may be empty
 
   setStage3Ui("none");
 
@@ -900,6 +932,7 @@ async function handleFile(file) {
   if (lastFileKind === "image") {
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
+    setManualPaneMode("redact"); // ✅ Mode B replaces manual terms pane
     requestAnimationFrame(() => {
       expandManualArea();
       expandRiskArea();
@@ -915,6 +948,7 @@ async function handleFile(file) {
       console.error("[handleFile] probePdfTextLayer missing");
       lastRunMeta.fromPdf = false;
       setStage3Ui("B");
+      setManualPaneMode("redact"); // ✅ Mode B
       requestAnimationFrame(() => {
         expandManualArea();
         expandRiskArea();
@@ -930,6 +964,7 @@ async function handleFile(file) {
       // Mode B
       lastRunMeta.fromPdf = false;
       setStage3Ui("B");
+      setManualPaneMode("redact"); // ✅ Mode B
       requestAnimationFrame(() => {
         expandManualArea();
         expandRiskArea();
@@ -940,6 +975,7 @@ async function handleFile(file) {
 
     lastRunMeta.fromPdf = true;
     setStage3Ui("A");
+    setManualPaneMode("terms"); // ✅ Mode A keeps manual terms pane
 
     const text = String(probe.text || "").trim();
     lastPdfOriginalText = text;
@@ -970,6 +1006,7 @@ async function handleFile(file) {
     console.error("[handleFile] ERROR:", e);
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
+    setManualPaneMode("redact"); // ✅ Mode B
     requestAnimationFrame(() => {
       expandManualArea();
       expandRiskArea();
@@ -1108,6 +1145,7 @@ function bind() {
       lastProbe = null;
       lastPdfOriginalText = "";
       setStage3Ui("none");
+      setManualPaneMode("terms"); // ✅ reset to Mode A pane
 
       window.__export_snapshot = null;
 
@@ -1257,6 +1295,7 @@ function bind() {
 /* ================= boot ================= */
 initEnabled();
 setText();
+setManualPaneMode("terms"); // ✅ default to Mode A pane on load
 bind();
 updateInputWatermarkVisibility();
 initRiskResizeObserver();
