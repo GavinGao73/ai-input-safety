@@ -1,14 +1,11 @@
 /* =========================
    assets/styles.css (FULL, consolidated)
    (UPDATED)
-   - Plan A: cards follow content (no forced tall blanks)
+   - Titles "输入提示"/"生成进程" centered + i18n-ready
+   - Expanded: left manual area height follows right risk area; manual textarea scrolls inside
    - Keep left textarea & right output EXACT same sizing
-   - Restore Risk card aesthetics (riskhead/score/list/advice)
-   - Feedback rail: centered question + small buttons inline (ONE row)
-   - Progress area lives UNDER feedback in SAME railcard, and takes remaining height
-   - Manual hint: title + smaller text + line breaks
-   - Overlay inset + hide overlay scrollbars (no double-scroll) BUT still scroll-syncable
-   - Expanded ratio: 3:2
+   - Railcard: ONE card (feedback + progress), progress takes remaining height
+   - Mobile: IO tabs have distinct style (NOT same as main buttons)
    ========================= */
 
 :root{
@@ -115,7 +112,7 @@ header{
   min-width:0;
 }
 
-/* ✅ Plan A: follow content (no tall blank area when collapsed) */
+/* ✅ follow content (no forced tall blank area when collapsed) */
 .card-col{
   display:flex;
   flex-direction:column;
@@ -197,8 +194,7 @@ h3{
 }
 
 /* =========================
-   Input / Output
-   (✅ keep both EXACT same sizing)
+   Input / Output (EXACT same sizing)
    ========================= */
 
 .outbox{ width:100%; min-width:0; }
@@ -279,7 +275,7 @@ textarea{
 }
 #inputWrap.has-content .input-watermark{ display:none; }
 
-/* ✅ overlay inset; ✅ hide overlay scrollbars (no double-scroll), but keep scrollable for sync */
+/* ✅ overlay inset; ✅ hide scrollbars, keep scrollable for sync */
 .input-overlay{
   display:none;
   position:absolute;
@@ -287,9 +283,9 @@ textarea{
   padding:0;
   border-radius:10px;
 
-  overflow:auto;               /* keep scrollTop/Left sync working */
-  scrollbar-width:none;        /* Firefox */
-  -ms-overflow-style:none;     /* IE/Edge legacy */
+  overflow:auto;
+  scrollbar-width:none;
+  -ms-overflow-style:none;
 
   white-space:pre;
   overflow-wrap:normal;
@@ -298,10 +294,7 @@ textarea{
   pointer-events:none;
   color: rgba(255,255,255,.92);
 }
-.input-overlay::-webkit-scrollbar{
-  width:0;
-  height:0;
-}
+.input-overlay::-webkit-scrollbar{ width:0; height:0; }
 #inputWrap.pdf-overlay-on .input-overlay{ display:block; }
 
 #inputWrap.pdf-overlay-on textarea{
@@ -309,9 +302,7 @@ textarea{
   caret-color: rgba(255,255,255,.88);
   -webkit-text-fill-color: transparent;
 }
-#inputWrap.pdf-overlay-on textarea::selection{
-  background: transparent;
-}
+#inputWrap.pdf-overlay-on textarea::selection{ background: transparent; }
 
 .hit{
   background: rgba(255, 92, 92, 0.12);
@@ -384,14 +375,8 @@ textarea{
 }
 .links a:hover{ text-decoration:underline; }
 
-.left-footer{
-  margin-top:12px;
-  padding-top:0;
-}
-.right-footer{
-  margin-top:12px;
-  padding-top:0;
-}
+.left-footer{ margin-top:12px; padding-top:0; }
+.right-footer{ margin-top:12px; padding-top:0; }
 
 .accent-link{ color: rgba(120,255,240,.80); }
 
@@ -405,8 +390,6 @@ textarea{
    ========================= */
 
 .ctlbar{ margin-top:10px; }
-
-/* compact like upload barcard */
 .barcard.ctlbar{ padding:0; }
 
 .ctlbtn{
@@ -425,22 +408,11 @@ textarea{
   min-height:46px;
   text-align:left;
 }
-.ctlbtn::after{
-  content:"▾";
-  opacity:.65;
-  transform: translateY(-1px);
-}
-.ctlbtn[aria-expanded="true"]::after{
-  content:"▴";
-}
+.ctlbtn::after{ content:"▾"; opacity:.65; transform: translateY(-1px); }
+.ctlbtn[aria-expanded="true"]::after{ content:"▴"; }
 
-.io-body{
-  margin-top:10px;
-  display:none;
-}
-.io-body.open{
-  display:block;
-}
+.io-body{ margin-top:10px; display:none; }
+.io-body.open{ display:block; }
 
 /* ✅ 3:2 ratio */
 .io-bottom-grid{
@@ -450,7 +422,12 @@ textarea{
   align-items:stretch;
   min-width:0;
 }
-.io-bottom-grid > *{ height:100%; }
+
+/* ✅ critical: allow equal-height + inner scroll */
+.io-bottom-grid > *{
+  min-height:0;
+  height:100%;
+}
 
 .subcard{
   border:1px solid var(--panel-bd);
@@ -458,6 +435,10 @@ textarea{
   background:var(--panel-bg);
   padding:12px;
   min-width:0;
+
+  display:flex;
+  flex-direction:column;
+  min-height:0;
 }
 
 /* =========================
@@ -469,12 +450,14 @@ textarea{
   border-radius:14px;
   background:var(--panel-bg);
   padding:10px;
+
   display:flex;
   flex-direction:column;
   gap:10px;
+
   min-width:0;
   height:100%;
-  min-height:0; /* allow inner overflow areas */
+  min-height:0;
 }
 
 .rail-title{
@@ -482,6 +465,9 @@ textarea{
   font-size:12px;
   color: rgba(255,255,255,.88);
   letter-spacing:.2px;
+
+  /* ✅ center in card */
+  text-align:center;
 }
 
 .rail-divider{
@@ -492,7 +478,6 @@ textarea{
 }
 
 /* ✅ hint text (smaller, wraps, line breaks) */
-.rail-text,
 .side-rail-note{
   font-size:11px;
   line-height:1.45;
@@ -503,18 +488,22 @@ textarea{
 }
 
 /* =========================
-   Manual textarea (shared)
+   Manual textarea (shared) — follow right height; scroll inside
    ========================= */
 
 .manual-terms-textarea{
   width:100%;
-  min-height:160px;
-  resize:vertical;
+  flex:1 1 auto;
+  min-height:0;
+  height:100%;
+
+  resize:none; /* ✅ prevent breaking equal-height layout */
   background:var(--box-bg);
   border:1px solid var(--box-bd);
   border-radius:12px;
   color:rgba(255,255,255,.92);
   padding:12px;
+
   font-size:var(--fs-body);
   line-height:var(--lh-body);
 
@@ -525,7 +514,7 @@ textarea{
 }
 
 /* =========================
-   Risk card (RESTORE aesthetic)
+   Risk card aesthetics
    ========================= */
 
 .risk{ padding:0; border:0; background:transparent; }
@@ -595,17 +584,16 @@ textarea{
   background:rgba(255,255,255,.05);
   color:var(--text);
   border-radius:10px;
-  padding:5px 10px;     /* smaller */
+  padding:5px 10px;
   cursor:pointer;
-  font-size:12px;       /* smaller */
+  font-size:12px;
   line-height:1;
 }
 
 /* =========================
-   Progress output (text) — takes remaining height
+   Progress output — takes remaining height and scrolls
    ========================= */
 
-.export-status,
 #exportStatus{
   flex:1 1 auto;
   min-height:0;
@@ -656,23 +644,32 @@ textarea{
     .wrap-mobile{ min-height: 100vh; }
   }
 
+  /* ✅ IO tabs: distinct from main buttons */
   .io-tabs{
     display:flex;
-    gap:8px;
+    gap:10px;
     margin: 8px 0 10px;
     flex: 0 0 auto;
   }
-  .io-tabs .btn{
+  .io-tabs label{
     flex:1 1 0;
     min-height:38px;
     display:flex;
     align-items:center;
     justify-content:center;
-  }
 
+    border:1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.04);
+    color: rgba(255,255,255,.82);
+    border-radius:999px;
+    font-weight:900;
+    font-size:12px;
+    cursor:pointer;
+    user-select:none;
+  }
   #tab-in:checked ~ .io-tabs label[for="tab-in"],
   #tab-out:checked ~ .io-tabs label[for="tab-out"]{
-    background: rgba(43,144,255,.20);
+    background: rgba(43,144,255,.18);
     border-color: rgba(43,144,255,.35);
     color: rgba(255,255,255,.92);
   }
@@ -747,7 +744,7 @@ textarea{
 
   .grid, .card, .card-col, .filebar, .top-actions, .filename{ min-width:0; }
 
-  /* mobile: stack columns */
+  /* mobile: bottom grids stack */
   .io-bottom-grid{ grid-template-columns: 1fr; }
 }
 
