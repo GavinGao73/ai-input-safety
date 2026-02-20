@@ -1,13 +1,5 @@
 <!-- =========================
-     m.html (FULL) — btnGenerate removed (auto filtering)
-     Layout refactor (this revision):
-     - Keep mobile IO tabs behavior unchanged
-     - Move titles OUTSIDE fold bodies (manual/risk)
-     - Replace details with title-button + hidden panel
-     - Default collapsed (panels hidden)
-     Notes:
-     - Keep leftControlBar (btnManualRedact) visible for Mode B access
-     - Remove always-on rightFeedbackBar; feedback moved under Risk panel as requested
+     m.html (FULL) — unified title-row toggles (mobile)
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -37,7 +29,7 @@
       color: rgba(255,255,255,.92);
     }
 
-    /* ===== Filebar alignment helper ===== */
+    /* Filebar alignment helper */
     .filebar{ display:flex; align-items:center; gap:10px; }
     #pdfName{
       flex:1 1 auto;
@@ -45,16 +37,7 @@
       text-align:center;
     }
     #btnClear{ margin-left:auto; }
-
     .io-tabs label{ white-space: nowrap; }
-
-    /* ✅ compact links on mobile within manual panel */
-    .manual-links{
-      display:flex;
-      gap:14px;
-      flex-wrap:wrap;
-    }
-    .manual-links a{ text-decoration:none; }
   </style>
 </head>
 
@@ -81,7 +64,7 @@
       </div>
     </header>
 
-    <!-- ===== IO Tabs (radio-driven) ===== -->
+    <!-- IO Tabs -->
     <input class="panel-radio" type="radio" name="io" id="tab-in" checked />
     <input class="panel-radio" type="radio" name="io" id="tab-out" />
 
@@ -97,7 +80,7 @@
 
         <div class="barcard barcard-top">
           <div class="filebar filebar-flat">
-            <input id="pdfFile" type="file" accept="application/pdf" />
+            <input id="pdfFile" type="file" accept="application/pdf,image/*" capture="none" />
             <label class="btn primary btn-s btn-slim" for="pdfFile" id="ui-upload-btn"></label>
 
             <div class="filename" id="pdfName" aria-hidden="true"></div>
@@ -108,51 +91,47 @@
 
         <div class="outbox outbox-input">
           <div class="textarea-wrap" id="inputWrap">
-            <textarea id="inputText" spellcheck="false"></textarea>
+            <textarea id="inputText" spellcheck="false" wrap="off"></textarea>
             <div class="input-overlay" id="inputOverlay" aria-hidden="true"></div>
             <div class="input-watermark" id="ui-input-watermark" aria-hidden="true"></div>
           </div>
         </div>
 
-        <!-- ✅ Keep Manual button accessible on mobile (Mode B) -->
+        <!-- Manual redact button (image/manual mode only) -->
         <div class="controlbar controlbar-eq" id="leftControlBar">
           <div class="ctl-actions">
             <button class="btn secondary btn-s btn-slim" id="btnManualRedact" style="display:none;"></button>
           </div>
         </div>
 
-        <!-- =========================
-             NEW: Manual control region (mobile)
-             - Title OUTSIDE body
-             - Body default hidden
-             ========================= -->
-        <div class="ctl-region ctl-region-left" aria-label="Manual input area">
-          <button class="ctl-title" id="toggleManual" type="button" aria-expanded="false">
-            <span id="ui-manual-terms-title">手工输入</span>
-          </button>
+        <!-- ✅ Title row toggle -->
+        <div class="barcard ctlbar" aria-label="Manual toggle bar">
+          <button class="ctlbtn" id="btnToggleManual" type="button" aria-expanded="false">手工输入</button>
+        </div>
 
-          <div class="ctl-body" id="manualPanel" hidden>
-            <div class="ctl-grid" aria-label="Manual input cards">
-              <div class="ctl-card">
-                <textarea
-                  id="manualTerms"
-                  class="manual-terms-textarea"
-                  placeholder="例如：张三, 李四, Bei.de Tech GmbH"
-                  autocomplete="off"
-                  spellcheck="false"
-                ></textarea>
+        <!-- ✅ Expand body -->
+        <div class="io-body" id="manualBody" aria-label="Manual body">
+          <div class="io-bottom-grid">
+            <div class="subcard">
+              <textarea
+                id="manualTerms"
+                class="manual-terms-textarea"
+                placeholder="例如：张三, 李四, Bei.de Tech GmbH"
+                autocomplete="off"
+                spellcheck="false"
+                wrap="off"
+              ></textarea>
+            </div>
+
+            <div class="railcard">
+              <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
+                支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。
               </div>
 
-              <div class="ctl-card ctl-card-narrow">
-                <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
-                  支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。
-                </div>
-
-                <div class="manual-links links">
-                  <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
-                  <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
-                  <a id="linkScope" href="./docs/mvp-scope.md" target="_blank"></a>
-                </div>
+              <div class="links" style="margin-top:auto; flex-wrap:wrap;">
+                <a id="linkLearn" href="./docs/extended-description.md" target="_blank"></a>
+                <a id="linkPrivacy" href="./PRIVACY.md" target="_blank"></a>
+                <a id="linkScope" href="./docs/mvp-scope.md" target="_blank"></a>
               </div>
             </div>
           </div>
@@ -174,34 +153,28 @@
           <div class="output output-scroll" id="outputText"></div>
         </div>
 
-        <!-- =========================
-             NEW: Risk control region (mobile)
-             - Title OUTSIDE body
-             - Body default hidden
-             ========================= -->
-        <div class="ctl-region ctl-region-right" aria-label="Risk and feedback area">
-          <button class="ctl-title" id="toggleRisk" type="button" aria-expanded="false">
-            <span id="ui-risk-title"></span>
-          </button>
+        <!-- ✅ Title row toggle -->
+        <div class="barcard ctlbar" aria-label="Risk toggle bar">
+          <button class="ctlbtn" id="btnToggleRisk" type="button" aria-expanded="false">风险评分</button>
+        </div>
 
-          <div class="ctl-body" id="riskPanel" hidden>
-            <div class="ctl-grid" aria-label="Risk cards">
-              <div class="ctl-card">
-                <div class="risk" id="riskBox"></div>
-              </div>
+        <!-- ✅ Expand body -->
+        <div class="io-body" id="riskBody" aria-label="Risk body">
+          <div class="io-bottom-grid">
+            <div class="subcard">
+              <div class="risk" id="riskBox"></div>
+            </div>
 
-              <div class="ctl-card ctl-card-narrow">
-                <div class="fbq" id="ui-fb-q"></div>
-                <div class="fb-buttons">
-                  <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
-                  <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
-                </div>
+            <div class="railcard">
+              <div class="fbq" id="ui-fb-q"></div>
+              <div class="fb-buttons">
+                <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
+                <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Footnote -->
         <div class="tiny footnote accent-link" id="ui-foot"></div>
       </section>
     </div>
@@ -215,6 +188,6 @@
   <script src="./assets/pdf.js" defer></script>
   <script src="./assets/raster-export.js" defer></script>
   <script src="./assets/redact-ui.js" defer></script>
-  <script src="./assets/app.js?v=20260219b" defer></script>
+  <script src="./assets/app.js?v=20260219c" defer></script>
 </body>
 </html>
