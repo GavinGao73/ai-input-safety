@@ -1,5 +1,10 @@
 <!-- =========================
-     m.html (FULL) — unified title-row toggles (mobile)
+     m.html (FULL) — unified title-row toggles (mobile) (UPDATED)
+     Fix targets in this file:
+     - manualBody / riskBody default collapsed (display:none; aria-expanded=false)
+     - add “输入提示” title + clearer hint text (i18n-ready ids)
+     - add export/progress area under feedback (exportStatus) to avoid overwriting riskBox
+     - keep textarea wrap=off
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -106,11 +111,13 @@
 
         <!-- ✅ Title row toggle -->
         <div class="barcard ctlbar" aria-label="Manual toggle bar">
-          <button class="ctlbtn" id="btnToggleManual" type="button" aria-expanded="false">手工输入</button>
+          <button class="ctlbtn" id="btnToggleManual" type="button" aria-expanded="false">
+            <span id="ui-manual-toggle-title">手工输入</span>
+          </button>
         </div>
 
-        <!-- ✅ Expand body -->
-        <div class="io-body" id="manualBody" aria-label="Manual body">
+        <!-- ✅ Expand body (default collapsed) -->
+        <div class="io-body" id="manualBody" aria-label="Manual body" style="display:none;">
           <div class="io-bottom-grid">
             <div class="subcard">
               <textarea
@@ -124,8 +131,9 @@
             </div>
 
             <div class="railcard">
+              <div class="rail-title" id="ui-manual-rail-title">输入提示</div>
               <div class="side-rail-note tiny muted" id="ui-manual-rail-note">
-                支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。
+                支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。建议仅输入需要额外遮盖的姓名、公司名、编号或地址关键词。
               </div>
 
               <div class="links" style="margin-top:auto; flex-wrap:wrap;">
@@ -155,11 +163,13 @@
 
         <!-- ✅ Title row toggle -->
         <div class="barcard ctlbar" aria-label="Risk toggle bar">
-          <button class="ctlbtn" id="btnToggleRisk" type="button" aria-expanded="false">风险评分</button>
+          <button class="ctlbtn" id="btnToggleRisk" type="button" aria-expanded="false">
+            <span id="ui-risk-toggle-title">风险评分</span>
+          </button>
         </div>
 
-        <!-- ✅ Expand body -->
-        <div class="io-body" id="riskBody" aria-label="Risk body">
+        <!-- ✅ Expand body (default collapsed) -->
+        <div class="io-body" id="riskBody" aria-label="Risk body" style="display:none;">
           <div class="io-bottom-grid">
             <div class="subcard">
               <div class="risk" id="riskBox"></div>
@@ -171,6 +181,11 @@
                 <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
                 <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
               </div>
+
+              <!-- ✅ Export/progress area -->
+              <div class="rail-divider" aria-hidden="true"></div>
+              <div class="rail-title" id="ui-export-title">生成进程</div>
+              <div class="tiny muted" id="exportStatus" style="white-space:pre-wrap; line-height:1.6;"></div>
             </div>
           </div>
         </div>
