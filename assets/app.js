@@ -1,16 +1,17 @@
 // =========================
 // assets/app.js (FULL)
-// ✅ Personal build (2026-02-19d)
+// ✅ Personal build (2026-02-19d+slotfix)
 // This revision:
 // - Auto expand "手工输入" + "风险评分" after file upload (pdf/image).
 // - Collapse them on Clear.
-// - Export progress no longer overwrites riskBox: it renders in a dedicated progress area
-//   placed under the “有帮助吗？” rail (auto-injected if HTML has no slot).
+// - Export progress NEVER overwrites riskBox: it renders in a dedicated progress slot.
+// - ✅ FIX: Prefer existing HTML slot #exportStatus (index.html) over injected #progressBox.
+// - ✅ FIX: clearProgress clears BOTH #exportStatus and injected #progressBox.
 // - Progress texts follow i18n (with safe fallbacks).
 // - Backward-compatible with legacy <details> if present.
 // =========================
 
-console.log("[APP] loaded v20260219d-personal-auto-ctl-progress");
+console.log("[APP] loaded v20260219d-slotfix-personal-auto-ctl-progress");
 
 let currentLang = "zh";
 window.currentLang = currentLang;
@@ -550,12 +551,17 @@ function collapseRiskArea(){
   if (rd && "open" in rd) rd.open = false;
 }
 
-/* ================= NEW: Progress area (under “Helpful?” rail) ================= */
+/* ================= Progress area (prefer HTML slot #exportStatus) ================= */
 function ensureProgressBox(){
+  // ✅ Prefer index.html slot
+  const slot = $("exportStatus");
+  if (slot) return slot;
+
+  // If someone already injected progressBox earlier, reuse it
   const existing = $("progressBox");
   if (existing) return existing;
 
-  // try to inject under risk railcard (new layout)
+  // Try to inject under risk railcard (new layout)
   const riskBody = $("riskBody");
   if (riskBody) {
     const rails = riskBody.querySelectorAll(".railcard");
@@ -588,17 +594,20 @@ function setProgressText(lines, isError){
   const html = escapeHTML(s);
 
   if (box.id === "riskBox") {
-    // legacy fallback: render as boxed tiny text (kept)
+    // legacy fallback: render as boxed tiny text
     box.innerHTML = `<div class="tiny" style="white-space:pre-wrap;line-height:1.6;${isError ? "color:#ffb4b4;" : ""}">${html}</div>`;
   } else {
+    // ✅ slot or injected box: pure text
     box.style.color = isError ? "#ffb4b4" : "";
     box.textContent = s;
   }
 }
 
 function clearProgress(){
-  const box = $("progressBox");
-  if (box) box.textContent = "";
+  const a = $("exportStatus");
+  if (a) a.textContent = "";
+  const b = $("progressBox");
+  if (b) b.textContent = "";
 }
 
 /* ================= UI text ================= */
@@ -629,13 +638,12 @@ function setText() {
   // Manual terms placeholder
   if ($("manualTerms")) $("manualTerms").placeholder = t.manualPlaceholder || "例如：张三, 李四, Bei.de Tech GmbH";
 
-  // Rail note (manual) — prefer new long tip if present
-  const railMan = $("ui-manual-rail-note");
-  if (railMan) {
-    const title = t.manualRailTitle || "";
+  // Rail note (manual) — keep note in its own slot; title is separate in HTML
+  const railNote = $("ui-manual-rail-note");
+  if (railNote) {
+    // prefer manualRailText, else manualHint
     const text = t.manualRailText || t.manualHint || "";
-    const combined = (title && text) ? `${title}\n${text}` : (text || "支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。");
-    railMan.textContent = combined;
+    railNote.textContent = text;
   }
 
   // Money UI removed
@@ -813,7 +821,7 @@ function applyRules(text) {
 async function handleFile(file) {
   if (!file) return;
 
-  // ✅ auto expand both areas on upload (requirement)
+  // ✅ auto expand both areas on upload
   expandManualArea();
   expandRiskArea();
 
@@ -912,7 +920,7 @@ function bind() {
     };
   });
 
-  // title-row toggles (if present)
+  // title-row toggles
   const btnToggleManual = $("btnToggleManual");
   const manualBody = $("manualBody");
   if (btnToggleManual && manualBody) {
@@ -969,7 +977,7 @@ function bind() {
 
       lastRunMeta.fromPdf = false;
 
-      // ✅ collapse areas + clear rail progress
+      // ✅ collapse areas + clear progress
       collapseManualArea();
       collapseRiskArea();
       clearProgress();
@@ -1082,7 +1090,7 @@ function bind() {
   const btnExportRasterPdf = $("btnExportRasterPdf");
   if (btnExportRasterPdf) {
     btnExportRasterPdf.onclick = async () => {
-      // show area + progress under "Helpful?"
+      // show area + progress under "生成进程" slot
       expandRiskArea();
       const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
 
@@ -1125,8 +1133,8 @@ function bind() {
         setProgressText(t.progressDone || "Done ✅ Download started.", false);
       } catch (e) {
         const msg = (e && (e.message || String(e))) || "Unknown error";
-        const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
-        setProgressText(`${t.progressFailed || "Export failed:"}\n${msg}`, true);
+        const t2 = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
+        setProgressText(`${t2.progressFailed || "Export failed:"}\n${msg}`, true);
       }
     };
   }
