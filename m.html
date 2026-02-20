@@ -2,7 +2,9 @@
      m.html (FULL)
      - IO tab switch (distinct style)
      - manual/risk bodies default collapsed
-     - titles i18n-ready (ui-manual-rail-title / ui-export-title)
+     - REMOVE feedback/like UI
+     - Mobile riskBody shows ONLY riskBox (no progress rail)
+     - Keep bottom links ALWAYS visible (not inside collapsed manualBody)
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -34,6 +36,23 @@
     }
     #btnClear{ margin-left:auto; }
     .io-tabs label{ white-space: nowrap; }
+
+    /* Make tab labels look like buttons (distinct) */
+    .io-tabs label{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:12px;
+      padding:9px 10px;
+      cursor:pointer;
+      background: rgba(255,255,255,.04);
+      color: rgba(255,255,255,.86);
+      font-weight:900;
+      font-size:12px;
+      line-height:1;
+      user-select:none;
+    }
   </style>
 </head>
 
@@ -122,13 +141,16 @@
             <div class="railcard">
               <div class="rail-title" id="ui-manual-rail-title"></div>
               <div class="side-rail-note" id="ui-manual-rail-note"></div>
-
-              <div class="links" style="margin-top:auto; flex-wrap:wrap;">
-                <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
-                <a id="linkPrivacy" href="./PRIVACY.md" target="_blank" rel="noopener"></a>
-                <a id="linkScope" href="./docs/mvp-scope.md" target="_blank" rel="noopener"></a>
-              </div>
             </div>
+          </div>
+        </div>
+
+        <!-- ✅ Links ALWAYS visible (not inside collapsed manualBody) -->
+        <div class="left-footer">
+          <div class="links" style="flex-wrap:wrap;">
+            <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
+            <a id="linkPrivacy" href="./PRIVACY.md" target="_blank" rel="noopener"></a>
+            <a id="linkScope" href="./docs/mvp-scope.md" target="_blank" rel="noopener"></a>
           </div>
         </div>
       </section>
@@ -154,24 +176,11 @@
           </button>
         </div>
 
+        <!-- ✅ Mobile: ONLY riskBox -->
         <div class="io-body" id="riskBody" aria-label="Risk body" style="display:none;">
           <div class="io-bottom-grid">
             <div class="subcard">
               <div class="risk" id="riskBox"></div>
-            </div>
-
-            <div class="railcard">
-              <div class="fb-area" aria-label="feedback">
-                <div class="fbq" id="ui-fb-q"></div>
-                <div class="fb-row" aria-label="feedback buttons">
-                  <button class="iconbtn" id="btnUp">👍 <span id="upCount">0</span></button>
-                  <button class="iconbtn" id="btnDown">👎 <span id="downCount">0</span></button>
-                </div>
-              </div>
-
-              <div class="rail-divider" aria-hidden="true"></div>
-              <div class="rail-title" id="ui-export-title"></div>
-              <div class="tiny muted" id="exportStatus"></div>
             </div>
           </div>
         </div>
@@ -187,6 +196,6 @@
   <script src="./assets/pdf.js" defer></script>
   <script src="./assets/raster-export.js" defer></script>
   <script src="./assets/redact-ui.js" defer></script>
-  <script src="./assets/app.js?v=20260219d1" defer></script>
+  <script src="./assets/app.js?v=20260219d2" defer></script>
 </body>
 </html>
