@@ -77,28 +77,40 @@
         </div>
 
         <div class="io-body" id="manualBody" aria-label="Manual body" style="display:none;">
-          <div class="io-bottom-grid io-bottom-grid-left">
-            <div class="subcard">
-              <textarea
-                id="manualTerms"
-                class="manual-terms-textarea"
-                spellcheck="false"
-                autocomplete="off"
-                wrap="off"
-                placeholder="例如：张三, 李四, Bei.de Tech GmbH"
-              ></textarea>
-            </div>
+  <div class="io-bottom-grid io-bottom-grid-left">
 
-            <div class="railcard">
-              <div class="rail-title" id="ui-manual-rail-title"></div>
-              <div class="side-rail-note" id="ui-manual-rail-note"></div>
+    <!-- Pane A: manual terms (Mode A only) -->
+    <div class="subcard manual-pane" id="manualTermsPane">
+      <textarea
+        id="manualTerms"
+        class="manual-terms-textarea"
+        spellcheck="false"
+        autocomplete="off"
+        wrap="off"
+        placeholder="例如：张三, 李四, Bei.de Tech GmbH"
+      ></textarea>
+    </div>
 
-              <div class="side-rail-actions">
-                <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
-              </div>
-            </div>
-          </div>
-        </div>
+    <!-- Pane B: manual visual redaction (Mode B only) -->
+    <div class="subcard manual-pane" id="manualRedactPane" style="display:none;">
+      <div class="manual-redact-title" id="ui-manual-redact-title">人工涂抹</div>
+      <div class="manual-redact-note" id="ui-manual-redact-note">
+        当前文件无法读取文字层（图片或扫描版 PDF）。请点击下方按钮进入框选遮盖模式。
+      </div>
+
+      <div class="manual-redact-actions">
+        <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
+      </div>
+    </div>
+
+    <!-- Keep the railcard as hint card (applies to both modes) -->
+    <div class="railcard">
+      <div class="rail-title" id="ui-manual-rail-title"></div>
+      <div class="side-rail-note" id="ui-manual-rail-note"></div>
+    </div>
+
+  </div>
+</div>
 
         <div class="left-footer">
           <div class="links">
