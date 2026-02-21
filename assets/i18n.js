@@ -43,8 +43,10 @@ const I18N = {
     manualPlaceholder: "例如：张三, 李四, Bei.de Tech GmbH",
 
     // ✅ Mode B: manual visual redaction pane (left)
-    manualRedactTitle: "手工涂抹",
-    manualRedactNote: "点击下方按钮进入框选。",
+    // ✅ no extra title (already have “手工处理”)
+    manualRedactTitle: "",
+    manualRedactNote:
+      "检测到上传内容为图片或不可读 PDF（无文本层）。\n请先进入手工框选，覆盖需要隐藏的信息；具体操作见下方「使用说明」。",
     btnManualRedact: "手工涂抹",
 
     // ✅ rail titles + separate texts
@@ -114,8 +116,10 @@ const I18N = {
     manualHint: "Separate by commas/new lines. Only masks terms that actually appear in the PDF text.",
     manualPlaceholder: "e.g. Alice, Bob, Bei.de Tech GmbH",
 
-    manualRedactTitle: "Manual redaction",
-    manualRedactNote: "Click below to start marking.",
+    // ✅ no extra title
+    manualRedactTitle: "",
+    manualRedactNote:
+      "Detected an image or an unreadable PDF (no text layer).\nPlease mark areas to hide first. See “How it works” below for steps.",
     btnManualRedact: "Mark areas",
 
     manualRailTitle: "How it works",
@@ -178,11 +182,13 @@ const I18N = {
 
     btnRedactPdf: "PDF schwärzen",
 
-    manualHint: "Trennung per Komma/Zeilenumbruch. Es wird nur maskiert, was im PDF-Text wirklich vorkommt.",
+    manualHint: "Trennung per Komma/Zeilenumbruch. Es wird nur maskiert, was im PDF-Text wirklich vorkommt。",
     manualPlaceholder: "z.B. Max Mustermann, Erika, Bei.de Tech GmbH",
 
-    manualRedactTitle: "Manuelle Schwärzung",
-    manualRedactNote: "Unten klicken und Bereiche markieren.",
+    // ✅ no extra title
+    manualRedactTitle: "",
+    manualRedactNote:
+      "Bild oder nicht lesbares PDF erkannt (kein Textlayer).\nBitte zuerst Bereiche markieren. Schritte siehe unten unter „So funktioniert’s“.",
     btnManualRedact: "Bereiche markieren",
 
     manualRailTitle: "So funktioniert’s",
