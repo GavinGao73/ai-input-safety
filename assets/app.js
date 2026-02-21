@@ -70,6 +70,15 @@ function show(el, yes){
   el.style.display = yes ? "" : "none";
 }
 
+/* ================= Screen helper ================= */
+function isSmallScreen(){
+  try {
+    return !!(window.matchMedia && window.matchMedia("(max-width: 560px)").matches);
+  } catch (_) {
+    return false;
+  }
+}
+
 // --- Risk scoring meta (local only) ---
 let lastRunMeta = {
   fromPdf: false,
@@ -502,6 +511,10 @@ function setStage3Ui(mode){
   if (btnPdf)  btnPdf.textContent  = (t && t.btnRedactPdf) ? t.btnRedactPdf : stage3Text("btnExportPdf");
   if (btnMan)  btnMan.textContent  = (t && t.btnManualRedact) ? t.btnManualRedact : stage3Text("btnManual");
 
+  // ✅ hard fallback (fix: mobile button text occasionally empty)
+  if (btnPdf && !String(btnPdf.textContent || "").trim()) btnPdf.textContent = stage3Text("btnExportPdf");
+  if (btnMan && !String(btnMan.textContent || "").trim()) btnMan.textContent = stage3Text("btnManual");
+
   // ✅ Mode B / none: do NOT lock manual height to risk box
   if (lastStage3Mode !== "A") resetManualHeightLock();
 }
@@ -710,7 +723,7 @@ function setText() {
   if ($("manualTerms")) $("manualTerms").placeholder = t.manualPlaceholder || "例如：张三, 李四, Bei.de Tech GmbH";
 
   const mrTitle = $("ui-manual-redact-title");
-  if (mrTitle) mrTitle.textContent = t.manualRedactTitle || "手工涂抹";
+  if (mrTitle) mrTitle.textContent = t.manualRedactTitle || "";
 
   const mrNote = $("ui-manual-redact-note");
   if (mrNote) mrNote.textContent = t.manualRedactNote || "";
@@ -796,7 +809,8 @@ function applyRules(text) {
     };
 
     requestAnimationFrame(() => {
-      if (lastUploadedFile) {
+      // ✅ desktop: do NOT auto expand for non-readable uploads (Mode B)
+      if (lastUploadedFile && (lastRunMeta.fromPdf || isSmallScreen())) {
         expandRiskArea();
         expandManualArea();
         syncManualToRiskHeight();
@@ -874,7 +888,8 @@ function applyRules(text) {
   };
 
   requestAnimationFrame(() => {
-    if (lastUploadedFile) {
+    // ✅ desktop: do NOT auto expand for non-readable uploads (Mode B)
+    if (lastUploadedFile && (lastRunMeta.fromPdf || isSmallScreen())) {
       expandRiskArea();
       expandManualArea();
       syncManualToRiskHeight();
@@ -909,11 +924,14 @@ async function handleFile(file) {
     setManualPanesForMode("B");
     setManualRailTextByMode();
 
-    requestAnimationFrame(() => {
-      expandManualArea();
-      expandRiskArea();
-      syncManualToRiskHeight();
-    });
+    // ✅ desktop: Mode B 不自动展开；mobile 仍展开以减少操作步数
+    if (isSmallScreen()) {
+      requestAnimationFrame(() => {
+        expandManualArea();
+        expandRiskArea();
+        syncManualToRiskHeight();
+      });
+    }
     return;
   }
 
@@ -925,11 +943,14 @@ async function handleFile(file) {
       setStage3Ui("B");
       setManualPanesForMode("B");
       setManualRailTextByMode();
-      requestAnimationFrame(() => {
-        expandManualArea();
-        expandRiskArea();
-        syncManualToRiskHeight();
-      });
+
+      if (isSmallScreen()) {
+        requestAnimationFrame(() => {
+          expandManualArea();
+          expandRiskArea();
+          syncManualToRiskHeight();
+        });
+      }
       return;
     }
 
@@ -942,11 +963,14 @@ async function handleFile(file) {
       setStage3Ui("B");
       setManualPanesForMode("B");
       setManualRailTextByMode();
-      requestAnimationFrame(() => {
-        expandManualArea();
-        expandRiskArea();
-        syncManualToRiskHeight();
-      });
+
+      if (isSmallScreen()) {
+        requestAnimationFrame(() => {
+          expandManualArea();
+          expandRiskArea();
+          syncManualToRiskHeight();
+        });
+      }
       return;
     }
 
@@ -985,11 +1009,14 @@ async function handleFile(file) {
     setStage3Ui("B");
     setManualPanesForMode("B");
     setManualRailTextByMode();
-    requestAnimationFrame(() => {
-      expandManualArea();
-      expandRiskArea();
-      syncManualToRiskHeight();
-    });
+
+    if (isSmallScreen()) {
+      requestAnimationFrame(() => {
+        expandManualArea();
+        expandRiskArea();
+        syncManualToRiskHeight();
+      });
+    }
   }
 }
 
