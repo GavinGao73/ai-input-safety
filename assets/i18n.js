@@ -10,7 +10,9 @@ const I18N = {
     inputWatermark:
       "AI 系统可以解析文档中的隐藏文本结构。\n本工具仅在本地运行，不上传、不保存内容。",
 
+    // ✅ Upload
     btnUpload: "上传文件",
+    btnUploadImg: "图片",
 
     btnGenerate: "过滤",
     btnCopy: "复制",
@@ -19,10 +21,8 @@ const I18N = {
 
     // toggle titles
     riskTitle: "风险评分",
-    // ✅ 更通用：Mode A=手工词条；Mode B=人工处理（框选）
     manualTitle: "手工处理",
 
-    // feedback removed (kept for compatibility if referenced elsewhere)
     fbQ: "有帮助吗？",
 
     learn: "了解更多",
@@ -42,16 +42,29 @@ const I18N = {
     manualHint: "支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。",
     manualPlaceholder: "例如：张三, 李四, Bei.de Tech GmbH",
 
-    // ✅ Mode B: manual visual redaction pane
-    manualRedactTitle: "人工涂抹",
-    manualRedactNote:
-      "当前文件无法读取文字层（图片或扫描版 PDF）。请点击下方按钮进入框选遮盖模式。",
-    btnManualRedact: "人工处理",
+    // ✅ Mode B: manual visual redaction pane (left)
+    manualRedactTitle: "手工涂抹",
+    manualRedactNote: "点击下方按钮进入框选。",
+    btnManualRedact: "手工涂抹",
 
-    // ✅ rail titles + text (cover Mode A + Mode B)
+    // ✅ rail titles + separate texts
     manualRailTitle: "使用说明",
-    manualRailText:
-      "若 PDF 可读（Mode A）：\n- 在此输入需要额外遮盖的关键词（逗号或换行分隔）。\n- 只会遮盖：① 你上传的 PDF 原文里真实出现的词；② 你在输入框里粘贴的文本里出现的词。\n\n若 PDF 不可读/图片（Mode B）：\n- 点击「人工处理」进入框选遮盖。\n- 可多次框选，支持清空本页/全部，导出红删 PDF。",
+
+    // Mode A only
+    manualRailTextA:
+      "Mode A（PDF 可读）：\n" +
+      "1) 在左侧「手工处理」中输入需要额外遮盖的关键词（逗号或换行分隔）。\n" +
+      "2) 只会遮盖：① 你上传的 PDF 原文里真实出现的词；② 你粘贴/输入的文本里出现的词。\n" +
+      "3) 完成后点击右侧「红删PDF」生成新的 PDF。\n" +
+      "4) 下载后先检查确认无误，再发送给他人或给 AI。",
+
+    // Mode B only
+    manualRailTextB:
+      "Mode B（扫描/图片 PDF）：\n" +
+      "1) 点击左侧「手工涂抹」，进入框选遮盖。\n" +
+      "2) 可多次框选；可清空本页/全部。\n" +
+      "3) 框选完成后关闭涂抹界面，回到主界面。\n" +
+      "4) 点击右侧「红删PDF」生成新的 PDF；下载检查无误后再发送。",
 
     exportTitle: "生成进程",
 
@@ -60,7 +73,8 @@ const I18N = {
     progressDone: "完成 ✅ 已开始下载。",
     progressNoFile: "未检测到文件，请先上传 PDF。",
     progressNotPdf: "当前不是 PDF 文件。",
-    progressNotReadable: "PDF 不可读（Mode B），请使用人工处理。",
+    progressNotReadable: "PDF 不可读（Mode B），请先手工涂抹并保存框选，然后再点红删PDF。",
+    progressNeedManualFirst: "请先点「手工涂抹」完成框选并关闭界面，然后再点「红删PDF」。",
     progressExportMissing: "导出模块未加载",
     progressFailed: "导出失败："
   },
@@ -74,6 +88,7 @@ const I18N = {
       "AI systems can extract hidden text-layer data.\nAll processing runs locally. Nothing is stored or transmitted.",
 
     btnUpload: "Choose file",
+    btnUploadImg: "Image",
 
     btnGenerate: "Filter",
     btnCopy: "Copy",
@@ -81,7 +96,6 @@ const I18N = {
     btnClear: "Clear",
 
     riskTitle: "Risk score",
-    // ✅ more general
     manualTitle: "Manual",
 
     fbQ: "Helpful?",
@@ -97,20 +111,28 @@ const I18N = {
 
     btnRedactPdf: "Redact PDF",
 
-    // Manual terms card (Mode A)
     manualHint: "Separate by commas/new lines. Only masks terms that actually appear in the PDF text.",
     manualPlaceholder: "e.g. Alice, Bob, Bei.de Tech GmbH",
 
-    // ✅ Mode B: manual visual redaction pane
     manualRedactTitle: "Manual redaction",
-    manualRedactNote:
-      "This file has no readable text layer (image or scanned PDF). Click the button below to mark areas with rectangles.",
-    btnManualRedact: "Manual",
+    manualRedactNote: "Click below to start marking.",
+    btnManualRedact: "Mark areas",
 
-    // ✅ rail titles + text (Mode A + Mode B)
     manualRailTitle: "How it works",
-    manualRailText:
-      "If the PDF is readable (Mode A):\n- Enter extra terms to mask (comma/new-line separated).\n- Only masks: ① terms that actually appear in the uploaded PDF text; ② terms that appear in your pasted input.\n\nIf the PDF is not readable / image (Mode B):\n- Click “Manual” to mark areas with rectangles.\n- You can add multiple boxes, clear page/all, and export a redacted raster PDF.",
+
+    manualRailTextA:
+      "Mode A (readable PDF):\n" +
+      "1) Enter extra terms to mask in “Manual” (comma/new-line separated).\n" +
+      "2) Only masks: ① terms that appear in the uploaded PDF text; ② terms that appear in your input.\n" +
+      "3) Click “Redact PDF” to generate a new PDF.\n" +
+      "4) Download and verify it before sending.",
+
+    manualRailTextB:
+      "Mode B (scanned/image PDF):\n" +
+      "1) Click “Manual” to mark areas with rectangles.\n" +
+      "2) You can add multiple boxes; clear page/all.\n" +
+      "3) Close the marking UI to return.\n" +
+      "4) Click “Redact PDF” to generate a new PDF; download and verify before sending.",
 
     exportTitle: "Progress",
 
@@ -118,7 +140,8 @@ const I18N = {
     progressDone: "Done ✅ Download started.",
     progressNoFile: "No file detected. Please upload a PDF first.",
     progressNotPdf: "This is not a PDF file.",
-    progressNotReadable: "PDF not readable (Mode B). Use Manual.",
+    progressNotReadable: "PDF not readable (Mode B). Please mark areas first, then click Redact PDF.",
+    progressNeedManualFirst: "Please mark areas first (Manual), close it, then click Redact PDF.",
     progressExportMissing: "Export module not loaded",
     progressFailed: "Export failed:"
   },
@@ -132,6 +155,7 @@ const I18N = {
       "KI-Systeme lesen auch verborgene Textlayer-Daten.\nVerarbeitung erfolgt ausschließlich lokal. Keine Speicherung.",
 
     btnUpload: "Datei auswählen",
+    btnUploadImg: "Bild",
 
     btnGenerate: "Filtern",
     btnCopy: "Kopieren",
@@ -139,7 +163,6 @@ const I18N = {
     btnClear: "Leeren",
 
     riskTitle: "Risikowert",
-    // ✅ more general
     manualTitle: "Manuell",
 
     fbQ: "Hilfreich?",
@@ -155,20 +178,28 @@ const I18N = {
 
     btnRedactPdf: "PDF schwärzen",
 
-    // Manual terms card (Mode A)
     manualHint: "Trennung per Komma/Zeilenumbruch. Es wird nur maskiert, was im PDF-Text wirklich vorkommt.",
     manualPlaceholder: "z.B. Max Mustermann, Erika, Bei.de Tech GmbH",
 
-    // ✅ Mode B: manual visual redaction pane
     manualRedactTitle: "Manuelle Schwärzung",
-    manualRedactNote:
-      "Diese Datei hat keinen lesbaren Textlayer (Bild oder Scan-PDF). Klicke unten, um Bereiche per Rechteck zu markieren.",
-    btnManualRedact: "Manuell",
+    manualRedactNote: "Unten klicken und Bereiche markieren.",
+    btnManualRedact: "Bereiche markieren",
 
-    // ✅ rail titles + text (Mode A + Mode B)
     manualRailTitle: "So funktioniert’s",
-    manualRailText:
-      "Wenn das PDF lesbar ist (Mode A):\n- Zusätzliche Begriffe zum Maskieren eingeben (Komma/Zeilenumbruch).\n- Maskiert wird nur: ① was im hochgeladenen PDF-Text wirklich vorkommt; ② was in deinem eingefügten Text vorkommt.\n\nWenn das PDF nicht lesbar ist / Bild (Mode B):\n- „Manuell“ klicken und Bereiche per Rechteck markieren.\n- Mehrfach markieren, Seite/Alles löschen und als Raster-PDF exportieren.",
+
+    manualRailTextA:
+      "Mode A (lesbares PDF):\n" +
+      "1) Zusätzliche Begriffe zum Maskieren unter „Manuell“ eingeben (Komma/Zeilenumbruch).\n" +
+      "2) Maskiert wird nur: ① was im PDF-Text vorkommt; ② was in deiner Eingabe vorkommt.\n" +
+      "3) „PDF schwärzen“ klicken und ein neues PDF erzeugen.\n" +
+      "4) Herunterladen und prüfen, erst dann senden.",
+
+    manualRailTextB:
+      "Mode B (Scan/Bild-PDF):\n" +
+      "1) „Manuell“ klicken und Bereiche per Rechteck markieren.\n" +
+      "2) Mehrfach markieren; Seite/Alles löschen.\n" +
+      "3) Markierungs-UI schließen und zurückkehren.\n" +
+      "4) „PDF schwärzen“ klicken, herunterladen und prüfen, erst dann senden.",
 
     exportTitle: "Fortschritt",
 
@@ -176,7 +207,8 @@ const I18N = {
     progressDone: "Fertig ✅ Download gestartet.",
     progressNoFile: "Keine Datei erkannt. Bitte zuerst ein PDF hochladen.",
     progressNotPdf: "Keine PDF-Datei.",
-    progressNotReadable: "PDF nicht lesbar (Mode B). Bitte Manuell verwenden.",
+    progressNotReadable: "PDF nicht lesbar (Mode B). Bitte erst markieren, dann PDF schwärzen.",
+    progressNeedManualFirst: "Bitte erst markieren (Manuell), schließen, dann PDF schwärzen.",
     progressExportMissing: "Export-Modul nicht geladen",
     progressFailed: "Export fehlgeschlagen:"
   }
