@@ -1,16 +1,35 @@
-// v1.6 — privacy rules tuned for "personal / readable" redaction
+// rules.js
+// v1.7 — privacy rules tuned for "personal / readable" redaction
 //
 // Goals:
 // - Keep document readable for AI/humans (labels remain, values masked)
-// - No URL handling by design
+// - ✅ URL handling enabled (full replace)
 // - Company name: mask ONLY the core identifying word (brand/主体词), keep suffix + region/type
 // - Person name: mask names with strong context to avoid false positives
+// - ✅ Strong context labels first (password/otp/account...)
 
 const RULES_BY_KEY = {
   /* ===================== EMAIL ===================== */
   email: {
     pattern: /\b[A-Z0-9._%+-]+\s*@\s*[A-Z0-9.-]+\s*\.\s*[A-Z]{2,}\b/gi,
     tag: "EMAIL"
+  },
+
+  /* ===================== URL (FULL) ===================== */
+  url: {
+    // covers: https://..., http://..., www....
+    // stop at whitespace / brackets / common closing punctuation
+    pattern: /\b(?:https?:\/\/|www\.)[^\s<>"'）)\]】]+/giu,
+    tag: "URL"
+  },
+
+  /* ===================== SECRET (password / otp) ===================== */
+  secret: {
+    // keep label, mask value until end-of-line (avoid over-capturing multi-line)
+    pattern:
+      /((?:密码|口令|登录密码|支付密码|PIN|Passwort|Password|验证码|校验码|动态码|OTP|2FA|短信验证码)\s*[:：]\s*)([^\n\r]{1,120})/giu,
+    tag: "SECRET",
+    mode: "prefix"
   },
 
   /* ===================== PERSON NAME (CONSERVATIVE) ===================== */
@@ -56,7 +75,7 @@ const RULES_BY_KEY = {
   /* ===================== ACCOUNT (label + value) ===================== */
   account: {
     pattern:
-      /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|Kontonummer|Account(?:\s*No\.)?|IBAN)\s*[:：]?\s*)(\d[\d\s-]{10,30}\d)/gi,
+      /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|对公账户|對公賬戶|Kontonummer|Account(?:\s*No\.)?|IBAN)\s*[:：]?\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{10,40}\d)/giu,
     tag: "ACCOUNT",
     mode: "prefix"
   },
@@ -65,13 +84,16 @@ const RULES_BY_KEY = {
   phone: {
     pattern: new RegExp(
       [
+        // A) labeled phone
         String.raw`((?:tel|telefon|phone|mobile|handy|kontakt|whatsapp|wechat|telegram|` +
           String.raw`联系方式|联系电话|电话|手機|手机|联系人|聯繫方式)\s*[:：]?\s*)` +
           String.raw`((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})?[\d\s().-]{6,}\d)`,
 
+        // B) unlabeled phone (guarded later by digit-count in applyRules)
         String.raw`((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d)` +
           String.raw`(?:\s*\((?:WhatsApp|WeChat|Telegram|Signal)\))?`,
 
+        // C) German-style landline
         String.raw`(\b0\d{2,4}[\d\s().-]{6,}\d\b)`
       ].join("|"),
       "giu"
@@ -87,15 +109,15 @@ const RULES_BY_KEY = {
     // - 单位在后：1,234.56 USD / 12000 元 / 199 RMB
     //
     // 约束：
-    // - 金额主体至少 2 位数字（避免把“€5”这种太短的也全抓，若你要抓可改 {2,} -> {1,}）
+    // - 金额主体至少 2 位数字
     // - 支持千分位（, . 空格）+ 可选小数（.xx 或 ,xx）
     pattern: new RegExp(
       String.raw`(?:` +
         // prefix: code/symbol + amount
         String.raw`(?:\b(?:EUR|USD|RMB|CNY|HKD|GBP|CHF)\b|[€$¥£])\s*` +
           String.raw`(` +
-            String.raw`\d{2,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?` + // 1.234,56 / 1,234.56 / 12 000,00
-            String.raw`|\d{4,18}(?:[.,]\d{2})?` +             // 12000 / 12000,00 (no thousand sep)
+            String.raw`\d{2,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?` +
+            String.raw`|\d{4,18}(?:[.,]\d{2})?` +
           String.raw`)` +
         String.raw`)` +
       String.raw`|` +
