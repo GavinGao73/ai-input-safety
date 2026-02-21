@@ -3,7 +3,8 @@
      - Upload split: PDF first, image second (mobile-friendly)
      - Right railcard becomes PURE progress card (ui-export-title + exportStatus)
      - Titles i18n-ready (ui-manual-rail-title / ui-export-title)
-     - ✅ UI tweak (Mode B): remove redundant "手工涂抹" title, add clearer instruction text + single button
+     - ✅ FIX (desktop Mode B visibility): “使用说明”不再被折叠隐藏（移出 manualBody，始终可见）
+     - ✅ UI tweak (Mode B): remove redundant title, add clearer instruction text + single button
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -82,6 +83,14 @@
           </button>
         </div>
 
+        <!-- ✅ FIX: “使用说明”移出折叠区域，桌面端即使未展开也能看见 -->
+        <div class="barcard" style="margin-top:10px;">
+          <div class="railcard" style="height:auto; min-height:0;">
+            <div class="rail-title" id="ui-manual-rail-title"></div>
+            <div class="side-rail-note" id="ui-manual-rail-note"></div>
+          </div>
+        </div>
+
         <div class="io-body" id="manualBody" aria-label="Manual body" style="display:none;">
           <div class="io-bottom-grid io-bottom-grid-left">
 
@@ -101,7 +110,7 @@
             <div class="subcard manual-pane" id="manualRedactPane" style="display:none;">
               <!-- ✅ removed redundant title "手工涂抹" (already have "手工处理") -->
               <div class="manual-redact-note" id="ui-manual-redact-note">
-                检测到上传内容为图片或不可读 PDF（无文本层）。请先进入手工框选，覆盖需要隐藏的信息；具体步骤见下方“使用说明”。
+                检测到上传内容为图片或不可读 PDF（无文本层）。请先进入手工框选，覆盖需要隐藏的信息；具体步骤见上方“使用说明”。
               </div>
 
               <div class="manual-redact-actions">
@@ -109,12 +118,7 @@
               </div>
             </div>
 
-            <!-- Keep the railcard as hint card (applies to both modes) -->
-            <div class="railcard">
-              <div class="rail-title" id="ui-manual-rail-title"></div>
-              <div class="side-rail-note" id="ui-manual-rail-note"></div>
-            </div>
-
+            <!-- ✅ removed: railcard moved outside manualBody -->
           </div>
         </div>
 
