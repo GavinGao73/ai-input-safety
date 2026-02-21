@@ -1,8 +1,10 @@
 <!-- =========================
      m.html (FULL)
-     - ✅ FIX: IO tab switch works reliably (remove conflicting hide-only rules)
+     - ✅ FIX: IO tab switch works reliably
      - Upload split: PDF first, image second
-     - Mode B export uses same top "红删PDF" button (no extra export button inside overlay)
+     - Mode B: “手工处理”卡片只保留「说明文字 + 手工涂抹按钮」（无重复标题）
+     - ✅ 三个链接仅放在「使用说明」卡片底部（不再出现在手工涂抹卡片内）
+     - ✅ Mode B 说明文字由 i18n.js 注入（多语言一致）
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -140,10 +142,8 @@
               <!-- ✅ keep id for i18n/app.js, but hidden via CSS (mobile) -->
               <div class="manual-redact-title" id="ui-manual-redact-title"></div>
 
-              <!-- ✅ Replace duplicate title with a clear instruction note -->
-              <div class="manual-redact-note" id="ui-manual-redact-note">
-                由于上传文件为图片或不可读的扫描版 PDF，需要手工框选需要遮盖的内容。具体操作请查看右侧「使用说明」。
-              </div>
+              <!-- ✅ i18n injected note (ZH/EN/DE) -->
+              <div class="manual-redact-note" id="ui-manual-redact-note"></div>
 
               <div class="manual-redact-actions">
                 <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
@@ -166,7 +166,6 @@
           </div>
         </div>
       </section>
-      <!-- ✅ IMPORTANT: close INPUT PANEL properly -->
 
       <!-- ================= OUTPUT PANEL ================= -->
       <section class="card card-col right io-panel io-out" id="rightCard">
