@@ -215,9 +215,9 @@ const I18N = {
     progressWorking: "Wird verarbeitet…",
     progressDone: "Fertig ✅ Download gestartet.",
     progressNoFile: "Keine Datei erkannt. Bitte zuerst ein PDF hochladen.",
-    progressNotPdf: "Keine PDF-Datei.",
+    progressNotPdf: "Keine PDF-Datei。",
     progressNotReadable: "PDF nicht lesbar (Mode B). Bitte erst markieren, dann PDF schwärzen.",
-    progressNeedManualFirst: "Bitte erst markieren (Manuell), schließen, dann PDF schwärzen.",
+    progressNeedManualFirst: "Bitte erst markieren (Manuell), schließen, dann PDF schwärzen。",
     progressExportMissing: "Export-Modul nicht geladen",
     progressFailed: "Export fehlgeschlagen:"
   }
