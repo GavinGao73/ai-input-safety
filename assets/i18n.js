@@ -22,6 +22,7 @@ const I18N = {
     // ✅ 更通用：Mode A=手工词条；Mode B=人工处理（框选）
     manualTitle: "手工处理",
 
+    // feedback removed (kept for compatibility if referenced elsewhere)
     fbQ: "有帮助吗？",
 
     learn: "了解更多",
@@ -40,6 +41,12 @@ const I18N = {
     // Manual terms card (Mode A)
     manualHint: "支持逗号/换行分隔；只遮盖 PDF 原文里真实出现的内容。",
     manualPlaceholder: "例如：张三, 李四, Bei.de Tech GmbH",
+
+    // ✅ Mode B: manual visual redaction pane
+    manualRedactTitle: "人工涂抹",
+    manualRedactNote:
+      "当前文件无法读取文字层（图片或扫描版 PDF）。请点击下方按钮进入框选遮盖模式。",
+    btnManualRedact: "人工处理",
 
     // ✅ rail titles + text (cover Mode A + Mode B)
     manualRailTitle: "使用说明",
@@ -94,6 +101,12 @@ const I18N = {
     manualHint: "Separate by commas/new lines. Only masks terms that actually appear in the PDF text.",
     manualPlaceholder: "e.g. Alice, Bob, Bei.de Tech GmbH",
 
+    // ✅ Mode B: manual visual redaction pane
+    manualRedactTitle: "Manual redaction",
+    manualRedactNote:
+      "This file has no readable text layer (image or scanned PDF). Click the button below to mark areas with rectangles.",
+    btnManualRedact: "Manual",
+
     // ✅ rail titles + text (Mode A + Mode B)
     manualRailTitle: "How it works",
     manualRailText:
@@ -145,6 +158,12 @@ const I18N = {
     // Manual terms card (Mode A)
     manualHint: "Trennung per Komma/Zeilenumbruch. Es wird nur maskiert, was im PDF-Text wirklich vorkommt.",
     manualPlaceholder: "z.B. Max Mustermann, Erika, Bei.de Tech GmbH",
+
+    // ✅ Mode B: manual visual redaction pane
+    manualRedactTitle: "Manuelle Schwärzung",
+    manualRedactNote:
+      "Diese Datei hat keinen lesbaren Textlayer (Bild oder Scan-PDF). Klicke unten, um Bereiche per Rechteck zu markieren.",
+    btnManualRedact: "Manuell",
 
     // ✅ rail titles + text (Mode A + Mode B)
     manualRailTitle: "So funktioniert’s",
