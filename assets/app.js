@@ -276,13 +276,55 @@ function markHitsInOriginal(text){
   }
 
   for (const key of PRIORITY) {
-    if (key !== "money" && !enabledSet.has(key)) continue;
+  if (key !== "money" && !enabledSet.has(key)) continue;
 
-    const r = window.RULES_BY_KEY && window.RULES_BY_KEY[key];
-    if (!r || !r.pattern) continue;
+  const r = window.RULES_BY_KEY && window.RULES_BY_KEY[key];
+  if (!r || !r.pattern) continue;
 
-    s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
+  // ✅ prefix highlight: keep label, highlight ONLY value group
+  if (r.mode === "prefix") {
+    s = s.replace(r.pattern, (m, p1, p2) => {
+      const label = p1 || "";
+      const val = p2 || "";
+      return `${label}${S1}${val}${S2}`;
+    });
+    continue;
   }
+
+  // ✅ phone highlight: best-effort keep label if captured; otherwise highlight whole
+  if (r.mode === "phone") {
+    s = s.replace(r.pattern, (m, p1, p2) => {
+      const label = p1 || "";
+      if (label) return `${label}${S1}${m.slice(label.length)}${S2}`;
+      return `${S1}${m}${S2}`;
+    });
+    continue;
+  }
+
+  // ✅ company highlight: highlight ONLY the core word (主体词 / name)
+  if (r.mode === "company") {
+    s = s.replace(r.pattern, (m, g1, g2, g3, g4, g5, g6) => {
+      // CN: g2 is core
+      if (g4) {
+        const prefixHan = g1 || "";
+        const core = g2 || "";
+        const tail = g3 || "";
+        const suffix = g4 || "";
+        return `${prefixHan}${S1}${core}${S2}${tail}${suffix}`;
+      }
+      // DE/EN: g5 is name, g6 is legal form
+      if (g6) {
+        const name = g5 || "";
+        return `${S1}${name}${S2}${g6}`;
+      }
+      return `${S1}${m}${S2}`;
+    });
+    continue;
+  }
+
+  // default highlight: whole match
+  s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
+}
 
   const esc = escapeHTML(s);
   return esc
@@ -793,24 +835,70 @@ function applyRules(text) {
   out = applyManualTermsMask(out, addHit);
 
   for (const key of PRIORITY) {
-    if (key !== "money" && !enabledSet.has(key)) continue;
+  if (key !== "money" && !enabledSet.has(key)) continue;
 
-    const r = rules[key];
-    if (!r || !r.pattern) continue;
+  const r = rules[key];
+  if (!r || !r.pattern) continue;
 
-    if (key === "money") {
-      out = out.replace(r.pattern, () => {
-        addHit("money");
-        return placeholder("MONEY");
-      });
-      continue;
+  // ✅ money: keep steady mode (M1) — always mask whole amount
+  if (key === "money") {
+    out = out.replace(r.pattern, () => {
+      addHit("money");
+      return placeholder("MONEY");
+    });
+    continue;
+  }
+
+  // ✅ mode-aware replacement:
+  // - prefix: keep label, mask only value
+  // - phone: keep label when group exists, else mask all
+  // - company: mask only core word, keep legal suffix
+  out = out.replace(r.pattern, (...args) => {
+    addHit(key);
+
+    // args: [match, g1, g2, ..., offset, input, groups]
+    const match = args[0] || "";
+
+    // 1) prefix: (label)(value)
+    if (r.mode === "prefix") {
+      const label = args[1] || "";
+      return `${label}${placeholder(r.tag)}`;
     }
 
-    out = out.replace(r.pattern, () => {
-      addHit(key);
+    // 2) phone: try keep label if captured; otherwise mask whole
+    // Your phone regex is a union; groups may vary -> best-effort only.
+    if (r.mode === "phone") {
+      const label = args[1] || ""; // label group in the first alternative
+      if (label) return `${label}${placeholder(r.tag)}`;
       return placeholder(r.tag);
-    });
-  }
+    }
+
+    // 3) company:
+    // CN alternative groups: (g1 prefixHan?)(g2 core)(g3 tail?)(g4 suffix)
+    // DE/EN alternative groups: (g5 name)(g6 legalForm)
+    if (r.mode === "company") {
+      const g1 = args[1], g2 = args[2], g3 = args[3], g4 = args[4];
+      if (g4) {
+        const prefixHan = g1 || "";
+        const tail = g3 || "";
+        const suffix = g4 || "";
+        // mask ONLY core (主体词), keep tail + suffix
+        return `${prefixHan}${placeholder(r.tag)}${tail}${suffix}`;
+      }
+
+      const g5 = args[5], g6 = args[6];
+      if (g6) {
+        // mask name, keep legal form (GmbH/AG/LLC...)
+        return `${placeholder(r.tag)}${g6}`;
+      }
+
+      return placeholder(r.tag);
+    }
+
+    // default: mask whole match
+    return placeholder(r.tag);
+  });
+}
 
   const report = computeRiskReport(hitsByKey, {
     hits,
