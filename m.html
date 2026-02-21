@@ -1,7 +1,7 @@
 <!-- =========================
      m.html (FULL)
      - ✅ FIX: IO tab switch works reliably
-     - Upload split: PDF first, image second
+     - ✅ Mobile upload: single entry (pdf + image). System picker decides file/photo/camera options (language follows system).
      - Mode B: “手工处理”卡片只保留「说明文字 + 手工涂抹按钮」（无重复标题）
      - ✅ 三个链接仅放在「使用说明」卡片底部（不再出现在手工涂抹卡片内）
      - ✅ Mode B 说明文字由 i18n.js 注入（多语言一致）
@@ -94,13 +94,9 @@
 
         <div class="barcard barcard-top">
           <div class="filebar filebar-flat">
-            <!-- ✅ PDF only -->
-            <input id="pdfFile" type="file" accept="application/pdf" />
+            <!-- ✅ Single entry: PDF + Image (system picker decides file/photo/camera options) -->
+            <input id="pdfFile" type="file" accept="application/pdf,image/*" />
             <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn"></label>
-
-            <!-- ✅ Image picker -->
-            <input id="imgFile" type="file" accept="image/*" />
-            <label class="btn secondary btn-s only-mobile" for="imgFile" id="ui-upload-img-btn"></label>
 
             <div class="filename" id="pdfName" aria-hidden="true"></div>
 
@@ -208,6 +204,6 @@
   <script src="./assets/pdf.js" defer></script>
   <script src="./assets/raster-export.js" defer></script>
   <script src="./assets/redact-ui.js" defer></script>
-  <script src="./assets/app.js?v=20260221a1" defer></script>
+  <script src="./assets/app.js?v=20260221a3" defer></script>
 </body>
 </html>
