@@ -3,7 +3,8 @@
  * Minimal manual redaction UI (in-memory only)
  * - Fullscreen overlay with canvas preview (PDF multi-page / image single page)
  * - Drag to create rectangles per page
- * - Returns {pages, rectsByPage, lang, dpi, filename} for RasterExport
+ * - ✅ NO export button here (export MUST happen via main "红删PDF" button)
+ * - Stores latest result in memory for app.js to export
  * ======================================================= */
 
 (function () {
@@ -15,35 +16,35 @@
 
   function langText(lang) {
     const zh = {
-      title: "人工处理（框选遮盖区域）",
-      tip: "拖拽框选要遮盖的区域；可多次框选。右上角导出。",
+      title: "手工涂抹（框选遮盖区域）",
+      tip: "拖拽框选要遮盖的区域；可多次框选。完成后关闭，回到主界面点「红删PDF」导出。",
       prev: "上一页",
       next: "下一页",
       clearPage: "清空本页",
       clearAll: "清空全部",
-      export: "导出红删PDF",
+      done: "完成",
       cancel: "关闭",
       page: (i, n) => `第 ${i}/${n} 页`
     };
     const de = {
       title: "Manuell (Bereiche markieren)",
-      tip: "Ziehen, um Bereiche zu schwärzen. Mehrfach möglich. Oben rechts exportieren.",
+      tip: "Ziehen, um Bereiche zu schwärzen. Danach schließen und im Hauptscreen „PDF schwärzen“ klicken.",
       prev: "Zurück",
       next: "Weiter",
       clearPage: "Seite löschen",
       clearAll: "Alles löschen",
-      export: "Raster-PDF exportieren",
+      done: "Fertig",
       cancel: "Schließen",
       page: (i, n) => `Seite ${i}/${n}`
     };
     const en = {
       title: "Manual redaction",
-      tip: "Drag to mark areas. Multiple selections allowed. Export on top-right.",
+      tip: "Drag to mark areas. Close it, then click “Redact PDF” on the main screen to export.",
       prev: "Prev",
       next: "Next",
       clearPage: "Clear page",
       clearAll: "Clear all",
-      export: "Export redacted PDF",
+      done: "Done",
       cancel: "Close",
       page: (i, n) => `Page ${i}/${n}`
     };
@@ -66,7 +67,7 @@
       <div class="rui-top" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.12);">
         <div style="font-weight:800; font-size:14px; opacity:.95;">${L.title}</div>
         <div class="rui-page" style="margin-left:auto; font-size:12px; opacity:.70;"></div>
-        <button class="rui-btn rui-export" style="border:0; padding:8px 10px; border-radius:10px; background:#2f7cff; color:#fff; font-weight:700; cursor:pointer;">${L.export}</button>
+        <button class="rui-btn rui-done" style="border:0; padding:8px 10px; border-radius:10px; background:#2f7cff; color:#fff; font-weight:700; cursor:pointer;">${L.done}</button>
         <button class="rui-btn rui-cancel" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.cancel}</button>
       </div>
 
@@ -100,10 +101,8 @@
     overlayCanvas.width = baseCanvas.width;
     overlayCanvas.height = baseCanvas.height;
 
-    // draw base
     ctx.drawImage(baseCanvas, 0, 0);
 
-    // draw rect outlines (visual only; actual redact applied later in RasterExport)
     ctx.save();
     ctx.lineWidth = Math.max(2, Math.round(baseCanvas.width / 500));
     ctx.strokeStyle = "rgba(255,255,255,.90)";
@@ -130,11 +129,10 @@
     const btnNext = $(".rui-next", ui);
     const btnClearPage = $(".rui-clear-page", ui);
     const btnClearAll = $(".rui-clear-all", ui);
-    const btnExport = $(".rui-export", ui);
+    const btnDone = $(".rui-done", ui);
     const btnCancel = $(".rui-cancel", ui);
     const L = langText(lang);
 
-    // Prepare pages (base canvases)
     let pages = [];
     if (fileKind === "image") {
       pages = await window.RasterExport.renderImageToCanvas(file, DPI);
@@ -147,8 +145,6 @@
     pages.forEach(p => { rectsByPage[p.pageNumber] = rectsByPage[p.pageNumber] || []; });
 
     let idx = 0;
-
-    // Use an offscreen overlay canvas for drawing rect previews
     const overlayCanvas = document.createElement("canvas");
 
     function updatePageUI() {
@@ -169,7 +165,6 @@
       btnNext.style.opacity = btnNext.disabled ? 0.4 : 1;
     }
 
-    // Drawing logic
     let isDown = false;
     let sx = 0, sy = 0;
     let activePointerId = null;
@@ -185,8 +180,6 @@
       try { ev.preventDefault(); } catch (_) {}
       isDown = true;
       activePointerId = ev.pointerId;
-
-      // ✅ critical: keep receiving move/up even if pointer leaves canvas
       try { canvas.setPointerCapture(ev.pointerId); } catch (_) {}
 
       const p = getPos(ev);
@@ -217,10 +210,8 @@
       if (activePointerId != null && ev && ev.pointerId != null && ev.pointerId !== activePointerId) return;
 
       try { if (ev) ev.preventDefault(); } catch (_) {}
-
       isDown = false;
 
-      // ✅ release capture
       try { if (activePointerId != null) canvas.releasePointerCapture(activePointerId); } catch (_) {}
 
       const p = ev ? getPos(ev) : { x: sx, y: sy };
@@ -244,14 +235,8 @@
     }
 
     function onUp(ev) { finishUp(ev); }
-
     function onCancel(ev) { finishUp(ev); }
-
-    function onLeave() {
-      // ✅ if we somehow didn't get pointerup, reset cleanly
-      if (!isDown) return;
-      finishUp(null);
-    }
+    function onLeave() { if (isDown) finishUp(null); }
 
     canvas.addEventListener("pointerdown", onDown);
     canvas.addEventListener("pointermove", onMove);
@@ -287,36 +272,37 @@
       ui.remove();
     }
 
-    btnCancel.onclick = () => close();
+    function buildResult() {
+      return {
+        pages: pages.map(p => ({
+          pageNumber: p.pageNumber,
+          canvas: p.canvas,
+          width: p.width,
+          height: p.height
+        })),
+        rectsByPage,
+        lang,
+        dpi: DPI,
+        filename: `raster_secure_${Date.now()}.pdf`
+      };
+    }
 
-    const session = {
-      async done() {
-        return {
-          pages: pages.map(p => ({
-            pageNumber: p.pageNumber,
-            canvas: p.canvas,
-            width: p.width,
-            height: p.height
-          })),
-          rectsByPage,
-          lang,
-          dpi: DPI,
-          filename: `raster_secure_${Date.now()}.pdf`
-        };
-      },
-      close
-    };
-
-    btnExport.onclick = async () => {
-      const res = await session.done();
-      await window.RasterExport.exportRasterSecurePdfFromVisual(res);
+    // ✅ Done = save to memory and close
+    btnDone.onclick = () => {
+      try { window.__manual_redact_last = buildResult(); } catch (_) {}
       close();
     };
 
+    btnCancel.onclick = () => close();
+
     updatePageUI();
-    return session;
+
+    // Return a session for app.js to pull result later
+    return {
+      done() { return buildResult(); },
+      close
+    };
   }
 
   window.RedactUI = { start };
 })();
-
