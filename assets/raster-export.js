@@ -882,6 +882,7 @@
     return pages;
   }
 
+  // ✅ Image -> pages[] (and also compatible with {pages: [...]})
   async function renderImageToCanvas(file, dpi) {
     const dataUrl = await readFileAsDataURL(file);
     const img = await new Promise((resolve) => {
@@ -896,7 +897,18 @@
     const ctx = c.getContext("2d", { alpha: false });
     ctx.drawImage(img, 0, 0, c.width, c.height);
 
-    return [{ pageNumber: 1, canvas: c, width: c.width, height: c.height, dpi: dpi || DEFAULT_DPI }];
+    const arr = [{
+      pageNumber: 1,
+      canvas: c,
+      width: c.width,
+      height: c.height,
+      dpi: dpi || DEFAULT_DPI
+    }];
+
+    // ✅ compat: allow callers to treat it as { pages: [...] }
+    try { arr.pages = arr; } catch (_) {}
+
+    return arr;
   }
 
   async function exportCanvasesToPdf(pages, dpi, filename) {
@@ -905,12 +917,18 @@
 
     const doc = await PDFDocument.create();
 
-    for (const p of pages) {
+    for (const p of (pages || [])) {
+      if (!p || !p.canvas) continue;
+
       const pngBytes = await canvasToPngBytes(p.canvas);
       const png = await doc.embedPng(pngBytes);
 
-      const pageWpt = (p.width * 72) / (dpi || DEFAULT_DPI);
-      const pageHpt = (p.height * 72) / (dpi || DEFAULT_DPI);
+      const pw = Number(p.width || (p.canvas ? p.canvas.width : 0));
+      const ph = Number(p.height || (p.canvas ? p.canvas.height : 0));
+      if (!pw || !ph) continue;
+
+      const pageWpt = (pw * 72) / (dpi || DEFAULT_DPI);
+      const pageHpt = (ph * 72) / (dpi || DEFAULT_DPI);
 
       const page = doc.addPage([pageWpt, pageHpt]);
       page.drawImage(png, { x: 0, y: 0, width: pageWpt, height: pageHpt });
@@ -974,31 +992,40 @@
     },
 
     async exportRasterSecurePdfFromVisual(result) {
-      if (!result || !result.pages || !result.pages.length) return;
+      // Accept both:
+      // - result = { pages: [...], rectsByPage, dpi, filename }
+      // - result = pagesArray (compat)
+      const pages =
+        (result && Array.isArray(result.pages)) ? result.pages :
+        (Array.isArray(result)) ? result :
+        null;
 
-      const dpi = result.dpi || DEFAULT_DPI;
-      const _placeholder = langPlaceholder(result.lang || "zh"); // kept for compat (not used)
+      if (!pages || !pages.length) return;
+
+      const dpi = (result && result.dpi) ? result.dpi : DEFAULT_DPI;
+      const _placeholder = langPlaceholder((result && result.lang) || "zh"); // kept for compat (not used)
 
       // ---- status snapshot ----
       try {
         window.__RasterExportLast = {
           when: Date.now(),
           phase: "exportRasterSecurePdfFromVisual",
-          pages: (result.pages || []).length,
-          hasRectPages: !!result.rectsByPage,
-          lang: result.lang || "zh",
+          pages: pages.length,
+          hasRectPages: !!(result && result.rectsByPage),
+          lang: (result && result.lang) || "zh",
           dpi
         };
       } catch (_) {}
 
-      const rectsByPage = result.rectsByPage || {};
-      for (const p of result.pages) {
-        const rects = rectsByPage[p.pageNumber] || [];
-        drawRedactionsOnCanvas(p.canvas, rects);
+      const rectsByPage = (result && result.rectsByPage) ? result.rectsByPage : {};
+      for (const p of pages) {
+        const pn = p && p.pageNumber ? p.pageNumber : 1;
+        const rects = rectsByPage[pn] || [];
+        if (p && p.canvas) drawRedactionsOnCanvas(p.canvas, rects);
       }
 
-      const name = result.filename || `raster_secure_${Date.now()}.pdf`;
-      await exportCanvasesToPdf(result.pages, dpi, name);
+      const name = (result && result.filename) ? result.filename : `raster_secure_${Date.now()}.pdf`;
+      await exportCanvasesToPdf(pages, dpi, name);
     },
 
     renderPdfToCanvases,
