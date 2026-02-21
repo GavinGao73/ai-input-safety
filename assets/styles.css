@@ -7,6 +7,8 @@
    - Keep left textarea & right output EXACT same sizing
    - Railcard: progress-only (feedback removed)
    - Mobile: IO tabs have distinct style (NOT same as main buttons)
+   - ✅ FIX: remove bottom shadow/overlay that covered content when expanded
+   - ✅ Mobile: show "图片" upload button only on small screens (optional)
    ========================= */
 
 :root{
@@ -192,6 +194,12 @@ h3{
   justify-content:flex-end;
   align-items:center;
   min-width:0;
+}
+
+/* ✅ Mobile-only helper (for "图片" button) */
+.only-mobile{ display:none; }
+@media (max-width: 560px){
+  .only-mobile{ display:inline-flex; }
 }
 
 /* =========================
@@ -414,6 +422,17 @@ textarea{
 
 .io-body{ margin-top:10px; display:none; }
 .io-body.open{ display:block; }
+
+/* ✅ FIX: remove bottom overlay/shadow that could cover content when expanded */
+#manualBody.open,
+#riskBody.open{
+  /* keep scroll behavior but avoid any accidental overlay look */
+  background: transparent;
+}
+#manualBody.open::after,
+#riskBody.open::after{
+  content:none !important;
+}
 
 /* ✅ FIX: when JS locks manualBody height, ensure inner grid fills it */
 #manualBody.open .io-bottom-grid,
@@ -786,4 +805,3 @@ textarea{
   display:flex;
   justify-content:center;
 }
-
