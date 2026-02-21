@@ -1,9 +1,8 @@
 <!-- =========================
      index.html (FULL)
-     - REMOVE feedback/like UI
+     - Upload split: PDF first, image second (mobile-friendly)
      - Right railcard becomes PURE progress card (ui-export-title + exportStatus)
      - Titles i18n-ready (ui-manual-rail-title / ui-export-title)
-     - Hint note is plain container (text set by i18n via app.js)
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -56,8 +55,14 @@
 
         <div class="barcard barcard-top">
           <div class="filebar filebar-flat">
-            <input id="pdfFile" type="file" accept="application/pdf,image/*" capture="none" />
+            <!-- ✅ PDF only (prefer file picker) -->
+            <input id="pdfFile" type="file" accept="application/pdf" />
             <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn"></label>
+
+            <!-- ✅ Image picker (optional; shown as secondary, mobile-friendly) -->
+            <input id="imgFile" type="file" accept="image/*" />
+            <label class="btn secondary btn-s only-mobile" for="imgFile" id="ui-upload-img-btn"></label>
+
             <div class="filename" id="pdfName" aria-hidden="true"></div>
           </div>
         </div>
@@ -72,45 +77,43 @@
 
         <div class="barcard ctlbar" aria-label="Manual toggle bar">
           <button class="ctlbtn" id="btnToggleManual" type="button" aria-expanded="false">
-            <span id="ui-manual-toggle-title">手工输入</span>
+            <span id="ui-manual-toggle-title">手工处理</span>
           </button>
         </div>
 
         <div class="io-body" id="manualBody" aria-label="Manual body" style="display:none;">
-  <div class="io-bottom-grid io-bottom-grid-left">
+          <div class="io-bottom-grid io-bottom-grid-left">
 
-    <!-- Pane A: manual terms (Mode A only) -->
-    <div class="subcard manual-pane" id="manualTermsPane">
-      <textarea
-        id="manualTerms"
-        class="manual-terms-textarea"
-        spellcheck="false"
-        autocomplete="off"
-        wrap="off"
-        placeholder="例如：张三, 李四, Bei.de Tech GmbH"
-      ></textarea>
-    </div>
+            <!-- Pane A: manual terms (Mode A only) -->
+            <div class="subcard manual-pane" id="manualTermsPane">
+              <textarea
+                id="manualTerms"
+                class="manual-terms-textarea"
+                spellcheck="false"
+                autocomplete="off"
+                wrap="off"
+                placeholder="例如：张三, 李四, Bei.de Tech GmbH"
+              ></textarea>
+            </div>
 
-    <!-- Pane B: manual visual redaction (Mode B only) -->
-    <div class="subcard manual-pane" id="manualRedactPane" style="display:none;">
-      <div class="manual-redact-title" id="ui-manual-redact-title">人工涂抹</div>
-      <div class="manual-redact-note" id="ui-manual-redact-note">
-        当前文件无法读取文字层（图片或扫描版 PDF）。请点击下方按钮进入框选遮盖模式。
-      </div>
+            <!-- Pane B: manual visual redaction (Mode B only) -->
+            <div class="subcard manual-pane" id="manualRedactPane" style="display:none;">
+              <div class="manual-redact-title" id="ui-manual-redact-title">手工涂抹</div>
+              <div class="manual-redact-note" id="ui-manual-redact-note">点击下方按钮进入框选。</div>
 
-      <div class="manual-redact-actions">
-        <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
-      </div>
-    </div>
+              <div class="manual-redact-actions">
+                <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
+              </div>
+            </div>
 
-    <!-- Keep the railcard as hint card (applies to both modes) -->
-    <div class="railcard">
-      <div class="rail-title" id="ui-manual-rail-title"></div>
-      <div class="side-rail-note" id="ui-manual-rail-note"></div>
-    </div>
+            <!-- Keep the railcard as hint card (applies to both modes) -->
+            <div class="railcard">
+              <div class="rail-title" id="ui-manual-rail-title"></div>
+              <div class="side-rail-note" id="ui-manual-rail-note"></div>
+            </div>
 
-  </div>
-</div>
+          </div>
+        </div>
 
         <div class="left-footer">
           <div class="links">
@@ -145,8 +148,9 @@
 
         <div class="barcard barcard-top">
           <div class="top-actions">
-            <button class="btn primary btn-s btn-mini" id="btnExportRasterPdf" style="display:none;"></button>
+            <!-- ✅ Order: Copy → Redact PDF → Clear -->
             <button class="btn primary btn-s btn-mini" id="btnCopy"></button>
+            <button class="btn primary btn-s btn-mini" id="btnExportRasterPdf" style="display:none;"></button>
             <button class="btn secondary btn-s btn-mini" id="btnClear"></button>
           </div>
         </div>
@@ -188,6 +192,6 @@
   <script src="./assets/pdf.js" defer></script>
   <script src="./assets/raster-export.js" defer></script>
   <script src="./assets/redact-ui.js" defer></script>
-  <script src="./assets/app.js?v=20260219d2" defer></script>
+  <script src="./assets/app.js?v=20260221a1" defer></script>
 </body>
 </html>
