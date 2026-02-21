@@ -1,16 +1,14 @@
 // =========================
 // assets/app.js (FULL)
-// ✅ Personal build (2026-02-19d2) + ModeB replaces manual card pane
+// ✅ Personal build (2026-02-19d2 + panes/progressfix)
 // This revision:
-// - Mode A: manualTermsPane visible; manualRedactPane hidden.
-// - Mode B: manualRedactPane visible (button + note); manualTermsPane hidden.
-// - Manual terms input listener only active in Mode A.
-// - Keep: no Helpful/Like UI; progress rail pure; mobile riskBody only riskBox (handled in m.html).
-// - Keep: avoid blank flash by delaying expand until AFTER riskBox rendered.
-// - Keep: sync heights via ResizeObserver.
+// - Mode A/B switches manual panes (terms vs visual redaction)
+// - i18n: manual redaction pane title/note/button
+// - FIX (mobile): if no exportStatus slot, inject progressBox (do NOT overwrite riskBox)
+// - Keep: expand after file upload; collapse on Clear; height sync via ResizeObserver
 // =========================
 
-console.log("[APP] loaded v20260219d2-progress-only-syncheight-ro + modeB-pane");
+console.log("[APP] loaded v20260219d2-progress-only-syncheight-ro+panesfix");
 
 let currentLang = "zh";
 window.currentLang = currentLang;
@@ -65,6 +63,15 @@ function show(el, yes){
   if (!el) return;
   el.style.display = yes ? "" : "none";
 }
+
+// --- Risk scoring meta (local only) ---
+let lastRunMeta = {
+  fromPdf: false,
+  inputLen: 0,
+  enabledCount: 0,
+  moneyMode: "m1",
+  lang: "zh"
+};
 
 function $(id) { return document.getElementById(id); }
 
@@ -300,15 +307,6 @@ const RISK_WEIGHTS = {
 
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
-// --- Risk scoring meta (local only) ---
-let lastRunMeta = {
-  fromPdf: false,
-  inputLen: 0,
-  enabledCount: 0,
-  moneyMode: "m1",
-  lang: "zh"
-};
-
 function riskI18n(lang) {
   const zh = {
     low: "低风险",
@@ -486,53 +484,53 @@ function stage3Text(key){
   return m[key] || "";
 }
 
-/* ================= Mode A/B manual pane switch ================= */
-function setManualPaneMode(mode){
-  const paneA = $("manualTermsPane");
-  const paneB = $("manualRedactPane");
-  if (!paneA || !paneB) return;
-
-  // A: manual terms
-  if (mode === "A") {
-    show(paneA, true);
-    show(paneB, false);
-    return;
-  }
-
-  // B: visual redaction
-  if (mode === "B") {
-    show(paneA, false);
-    show(paneB, true);
-    return;
-  }
-
-  // none: default show paneA (empty) to keep layout stable
-  show(paneA, true);
-  show(paneB, false);
-}
-
 function setStage3Ui(mode){
   lastStage3Mode = mode || "none";
-
-  // right-side export buttons (Mode A only)
   const btnText = $("btnExportText");
   const btnPdf  = $("btnExportRasterPdf");
-
-  // Mode B entry button (inside manualRedactPane)
   const btnMan  = $("btnManualRedact");
 
   show(btnText, lastStage3Mode === "A");
   show(btnPdf,  lastStage3Mode === "A");
   show(btnMan,  lastStage3Mode === "B");
 
-  // switch left manual pane content
-  setManualPaneMode(lastStage3Mode);
-
   const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : null;
 
   if (btnText) btnText.textContent = stage3Text("btnExportText");
   if (btnPdf)  btnPdf.textContent  = (t && t.btnRedactPdf) ? t.btnRedactPdf : stage3Text("btnExportPdf");
+
+  // ✅ Mode B button label from i18n
   if (btnMan)  btnMan.textContent  = (t && t.btnManualRedact) ? t.btnManualRedact : stage3Text("btnManual");
+}
+
+/* ================= Manual panes switch (Mode A/B) ================= */
+function setManualPanesForMode(mode){
+  const paneA = $("manualTermsPane");
+  const paneB = $("manualRedactPane");
+  const termInput = $("manualTerms") || $("nameList");
+
+  if (mode === "A") {
+    show(paneA, true);
+    show(paneB, false);
+
+    // term input enabled
+    if (termInput) termInput.disabled = false;
+    return;
+  }
+
+  if (mode === "B") {
+    show(paneA, false);
+    show(paneB, true);
+
+    // term input disabled (avoid confusion; also improves perf)
+    if (termInput) termInput.disabled = true;
+    return;
+  }
+
+  // none
+  show(paneA, true);
+  show(paneB, false);
+  if (termInput) termInput.disabled = false;
 }
 
 /* ================= Unified control toggles (button + body) ================= */
@@ -628,28 +626,23 @@ function ensureProgressBox(){
   const existing = $("progressBox");
   if (existing) return existing;
 
-  // inject under risk railcard (desktop only)
-  const riskBody = $("riskBody");
-  if (riskBody) {
-    const rails = riskBody.querySelectorAll(".railcard");
-    if (rails && rails.length) {
-      const rail = rails[0];
-
-      const box = document.createElement("div");
-      box.id = "progressBox";
-      box.className = "tiny muted";
-      box.style.whiteSpace = "pre-wrap";
-      box.style.lineHeight = "1.6";
-      box.style.marginTop = "10px";
-      box.style.paddingTop = "8px";
-      box.style.borderTop = "1px solid rgba(255,255,255,.06)";
-      rail.appendChild(box);
-      return box;
-    }
+  // ✅ Mobile fix: inject a progress box WITHOUT overwriting riskBox
+  const riskBox = $("riskBox");
+  if (riskBox && riskBox.parentElement) {
+    const box = document.createElement("div");
+    box.id = "progressBox";
+    box.className = "tiny muted";
+    box.style.whiteSpace = "pre-wrap";
+    box.style.lineHeight = "1.6";
+    box.style.marginTop = "10px";
+    box.style.paddingTop = "8px";
+    box.style.borderTop = "1px solid rgba(255,255,255,.06)";
+    riskBox.parentElement.appendChild(box);
+    return box;
   }
 
-  // fallback
-  return $("riskBox");
+  // last fallback
+  return null;
 }
 
 function setProgressText(lines, isError){
@@ -657,14 +650,8 @@ function setProgressText(lines, isError){
   if (!box) return;
 
   const s = Array.isArray(lines) ? lines.join("\n") : String(lines || "");
-  const html = escapeHTML(s);
-
-  if (box.id === "riskBox") {
-    box.innerHTML = `<div class="tiny" style="white-space:pre-wrap;line-height:1.6;${isError ? "color:#ffb4b4;" : ""}">${html}</div>`;
-  } else {
-    box.style.color = isError ? "#ffb4b4" : "";
-    box.textContent = s;
-  }
+  box.style.color = isError ? "#ffb4b4" : "";
+  box.textContent = s;
 }
 
 function clearProgress(){
@@ -703,8 +690,8 @@ function setText() {
   const spMan = document.getElementById("ui-manual-toggle-title");
   const spRisk = document.getElementById("ui-risk-toggle-title");
 
-  if (spMan) spMan.textContent = t.manualTitle || "手工输入";
-  else if ($("btnToggleManual")) $("btnToggleManual").textContent = t.manualTitle || "手工输入"; // fallback
+  if (spMan) spMan.textContent = t.manualTitle || "手工处理";
+  else if ($("btnToggleManual")) $("btnToggleManual").textContent = t.manualTitle || "手工处理"; // fallback
 
   if (spRisk) spRisk.textContent = t.riskTitle || "风险评分";
   else if ($("btnToggleRisk")) $("btnToggleRisk").textContent = t.riskTitle || "风险评分"; // fallback
@@ -720,14 +707,15 @@ function setText() {
   const exportTitle = document.getElementById("ui-export-title");
   if (exportTitle) exportTitle.textContent = t.exportTitle || exportTitleFallback();
 
-  // Manual terms placeholder (Mode A pane)
+  // Manual terms placeholder
   if ($("manualTerms")) $("manualTerms").placeholder = t.manualPlaceholder || "例如：张三, 李四, Bei.de Tech GmbH";
 
-  // Manual redact pane texts (Mode B pane)
+  // ✅ Mode B pane texts
   const mrTitle = $("ui-manual-redact-title");
-  const mrNote  = $("ui-manual-redact-note");
-  if (mrTitle) mrTitle.textContent = t.manualRedactTitle || "人工涂抹";
-  if (mrNote)  mrNote.textContent  = t.manualRedactNote  || "当前文件无法读取文字层（图片或扫描版 PDF）。请点击下方按钮进入框选遮盖模式。";
+  if (mrTitle) mrTitle.textContent = t.manualRedactTitle || (currentLang === "de" ? "Manuell" : currentLang === "en" ? "Manual" : "人工处理");
+
+  const mrNote = $("ui-manual-redact-note");
+  if (mrNote) mrNote.textContent = t.manualRedactNote || "";
 
   // Money UI removed
   if ($("ui-money-label")) $("ui-money-label").textContent = "";
@@ -750,7 +738,6 @@ function setText() {
 
   if ($("ui-foot")) $("ui-foot").textContent = t.foot;
 
-  // ensure stage3 labels and pane mode reflect current state
   setStage3Ui(lastStage3Mode);
 }
 
@@ -922,7 +909,6 @@ async function handleFile(file) {
   if (!file) return;
 
   // ✅ IMPORTANT: DO NOT expand here (prevents blank flash on right)
-  // We expand after riskBox has content (in applyRules rAF) or in Mode B rAF.
 
   lastUploadedFile = file;
   lastProbe = null;
@@ -931,10 +917,11 @@ async function handleFile(file) {
 
   setStage3Ui("none");
 
-  // Image => Mode B: manual visual redaction
+  // Image => Mode B
   if (lastFileKind === "image") {
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
+    setManualPanesForMode("B");
     requestAnimationFrame(() => {
       expandManualArea();
       expandRiskArea();
@@ -950,6 +937,7 @@ async function handleFile(file) {
       console.error("[handleFile] probePdfTextLayer missing");
       lastRunMeta.fromPdf = false;
       setStage3Ui("B");
+      setManualPanesForMode("B");
       requestAnimationFrame(() => {
         expandManualArea();
         expandRiskArea();
@@ -965,6 +953,7 @@ async function handleFile(file) {
       // Mode B
       lastRunMeta.fromPdf = false;
       setStage3Ui("B");
+      setManualPanesForMode("B");
       requestAnimationFrame(() => {
         expandManualArea();
         expandRiskArea();
@@ -973,8 +962,10 @@ async function handleFile(file) {
       return;
     }
 
+    // Mode A
     lastRunMeta.fromPdf = true;
     setStage3Ui("A");
+    setManualPanesForMode("A");
 
     const text = String(probe.text || "").trim();
     lastPdfOriginalText = text;
@@ -1005,6 +996,7 @@ async function handleFile(file) {
     console.error("[handleFile] ERROR:", e);
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
+    setManualPanesForMode("B");
     requestAnimationFrame(() => {
       expandManualArea();
       expandRiskArea();
@@ -1071,13 +1063,10 @@ function bind() {
     };
   }
 
-  // Manual terms input (Mode A only)
+  // Manual terms input
   const termInput = $("manualTerms") || $("nameList");
   if (termInput) {
     termInput.addEventListener("input", () => {
-      // ✅ If we are in Mode B, ignore manual terms input entirely
-      if (lastStage3Mode !== "A") return;
-
       setManualTermsFromText(termInput.value || "");
 
       if (!window.__export_snapshot) window.__export_snapshot = {};
@@ -1091,7 +1080,7 @@ function bind() {
       requestAnimationFrame(syncManualToRiskHeight);
     });
 
-    // init (Mode A only; safe no-op otherwise)
+    // init
     setManualTermsFromText(termInput.value || "");
     if (!window.__export_snapshot) window.__export_snapshot = {};
     window.__export_snapshot.manualTerms = manualTerms.slice(0);
@@ -1127,6 +1116,10 @@ function bind() {
       const rb = $("riskBox");
       if (rb) rb.innerHTML = "";
 
+      // ✅ remove injected progressBox (mobile)
+      const pb = $("progressBox");
+      if (pb) pb.remove();
+
       if ($("pdfName")) $("pdfName").textContent = "";
 
       const wrap = $("inputWrap");
@@ -1136,16 +1129,20 @@ function bind() {
       }
       if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
 
-      // reset manual terms (only meaningful for Mode A)
+      // reset manual terms
       manualTerms = [];
       const termInput2 = $("manualTerms") || $("nameList");
-      if (termInput2) termInput2.value = "";
+      if (termInput2) {
+        termInput2.value = "";
+        termInput2.disabled = false;
+      }
 
       lastUploadedFile = null;
       lastFileKind = "";
       lastProbe = null;
       lastPdfOriginalText = "";
       setStage3Ui("none");
+      setManualPanesForMode("none");
 
       window.__export_snapshot = null;
 
@@ -1187,6 +1184,9 @@ function bind() {
           renderOutput("");
           const rb = $("riskBox");
           if (rb) rb.innerHTML = "";
+          clearProgress();
+          const pb = $("progressBox");
+          if (pb) pb.remove();
           window.dispatchEvent(new Event("safe:updated"));
         }
       }, AUTO_DELAY);
@@ -1221,7 +1221,7 @@ function bind() {
   const btnExportRasterPdf = $("btnExportRasterPdf");
   if (btnExportRasterPdf) {
     btnExportRasterPdf.onclick = async () => {
-      // show area + progress under slot
+      // show area + progress
       expandRiskArea();
       requestAnimationFrame(syncManualToRiskHeight);
 
@@ -1274,7 +1274,6 @@ function bind() {
     };
   }
 
-  // Mode B visual redaction entry
   const btnManual = $("btnManualRedact");
   if (btnManual) {
     btnManual.onclick = async () => {
