@@ -1,13 +1,11 @@
 <!-- =========================
      index.html (FULL)
-     ✅ Target behavior (2026-02-21b)
-     - Default: BOTH “手工处理” + “风险评分” collapsed
-     - After ANY upload (Mode A / Mode B / image): BOTH auto expand
-     - Desktop: expanded manualBody and riskBody are equal-height, side-by-side
-     - Mobile: allow stacking
-       * Mode B manual order: note → button → Mode B instructions (same fold)
-       * Mode A manual order: textarea → Mode A instructions (same fold)
-     - Links always last (outside fold)
+     - Desktop: Manual/Risk default collapsed
+     - After ANY upload: auto expand BOTH manual + risk
+     - Input (Mode A/B) inside the SAME fold area:
+       Mode A order: manualTerms textarea -> Mode A rail text
+       Mode B order: note -> "手工涂抹" button -> Mode B rail text
+     - Output fixed: Risk card + Progress card (always)
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -60,11 +58,11 @@
 
         <div class="barcard barcard-top">
           <div class="filebar filebar-flat">
-            <!-- ✅ PDF only -->
+            <!-- PDF only -->
             <input id="pdfFile" type="file" accept="application/pdf" />
             <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn"></label>
 
-            <!-- ✅ Image picker (mobile-friendly) -->
+            <!-- Image (mobile-only label; desktop can still drag/drop or use dev tools if needed) -->
             <input id="imgFile" type="file" accept="image/*" />
             <label class="btn secondary btn-s only-mobile" for="imgFile" id="ui-upload-img-btn"></label>
 
@@ -80,28 +78,21 @@
           </div>
         </div>
 
-        <!-- Manual fold toggle -->
+        <!-- Manual toggle bar -->
         <div class="barcard ctlbar" aria-label="Manual toggle bar">
           <button class="ctlbtn" id="btnToggleManual" type="button" aria-expanded="false">
             <span id="ui-manual-toggle-title">手工处理</span>
           </button>
         </div>
 
-        <!-- ✅ Manual fold body: left pane + instructions rail (same fold)
-             Desktop: 2 columns (3fr/2fr)
-             Mobile: stacks in DOM order:
-               - left pane (Mode A textarea OR Mode B note+button)
-               - then instructions rail (Mode A or Mode B)
-             Links are outside fold and always last.
-        -->
+        <!-- Manual fold body -->
         <div class="io-body" id="manualBody" aria-label="Manual body" style="display:none;">
           <div class="io-bottom-grid io-bottom-grid-left">
 
-            <!-- LEFT pane (Mode A/B switch inside) -->
-            <div class="subcard manual-pane" id="manualPaneLeft">
-
-              <!-- Mode A: manual terms -->
-              <div class="manual-pane" id="manualTermsPane">
+            <!-- LEFT column: Mode A/B panes (switch) -->
+            <div class="subcard manual-pane" style="min-height:0;">
+              <!-- Pane A: manual terms (Mode A only) -->
+              <div class="manual-pane" id="manualTermsPane" style="height:100%; min-height:0;">
                 <textarea
                   id="manualTerms"
                   class="manual-terms-textarea"
@@ -112,12 +103,9 @@
                 ></textarea>
               </div>
 
-              <!-- Mode B: manual visual redaction -->
-              <div class="manual-pane" id="manualRedactPane" style="display:none;">
-                <div class="manual-redact-note" id="ui-manual-redact-note">
-                  检测到上传内容为图片或不可读 PDF（无文本层）。
-                  请先进入手工框选，覆盖需要隐藏的信息；详细步骤见「使用说明」。
-                </div>
+              <!-- Pane B: manual visual redaction (Mode B only) -->
+              <div class="manual-pane" id="manualRedactPane" style="display:none; height:100%; min-height:0;">
+                <div class="manual-redact-note" id="ui-manual-redact-note"></div>
 
                 <div class="manual-redact-actions">
                   <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
@@ -125,8 +113,8 @@
               </div>
             </div>
 
-            <!-- RIGHT rail: instructions (Mode A/B switch by i18n text) -->
-            <div class="railcard" id="manualRailCard">
+            <!-- RIGHT column: Rail note (Mode A/B text switched by app.js) -->
+            <div class="railcard" style="height:100%; min-height:0;">
               <div class="rail-title" id="ui-manual-rail-title"></div>
               <div class="side-rail-note" id="ui-manual-rail-note"></div>
             </div>
@@ -134,7 +122,6 @@
           </div>
         </div>
 
-        <!-- Links (always last; outside fold) -->
         <div class="left-footer">
           <div class="links">
             <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
@@ -178,14 +165,14 @@
           <div class="output output-scroll" id="outputText"></div>
         </div>
 
-        <!-- Risk fold toggle -->
+        <!-- Risk toggle bar -->
         <div class="barcard ctlbar" aria-label="Risk toggle bar">
           <button class="ctlbtn" id="btnToggleRisk" type="button" aria-expanded="false">
             <span id="ui-risk-toggle-title">风险评分</span>
           </button>
         </div>
 
-        <!-- Output fold body: fixed two cards (risk + progress) -->
+        <!-- Risk fold body: ALWAYS 2 cards (risk + progress) -->
         <div class="io-body" id="riskBody" aria-label="Risk body" style="display:none;">
           <div class="io-bottom-grid io-bottom-grid-right">
             <div class="subcard">
@@ -212,6 +199,6 @@
   <script src="./assets/pdf.js" defer></script>
   <script src="./assets/raster-export.js" defer></script>
   <script src="./assets/redact-ui.js" defer></script>
-  <script src="./assets/app.js?v=20260221b" defer></script>
+  <script src="./assets/app.js?v=20260221a2" defer></script>
 </body>
 </html>
