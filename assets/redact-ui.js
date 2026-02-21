@@ -108,11 +108,38 @@
     ctx.strokeStyle = "rgba(255,255,255,.90)";
     ctx.fillStyle = "rgba(255,255,255,.14)";
 
-    for (const r of rects) {
+    for (const r of (rects || [])) {
       ctx.fillRect(r.x, r.y, r.w, r.h);
       ctx.strokeRect(r.x, r.y, r.w, r.h);
     }
     ctx.restore();
+  }
+
+  // ✅ Normalize pages from multiple return shapes
+  function normalizePages(rendered) {
+    let pages =
+      Array.isArray(rendered) ? rendered :
+      (rendered && Array.isArray(rendered.pages)) ? rendered.pages :
+      [];
+
+    // sanitize minimal shape (pageNumber/canvas/width/height)
+    const out = [];
+    for (let i = 0; i < pages.length; i++) {
+      const p = pages[i];
+      if (!p || !p.canvas) continue;
+
+      const pn = Number(p.pageNumber || (i + 1));
+      const w = Number(p.width || (p.canvas ? p.canvas.width : 0));
+      const h = Number(p.height || (p.canvas ? p.canvas.height : 0));
+
+      out.push({
+        pageNumber: pn > 0 ? pn : (i + 1),
+        canvas: p.canvas,
+        width: w || (p.canvas ? p.canvas.width : 1),
+        height: h || (p.canvas ? p.canvas.height : 1)
+      });
+    }
+    return out;
   }
 
   async function start(opts) {
@@ -134,21 +161,37 @@
     const L = langText(lang);
 
     let pages = [];
-    if (fileKind === "image") {
-      pages = await window.RasterExport.renderImageToCanvas(file, DPI);
-    } else {
-      const rendered = await window.RasterExport.renderPdfToCanvases(file, DPI);
-      pages = rendered.pages;
+    try {
+      if (fileKind === "image") {
+        const rendered = await window.RasterExport.renderImageToCanvas(file, DPI);
+        pages = normalizePages(rendered);
+      } else {
+        const rendered = await window.RasterExport.renderPdfToCanvases(file, DPI);
+        pages = normalizePages(rendered);
+      }
+    } catch (e) {
+      try { ui.remove(); } catch (_) {}
+      throw e;
+    }
+
+    if (!pages.length) {
+      try { ui.remove(); } catch (_) {}
+      return null;
     }
 
     const rectsByPage = {};
-    pages.forEach(p => { rectsByPage[p.pageNumber] = rectsByPage[p.pageNumber] || []; });
+    pages.forEach(p => {
+      const pn = p.pageNumber || 1;
+      rectsByPage[pn] = rectsByPage[pn] || [];
+    });
 
     let idx = 0;
     const overlayCanvas = document.createElement("canvas");
 
     function updatePageUI() {
       const p = pages[idx];
+      if (!p || !p.canvas) return;
+
       const rects = rectsByPage[p.pageNumber] || [];
       drawPreview(p.canvas, overlayCanvas, rects);
 
@@ -199,6 +242,8 @@
       const h = Math.abs(p.y - sy);
 
       const page = pages[idx];
+      if (!page) return;
+
       const rects = rectsByPage[page.pageNumber] || [];
       const tmp = rects.concat([{ x, y, w, h }]);
       drawPreview(page.canvas, overlayCanvas, tmp);
@@ -225,6 +270,8 @@
       if (w < 6 || h < 6) { updatePageUI(); return; }
 
       const page = pages[idx];
+      if (!page) return;
+
       rectsByPage[page.pageNumber].push({
         x: Math.round(x),
         y: Math.round(y),
@@ -249,6 +296,7 @@
 
     btnClearPage.onclick = () => {
       const page = pages[idx];
+      if (!page) return;
       rectsByPage[page.pageNumber] = [];
       updatePageUI();
     };
@@ -277,8 +325,8 @@
         pages: pages.map(p => ({
           pageNumber: p.pageNumber,
           canvas: p.canvas,
-          width: p.width,
-          height: p.height
+          width: p.width || (p.canvas ? p.canvas.width : 1),
+          height: p.height || (p.canvas ? p.canvas.height : 1)
         })),
         rectsByPage,
         lang,
