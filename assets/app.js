@@ -1,14 +1,16 @@
 // =========================
 // assets/app.js (FULL)
-// ✅ Personal build (2026-02-19d2 + panes/progressfix)
+// ✅ Personal build (2026-02-21a1)
 // This revision:
-// - Mode A/B switches manual panes (terms vs visual redaction)
-// - i18n: manual redaction pane title/note/button
-// - FIX (mobile): if no exportStatus slot, inject progressBox (do NOT overwrite riskBox)
+// - ✅ Upload split: pdfFile (PDF only) + imgFile (image/*)
+// - ✅ Rail text switches by Mode A/B (Mode A no longer shows Mode B text)
+// - ✅ Mode B export uses SAME top "红删PDF" button (no extra export button)
+// - ✅ RedactUI no longer exports; it stores selection; main button exports
+// - FIX (mobile): progress injected if no exportStatus slot
 // - Keep: expand after file upload; collapse on Clear; height sync via ResizeObserver
 // =========================
 
-console.log("[APP] loaded v20260219d2-progress-only-syncheight-ro+panesfix");
+console.log("[APP] loaded v20260221a1-unified-export+rail-split+upload-split");
 
 let currentLang = "zh";
 window.currentLang = currentLang;
@@ -27,6 +29,10 @@ let lastFileKind = "";             // "pdf" | "image" | ""
 let lastProbe = null;              // { hasTextLayer, text }
 let lastPdfOriginalText = "";      // extracted text for readable PDF
 let lastStage3Mode = "none";       // "A" | "B" | "none"
+
+// ✅ store manual redaction session/result for Mode B export via main button
+let __manualRedactSession = null;  // session object returned by RedactUI.start
+let __manualRedactResult = null;   // last saved rectangles/pages
 
 // ================= Manual terms (NO auto NER) =================
 let manualTerms = []; // array of strings (user-provided)
@@ -91,7 +97,6 @@ function getRulesSafe() {
 }
 
 /* ================= ENABLED KEYS FOR EXPORT ================= */
-// Personal: keep strategy simple. We DO NOT force person_name.
 function effectiveEnabledKeys() {
   const MUST_INCLUDE = ["company"]; // optional; remove if you want pure personal
   const base = new Set(Array.from(enabled || []));
@@ -403,7 +408,6 @@ function computeRiskReport(hitsByKey, meta) {
     score += w * capped;
   }
 
-  // money fixed M1
   score += 10;
 
   if (meta.inputLen >= 1500) score += 6;
@@ -476,9 +480,9 @@ function renderRiskBox(report, meta) {
 /* ================= Stage 3 UI texts (fallback-safe) ================= */
 function stage3Text(key){
   const map = {
-    zh: { btnExportText: "导出文本", btnExportPdf: "红删PDF", btnManual: "人工处理" },
-    de: { btnExportText: "Text", btnExportPdf: "PDF", btnManual: "Manuell" },
-    en: { btnExportText: "Text", btnExportPdf: "PDF", btnManual: "Manual" }
+    zh: { btnExportPdf: "红删PDF", btnManual: "手工涂抹" },
+    de: { btnExportPdf: "PDF", btnManual: "Manuell" },
+    en: { btnExportPdf: "PDF", btnManual: "Manual" }
   };
   const m = map[currentLang] || map.zh;
   return m[key] || "";
@@ -486,20 +490,16 @@ function stage3Text(key){
 
 function setStage3Ui(mode){
   lastStage3Mode = mode || "none";
-  const btnText = $("btnExportText");
   const btnPdf  = $("btnExportRasterPdf");
   const btnMan  = $("btnManualRedact");
 
-  show(btnText, lastStage3Mode === "A");
-  show(btnPdf,  lastStage3Mode === "A");
-  show(btnMan,  lastStage3Mode === "B");
+  // ✅ unified: show same export button for BOTH A and B (once file exists)
+  show(btnPdf, lastStage3Mode === "A" || lastStage3Mode === "B");
+  show(btnMan, lastStage3Mode === "B");
 
   const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : null;
 
-  if (btnText) btnText.textContent = stage3Text("btnExportText");
   if (btnPdf)  btnPdf.textContent  = (t && t.btnRedactPdf) ? t.btnRedactPdf : stage3Text("btnExportPdf");
-
-  // ✅ Mode B button label from i18n
   if (btnMan)  btnMan.textContent  = (t && t.btnManualRedact) ? t.btnManualRedact : stage3Text("btnManual");
 }
 
@@ -512,8 +512,6 @@ function setManualPanesForMode(mode){
   if (mode === "A") {
     show(paneA, true);
     show(paneB, false);
-
-    // term input enabled
     if (termInput) termInput.disabled = false;
     return;
   }
@@ -521,16 +519,26 @@ function setManualPanesForMode(mode){
   if (mode === "B") {
     show(paneA, false);
     show(paneB, true);
-
-    // term input disabled (avoid confusion; also improves perf)
     if (termInput) termInput.disabled = true;
     return;
   }
 
-  // none
   show(paneA, true);
   show(paneB, false);
   if (termInput) termInput.disabled = false;
+}
+
+/* ================= Rail note: switch by stage mode ================= */
+function setManualRailTextByMode(){
+  const t = window.I18N && window.I18N[currentLang];
+  const note = $("ui-manual-rail-note");
+  if (!note || !t) return;
+
+  if (lastStage3Mode === "B") {
+    note.textContent = t.manualRailTextB || t.manualRailText || "";
+  } else {
+    note.textContent = t.manualRailTextA || t.manualRailText || "";
+  }
 }
 
 /* ================= Unified control toggles (button + body) ================= */
@@ -591,42 +599,31 @@ function expandManualArea(){
   const btn = $("btnToggleManual");
   const body = $("manualBody");
   if (btn && body) { setCtlExpanded(btn, body, true); return; }
-  const md = $("manualDetails");
-  if (md && "open" in md) md.open = true;
 }
 function expandRiskArea(){
   const btn = $("btnToggleRisk");
   const body = $("riskBody");
   if (btn && body) { setCtlExpanded(btn, body, true); return; }
-  const rd = $("riskDetails");
-  if (rd && "open" in rd) rd.open = true;
 }
 function collapseManualArea(){
   const btn = $("btnToggleManual");
   const body = $("manualBody");
   if (btn && body) { setCtlExpanded(btn, body, false); return; }
-  const md = $("manualDetails");
-  if (md && "open" in md) md.open = false;
 }
 function collapseRiskArea(){
   const btn = $("btnToggleRisk");
   const body = $("riskBody");
   if (btn && body) { setCtlExpanded(btn, body, false); return; }
-  const rd = $("riskDetails");
-  if (rd && "open" in rd) rd.open = false;
 }
 
 /* ================= Progress area (prefer HTML slot #exportStatus) ================= */
 function ensureProgressBox(){
-  // ✅ Prefer index.html slot
   const slot = $("exportStatus");
   if (slot) return slot;
 
-  // reuse injected
   const existing = $("progressBox");
   if (existing) return existing;
 
-  // ✅ Mobile fix: inject a progress box WITHOUT overwriting riskBox
   const riskBox = $("riskBox");
   if (riskBox && riskBox.parentElement) {
     const box = document.createElement("div");
@@ -641,7 +638,6 @@ function ensureProgressBox(){
     return box;
   }
 
-  // last fallback
   return null;
 }
 
@@ -681,53 +677,34 @@ function setText() {
   if ($("ui-input-watermark")) $("ui-input-watermark").textContent = t.inputWatermark;
 
   if ($("ui-upload-btn")) $("ui-upload-btn").textContent = t.btnUpload;
+  if ($("ui-upload-img-btn")) $("ui-upload-img-btn").textContent = t.btnUploadImg || "图片";
 
   // Mobile tabs
   if ($("ui-tab-in")) $("ui-tab-in").textContent = t.tabIn || "";
   if ($("ui-tab-out")) $("ui-tab-out").textContent = t.tabOut || "";
 
-  // control titles (button spans)
   const spMan = document.getElementById("ui-manual-toggle-title");
   const spRisk = document.getElementById("ui-risk-toggle-title");
 
   if (spMan) spMan.textContent = t.manualTitle || "手工处理";
-  else if ($("btnToggleManual")) $("btnToggleManual").textContent = t.manualTitle || "手工处理"; // fallback
-
   if (spRisk) spRisk.textContent = t.riskTitle || "风险评分";
-  else if ($("btnToggleRisk")) $("btnToggleRisk").textContent = t.riskTitle || "风险评分"; // fallback
 
-  // rail titles + note (i18n)
   const railManTitle = document.getElementById("ui-manual-rail-title");
   if (railManTitle) railManTitle.textContent = t.manualRailTitle || "";
 
-  const railManNote = document.getElementById("ui-manual-rail-note");
-  if (railManNote) railManNote.textContent = t.manualRailText || "";
+  // ✅ rail text switches by mode
+  setManualRailTextByMode();
 
-  // ✅ Progress title (desktop)
   const exportTitle = document.getElementById("ui-export-title");
   if (exportTitle) exportTitle.textContent = t.exportTitle || exportTitleFallback();
 
-  // Manual terms placeholder
   if ($("manualTerms")) $("manualTerms").placeholder = t.manualPlaceholder || "例如：张三, 李四, Bei.de Tech GmbH";
 
-  // ✅ Mode B pane texts
   const mrTitle = $("ui-manual-redact-title");
-  if (mrTitle) mrTitle.textContent = t.manualRedactTitle || (currentLang === "de" ? "Manuell" : currentLang === "en" ? "Manual" : "人工处理");
+  if (mrTitle) mrTitle.textContent = t.manualRedactTitle || "手工涂抹";
 
   const mrNote = $("ui-manual-redact-note");
   if (mrNote) mrNote.textContent = t.manualRedactNote || "";
-
-  // Money UI removed
-  if ($("ui-money-label")) $("ui-money-label").textContent = "";
-  const sel = $("moneyMode");
-  if (sel) sel.style.display = "none";
-
-  // Legacy "Filter" button removed
-  const btnGenerate = $("btnGenerate");
-  if (btnGenerate) {
-    btnGenerate.textContent = "";
-    btnGenerate.style.display = "none";
-  }
 
   if ($("btnCopy")) $("btnCopy").textContent = t.btnCopy;
   if ($("btnClear")) $("btnClear").textContent = t.btnClear;
@@ -771,7 +748,6 @@ function applyRules(text) {
   const enabledKeysArr = effectiveEnabledKeys();
   const enabledSet = new Set(enabledKeysArr);
 
-  // meta
   lastRunMeta.inputLen = (String(text || "")).length;
   lastRunMeta.enabledCount = enabledSet.size;
   lastRunMeta.moneyMode = "m1";
@@ -810,7 +786,6 @@ function applyRules(text) {
       manualTerms: manualTerms.slice(0)
     };
 
-    // ✅ Expand AFTER render (avoid blank flash) + sync heights
     requestAnimationFrame(() => {
       if (lastUploadedFile) {
         expandRiskArea();
@@ -823,10 +798,8 @@ function applyRules(text) {
     return out;
   }
 
-  // 1) manual terms first
   out = applyManualTermsMask(out, addHit);
 
-  // 2) built-in rules
   for (const key of PRIORITY) {
     if (key !== "money" && !enabledSet.has(key)) continue;
 
@@ -891,7 +864,6 @@ function applyRules(text) {
     manualTerms: manualTerms.slice(0)
   };
 
-  // ✅ Expand AFTER render (avoid blank flash) + sync heights
   requestAnimationFrame(() => {
     if (lastUploadedFile) {
       expandRiskArea();
@@ -908,20 +880,26 @@ function applyRules(text) {
 async function handleFile(file) {
   if (!file) return;
 
-  // ✅ IMPORTANT: DO NOT expand here (prevents blank flash on right)
-
   lastUploadedFile = file;
   lastProbe = null;
   lastPdfOriginalText = "";
   lastFileKind = (file.type === "application/pdf") ? "pdf" : (file.type && file.type.startsWith("image/") ? "image" : "");
 
+  // reset manual selection when new file comes in
+  __manualRedactSession = null;
+  __manualRedactResult = null;
+  try { window.__manual_redact_last = null; } catch (_) {}
+
   setStage3Ui("none");
+  setManualRailTextByMode();
 
   // Image => Mode B
   if (lastFileKind === "image") {
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
     setManualPanesForMode("B");
+    setManualRailTextByMode();
+
     requestAnimationFrame(() => {
       expandManualArea();
       expandRiskArea();
@@ -934,10 +912,10 @@ async function handleFile(file) {
 
   try {
     if (!window.probePdfTextLayer) {
-      console.error("[handleFile] probePdfTextLayer missing");
       lastRunMeta.fromPdf = false;
       setStage3Ui("B");
       setManualPanesForMode("B");
+      setManualRailTextByMode();
       requestAnimationFrame(() => {
         expandManualArea();
         expandRiskArea();
@@ -954,6 +932,7 @@ async function handleFile(file) {
       lastRunMeta.fromPdf = false;
       setStage3Ui("B");
       setManualPanesForMode("B");
+      setManualRailTextByMode();
       requestAnimationFrame(() => {
         expandManualArea();
         expandRiskArea();
@@ -966,6 +945,7 @@ async function handleFile(file) {
     lastRunMeta.fromPdf = true;
     setStage3Ui("A");
     setManualPanesForMode("A");
+    setManualRailTextByMode();
 
     const text = String(probe.text || "").trim();
     lastPdfOriginalText = text;
@@ -987,16 +967,15 @@ async function handleFile(file) {
 
     updateInputWatermarkVisibility();
 
-    // applyRules() will render riskBox then expand + sync in rAF
     applyRules(text);
     renderInputOverlayForPdf(text);
 
     window.dispatchEvent(new Event("safe:updated"));
   } catch (e) {
-    console.error("[handleFile] ERROR:", e);
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
     setManualPanesForMode("B");
+    setManualRailTextByMode();
     requestAnimationFrame(() => {
       expandManualArea();
       expandRiskArea();
@@ -1007,15 +986,26 @@ async function handleFile(file) {
 
 function bindPdfUI() {
   const pdfInput = $("pdfFile");
-  if (!pdfInput) return;
+  if (pdfInput) {
+    pdfInput.addEventListener("change", (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (f && $("pdfName")) $("pdfName").textContent = f.name || "";
+      clearProgress();
+      handleFile(f);
+      e.target.value = "";
+    });
+  }
 
-  pdfInput.addEventListener("change", (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (f && $("pdfName")) $("pdfName").textContent = f.name || "";
-    clearProgress();
-    handleFile(f);
-    e.target.value = "";
-  });
+  const imgInput = $("imgFile");
+  if (imgInput) {
+    imgInput.addEventListener("change", (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (f && $("pdfName")) $("pdfName").textContent = f.name || "";
+      clearProgress();
+      handleFile(f);
+      e.target.value = "";
+    });
+  }
 }
 
 /* ================= bind ================= */
@@ -1080,17 +1070,9 @@ function bind() {
       requestAnimationFrame(syncManualToRiskHeight);
     });
 
-    // init
     setManualTermsFromText(termInput.value || "");
     if (!window.__export_snapshot) window.__export_snapshot = {};
     window.__export_snapshot.manualTerms = manualTerms.slice(0);
-  }
-
-  // Legacy btnGenerate: disable/hide safely
-  const btnGenerate = $("btnGenerate");
-  if (btnGenerate) {
-    btnGenerate.onclick = null;
-    btnGenerate.style.display = "none";
   }
 
   const btnClear = $("btnClear");
@@ -1107,7 +1089,6 @@ function bind() {
 
       lastRunMeta.fromPdf = false;
 
-      // ✅ collapse areas + clear progress
       collapseManualArea();
       collapseRiskArea();
       clearProgress();
@@ -1116,7 +1097,6 @@ function bind() {
       const rb = $("riskBox");
       if (rb) rb.innerHTML = "";
 
-      // ✅ remove injected progressBox (mobile)
       const pb = $("progressBox");
       if (pb) pb.remove();
 
@@ -1129,7 +1109,6 @@ function bind() {
       }
       if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
 
-      // reset manual terms
       manualTerms = [];
       const termInput2 = $("manualTerms") || $("nameList");
       if (termInput2) {
@@ -1143,6 +1122,10 @@ function bind() {
       lastPdfOriginalText = "";
       setStage3Ui("none");
       setManualPanesForMode("none");
+
+      __manualRedactSession = null;
+      __manualRedactResult = null;
+      try { window.__manual_redact_last = null; } catch (_) {}
 
       window.__export_snapshot = null;
 
@@ -1201,27 +1184,34 @@ function bind() {
     });
   }
 
-  const btnExportText = $("btnExportText");
-  if (btnExportText) {
-    btnExportText.onclick = () => {
-      const out = String(lastOutputPlain || "").trim();
-      if (!out) return;
+  // ✅ Manual redact button: open UI and keep session/result
+  const btnManual = $("btnManualRedact");
+  if (btnManual) {
+    btnManual.onclick = async () => {
+      const f = lastUploadedFile;
+      if (!f) return;
+      if (!window.RedactUI || !window.RedactUI.start) return;
 
-      const blob = new Blob([out], { type: "text/plain;charset=utf-8" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `safe_text_${Date.now()}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 500);
+      __manualRedactSession = await window.RedactUI.start({
+        file: f,
+        fileKind: lastFileKind,
+        lang: currentLang
+      });
+
+      // If UI saved a result in window.__manual_redact_last, keep it
+      try {
+        if (window.__manual_redact_last) __manualRedactResult = window.__manual_redact_last;
+      } catch (_) {}
+
+      // keep heights stable
+      requestAnimationFrame(syncManualToRiskHeight);
     };
   }
 
+  // ✅ Unified export button (A/B)
   const btnExportRasterPdf = $("btnExportRasterPdf");
   if (btnExportRasterPdf) {
     btnExportRasterPdf.onclick = async () => {
-      // show area + progress
       expandRiskArea();
       requestAnimationFrame(syncManualToRiskHeight);
 
@@ -1231,9 +1221,47 @@ function bind() {
         const f = lastUploadedFile;
 
         if (!f) { setProgressText(t.progressNoFile || "No file detected. Please upload a PDF first.", true); return; }
+
+        // -------- Mode B (manual redaction export) --------
+        if (lastStage3Mode === "B") {
+          // ensure we have a saved selection
+          let res = __manualRedactResult || null;
+
+          try {
+            if (!res && window.__manual_redact_last) res = window.__manual_redact_last;
+          } catch (_) {}
+
+          if (!res && __manualRedactSession && typeof __manualRedactSession.done === "function") {
+            res = await __manualRedactSession.done();
+          }
+
+          if (!res || !res.pages || !res.rectsByPage) {
+            setProgressText(t.progressNeedManualFirst || "Please mark areas first (Manual), close it, then click Redact PDF.", true);
+            return;
+          }
+
+          if (!window.RasterExport || !window.RasterExport.exportRasterSecurePdfFromVisual) {
+            setProgressText(t.progressExportMissing || "Export module not loaded", true);
+            return;
+          }
+
+          setProgressText([
+            (t.progressWorking || "Working…"),
+            `mode=B`,
+            `dpi=${res.dpi || 600}`
+          ], false);
+
+          await window.RasterExport.exportRasterSecurePdfFromVisual(res);
+
+          setProgressText(t.progressDone || "Done ✅ Download started.", false);
+          requestAnimationFrame(syncManualToRiskHeight);
+          return;
+        }
+
+        // -------- Mode A (readable PDF auto redact) --------
         if (lastFileKind !== "pdf") { setProgressText(t.progressNotPdf || "This is not a PDF file.", true); return; }
-        if (!lastProbe) { setProgressText(t.progressNotReadable || "PDF not readable (Mode B). Use Manual.", true); return; }
-        if (!lastProbe.hasTextLayer) { setProgressText(t.progressNotReadable || "PDF not readable (Mode B). Use Manual.", true); return; }
+        if (!lastProbe) { setProgressText(t.progressNotReadable || "PDF not readable (Mode B). Please mark areas first, then click Redact PDF.", true); return; }
+        if (!lastProbe.hasTextLayer) { setProgressText(t.progressNotReadable || "PDF not readable (Mode B). Please mark areas first, then click Redact PDF.", true); return; }
 
         if (!window.RasterExport || !window.RasterExport.exportRasterSecurePdfFromReadablePdf) {
           setProgressText(t.progressExportMissing || "Export module not loaded", true);
@@ -1247,6 +1275,7 @@ function bind() {
 
         setProgressText([
           (t.progressWorking || "Working…"),
+          `mode=A`,
           `lang=${lang}`,
           `moneyMode=M1`,
           `enabledKeys=${enabledKeys.length}`,
@@ -1271,21 +1300,6 @@ function bind() {
         setProgressText(`${t2.progressFailed || "Export failed:"}\n${msg}`, true);
         requestAnimationFrame(syncManualToRiskHeight);
       }
-    };
-  }
-
-  const btnManual = $("btnManualRedact");
-  if (btnManual) {
-    btnManual.onclick = async () => {
-      const f = lastUploadedFile;
-      if (!f) return;
-      if (!window.RedactUI || !window.RedactUI.start) return;
-
-      await window.RedactUI.start({
-        file: f,
-        fileKind: lastFileKind,
-        lang: currentLang
-      });
     };
   }
 
