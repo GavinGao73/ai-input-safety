@@ -47,6 +47,9 @@
       line-height:1;
       user-select:none;
     }
+
+    /* ✅ Mobile: hide redundant manual-redact title (we use note text instead) */
+    #ui-manual-redact-title{ display:none !important; }
   </style>
 </head>
 
@@ -134,17 +137,16 @@
 
             <!-- Pane B: manual visual redaction (Mode B only) -->
             <div class="subcard manual-pane" id="manualRedactPane" style="display:none;">
-              <div class="manual-redact-title" id="ui-manual-redact-title">手工涂抹</div>
-              <div class="manual-redact-note" id="ui-manual-redact-note">点击下方按钮进入框选。</div>
+              <!-- ✅ keep id for i18n/app.js, but hidden via CSS (mobile) -->
+              <div class="manual-redact-title" id="ui-manual-redact-title"></div>
+
+              <!-- ✅ Replace duplicate title with a clear instruction note -->
+              <div class="manual-redact-note" id="ui-manual-redact-note">
+                由于上传文件为图片或不可读的扫描版 PDF，需要手工框选需要遮盖的内容。具体操作请查看右侧「使用说明」。
+              </div>
 
               <div class="manual-redact-actions">
                 <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
-              </div>
-
-              <div class="links" style="margin-top:auto; flex-wrap:wrap;">
-                <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
-                <a id="linkPrivacy" href="./PRIVACY.md" target="_blank" rel="noopener"></a>
-                <a id="linkScope" href="./docs/mvp-scope.md" target="_blank" rel="noopener"></a>
               </div>
             </div>
 
@@ -153,6 +155,7 @@
               <div class="rail-title" id="ui-manual-rail-title"></div>
               <div class="side-rail-note" id="ui-manual-rail-note"></div>
 
+              <!-- ✅ Links ONLY here (under "使用说明") -->
               <div class="links" style="margin-top:auto; flex-wrap:wrap;">
                 <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
                 <a id="linkPrivacy" href="./PRIVACY.md" target="_blank" rel="noopener"></a>
@@ -162,6 +165,8 @@
 
           </div>
         </div>
+      </section>
+      <!-- ✅ IMPORTANT: close INPUT PANEL properly -->
 
       <!-- ================= OUTPUT PANEL ================= -->
       <section class="card card-col right io-panel io-out" id="rightCard">
