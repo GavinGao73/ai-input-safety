@@ -1,10 +1,13 @@
 <!-- =========================
      index.html (FULL)
-     - Upload split: PDF first, image second (mobile-friendly)
-     - Right railcard becomes PURE progress card (ui-export-title + exportStatus)
-     - Titles i18n-ready (ui-manual-rail-title / ui-export-title)
-     - ✅ FIX (desktop Mode B visibility): “使用说明”不再被折叠隐藏（移出 manualBody，始终可见）
-     - ✅ UI tweak (Mode B): remove redundant title, add clearer instruction text + single button
+     ✅ Target behavior (2026-02-21b)
+     - Default: BOTH “手工处理” + “风险评分” collapsed
+     - After ANY upload (Mode A / Mode B / image): BOTH auto expand
+     - Desktop: expanded manualBody and riskBody are equal-height, side-by-side
+     - Mobile: allow stacking
+       * Mode B manual order: note → button → Mode B instructions (same fold)
+       * Mode A manual order: textarea → Mode A instructions (same fold)
+     - Links always last (outside fold)
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -57,11 +60,11 @@
 
         <div class="barcard barcard-top">
           <div class="filebar filebar-flat">
-            <!-- ✅ PDF only (prefer file picker) -->
+            <!-- ✅ PDF only -->
             <input id="pdfFile" type="file" accept="application/pdf" />
             <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn"></label>
 
-            <!-- ✅ Image picker (optional; shown as secondary, mobile-friendly) -->
+            <!-- ✅ Image picker (mobile-friendly) -->
             <input id="imgFile" type="file" accept="image/*" />
             <label class="btn secondary btn-s only-mobile" for="imgFile" id="ui-upload-img-btn"></label>
 
@@ -77,51 +80,61 @@
           </div>
         </div>
 
+        <!-- Manual fold toggle -->
         <div class="barcard ctlbar" aria-label="Manual toggle bar">
           <button class="ctlbtn" id="btnToggleManual" type="button" aria-expanded="false">
             <span id="ui-manual-toggle-title">手工处理</span>
           </button>
         </div>
 
-        <!-- ✅ FIX: “使用说明”移出折叠区域，桌面端即使未展开也能看见 -->
-        <div class="barcard" style="margin-top:10px;">
-          <div class="railcard" style="height:auto; min-height:0;">
-            <div class="rail-title" id="ui-manual-rail-title"></div>
-            <div class="side-rail-note" id="ui-manual-rail-note"></div>
-          </div>
-        </div>
-
+        <!-- ✅ Manual fold body: left pane + instructions rail (same fold)
+             Desktop: 2 columns (3fr/2fr)
+             Mobile: stacks in DOM order:
+               - left pane (Mode A textarea OR Mode B note+button)
+               - then instructions rail (Mode A or Mode B)
+             Links are outside fold and always last.
+        -->
         <div class="io-body" id="manualBody" aria-label="Manual body" style="display:none;">
           <div class="io-bottom-grid io-bottom-grid-left">
 
-            <!-- Pane A: manual terms (Mode A only) -->
-            <div class="subcard manual-pane" id="manualTermsPane">
-              <textarea
-                id="manualTerms"
-                class="manual-terms-textarea"
-                spellcheck="false"
-                autocomplete="off"
-                wrap="off"
-                placeholder="例如：张三, 李四, Bei.de Tech GmbH"
-              ></textarea>
-            </div>
+            <!-- LEFT pane (Mode A/B switch inside) -->
+            <div class="subcard manual-pane" id="manualPaneLeft">
 
-            <!-- Pane B: manual visual redaction (Mode B only) -->
-            <div class="subcard manual-pane" id="manualRedactPane" style="display:none;">
-              <!-- ✅ removed redundant title "手工涂抹" (already have "手工处理") -->
-              <div class="manual-redact-note" id="ui-manual-redact-note">
-                检测到上传内容为图片或不可读 PDF（无文本层）。请先进入手工框选，覆盖需要隐藏的信息；具体步骤见上方“使用说明”。
+              <!-- Mode A: manual terms -->
+              <div class="manual-pane" id="manualTermsPane">
+                <textarea
+                  id="manualTerms"
+                  class="manual-terms-textarea"
+                  spellcheck="false"
+                  autocomplete="off"
+                  wrap="off"
+                  placeholder="例如：张三, 李四, Bei.de Tech GmbH"
+                ></textarea>
               </div>
 
-              <div class="manual-redact-actions">
-                <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
+              <!-- Mode B: manual visual redaction -->
+              <div class="manual-pane" id="manualRedactPane" style="display:none;">
+                <div class="manual-redact-note" id="ui-manual-redact-note">
+                  检测到上传内容为图片或不可读 PDF（无文本层）。
+                  请先进入手工框选，覆盖需要隐藏的信息；详细步骤见「使用说明」。
+                </div>
+
+                <div class="manual-redact-actions">
+                  <button class="btn secondary btn-s btn-fixed" id="btnManualRedact" style="display:none;"></button>
+                </div>
               </div>
             </div>
 
-            <!-- ✅ removed: railcard moved outside manualBody -->
+            <!-- RIGHT rail: instructions (Mode A/B switch by i18n text) -->
+            <div class="railcard" id="manualRailCard">
+              <div class="rail-title" id="ui-manual-rail-title"></div>
+              <div class="side-rail-note" id="ui-manual-rail-note"></div>
+            </div>
+
           </div>
         </div>
 
+        <!-- Links (always last; outside fold) -->
         <div class="left-footer">
           <div class="links">
             <a id="linkLearn" href="./docs/extended-description.md" target="_blank" rel="noopener"></a>
@@ -155,7 +168,6 @@
 
         <div class="barcard barcard-top">
           <div class="top-actions">
-            <!-- ✅ Order: Copy → Redact PDF → Clear -->
             <button class="btn primary btn-s btn-mini" id="btnCopy"></button>
             <button class="btn primary btn-s btn-mini" id="btnExportRasterPdf" style="display:none;"></button>
             <button class="btn secondary btn-s btn-mini" id="btnClear"></button>
@@ -166,19 +178,20 @@
           <div class="output output-scroll" id="outputText"></div>
         </div>
 
+        <!-- Risk fold toggle -->
         <div class="barcard ctlbar" aria-label="Risk toggle bar">
           <button class="ctlbtn" id="btnToggleRisk" type="button" aria-expanded="false">
             <span id="ui-risk-toggle-title">风险评分</span>
           </button>
         </div>
 
+        <!-- Output fold body: fixed two cards (risk + progress) -->
         <div class="io-body" id="riskBody" aria-label="Risk body" style="display:none;">
           <div class="io-bottom-grid io-bottom-grid-right">
             <div class="subcard">
               <div class="risk" id="riskBox"></div>
             </div>
 
-            <!-- PURE progress railcard -->
             <div class="railcard railcard-progress-only">
               <div class="rail-title" id="ui-export-title"></div>
               <div class="tiny muted export-status" id="exportStatus" style="white-space:pre-wrap; line-height:1.6;"></div>
@@ -199,6 +212,6 @@
   <script src="./assets/pdf.js" defer></script>
   <script src="./assets/raster-export.js" defer></script>
   <script src="./assets/redact-ui.js" defer></script>
-  <script src="./assets/app.js?v=20260221a1" defer></script>
+  <script src="./assets/app.js?v=20260221b" defer></script>
 </body>
 </html>
