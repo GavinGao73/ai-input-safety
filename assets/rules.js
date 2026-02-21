@@ -51,8 +51,9 @@ const RULES_BY_KEY = {
         // ✅ core must contain at least one Han OR letter (blocks pure numbers / garbage)
         String.raw`((?=[\p{Script=Han}A-Za-z])[\p{Script=Han}A-Za-z0-9·&\-]{2,12})` +
         // tail: keep short, avoid swallowing whole sentences
-        String.raw`([\p{Script=Han}A-Za-z0-9（）()·&\-\s]{0,24}?)` +
-        String.raw`(股份有限公司|有限责任公司|有限公司|集团有限公司|集团|公司)` +
+        String.raw`([\p{Script=Han}A-Za-z0-9（）()·&\-\s]{0,40}?)` +
+        // ✅ prefer longer legal suffix first
+        String.raw`(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)` +
         String.raw`)` +
         String.raw`|` +
         // DE/EN company: name + legal form
@@ -142,16 +143,40 @@ const RULES_BY_KEY = {
     tag: "ADDRESS"
   },
 
+  // ✅ CN address (label-driven; partial masking handled in app.js)
+  address_cn: {
+    pattern:
+      /((?:办公地址|通信地址|联系地址|地址)\s*[:：]\s*)([^\n\r]{1,160})/giu,
+    tag: "ADDRESS",
+    mode: "address_cn_partial"
+  },
+
   /* ===================== HANDLE ===================== */
   handle: {
     pattern: /@[A-Za-z0-9_]{2,32}\b/g,
     tag: "HANDLE"
   },
 
+  // ✅ username / login / IM id (label-driven)
+  handle_label: {
+    pattern:
+      /((?:用户名|用\s*户\s*名|登录账号|登\s*录\s*账\s*号|账号名|账\s*号\s*名|账户名|帐户名|支付账号|支付账户|微信号|WeChat\s*ID|wxid)\s*[:：]\s*)([A-Za-z0-9_@.\-]{3,80})/giu,
+    tag: "HANDLE",
+    mode: "prefix"
+  },
+
   /* ===================== REF ===================== */
   ref: {
     pattern: /\b[A-Z]{2,6}-?\d{5,14}\b/g,
     tag: "REF"
+  },
+
+  // ✅ CN business refs (label-driven)
+  ref_label: {
+    pattern:
+      /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号)\s*[:：]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,80})/giu,
+    tag: "REF",
+    mode: "prefix"
   },
 
   /* ===================== TITLE ===================== */
