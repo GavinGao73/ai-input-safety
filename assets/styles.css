@@ -6,7 +6,7 @@
    - Expanded: left manual area height follows right risk area; manual textarea scrolls inside
    - Keep left textarea & right output EXACT same sizing
    - Railcard: progress-only (feedback removed)
-   - Mobile: IO tabs have distinct style (NOT same as main buttons)
+   - Mobile: IO tabs use TRUE segmented control (connected)
    - ✅ FIX: remove bottom shadow/overlay that covered content when expanded
    - ✅ Mobile: show "图片" upload button only on small screens (optional)
    - ✅ FIX (2026-02-21a2): robust inner fill for equal-height lock (A/B)
@@ -640,34 +640,69 @@ textarea{
     .wrap-mobile{ min-height: 100vh; }
   }
 
+  /* =========================
+     Mobile segmented tabs (Input / Output)
+     - 连体切换按钮（segmented control）
+     - 不改 HTML 结构，只改样式
+     ========================= */
+
   .io-tabs{
     display:flex;
-    gap:10px;
+    gap:0;                 /* ✅ 连体：去掉间距 */
     margin: 8px 0 10px;
     flex: 0 0 auto;
+
+    border:1px solid rgba(255,255,255,.16);
+    background: rgba(255,255,255,.03);
+    border-radius: 999px;
+    padding: 3px;          /* 外壳内边距，形成“槽” */
+    overflow:hidden;
   }
+
   .io-tabs label{
     flex:1 1 0;
-    min-height:38px;
+    min-height:36px;
+    margin:0;
+    border:0;              /* ✅ 子按钮不要外框 */
+    border-radius: 999px;  /* ✅ 选中态内部胶囊 */
+    background: transparent;
+    color: rgba(255,255,255,.70);
+
     display:flex;
     align-items:center;
     justify-content:center;
 
-    border:1px solid rgba(255,255,255,.14);
-    background: rgba(255,255,255,.04);
-    color: rgba(255,255,255,.82);
-    border-radius:999px;
     font-weight:900;
     font-size:12px;
     cursor:pointer;
     user-select:none;
+    position:relative;
   }
+
+  /* 中间分割线（只在左段右侧画一条） */
+  .io-tabs label[for="tab-in"]::after{
+    content:"";
+    position:absolute;
+    right:-1px;
+    top:8px;
+    bottom:8px;
+    width:1px;
+    background: rgba(255,255,255,.10);
+    opacity:.9;
+  }
+
+  /* 选中态（高亮段） */
   #tab-in:checked ~ .io-tabs label[for="tab-in"],
   #tab-out:checked ~ .io-tabs label[for="tab-out"]{
-    background: rgba(43,144,255,.18);
-    border-color: rgba(43,144,255,.35);
+    background: rgba(43,144,255,.22);
     color: rgba(255,255,255,.92);
+    box-shadow: 0 6px 14px rgba(0,0,0,.25) inset,
+                0 8px 18px rgba(0,0,0,.20);
   }
+
+  /* 选中时隐藏中线（避免压在高亮上） */
+  #tab-in:checked ~ .io-tabs label[for="tab-in"]::after{ opacity:0; }
+  #tab-out:checked ~ .io-tabs label[for="tab-in"]::after{ opacity:.9; }
 
   .grid-mobile-one{
     flex: 1 1 auto;
@@ -811,70 +846,4 @@ textarea{
   margin-top:12px;
   display:flex;
   justify-content:center;
-}
-
-/* =========================
-   Mobile segmented tabs (Input / Output)
-   - 连体切换按钮（segmented control）
-   - 不改 HTML 结构，只改样式
-   ========================= */
-
-@media (max-width: 560px){
-  .io-tabs{
-    display:flex;
-    gap:0;                 /* ✅ 连体：去掉间距 */
-    margin: 8px 0 10px;
-    flex: 0 0 auto;
-
-    border:1px solid rgba(255,255,255,.16);
-    background: rgba(255,255,255,.03);
-    border-radius: 999px;
-    padding: 3px;          /* 外壳内边距，形成“槽” */
-    overflow:hidden;
-  }
-
-  .io-tabs label{
-    flex:1 1 0;
-    min-height:36px;
-    margin:0;
-    border:0;              /* ✅ 子按钮不要外框 */
-    border-radius: 999px;  /* ✅ 选中态内部胶囊 */
-    background: transparent;
-    color: rgba(255,255,255,.70);
-
-    display:flex;
-    align-items:center;
-    justify-content:center;
-
-    font-weight:900;
-    font-size:12px;
-    cursor:pointer;
-    user-select:none;
-    position:relative;
-  }
-
-  /* 中间分割线（只在左段右侧画一条） */
-  .io-tabs label[for="tab-in"]::after{
-    content:"";
-    position:absolute;
-    right:-1px;
-    top:8px;
-    bottom:8px;
-    width:1px;
-    background: rgba(255,255,255,.10);
-    opacity:.9;
-  }
-
-  /* 选中态（高亮段） */
-  #tab-in:checked ~ .io-tabs label[for="tab-in"],
-  #tab-out:checked ~ .io-tabs label[for="tab-out"]{
-    background: rgba(43,144,255,.22);
-    color: rgba(255,255,255,.92);
-    box-shadow: 0 6px 14px rgba(0,0,0,.25) inset,
-                0 8px 18px rgba(0,0,0,.20);
-  }
-
-  /* 选中时隐藏中线（避免压在高亮上） */
-  #tab-in:checked ~ .io-tabs label[for="tab-in"]::after{ opacity:0; }
-  #tab-out:checked ~ .io-tabs label[for="tab-in"]::after{ opacity:.9; }
 }
