@@ -1,17 +1,17 @@
 // =========================
 // assets/app.js (FULL)
-// ✅ Personal build (2026-02-21b)
-// FIXED per your spec:
-// - Default: manual + risk collapsed
-// - After ANY upload (Mode A/B/image): BOTH auto expand (desktop + mobile)
-// - Desktop: manualBody height == riskBody height (A/B both)
-// - Mobile: allow stacking; DOM order guarantees:
-//   Mode A: textarea -> instructions -> links
-//   Mode B: note -> button -> instructions -> links
-// - Output side always: Risk card + Progress card (same layout)
+// ✅ Personal build (2026-02-21a2)
+// Fixes per your latest requirement:
+// - Default collapsed (Manual + Risk)
+// - After ANY upload (Mode A or Mode B): auto expand BOTH manual + risk
+// - Desktop Mode B: ensure enough expanded height so Manual content is visible
+// - Desktop: keep left/right fold areas equal-height (manualBody == riskBody)
+// - Manual fold structure (Mode A/B) matches index.html grid:
+//   left pane (terms or note+button) + right rail (mode text)
+// - Mobile is handled by m.html (do not change here)
 // =========================
 
-console.log("[APP] loaded v20260221b-autoexpand-both+heightlock-AB+manual-rail-in-fold");
+console.log("[APP] loaded v20260221a2-autoexpand+desktop-minheight+equalheight");
 
 let currentLang = "zh";
 window.currentLang = currentLang;
@@ -19,34 +19,33 @@ window.currentLang = currentLang;
 const enabled = new Set();
 
 // ✅ Money protection always ON (M1). No UI selector.
-let moneyMode = "m1"; // fixed: "m1"
+let moneyMode = "m1";
 window.__safe_moneyMode = moneyMode;
 
 let lastOutputPlain = "";
 
-// ================= Stage 3 state (minimal glue) =================
+// ================= Stage 3 state =================
 let lastUploadedFile = null;       // File object (pdf or image)
 let lastFileKind = "";             // "pdf" | "image" | ""
 let lastProbe = null;              // { hasTextLayer, text }
 let lastPdfOriginalText = "";      // extracted text for readable PDF
 let lastStage3Mode = "none";       // "A" | "B" | "none"
 
-// ✅ store manual redaction session/result for Mode B export via main button
-let __manualRedactSession = null;  // session object returned by RedactUI.start
-let __manualRedactResult = null;   // last saved rectangles/pages
+// store manual redaction session/result (Mode B export via main button)
+let __manualRedactSession = null;
+let __manualRedactResult = null;
 
-// ================= Manual terms (NO auto NER) =================
-let manualTerms = []; // array of strings (user-provided)
+// ================= Manual terms =================
+let manualTerms = [];
 
 function normalizeTerm(s){
   return String(s || "").trim();
 }
 
 /**
- * 输入规则（不做“必须人名”的限制）：
- * - 支持逗号/中文逗号/分号/顿号/换行作为分隔
- * - 自动去重（不区分大小写）
- * - 最大 24 个（防止本地正则性能问题）
+ * - split by comma/newline/;、 etc
+ * - dedup case-insensitive
+ * - cap 24
  */
 function setManualTermsFromText(raw){
   const s = String(raw || "");
@@ -71,7 +70,6 @@ function show(el, yes){
   el.style.display = yes ? "" : "none";
 }
 
-/* ================= Screen helper ================= */
 function isSmallScreen(){
   try {
     return !!(window.matchMedia && window.matchMedia("(max-width: 560px)").matches);
@@ -80,7 +78,7 @@ function isSmallScreen(){
   }
 }
 
-// --- Risk scoring meta (local only) ---
+// --- Risk scoring meta ---
 let lastRunMeta = {
   fromPdf: false,
   inputLen: 0,
@@ -100,21 +98,21 @@ function escapeHTML(s){
     .replaceAll("'", "&#039;");
 }
 
-/* ================= RULES SAFE ACCESS (CRITICAL) ================= */
+// ================= RULES SAFE ACCESS =================
 function getRulesSafe() {
   const r = window.RULES_BY_KEY;
   return (r && typeof r === "object") ? r : null;
 }
 
-/* ================= ENABLED KEYS FOR EXPORT ================= */
+// ================= ENABLED KEYS FOR EXPORT =================
 function effectiveEnabledKeys() {
-  const MUST_INCLUDE = ["company"]; // optional; remove if you want pure personal
+  const MUST_INCLUDE = ["company"]; // keep as-is (your build choice)
   const base = new Set(Array.from(enabled || []));
   for (const k of MUST_INCLUDE) base.add(k);
   return Array.from(base);
 }
 
-/* ================= placeholders ================= */
+// ================= placeholders =================
 function placeholder(key) {
   const map = {
     zh: {
@@ -160,7 +158,7 @@ function placeholder(key) {
   return (map[currentLang] && map[currentLang][key]) || `[${key}]`;
 }
 
-/* ================= output render (highlight placeholders) ================= */
+// ================= output render =================
 function renderOutput(outPlain){
   lastOutputPlain = String(outPlain || "");
   const host = $("outputText");
@@ -172,7 +170,7 @@ function renderOutput(outPlain){
   host.innerHTML = html;
 }
 
-/* ================= input watermark hide ================= */
+// ================= input watermark hide =================
 function updateInputWatermarkVisibility(){
   const ta = $("inputText");
   const wrap = $("inputWrap");
@@ -181,7 +179,7 @@ function updateInputWatermarkVisibility(){
   wrap.classList.toggle("has-content", has);
 }
 
-/* ================= Manual terms masking ================= */
+// ================= Manual terms masking =================
 function escapeRegExp(s){
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -219,7 +217,7 @@ function applyManualTermsMask(out, addHit){
   return s;
 }
 
-/* ================= PDF input overlay highlight (only for PDF) ================= */
+// ================= PDF overlay highlight =================
 function renderInputOverlayForPdf(originalText){
   const overlay = $("inputOverlay");
   const ta = $("inputText");
@@ -296,7 +294,7 @@ function markHitsInOriginal(text){
     .replaceAll(S2, `</span>`);
 }
 
-/* ================= init enabled ================= */
+// ================= init enabled =================
 function initEnabled() {
   enabled.clear();
   Object.values(window.DETECTION_ITEMS || {}).flat().forEach(i => {
@@ -304,7 +302,7 @@ function initEnabled() {
   });
 }
 
-/* ================= Risk scoring ================= */
+// ================= Risk scoring =================
 const RISK_WEIGHTS = {
   bank: 28,
   account: 26,
@@ -487,12 +485,12 @@ function renderRiskBox(report, meta) {
   `;
 }
 
-/* ================= Stage 3 UI texts (fallback-safe) ================= */
+// ================= Stage 3 UI texts =================
 function stage3Text(key){
   const map = {
     zh: { btnExportPdf: "红删PDF", btnManual: "手工涂抹" },
-    de: { btnExportPdf: "PDF schwärzen", btnManual: "Bereiche markieren" },
-    en: { btnExportPdf: "Redact PDF", btnManual: "Mark areas" }
+    de: { btnExportPdf: "PDF", btnManual: "Manuell" },
+    en: { btnExportPdf: "PDF", btnManual: "Manual" }
   };
   const m = map[currentLang] || map.zh;
   return m[key] || "";
@@ -503,20 +501,19 @@ function setStage3Ui(mode){
   const btnPdf  = $("btnExportRasterPdf");
   const btnMan  = $("btnManualRedact");
 
-  // ✅ unified: show same export button for BOTH A and B (once file exists)
   show(btnPdf, lastStage3Mode === "A" || lastStage3Mode === "B");
   show(btnMan, lastStage3Mode === "B");
 
   const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : null;
 
-  if (btnPdf)  btnPdf.textContent  = (t && t.btnRedactPdf) ? t.btnRedactPdf : stage3Text("btnExportPdf");
-  if (btnMan)  btnMan.textContent  = (t && t.btnManualRedact) ? t.btnManualRedact : stage3Text("btnManual");
+  if (btnPdf) btnPdf.textContent = (t && t.btnRedactPdf) ? t.btnRedactPdf : stage3Text("btnExportPdf");
+  if (btnMan) btnMan.textContent = (t && t.btnManualRedact) ? t.btnManualRedact : stage3Text("btnManual");
 
   if (btnPdf && !String(btnPdf.textContent || "").trim()) btnPdf.textContent = stage3Text("btnExportPdf");
   if (btnMan && !String(btnMan.textContent || "").trim()) btnMan.textContent = stage3Text("btnManual");
 }
 
-/* ================= Manual panes switch (Mode A/B) ================= */
+// ================= Manual panes switch (Mode A/B) =================
 function setManualPanesForMode(mode){
   const paneA = $("manualTermsPane");
   const paneB = $("manualRedactPane");
@@ -541,11 +538,15 @@ function setManualPanesForMode(mode){
   if (termInput) termInput.disabled = false;
 }
 
-/* ================= Rail note: switch by stage mode ================= */
+// ================= Rail note: switch by mode =================
 function setManualRailTextByMode(){
   const t = window.I18N && window.I18N[currentLang];
   const note = $("ui-manual-rail-note");
-  if (!note || !t) return;
+  const title = $("ui-manual-rail-title");
+  if (!t) return;
+  if (title) title.textContent = t.manualRailTitle || "";
+
+  if (!note) return;
 
   if (lastStage3Mode === "B") {
     note.textContent = t.manualRailTextB || t.manualRailText || "";
@@ -554,7 +555,7 @@ function setManualRailTextByMode(){
   }
 }
 
-/* ================= Unified control toggles (button + body) ================= */
+// ================= Unified control toggles =================
 function setCtlExpanded(btn, body, expanded){
   if (btn) btn.setAttribute("aria-expanded", expanded ? "true" : "false");
   if (body) {
@@ -567,39 +568,54 @@ function toggleCtl(btn, body){
   setCtlExpanded(btn, body, !cur);
 }
 
-/* ================= Height sync: manual follows risk (A + B on desktop) ================= */
-function syncManualToRiskHeight(){
-  // ✅ Mobile stacks: no height lock
-  if (isSmallScreen()) {
-    resetManualHeightLock();
-    return;
-  }
+// ================= Desktop equal-height + minimum expanded height =================
+const DESKTOP_MIN_OPEN_H = 260;
 
+function clearBodyHeights(){
+  const manualBody = $("manualBody");
   const riskBody = $("riskBody");
-  const manualBody = $("manualBody");
-  if (!riskBody || !manualBody) return;
+  if (manualBody) {
+    manualBody.style.height = "";
+    manualBody.style.maxHeight = "";
+    manualBody.style.minHeight = "";
+    manualBody.style.overflow = "";
+  }
+  if (riskBody) {
+    riskBody.style.height = "";
+    riskBody.style.maxHeight = "";
+    riskBody.style.minHeight = "";
+    riskBody.style.overflow = "";
+  }
+}
 
+function syncManualRiskHeights(){
+  if (isSmallScreen()) { clearBodyHeights(); return; }
+
+  const manualBody = $("manualBody");
+  const riskBody = $("riskBody");
+  if (!manualBody || !riskBody) return;
+
+  const manOpen = $("btnToggleManual")?.getAttribute("aria-expanded") === "true";
   const riskOpen = $("btnToggleRisk")?.getAttribute("aria-expanded") === "true";
-  const manOpen  = $("btnToggleManual")?.getAttribute("aria-expanded") === "true";
-  if (!riskOpen || !manOpen) return;
+  if (!manOpen || !riskOpen) { clearBodyHeights(); return; }
 
-  const riskH = riskBody.getBoundingClientRect().height;
-  if (!riskH || riskH < 40) return;
+  // measure current risk content height
+  const rh = riskBody.getBoundingClientRect().height;
+  const target = Math.max(Math.ceil(rh || 0), DESKTOP_MIN_OPEN_H);
 
-  manualBody.style.height = `${Math.ceil(riskH)}px`;
-  manualBody.style.maxHeight = `${Math.ceil(riskH)}px`;
-  manualBody.style.overflow = "hidden"; // grid children manage their own scroll
+  // force BOTH sides to same target height so Mode B won't collapse into a tiny strip
+  manualBody.style.height = `${target}px`;
+  manualBody.style.maxHeight = `${target}px`;
+  manualBody.style.minHeight = `${DESKTOP_MIN_OPEN_H}px`;
+  manualBody.style.overflow = "hidden";
+
+  riskBody.style.height = `${target}px`;
+  riskBody.style.maxHeight = `${target}px`;
+  riskBody.style.minHeight = `${DESKTOP_MIN_OPEN_H}px`;
+  riskBody.style.overflow = "hidden";
 }
 
-function resetManualHeightLock(){
-  const manualBody = $("manualBody");
-  if (!manualBody) return;
-  manualBody.style.height = "";
-  manualBody.style.maxHeight = "";
-  manualBody.style.overflow = "";
-}
-
-/* ✅ live observer: riskBody resize => manualBody sync */
+// Observe riskBody changes (content / progress updates) -> resync
 let __riskResizeObs = null;
 function initRiskResizeObserver(){
   const riskBody = $("riskBody");
@@ -608,7 +624,7 @@ function initRiskResizeObserver(){
   if (__riskResizeObs) __riskResizeObs.disconnect();
 
   __riskResizeObs = new ResizeObserver(() => {
-    requestAnimationFrame(syncManualToRiskHeight);
+    requestAnimationFrame(syncManualRiskHeights);
   });
 
   __riskResizeObs.observe(riskBody);
@@ -617,51 +633,27 @@ function initRiskResizeObserver(){
 function expandManualArea(){
   const btn = $("btnToggleManual");
   const body = $("manualBody");
-  if (btn && body) { setCtlExpanded(btn, body, true); return; }
+  if (btn && body) setCtlExpanded(btn, body, true);
 }
 function expandRiskArea(){
   const btn = $("btnToggleRisk");
   const body = $("riskBody");
-  if (btn && body) { setCtlExpanded(btn, body, true); return; }
+  if (btn && body) setCtlExpanded(btn, body, true);
 }
 function collapseManualArea(){
   const btn = $("btnToggleManual");
   const body = $("manualBody");
-  if (btn && body) { setCtlExpanded(btn, body, false); return; }
+  if (btn && body) setCtlExpanded(btn, body, false);
 }
 function collapseRiskArea(){
   const btn = $("btnToggleRisk");
   const body = $("riskBody");
-  if (btn && body) { setCtlExpanded(btn, body, false); return; }
+  if (btn && body) setCtlExpanded(btn, body, false);
 }
 
-/* ================= Progress area (prefer HTML slot #exportStatus) ================= */
-function ensureProgressBox(){
-  const slot = $("exportStatus");
-  if (slot) return slot;
-
-  const existing = $("progressBox");
-  if (existing) return existing;
-
-  const riskBox = $("riskBox");
-  if (riskBox && riskBox.parentElement) {
-    const box = document.createElement("div");
-    box.id = "progressBox";
-    box.className = "tiny muted";
-    box.style.whiteSpace = "pre-wrap";
-    box.style.lineHeight = "1.6";
-    box.style.marginTop = "10px";
-    box.style.paddingTop = "8px";
-    box.style.borderTop = "1px solid rgba(255,255,255,.06)";
-    riskBox.parentElement.appendChild(box);
-    return box;
-  }
-
-  return null;
-}
-
+// ================= Progress area =================
 function setProgressText(lines, isError){
-  const box = ensureProgressBox();
+  const box = $("exportStatus");
   if (!box) return;
 
   const s = Array.isArray(lines) ? lines.join("\n") : String(lines || "");
@@ -672,11 +664,9 @@ function setProgressText(lines, isError){
 function clearProgress(){
   const a = $("exportStatus");
   if (a) a.textContent = "";
-  const b = $("progressBox");
-  if (b) b.textContent = "";
 }
 
-/* ================= UI text ================= */
+// ================= UI text =================
 function exportTitleFallback(){
   if (currentLang === "de") return "Fortschritt";
   if (currentLang === "en") return "Progress";
@@ -698,19 +688,12 @@ function setText() {
   if ($("ui-upload-btn")) $("ui-upload-btn").textContent = t.btnUpload;
   if ($("ui-upload-img-btn")) $("ui-upload-img-btn").textContent = t.btnUploadImg || "图片";
 
-  // Mobile tabs (if present on m.html)
-  if ($("ui-tab-in")) $("ui-tab-in").textContent = t.tabIn || "";
-  if ($("ui-tab-out")) $("ui-tab-out").textContent = t.tabOut || "";
-
   const spMan = $("ui-manual-toggle-title");
   const spRisk = $("ui-risk-toggle-title");
   if (spMan) spMan.textContent = t.manualTitle || "手工处理";
   if (spRisk) spRisk.textContent = t.riskTitle || "风险评分";
 
-  const railManTitle = $("ui-manual-rail-title");
-  if (railManTitle) railManTitle.textContent = t.manualRailTitle || "";
-
-  // ✅ rail text switches by mode
+  // rail title + rail note by mode
   setManualRailTextByMode();
 
   const exportTitle = $("ui-export-title");
@@ -733,7 +716,7 @@ function setText() {
   setStage3Ui(lastStage3Mode);
 }
 
-/* ================= rule application ================= */
+// ================= rule application =================
 function applyRules(text) {
   let out = String(text || "");
   let hits = 0;
@@ -768,9 +751,9 @@ function applyRules(text) {
   lastRunMeta.moneyMode = "m1";
   lastRunMeta.lang = currentLang;
 
+  // If no rules, still allow manual terms masking + render
   if (!rules) {
     out = applyManualTermsMask(out, addHit);
-
     renderOutput(out);
 
     const report = computeRiskReport(hitsByKey, {
@@ -800,6 +783,15 @@ function applyRules(text) {
       fromPdf: !!lastRunMeta.fromPdf,
       manualTerms: manualTerms.slice(0)
     };
+
+    // ✅ If a file is uploaded, keep both folds open
+    requestAnimationFrame(() => {
+      if (lastUploadedFile) {
+        expandManualArea();
+        expandRiskArea();
+        syncManualRiskHeights();
+      }
+    });
 
     window.dispatchEvent(new Event("safe:updated"));
     return out;
@@ -871,18 +863,20 @@ function applyRules(text) {
     manualTerms: manualTerms.slice(0)
   };
 
+  // ✅ If a file is uploaded, keep both folds open
+  requestAnimationFrame(() => {
+    if (lastUploadedFile) {
+      expandManualArea();
+      expandRiskArea();
+      syncManualRiskHeights();
+    }
+  });
+
   window.dispatchEvent(new Event("safe:updated"));
   return out;
 }
 
-/* ================= After upload: auto expand both (A/B/image) ================= */
-function autoExpandAfterUpload(){
-  expandManualArea();
-  expandRiskArea();
-  requestAnimationFrame(syncManualToRiskHeight);
-}
-
-/* ================= Stage 3 file handler (PDF + image) ================= */
+// ================= Stage 3 file handler =================
 async function handleFile(file) {
   if (!file) return;
 
@@ -892,7 +886,7 @@ async function handleFile(file) {
   lastFileKind = (file.type === "application/pdf") ? "pdf"
               : (file.type && file.type.startsWith("image/") ? "image" : "");
 
-  // reset manual selection when new file comes in
+  // reset manual selection
   __manualRedactSession = null;
   __manualRedactResult = null;
   try { window.__manual_redact_last = null; } catch (_) {}
@@ -906,15 +900,16 @@ async function handleFile(file) {
     setManualPanesForMode("B");
     setManualRailTextByMode();
 
-    // ✅ ALWAYS auto expand (desktop + mobile)
-    requestAnimationFrame(autoExpandAfterUpload);
+    // ✅ REQUIRED: upload triggers auto expand (desktop + mobile)
+    requestAnimationFrame(() => {
+      expandManualArea();
+      expandRiskArea();
+      syncManualRiskHeights();
+    });
     return;
   }
 
-  if (lastFileKind !== "pdf") {
-    // unknown type (should not happen with accept=)
-    return;
-  }
+  if (lastFileKind !== "pdf") return;
 
   try {
     if (!window.probePdfTextLayer) {
@@ -923,7 +918,11 @@ async function handleFile(file) {
       setManualPanesForMode("B");
       setManualRailTextByMode();
 
-      requestAnimationFrame(autoExpandAfterUpload);
+      requestAnimationFrame(() => {
+        expandManualArea();
+        expandRiskArea();
+        syncManualRiskHeights();
+      });
       return;
     }
 
@@ -937,7 +936,11 @@ async function handleFile(file) {
       setManualPanesForMode("B");
       setManualRailTextByMode();
 
-      requestAnimationFrame(autoExpandAfterUpload);
+      requestAnimationFrame(() => {
+        expandManualArea();
+        expandRiskArea();
+        syncManualRiskHeights();
+      });
       return;
     }
 
@@ -950,9 +953,6 @@ async function handleFile(file) {
     const text = String(probe.text || "").trim();
     lastPdfOriginalText = text;
 
-    // ✅ ALWAYS auto expand even if text empty
-    requestAnimationFrame(autoExpandAfterUpload);
-
     const ta = $("inputText");
     if (ta) {
       ta.value = text;
@@ -964,18 +964,32 @@ async function handleFile(file) {
     if (text) {
       applyRules(text);
       renderInputOverlayForPdf(text);
-      window.dispatchEvent(new Event("safe:updated"));
     }
+
+    // ✅ REQUIRED: upload triggers auto expand
+    requestAnimationFrame(() => {
+      expandManualArea();
+      expandRiskArea();
+      syncManualRiskHeights();
+    });
+
+    window.dispatchEvent(new Event("safe:updated"));
   } catch (e) {
+    // Any error => Mode B
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
     setManualPanesForMode("B");
     setManualRailTextByMode();
 
-    requestAnimationFrame(autoExpandAfterUpload);
+    requestAnimationFrame(() => {
+      expandManualArea();
+      expandRiskArea();
+      syncManualRiskHeights();
+    });
   }
 }
 
+// ================= bind upload =================
 function bindPdfUI() {
   const pdfInput = $("pdfFile");
   if (pdfInput) {
@@ -1000,7 +1014,7 @@ function bindPdfUI() {
   }
 }
 
-/* ================= bind ================= */
+// ================= bind =================
 function bind() {
   // language buttons
   document.querySelectorAll(".lang button").forEach(b => {
@@ -1020,7 +1034,7 @@ function bind() {
 
       if (ta) renderInputOverlayForPdf(ta.value || "");
 
-      requestAnimationFrame(syncManualToRiskHeight);
+      requestAnimationFrame(syncManualRiskHeights);
     };
   });
 
@@ -1031,7 +1045,7 @@ function bind() {
     setCtlExpanded(btnToggleManual, manualBody, false);
     btnToggleManual.onclick = () => {
       toggleCtl(btnToggleManual, manualBody);
-      requestAnimationFrame(syncManualToRiskHeight);
+      requestAnimationFrame(syncManualRiskHeights);
     };
   }
 
@@ -1041,7 +1055,7 @@ function bind() {
     setCtlExpanded(btnToggleRisk, riskBody, false);
     btnToggleRisk.onclick = () => {
       toggleCtl(btnToggleRisk, riskBody);
-      requestAnimationFrame(syncManualToRiskHeight);
+      requestAnimationFrame(syncManualRiskHeights);
     };
   }
 
@@ -1059,7 +1073,7 @@ function bind() {
       else window.dispatchEvent(new Event("safe:updated"));
 
       renderInputOverlayForPdf(($("inputText") && $("inputText").value) || "");
-      requestAnimationFrame(syncManualToRiskHeight);
+      requestAnimationFrame(syncManualRiskHeights);
     });
 
     setManualTermsFromText(termInput.value || "");
@@ -1067,6 +1081,7 @@ function bind() {
     window.__export_snapshot.manualTerms = manualTerms.slice(0);
   }
 
+  // Clear
   const btnClear = $("btnClear");
   if (btnClear) {
     btnClear.onclick = () => {
@@ -1081,17 +1096,13 @@ function bind() {
 
       lastRunMeta.fromPdf = false;
 
-      // ✅ back to default collapsed
       collapseManualArea();
       collapseRiskArea();
       clearProgress();
-      resetManualHeightLock();
+      clearBodyHeights();
 
       const rb = $("riskBox");
       if (rb) rb.innerHTML = "";
-
-      const pb = $("progressBox");
-      if (pb) pb.remove();
 
       if ($("pdfName")) $("pdfName").textContent = "";
 
@@ -1113,10 +1124,8 @@ function bind() {
       lastFileKind = "";
       lastProbe = null;
       lastPdfOriginalText = "";
-
       setStage3Ui("none");
       setManualPanesForMode("none");
-      setManualRailTextByMode();
 
       __manualRedactSession = null;
       __manualRedactResult = null;
@@ -1128,6 +1137,7 @@ function bind() {
     };
   }
 
+  // Copy
   const btnCopy = $("btnCopy");
   if (btnCopy) {
     btnCopy.onclick = async () => {
@@ -1163,8 +1173,6 @@ function bind() {
           const rb = $("riskBox");
           if (rb) rb.innerHTML = "";
           clearProgress();
-          const pb = $("progressBox");
-          if (pb) pb.remove();
           window.dispatchEvent(new Event("safe:updated"));
         }
       }, AUTO_DELAY);
@@ -1179,7 +1187,7 @@ function bind() {
     });
   }
 
-  // ✅ Manual redact button: open UI and keep session/result
+  // Manual redact button: open UI (Mode B)
   const btnManual = $("btnManualRedact");
   if (btnManual) {
     btnManual.onclick = async () => {
@@ -1197,30 +1205,27 @@ function bind() {
         if (window.__manual_redact_last) __manualRedactResult = window.__manual_redact_last;
       } catch (_) {}
 
-      requestAnimationFrame(syncManualToRiskHeight);
+      requestAnimationFrame(syncManualRiskHeights);
     };
   }
 
-  // ✅ Unified export button (A/B)
+  // Unified export button (A/B)
   const btnExportRasterPdf = $("btnExportRasterPdf");
   if (btnExportRasterPdf) {
     btnExportRasterPdf.onclick = async () => {
-      // Always keep right side open for progress
+      // Always open risk so progress is visible
       expandRiskArea();
-      // Keep left open too (user spec: both open after upload; export should not collapse)
       expandManualArea();
-      requestAnimationFrame(syncManualToRiskHeight);
+      requestAnimationFrame(syncManualRiskHeights);
 
       const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
 
       try {
         const f = lastUploadedFile;
-        if (!f) {
-          setProgressText(t.progressNoFile || "No file detected. Please upload a PDF first.", true);
-          return;
-        }
 
-        // -------- Mode B (manual redaction export) --------
+        if (!f) { setProgressText(t.progressNoFile || "未检测到文件，请先上传 PDF。", true); return; }
+
+        // -------- Mode B (manual visual export) --------
         if (lastStage3Mode === "B") {
           let res = __manualRedactResult || null;
 
@@ -1233,7 +1238,11 @@ function bind() {
           }
 
           if (!res || !res.pages || !res.rectsByPage) {
-            setProgressText(t.progressNeedManualFirst || "请先点「手工涂抹」完成框选并关闭界面，然后再点「红删PDF」。", true);
+            setProgressText(
+              t.progressNeedManualFirst ||
+              "请先点「手工涂抹」完成框选并关闭界面，然后再点「红删PDF」。",
+              true
+            );
             return;
           }
 
@@ -1251,15 +1260,12 @@ function bind() {
           await window.RasterExport.exportRasterSecurePdfFromVisual(res);
 
           setProgressText(t.progressDone || "完成 ✅ 已开始下载。", false);
-          requestAnimationFrame(syncManualToRiskHeight);
+          requestAnimationFrame(syncManualRiskHeights);
           return;
         }
 
-        // -------- Mode A (readable PDF auto redact) --------
-        if (lastFileKind !== "pdf") {
-          setProgressText(t.progressNotPdf || "当前不是 PDF 文件。", true);
-          return;
-        }
+        // -------- Mode A (readable PDF auto export) --------
+        if (lastFileKind !== "pdf") { setProgressText(t.progressNotPdf || "当前不是 PDF 文件。", true); return; }
         if (!lastProbe || !lastProbe.hasTextLayer) {
           setProgressText(t.progressNotReadable || "PDF 不可读（Mode B），请先手工涂抹并保存框选，然后再点红删PDF。", true);
           return;
@@ -1295,12 +1301,12 @@ function bind() {
         });
 
         setProgressText(t.progressDone || "完成 ✅ 已开始下载。", false);
-        requestAnimationFrame(syncManualToRiskHeight);
+        requestAnimationFrame(syncManualRiskHeights);
       } catch (e) {
         const msg = (e && (e.message || String(e))) || "Unknown error";
         const t2 = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
         setProgressText(`${t2.progressFailed || "导出失败："}\n${msg}`, true);
-        requestAnimationFrame(syncManualToRiskHeight);
+        requestAnimationFrame(syncManualRiskHeights);
       }
     };
   }
@@ -1308,7 +1314,7 @@ function bind() {
   bindPdfUI();
 }
 
-/* ================= boot ================= */
+// ================= boot =================
 initEnabled();
 setText();
 bind();
