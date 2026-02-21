@@ -1,5 +1,8 @@
 // =========================
 // assets/i18n.js (FULL)
+// ✅ UI copy polish (2026-02-21)
+// - Mode B manualRedactNote: clearer, shorter, consistent wording (ZH/EN/DE)
+// - Keep all keys/structure unchanged
 // =========================
 const I18N = {
   zh: {
@@ -46,7 +49,7 @@ const I18N = {
     // ✅ no extra title (already have “手工处理”)
     manualRedactTitle: "",
     manualRedactNote:
-      "检测到上传内容为图片或不可读 PDF（无文本层）。\n请先进入手工框选，覆盖需要隐藏的信息；具体操作见下方「使用说明」。",
+      "检测到上传内容为图片或不可读 PDF（无文本层）。\n请先进入手工框选，覆盖需要隐藏的信息；详细步骤见下方「使用说明」。",
     btnManualRedact: "手工涂抹",
 
     // ✅ rail titles + separate texts
@@ -119,7 +122,7 @@ const I18N = {
     // ✅ no extra title
     manualRedactTitle: "",
     manualRedactNote:
-      "Detected an image or an unreadable PDF (no text layer).\nPlease mark areas to hide first. See “How it works” below for steps.",
+      "Detected an image or an unreadable PDF (no text layer).\nPlease mark areas to hide first. See “How it works” below for the steps.",
     btnManualRedact: "Mark areas",
 
     manualRailTitle: "How it works",
@@ -188,7 +191,7 @@ const I18N = {
     // ✅ no extra title
     manualRedactTitle: "",
     manualRedactNote:
-      "Bild oder nicht lesbares PDF erkannt (kein Textlayer).\nBitte zuerst Bereiche markieren. Schritte siehe unten unter „So funktioniert’s“.",
+      "Bild oder nicht lesbares PDF erkannt (kein Textlayer).\nBitte zuerst Bereiche markieren. Schritte stehen unten unter „So funktioniert’s“.",
     btnManualRedact: "Bereiche markieren",
 
     manualRailTitle: "So funktioniert’s",
