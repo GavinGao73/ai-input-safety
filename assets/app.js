@@ -1,10 +1,13 @@
 // =========================
 // assets/app.js (FULL)
-// ✅ Personal build (2026-02-21a3)
-// Changes ONLY for your latest mobile requirements:
-// - Mobile: single upload entry (pdf + image) via #pdfFile
-// - Mobile: IO tab labels text restored via i18n (ui-tab-in / ui-tab-out)
-// - Keep everything else unchanged
+// ✅ Personal build (2026-02-21a3-mobile-single-upload+tabs-text)
+// Changes in this revision:
+// - ✅ Strong-context-first priority: secret/account/bank/email/url/phone/...
+// - ✅ URL + SECRET placeholders
+// - ✅ Always-on keys for zh-stable build: secret/url/email/phone/account/bank/company
+// - ✅ Skip secondary matching on already-inserted placeholders (anti "串味"/二次污染)
+// - ✅ Phone digit-count guard (>=16 digits => do NOT treat as phone; prevents card/account shredding)
+// - ✅ markHitsInOriginal sync with applyRules logic (priority + digit guard)
 // =========================
 
 console.log("[APP] loaded v20260221a3-mobile-single-upload+tabs-text");
@@ -114,6 +117,8 @@ function placeholder(key) {
     zh: {
       PHONE: "【电话】",
       EMAIL: "【邮箱】",
+      URL: "【网址】",
+      SECRET: "【敏感】",
       ACCOUNT: "【账号】",
       ADDRESS: "【地址】",
       HANDLE: "【账号名】",
@@ -127,6 +132,8 @@ function placeholder(key) {
     de: {
       PHONE: "[Telefon]",
       EMAIL: "[E-Mail]",
+      URL: "[URL]",
+      SECRET: "[Geheim]",
       ACCOUNT: "[Konto]",
       ADDRESS: "[Adresse]",
       HANDLE: "[Handle]",
@@ -140,6 +147,8 @@ function placeholder(key) {
     en: {
       PHONE: "[Phone]",
       EMAIL: "[Email]",
+      URL: "[URL]",
+      SECRET: "[Secret]",
       ACCOUNT: "[Account]",
       ADDRESS: "[Address]",
       HANDLE: "[Handle]",
@@ -248,12 +257,17 @@ function markHitsInOriginal(text){
 
   const enabledSet = new Set(enabledKeysArr);
 
+  // ✅ Always-on for zh-stable build (UI fixed, but coverage must be stable)
+  const ALWAYS_ON = new Set(["secret", "url", "email", "phone", "account", "bank", "company"]);
+
   const PRIORITY = [
-    "company",
-    "email",
-    "bank",
+    "secret",
     "account",
+    "bank",
+    "email",
+    "url",
     "phone",
+    "company",
     "money",
     "address_de_street",
     "handle",
@@ -276,55 +290,59 @@ function markHitsInOriginal(text){
   }
 
   for (const key of PRIORITY) {
-  if (key !== "money" && !enabledSet.has(key)) continue;
+    if (key !== "money" && !enabledSet.has(key) && !ALWAYS_ON.has(key)) continue;
 
-  const r = window.RULES_BY_KEY && window.RULES_BY_KEY[key];
-  if (!r || !r.pattern) continue;
+    const r = window.RULES_BY_KEY && window.RULES_BY_KEY[key];
+    if (!r || !r.pattern) continue;
 
-  // ✅ prefix highlight: keep label, highlight ONLY value group
-  if (r.mode === "prefix") {
-    s = s.replace(r.pattern, (m, p1, p2) => {
-      const label = p1 || "";
-      const val = p2 || "";
-      return `${label}${S1}${val}${S2}`;
-    });
-    continue;
+    // ✅ prefix highlight: keep label, highlight ONLY value group
+    if (r.mode === "prefix") {
+      s = s.replace(r.pattern, (m, p1, p2) => {
+        const label = p1 || "";
+        const val = p2 || "";
+        return `${label}${S1}${val}${S2}`;
+      });
+      continue;
+    }
+
+    // ✅ phone highlight: keep label if captured; skip if digits look like account/card (>=16)
+    if (r.mode === "phone") {
+      s = s.replace(r.pattern, (m, p1, p2, p3, p4) => {
+        const label = p1 || "";
+        const value = (p2 || p3 || p4 || m);
+        const digits = String(value).replace(/\D+/g, "");
+        if (digits.length >= 16) return m;
+
+        if (label) return `${label}${S1}${m.slice(label.length)}${S2}`;
+        return `${S1}${m}${S2}`;
+      });
+      continue;
+    }
+
+    // ✅ company highlight: highlight ONLY the core word (主体词 / name)
+    if (r.mode === "company") {
+      s = s.replace(r.pattern, (m, g1, g2, g3, g4, g5, g6) => {
+        // CN: g2 is core
+        if (g4) {
+          const prefixHan = g1 || "";
+          const core = g2 || "";
+          const tail = g3 || "";
+          const suffix = g4 || "";
+          return `${prefixHan}${S1}${core}${S2}${tail}${suffix}`;
+        }
+        // DE/EN: g5 is name, g6 is legal form
+        if (g6) {
+          const name = g5 || "";
+          return `${S1}${name}${S2}${g6}`;
+        }
+        return `${S1}${m}${S2}`;
+      });
+      continue;
+    }
+
+    // default highlight: whole match
+    s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
   }
-
-  // ✅ phone highlight: best-effort keep label if captured; otherwise highlight whole
-  if (r.mode === "phone") {
-    s = s.replace(r.pattern, (m, p1, p2) => {
-      const label = p1 || "";
-      if (label) return `${label}${S1}${m.slice(label.length)}${S2}`;
-      return `${S1}${m}${S2}`;
-    });
-    continue;
-  }
-
-  // ✅ company highlight: highlight ONLY the core word (主体词 / name)
-  if (r.mode === "company") {
-    s = s.replace(r.pattern, (m, g1, g2, g3, g4, g5, g6) => {
-      // CN: g2 is core
-      if (g4) {
-        const prefixHan = g1 || "";
-        const core = g2 || "";
-        const tail = g3 || "";
-        const suffix = g4 || "";
-        return `${prefixHan}${S1}${core}${S2}${tail}${suffix}`;
-      }
-      // DE/EN: g5 is name, g6 is legal form
-      if (g6) {
-        const name = g5 || "";
-        return `${S1}${name}${S2}${g6}`;
-      }
-      return `${S1}${m}${S2}`;
-    });
-    continue;
-  }
-
-  // default highlight: whole match
-  s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
-}
 
   const esc = escapeHTML(s);
   return esc
@@ -345,6 +363,8 @@ const RISK_WEIGHTS = {
   bank: 28,
   account: 26,
   email: 14,
+  url: 10,
+  secret: 30,
   phone: 16,
   address_de_street: 18,
   handle: 10,
@@ -401,6 +421,8 @@ function labelForKey(k) {
       bank: "银行/支付信息",
       account: "账号/卡号",
       email: "邮箱",
+      url: "网址/链接",
+      secret: "密码/验证码",
       phone: "电话",
       address_de_street: "地址（街道门牌）",
       handle: "账号名/Handle",
@@ -415,6 +437,8 @@ function labelForKey(k) {
       bank: "Bank/Payment",
       account: "Konto/Nummer",
       email: "E-Mail",
+      url: "URL/Link",
+      secret: "Passwort/Code",
       phone: "Telefon",
       address_de_street: "Adresse (Straße/Nr.)",
       handle: "Handle/Account",
@@ -429,6 +453,8 @@ function labelForKey(k) {
       bank: "Bank/Payment",
       account: "Account/Number",
       email: "Email",
+      url: "URL/Link",
+      secret: "Password/OTP",
       phone: "Phone",
       address_de_street: "Address (street/no.)",
       handle: "Handle/Account",
@@ -760,11 +786,13 @@ function applyRules(text) {
   const hitsByKey = {};
 
   const PRIORITY = [
-    "company",
-    "email",
-    "bank",
+    "secret",
     "account",
+    "bank",
+    "email",
+    "url",
     "phone",
+    "company",
     "money",
     "address_de_street",
     "handle",
@@ -773,9 +801,32 @@ function applyRules(text) {
     "number"
   ];
 
+  // ✅ Always-on keys for zh-stable build (UI fixed, but coverage must be stable)
+  const ALWAYS_ON = new Set(["secret", "url", "email", "phone", "account", "bank", "company"]);
+
   function addHit(key) {
     hits++;
     hitsByKey[key] = (hitsByKey[key] || 0) + 1;
+  }
+
+  function protectPlaceholders(s){
+    const map = [];
+    const re = /(【[^【】]{1,36}】|\[[^\[\]]{1,36}\])/g;
+    const t = String(s || "").replace(re, (m) => {
+      const id = map.length;
+      map.push(m);
+      return `\uE000${id}\uE001`; // sentinel
+    });
+    return { t, map };
+  }
+
+  function restorePlaceholders(s, map){
+    let t = String(s || "");
+    for (let i = 0; i < (map || []).length; i++) {
+      const token = new RegExp(`\\uE000${i}\\uE001`, "g");
+      t = t.replace(token, map[i]);
+    }
+    return t;
   }
 
   const rules = getRulesSafe();
@@ -789,7 +840,7 @@ function applyRules(text) {
   lastRunMeta.lang = currentLang;
 
   if (!rules) {
-    out = applyManualTermsMask(out, addHit);
+    out = applyManualTermsMask(out, () => addHit("manual_term"));
     renderOutput(out);
 
     const report = computeRiskReport(hitsByKey, {
@@ -832,73 +883,84 @@ function applyRules(text) {
     return out;
   }
 
-  out = applyManualTermsMask(out, addHit);
+  // manual first
+  out = applyManualTermsMask(out, () => addHit("manual_term"));
+
+  // ✅ protect already-inserted placeholders against "串味" / second-pass matching
+  const p0 = protectPlaceholders(out);
+  out = p0.t;
 
   for (const key of PRIORITY) {
-  if (key !== "money" && !enabledSet.has(key)) continue;
+    if (key !== "money" && !enabledSet.has(key) && !ALWAYS_ON.has(key)) continue;
 
-  const r = rules[key];
-  if (!r || !r.pattern) continue;
+    const r = rules[key];
+    if (!r || !r.pattern) continue;
 
-  // ✅ money: keep steady mode (M1) — always mask whole amount
-  if (key === "money") {
-    out = out.replace(r.pattern, () => {
-      addHit("money");
-      return placeholder("MONEY");
+    // ✅ money: keep steady mode (M1) — always mask whole amount
+    if (key === "money") {
+      out = out.replace(r.pattern, () => {
+        addHit("money");
+        return placeholder("MONEY");
+      });
+      continue;
+    }
+
+    // ✅ mode-aware replacement:
+    out = out.replace(r.pattern, (...args) => {
+      const match = args[0] || "";
+
+      // 1) prefix: (label)(value)
+      if (r.mode === "prefix") {
+        const label = args[1] || "";
+        addHit(key);
+        return `${label}${placeholder(r.tag)}`;
+      }
+
+      // 2) phone: keep label if possible; guard card/account digits (>=16)
+      if (r.mode === "phone") {
+        const label = args[1] || "";
+        const vA = args[2] || "";
+        const vB = args[3] || "";
+        const vC = args[4] || "";
+        const value = vA || vB || vC || match;
+
+        const digits = String(value).replace(/\D+/g, "");
+        if (digits.length >= 16) {
+          // do not replace; let account/bank handle it
+          return match;
+        }
+
+        addHit(key);
+        if (label) return `${label}${placeholder(r.tag)}`;
+        return placeholder(r.tag);
+      }
+
+      // 3) company: mask only core word, keep legal suffix
+      if (r.mode === "company") {
+        const g1 = args[1], g2 = args[2], g3 = args[3], g4 = args[4];
+        if (g4) {
+          addHit(key);
+          return `${g1 || ""}${placeholder(r.tag)}${g3 || ""}${g4 || ""}`;
+        }
+
+        const g5 = args[5], g6 = args[6];
+        if (g6) {
+          addHit(key);
+          return `${placeholder(r.tag)}${g6 || ""}`;
+        }
+
+        addHit(key);
+        return placeholder(r.tag);
+      }
+
+      // default: mask whole match
+      addHit(key);
+      return placeholder(r.tag);
     });
-    continue;
   }
 
-  // ✅ mode-aware replacement:
-  // - prefix: keep label, mask only value
-  // - phone: keep label when group exists, else mask all
-  // - company: mask only core word, keep legal suffix
-  out = out.replace(r.pattern, (...args) => {
-    addHit(key);
-
-    // args: [match, g1, g2, ..., offset, input, groups]
-    const match = args[0] || "";
-
-    // 1) prefix: (label)(value)
-    if (r.mode === "prefix") {
-      const label = args[1] || "";
-      return `${label}${placeholder(r.tag)}`;
-    }
-
-    // 2) phone: try keep label if captured; otherwise mask whole
-    // Your phone regex is a union; groups may vary -> best-effort only.
-    if (r.mode === "phone") {
-      const label = args[1] || ""; // label group in the first alternative
-      if (label) return `${label}${placeholder(r.tag)}`;
-      return placeholder(r.tag);
-    }
-
-    // 3) company:
-    // CN alternative groups: (g1 prefixHan?)(g2 core)(g3 tail?)(g4 suffix)
-    // DE/EN alternative groups: (g5 name)(g6 legalForm)
-    if (r.mode === "company") {
-      const g1 = args[1], g2 = args[2], g3 = args[3], g4 = args[4];
-      if (g4) {
-        const prefixHan = g1 || "";
-        const tail = g3 || "";
-        const suffix = g4 || "";
-        // mask ONLY core (主体词), keep tail + suffix
-        return `${prefixHan}${placeholder(r.tag)}${tail}${suffix}`;
-      }
-
-      const g5 = args[5], g6 = args[6];
-      if (g6) {
-        // mask name, keep legal form (GmbH/AG/LLC...)
-        return `${placeholder(r.tag)}${g6}`;
-      }
-
-      return placeholder(r.tag);
-    }
-
-    // default: mask whole match
-    return placeholder(r.tag);
-  });
-}
+  // ✅ restore placeholders after all rules
+  out = restorePlaceholders(out, p0.map);
 
   const report = computeRiskReport(hitsByKey, {
     hits,
