@@ -1,18 +1,17 @@
 // =========================
 // assets/app.js (FULL)
-// ✅ Personal build (2026-02-21a1)
-// This revision:
-// - ✅ Upload split: pdfFile (PDF only) + imgFile (image/*)
-// - ✅ Rail text switches by Mode A/B (Mode A no longer shows Mode B text)
-// - ✅ Mode B export uses SAME top "红删PDF" button (no extra export button)
-// - ✅ RedactUI no longer exports; it stores selection; main button exports
-// - FIX (mobile): progress injected if no exportStatus slot
-// - ✅ FIX (2026-02-21a2): Always auto-expand on ANY upload (A/B, desktop/mobile)
-// - ✅ FIX (2026-02-21a2): Keep Manual/Risk equal height when expanded (A/B)
-// - Keep: collapse on Clear; height sync via ResizeObserver
+// ✅ Personal build (2026-02-21b)
+// FIXED per your spec:
+// - Default: manual + risk collapsed
+// - After ANY upload (Mode A/B/image): BOTH auto expand (desktop + mobile)
+// - Desktop: manualBody height == riskBody height (A/B both)
+// - Mobile: allow stacking; DOM order guarantees:
+//   Mode A: textarea -> instructions -> links
+//   Mode B: note -> button -> instructions -> links
+// - Output side always: Risk card + Progress card (same layout)
 // =========================
 
-console.log("[APP] loaded v20260221a2-auto-expand-any-upload+equal-height");
+console.log("[APP] loaded v20260221b-autoexpand-both+heightlock-AB+manual-rail-in-fold");
 
 let currentLang = "zh";
 window.currentLang = currentLang;
@@ -492,8 +491,8 @@ function renderRiskBox(report, meta) {
 function stage3Text(key){
   const map = {
     zh: { btnExportPdf: "红删PDF", btnManual: "手工涂抹" },
-    de: { btnExportPdf: "PDF", btnManual: "Manuell" },
-    en: { btnExportPdf: "PDF", btnManual: "Manual" }
+    de: { btnExportPdf: "PDF schwärzen", btnManual: "Bereiche markieren" },
+    en: { btnExportPdf: "Redact PDF", btnManual: "Mark areas" }
   };
   const m = map[currentLang] || map.zh;
   return m[key] || "";
@@ -513,7 +512,6 @@ function setStage3Ui(mode){
   if (btnPdf)  btnPdf.textContent  = (t && t.btnRedactPdf) ? t.btnRedactPdf : stage3Text("btnExportPdf");
   if (btnMan)  btnMan.textContent  = (t && t.btnManualRedact) ? t.btnManualRedact : stage3Text("btnManual");
 
-  // ✅ hard fallback (fix: mobile button text occasionally empty)
   if (btnPdf && !String(btnPdf.textContent || "").trim()) btnPdf.textContent = stage3Text("btnExportPdf");
   if (btnMan && !String(btnMan.textContent || "").trim()) btnMan.textContent = stage3Text("btnManual");
 }
@@ -569,66 +567,51 @@ function toggleCtl(btn, body){
   setCtlExpanded(btn, body, !cur);
 }
 
-/* ================= Height sync: Manual/Risk equal height (A/B) ================= */
-function resetIoHeightLock(){
-  const manualBody = $("manualBody");
-  const riskBody = $("riskBody");
-  if (manualBody) {
-    manualBody.style.height = "";
-    manualBody.style.maxHeight = "";
-    manualBody.style.overflow = "";
-  }
-  if (riskBody) {
-    riskBody.style.height = "";
-    riskBody.style.maxHeight = "";
-    riskBody.style.overflow = "";
-  }
-}
-
-function syncIoBodiesEqualHeight(){
-  const manualBody = $("manualBody");
-  const riskBody = $("riskBody");
-  if (!manualBody || !riskBody) return;
-
-  const manOpen  = $("btnToggleManual")?.getAttribute("aria-expanded") === "true";
-  const riskOpen = $("btnToggleRisk")?.getAttribute("aria-expanded") === "true";
-
-  if (!manOpen || !riskOpen) {
-    resetIoHeightLock();
+/* ================= Height sync: manual follows risk (A + B on desktop) ================= */
+function syncManualToRiskHeight(){
+  // ✅ Mobile stacks: no height lock
+  if (isSmallScreen()) {
+    resetManualHeightLock();
     return;
   }
 
-  // ✅ baseline to avoid “empty risk box collapses”
-  const BASE = 220;
+  const riskBody = $("riskBody");
+  const manualBody = $("manualBody");
+  if (!riskBody || !manualBody) return;
 
-  const mh = Math.max(BASE, manualBody.scrollHeight || 0);
-  const rh = Math.max(BASE, riskBody.scrollHeight || 0);
-  const H  = Math.ceil(Math.max(mh, rh));
+  const riskOpen = $("btnToggleRisk")?.getAttribute("aria-expanded") === "true";
+  const manOpen  = $("btnToggleManual")?.getAttribute("aria-expanded") === "true";
+  if (!riskOpen || !manOpen) return;
 
-  manualBody.style.height = `${H}px`;
-  manualBody.style.maxHeight = `${H}px`;
-  manualBody.style.overflow = "auto";
+  const riskH = riskBody.getBoundingClientRect().height;
+  if (!riskH || riskH < 40) return;
 
-  riskBody.style.height = `${H}px`;
-  riskBody.style.maxHeight = `${H}px`;
-  riskBody.style.overflow = "auto";
+  manualBody.style.height = `${Math.ceil(riskH)}px`;
+  manualBody.style.maxHeight = `${Math.ceil(riskH)}px`;
+  manualBody.style.overflow = "hidden"; // grid children manage their own scroll
 }
 
-/* ✅ live observer: either side resize => equalize */
-let __ioResizeObs = null;
-function initRiskResizeObserver(){
+function resetManualHeightLock(){
   const manualBody = $("manualBody");
+  if (!manualBody) return;
+  manualBody.style.height = "";
+  manualBody.style.maxHeight = "";
+  manualBody.style.overflow = "";
+}
+
+/* ✅ live observer: riskBody resize => manualBody sync */
+let __riskResizeObs = null;
+function initRiskResizeObserver(){
   const riskBody = $("riskBody");
-  if (!manualBody || !riskBody || !("ResizeObserver" in window)) return;
+  if (!riskBody || !("ResizeObserver" in window)) return;
 
-  if (__ioResizeObs) __ioResizeObs.disconnect();
+  if (__riskResizeObs) __riskResizeObs.disconnect();
 
-  __ioResizeObs = new ResizeObserver(() => {
-    requestAnimationFrame(syncIoBodiesEqualHeight);
+  __riskResizeObs = new ResizeObserver(() => {
+    requestAnimationFrame(syncManualToRiskHeight);
   });
 
-  __ioResizeObs.observe(manualBody);
-  __ioResizeObs.observe(riskBody);
+  __riskResizeObs.observe(riskBody);
 }
 
 function expandManualArea(){
@@ -650,12 +633,6 @@ function collapseRiskArea(){
   const btn = $("btnToggleRisk");
   const body = $("riskBody");
   if (btn && body) { setCtlExpanded(btn, body, false); return; }
-}
-
-function autoExpandAfterUpload(){
-  expandManualArea();
-  expandRiskArea();
-  requestAnimationFrame(syncIoBodiesEqualHeight);
 }
 
 /* ================= Progress area (prefer HTML slot #exportStatus) ================= */
@@ -721,29 +698,25 @@ function setText() {
   if ($("ui-upload-btn")) $("ui-upload-btn").textContent = t.btnUpload;
   if ($("ui-upload-img-btn")) $("ui-upload-img-btn").textContent = t.btnUploadImg || "图片";
 
-  // Mobile tabs
+  // Mobile tabs (if present on m.html)
   if ($("ui-tab-in")) $("ui-tab-in").textContent = t.tabIn || "";
   if ($("ui-tab-out")) $("ui-tab-out").textContent = t.tabOut || "";
 
-  const spMan = document.getElementById("ui-manual-toggle-title");
-  const spRisk = document.getElementById("ui-risk-toggle-title");
-
+  const spMan = $("ui-manual-toggle-title");
+  const spRisk = $("ui-risk-toggle-title");
   if (spMan) spMan.textContent = t.manualTitle || "手工处理";
   if (spRisk) spRisk.textContent = t.riskTitle || "风险评分";
 
-  const railManTitle = document.getElementById("ui-manual-rail-title");
+  const railManTitle = $("ui-manual-rail-title");
   if (railManTitle) railManTitle.textContent = t.manualRailTitle || "";
 
   // ✅ rail text switches by mode
   setManualRailTextByMode();
 
-  const exportTitle = document.getElementById("ui-export-title");
+  const exportTitle = $("ui-export-title");
   if (exportTitle) exportTitle.textContent = t.exportTitle || exportTitleFallback();
 
   if ($("manualTerms")) $("manualTerms").placeholder = t.manualPlaceholder || "例如：张三, 李四, Bei.de Tech GmbH";
-
-  const mrTitle = $("ui-manual-redact-title");
-  if (mrTitle) mrTitle.textContent = t.manualRedactTitle || "";
 
   const mrNote = $("ui-manual-redact-note");
   if (mrNote) mrNote.textContent = t.manualRedactNote || "";
@@ -902,6 +875,13 @@ function applyRules(text) {
   return out;
 }
 
+/* ================= After upload: auto expand both (A/B/image) ================= */
+function autoExpandAfterUpload(){
+  expandManualArea();
+  expandRiskArea();
+  requestAnimationFrame(syncManualToRiskHeight);
+}
+
 /* ================= Stage 3 file handler (PDF + image) ================= */
 async function handleFile(file) {
   if (!file) return;
@@ -909,7 +889,8 @@ async function handleFile(file) {
   lastUploadedFile = file;
   lastProbe = null;
   lastPdfOriginalText = "";
-  lastFileKind = (file.type === "application/pdf") ? "pdf" : (file.type && file.type.startsWith("image/") ? "image" : "");
+  lastFileKind = (file.type === "application/pdf") ? "pdf"
+              : (file.type && file.type.startsWith("image/") ? "image" : "");
 
   // reset manual selection when new file comes in
   __manualRedactSession = null;
@@ -917,7 +898,6 @@ async function handleFile(file) {
   try { window.__manual_redact_last = null; } catch (_) {}
 
   setStage3Ui("none");
-  setManualRailTextByMode();
 
   // Image => Mode B
   if (lastFileKind === "image") {
@@ -926,12 +906,15 @@ async function handleFile(file) {
     setManualPanesForMode("B");
     setManualRailTextByMode();
 
-    // ✅ ALWAYS auto-expand after any upload (desktop/mobile)
+    // ✅ ALWAYS auto expand (desktop + mobile)
     requestAnimationFrame(autoExpandAfterUpload);
     return;
   }
 
-  if (lastFileKind !== "pdf") return;
+  if (lastFileKind !== "pdf") {
+    // unknown type (should not happen with accept=)
+    return;
+  }
 
   try {
     if (!window.probePdfTextLayer) {
@@ -967,6 +950,9 @@ async function handleFile(file) {
     const text = String(probe.text || "").trim();
     lastPdfOriginalText = text;
 
+    // ✅ ALWAYS auto expand even if text empty
+    requestAnimationFrame(autoExpandAfterUpload);
+
     const ta = $("inputText");
     if (ta) {
       ta.value = text;
@@ -980,9 +966,6 @@ async function handleFile(file) {
       renderInputOverlayForPdf(text);
       window.dispatchEvent(new Event("safe:updated"));
     }
-
-    // ✅ ALWAYS auto-expand after any upload (desktop/mobile)
-    requestAnimationFrame(autoExpandAfterUpload);
   } catch (e) {
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
@@ -1037,28 +1020,28 @@ function bind() {
 
       if (ta) renderInputOverlayForPdf(ta.value || "");
 
-      requestAnimationFrame(syncIoBodiesEqualHeight);
+      requestAnimationFrame(syncManualToRiskHeight);
     };
   });
 
-  // title-row toggles
+  // title-row toggles (default collapsed)
   const btnToggleManual = $("btnToggleManual");
   const manualBody = $("manualBody");
   if (btnToggleManual && manualBody) {
-    setCtlExpanded(btnToggleManual, manualBody, false); // ✅ default collapsed
+    setCtlExpanded(btnToggleManual, manualBody, false);
     btnToggleManual.onclick = () => {
       toggleCtl(btnToggleManual, manualBody);
-      requestAnimationFrame(syncIoBodiesEqualHeight);
+      requestAnimationFrame(syncManualToRiskHeight);
     };
   }
 
   const btnToggleRisk = $("btnToggleRisk");
   const riskBody = $("riskBody");
   if (btnToggleRisk && riskBody) {
-    setCtlExpanded(btnToggleRisk, riskBody, false); // ✅ default collapsed
+    setCtlExpanded(btnToggleRisk, riskBody, false);
     btnToggleRisk.onclick = () => {
       toggleCtl(btnToggleRisk, riskBody);
-      requestAnimationFrame(syncIoBodiesEqualHeight);
+      requestAnimationFrame(syncManualToRiskHeight);
     };
   }
 
@@ -1076,7 +1059,7 @@ function bind() {
       else window.dispatchEvent(new Event("safe:updated"));
 
       renderInputOverlayForPdf(($("inputText") && $("inputText").value) || "");
-      requestAnimationFrame(syncIoBodiesEqualHeight);
+      requestAnimationFrame(syncManualToRiskHeight);
     });
 
     setManualTermsFromText(termInput.value || "");
@@ -1098,10 +1081,11 @@ function bind() {
 
       lastRunMeta.fromPdf = false;
 
+      // ✅ back to default collapsed
       collapseManualArea();
       collapseRiskArea();
       clearProgress();
-      resetIoHeightLock();
+      resetManualHeightLock();
 
       const rb = $("riskBox");
       if (rb) rb.innerHTML = "";
@@ -1129,8 +1113,10 @@ function bind() {
       lastFileKind = "";
       lastProbe = null;
       lastPdfOriginalText = "";
+
       setStage3Ui("none");
       setManualPanesForMode("none");
+      setManualRailTextByMode();
 
       __manualRedactSession = null;
       __manualRedactResult = null;
@@ -1207,12 +1193,11 @@ function bind() {
         lang: currentLang
       });
 
-      // If UI saved a result in window.__manual_redact_last, keep it
       try {
         if (window.__manual_redact_last) __manualRedactResult = window.__manual_redact_last;
       } catch (_) {}
 
-      requestAnimationFrame(syncIoBodiesEqualHeight);
+      requestAnimationFrame(syncManualToRiskHeight);
     };
   }
 
@@ -1220,19 +1205,23 @@ function bind() {
   const btnExportRasterPdf = $("btnExportRasterPdf");
   if (btnExportRasterPdf) {
     btnExportRasterPdf.onclick = async () => {
-      // ✅ always show both panes, keep equal height
-      autoExpandAfterUpload();
+      // Always keep right side open for progress
+      expandRiskArea();
+      // Keep left open too (user spec: both open after upload; export should not collapse)
+      expandManualArea();
+      requestAnimationFrame(syncManualToRiskHeight);
 
       const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
 
       try {
         const f = lastUploadedFile;
-
-        if (!f) { setProgressText(t.progressNoFile || "No file detected. Please upload a PDF first.", true); return; }
+        if (!f) {
+          setProgressText(t.progressNoFile || "No file detected. Please upload a PDF first.", true);
+          return;
+        }
 
         // -------- Mode B (manual redaction export) --------
         if (lastStage3Mode === "B") {
-          // ensure we have a saved selection
           let res = __manualRedactResult || null;
 
           try {
@@ -1244,35 +1233,40 @@ function bind() {
           }
 
           if (!res || !res.pages || !res.rectsByPage) {
-            setProgressText(t.progressNeedManualFirst || "Please mark areas first (Manual), close it, then click Redact PDF.", true);
+            setProgressText(t.progressNeedManualFirst || "请先点「手工涂抹」完成框选并关闭界面，然后再点「红删PDF」。", true);
             return;
           }
 
           if (!window.RasterExport || !window.RasterExport.exportRasterSecurePdfFromVisual) {
-            setProgressText(t.progressExportMissing || "Export module not loaded", true);
+            setProgressText(t.progressExportMissing || "导出模块未加载", true);
             return;
           }
 
           setProgressText([
-            (t.progressWorking || "Working…"),
+            (t.progressWorking || "处理中…"),
             `mode=B`,
             `dpi=${res.dpi || 600}`
           ], false);
 
           await window.RasterExport.exportRasterSecurePdfFromVisual(res);
 
-          setProgressText(t.progressDone || "Done ✅ Download started.", false);
-          requestAnimationFrame(syncIoBodiesEqualHeight);
+          setProgressText(t.progressDone || "完成 ✅ 已开始下载。", false);
+          requestAnimationFrame(syncManualToRiskHeight);
           return;
         }
 
         // -------- Mode A (readable PDF auto redact) --------
-        if (lastFileKind !== "pdf") { setProgressText(t.progressNotPdf || "This is not a PDF file.", true); return; }
-        if (!lastProbe) { setProgressText(t.progressNotReadable || "PDF not readable (Mode B). Please mark areas first, then click Redact PDF.", true); return; }
-        if (!lastProbe.hasTextLayer) { setProgressText(t.progressNotReadable || "PDF not readable (Mode B). Please mark areas first, then click Redact PDF.", true); return; }
+        if (lastFileKind !== "pdf") {
+          setProgressText(t.progressNotPdf || "当前不是 PDF 文件。", true);
+          return;
+        }
+        if (!lastProbe || !lastProbe.hasTextLayer) {
+          setProgressText(t.progressNotReadable || "PDF 不可读（Mode B），请先手工涂抹并保存框选，然后再点红删PDF。", true);
+          return;
+        }
 
         if (!window.RasterExport || !window.RasterExport.exportRasterSecurePdfFromReadablePdf) {
-          setProgressText(t.progressExportMissing || "Export module not loaded", true);
+          setProgressText(t.progressExportMissing || "导出模块未加载", true);
           return;
         }
 
@@ -1282,7 +1276,7 @@ function bind() {
         const manualTermsSafe = Array.isArray(snap.manualTerms) ? snap.manualTerms : [];
 
         setProgressText([
-          (t.progressWorking || "Working…"),
+          (t.progressWorking || "处理中…"),
           `mode=A`,
           `lang=${lang}`,
           `moneyMode=M1`,
@@ -1300,13 +1294,13 @@ function bind() {
           manualTerms: manualTermsSafe
         });
 
-        setProgressText(t.progressDone || "Done ✅ Download started.", false);
-        requestAnimationFrame(syncIoBodiesEqualHeight);
+        setProgressText(t.progressDone || "完成 ✅ 已开始下载。", false);
+        requestAnimationFrame(syncManualToRiskHeight);
       } catch (e) {
         const msg = (e && (e.message || String(e))) || "Unknown error";
         const t2 = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
-        setProgressText(`${t2.progressFailed || "Export failed:"}\n${msg}`, true);
-        requestAnimationFrame(syncIoBodiesEqualHeight);
+        setProgressText(`${t2.progressFailed || "导出失败："}\n${msg}`, true);
+        requestAnimationFrame(syncManualToRiskHeight);
       }
     };
   }
