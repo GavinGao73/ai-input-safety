@@ -9,6 +9,7 @@
    - Mobile: IO tabs have distinct style (NOT same as main buttons)
    - ✅ FIX: remove bottom shadow/overlay that covered content when expanded
    - ✅ Mobile: show "图片" upload button only on small screens (optional)
+   - ✅ FIX (2026-02-21a2): robust inner fill for equal-height lock (A/B)
    ========================= */
 
 :root{
@@ -426,7 +427,6 @@ textarea{
 /* ✅ FIX: remove bottom overlay/shadow that could cover content when expanded */
 #manualBody.open,
 #riskBody.open{
-  /* keep scroll behavior but avoid any accidental overlay look */
   background: transparent;
 }
 #manualBody.open::after,
@@ -434,17 +434,22 @@ textarea{
   content:none !important;
 }
 
-/* ✅ FIX: when JS locks manualBody height, ensure inner grid fills it */
+/* ✅ FIX: when JS locks height, ensure inner fills it */
 #manualBody.open .io-bottom-grid,
 #riskBody.open .io-bottom-grid{
   height:100%;
 }
-#manualBody.open .io-bottom-grid-left,
-#riskBody.open .io-bottom-grid-right{
+
+/* ✅ EXTRA ROBUST FILL (2026-02-21a2):
+   Some DOM variants may not have .io-bottom-grid-left/.right.
+   Make ANY direct child inside .io-bottom-grid stretch. */
+#manualBody.open .io-bottom-grid > *,
+#riskBody.open .io-bottom-grid > *{
   height:100%;
+  min-height:0;
 }
 
-/* ✅ 3:2 ratio */
+/* ✅ 3:2 ratio (internal within each pane) */
 .io-bottom-grid{
   display:grid;
   grid-template-columns: 3fr 2fr;
@@ -490,7 +495,6 @@ textarea{
   min-height:0;
 }
 
-/* optional: make progress-only slightly tighter */
 .railcard-progress-only{
   gap:8px;
 }
@@ -500,7 +504,7 @@ textarea{
   font-size:12px;
   color: rgba(255,255,255,.88);
   letter-spacing:.2px;
-  text-align:center; /* ✅ center in card */
+  text-align:center;
 }
 
 .rail-divider{
@@ -510,18 +514,17 @@ textarea{
   margin:4px 0;
 }
 
-/* ✅ hint text (more readable on desktop; keep style) */
 .side-rail-note{
-  font-size:12px;             /* was 11px */
-  line-height:1.5;            /* slightly clearer */
-  color:rgba(255,255,255,.82);/* was .72 */
+  font-size:12px;
+  line-height:1.5;
+  color:rgba(255,255,255,.82);
   white-space:pre-line;
   overflow-wrap:anywhere;
   word-break:break-word;
 }
 
 /* =========================
-   Manual textarea (shared) — follow right height; scroll inside
+   Manual textarea (shared) — scrolls inside
    ========================= */
 
 .manual-terms-textarea{
@@ -530,7 +533,7 @@ textarea{
   min-height:0;
   height:100%;
 
-  resize:none; /* ✅ prevent breaking equal-height layout */
+  resize:none;
   background:var(--box-bg);
   border:1px solid var(--box-bd);
   border-radius:12px;
@@ -637,7 +640,6 @@ textarea{
     .wrap-mobile{ min-height: 100vh; }
   }
 
-  /* ✅ IO tabs: distinct from main buttons */
   .io-tabs{
     display:flex;
     gap:10px;
@@ -737,7 +739,6 @@ textarea{
 
   .grid, .card, .card-col, .filebar, .top-actions, .filename{ min-width:0; }
 
-  /* mobile: bottom grids stack */
   .io-bottom-grid{ grid-template-columns: 1fr; }
 }
 
