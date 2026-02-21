@@ -1,17 +1,13 @@
 // =========================
 // assets/app.js (FULL)
-// ✅ Personal build (2026-02-21a2)
-// Fixes per your latest requirement:
-// - Default collapsed (Manual + Risk)
-// - After ANY upload (Mode A or Mode B): auto expand BOTH manual + risk
-// - Desktop Mode B: ensure enough expanded height so Manual content is visible
-// - Desktop: keep left/right fold areas equal-height (manualBody == riskBody)
-// - Manual fold structure (Mode A/B) matches index.html grid:
-//   left pane (terms or note+button) + right rail (mode text)
-// - Mobile is handled by m.html (do not change here)
+// ✅ Personal build (2026-02-21a3)
+// Changes ONLY for your latest mobile requirements:
+// - Mobile: single upload entry (pdf + image) via #pdfFile
+// - Mobile: IO tab labels text restored via i18n (ui-tab-in / ui-tab-out)
+// - Keep everything else unchanged
 // =========================
 
-console.log("[APP] loaded v20260221a2-autoexpand+desktop-minheight+equalheight");
+console.log("[APP] loaded v20260221a3-mobile-single-upload+tabs-text");
 
 let currentLang = "zh";
 window.currentLang = currentLang;
@@ -599,11 +595,9 @@ function syncManualRiskHeights(){
   const riskOpen = $("btnToggleRisk")?.getAttribute("aria-expanded") === "true";
   if (!manOpen || !riskOpen) { clearBodyHeights(); return; }
 
-  // measure current risk content height
   const rh = riskBody.getBoundingClientRect().height;
   const target = Math.max(Math.ceil(rh || 0), DESKTOP_MIN_OPEN_H);
 
-  // force BOTH sides to same target height so Mode B won't collapse into a tiny strip
   manualBody.style.height = `${target}px`;
   manualBody.style.maxHeight = `${target}px`;
   manualBody.style.minHeight = `${DESKTOP_MIN_OPEN_H}px`;
@@ -615,7 +609,6 @@ function syncManualRiskHeights(){
   riskBody.style.overflow = "hidden";
 }
 
-// Observe riskBody changes (content / progress updates) -> resync
 let __riskResizeObs = null;
 function initRiskResizeObserver(){
   const riskBody = $("riskBody");
@@ -682,18 +675,20 @@ function setText() {
   if ($("ui-in-title")) $("ui-in-title").textContent = t.inTitle;
   if ($("ui-out-title")) $("ui-out-title").textContent = t.outTitle;
 
+  // ✅ FIX: mobile top IO tabs text
+  if ($("ui-tab-in")) $("ui-tab-in").textContent = t.tabIn || "";
+  if ($("ui-tab-out")) $("ui-tab-out").textContent = t.tabOut || "";
+
   if ($("inputText")) $("inputText").placeholder = t.placeholder;
   if ($("ui-input-watermark")) $("ui-input-watermark").textContent = t.inputWatermark;
 
   if ($("ui-upload-btn")) $("ui-upload-btn").textContent = t.btnUpload;
-  if ($("ui-upload-img-btn")) $("ui-upload-img-btn").textContent = t.btnUploadImg || "图片";
 
   const spMan = $("ui-manual-toggle-title");
   const spRisk = $("ui-risk-toggle-title");
   if (spMan) spMan.textContent = t.manualTitle || "手工处理";
   if (spRisk) spRisk.textContent = t.riskTitle || "风险评分";
 
-  // rail title + rail note by mode
   setManualRailTextByMode();
 
   const exportTitle = $("ui-export-title");
@@ -751,7 +746,6 @@ function applyRules(text) {
   lastRunMeta.moneyMode = "m1";
   lastRunMeta.lang = currentLang;
 
-  // If no rules, still allow manual terms masking + render
   if (!rules) {
     out = applyManualTermsMask(out, addHit);
     renderOutput(out);
@@ -784,7 +778,6 @@ function applyRules(text) {
       manualTerms: manualTerms.slice(0)
     };
 
-    // ✅ If a file is uploaded, keep both folds open
     requestAnimationFrame(() => {
       if (lastUploadedFile) {
         expandManualArea();
@@ -863,7 +856,6 @@ function applyRules(text) {
     manualTerms: manualTerms.slice(0)
   };
 
-  // ✅ If a file is uploaded, keep both folds open
   requestAnimationFrame(() => {
     if (lastUploadedFile) {
       expandManualArea();
@@ -886,21 +878,18 @@ async function handleFile(file) {
   lastFileKind = (file.type === "application/pdf") ? "pdf"
               : (file.type && file.type.startsWith("image/") ? "image" : "");
 
-  // reset manual selection
   __manualRedactSession = null;
   __manualRedactResult = null;
   try { window.__manual_redact_last = null; } catch (_) {}
 
   setStage3Ui("none");
 
-  // Image => Mode B
   if (lastFileKind === "image") {
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
     setManualPanesForMode("B");
     setManualRailTextByMode();
 
-    // ✅ REQUIRED: upload triggers auto expand (desktop + mobile)
     requestAnimationFrame(() => {
       expandManualArea();
       expandRiskArea();
@@ -930,7 +919,6 @@ async function handleFile(file) {
     lastProbe = probe || null;
 
     if (!probe || !probe.hasTextLayer) {
-      // Mode B
       lastRunMeta.fromPdf = false;
       setStage3Ui("B");
       setManualPanesForMode("B");
@@ -944,7 +932,6 @@ async function handleFile(file) {
       return;
     }
 
-    // Mode A
     lastRunMeta.fromPdf = true;
     setStage3Ui("A");
     setManualPanesForMode("A");
@@ -966,7 +953,6 @@ async function handleFile(file) {
       renderInputOverlayForPdf(text);
     }
 
-    // ✅ REQUIRED: upload triggers auto expand
     requestAnimationFrame(() => {
       expandManualArea();
       expandRiskArea();
@@ -975,7 +961,6 @@ async function handleFile(file) {
 
     window.dispatchEvent(new Event("safe:updated"));
   } catch (e) {
-    // Any error => Mode B
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
     setManualPanesForMode("B");
@@ -991,6 +976,7 @@ async function handleFile(file) {
 
 // ================= bind upload =================
 function bindPdfUI() {
+  // ✅ Single input on mobile/desktop (m.html uses only #pdfFile)
   const pdfInput = $("pdfFile");
   if (pdfInput) {
     pdfInput.addEventListener("change", (e) => {
@@ -1002,6 +988,7 @@ function bindPdfUI() {
     });
   }
 
+  // keep backward-compat safety (if some page still has #imgFile, it won't break)
   const imgInput = $("imgFile");
   if (imgInput) {
     imgInput.addEventListener("change", (e) => {
@@ -1016,7 +1003,6 @@ function bindPdfUI() {
 
 // ================= bind =================
 function bind() {
-  // language buttons
   document.querySelectorAll(".lang button").forEach(b => {
     b.onclick = () => {
       document.querySelectorAll(".lang button").forEach(x => x.classList.remove("active"));
@@ -1038,7 +1024,6 @@ function bind() {
     };
   });
 
-  // title-row toggles (default collapsed)
   const btnToggleManual = $("btnToggleManual");
   const manualBody = $("manualBody");
   if (btnToggleManual && manualBody) {
@@ -1059,7 +1044,6 @@ function bind() {
     };
   }
 
-  // Manual terms input
   const termInput = $("manualTerms") || $("nameList");
   if (termInput) {
     termInput.addEventListener("input", () => {
@@ -1081,7 +1065,6 @@ function bind() {
     window.__export_snapshot.manualTerms = manualTerms.slice(0);
   }
 
-  // Clear
   const btnClear = $("btnClear");
   if (btnClear) {
     btnClear.onclick = () => {
@@ -1137,7 +1120,6 @@ function bind() {
     };
   }
 
-  // Copy
   const btnCopy = $("btnCopy");
   if (btnCopy) {
     btnCopy.onclick = async () => {
@@ -1153,7 +1135,6 @@ function bind() {
     };
   }
 
-  // Auto-filter on typing (debounced)
   let autoTimer = null;
   const AUTO_DELAY = 220;
 
@@ -1187,7 +1168,6 @@ function bind() {
     });
   }
 
-  // Manual redact button: open UI (Mode B)
   const btnManual = $("btnManualRedact");
   if (btnManual) {
     btnManual.onclick = async () => {
@@ -1209,11 +1189,9 @@ function bind() {
     };
   }
 
-  // Unified export button (A/B)
   const btnExportRasterPdf = $("btnExportRasterPdf");
   if (btnExportRasterPdf) {
     btnExportRasterPdf.onclick = async () => {
-      // Always open risk so progress is visible
       expandRiskArea();
       expandManualArea();
       requestAnimationFrame(syncManualRiskHeights);
@@ -1225,7 +1203,6 @@ function bind() {
 
         if (!f) { setProgressText(t.progressNoFile || "未检测到文件，请先上传 PDF。", true); return; }
 
-        // -------- Mode B (manual visual export) --------
         if (lastStage3Mode === "B") {
           let res = __manualRedactResult || null;
 
@@ -1264,7 +1241,6 @@ function bind() {
           return;
         }
 
-        // -------- Mode A (readable PDF auto export) --------
         if (lastFileKind !== "pdf") { setProgressText(t.progressNotPdf || "当前不是 PDF 文件。", true); return; }
         if (!lastProbe || !lastProbe.hasTextLayer) {
           setProgressText(t.progressNotReadable || "PDF 不可读（Mode B），请先手工涂抹并保存框选，然后再点红删PDF。", true);
