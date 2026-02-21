@@ -501,6 +501,9 @@ function setStage3Ui(mode){
 
   if (btnPdf)  btnPdf.textContent  = (t && t.btnRedactPdf) ? t.btnRedactPdf : stage3Text("btnExportPdf");
   if (btnMan)  btnMan.textContent  = (t && t.btnManualRedact) ? t.btnManualRedact : stage3Text("btnManual");
+
+  // ✅ Mode B / none: do NOT lock manual height to risk box
+  if (lastStage3Mode !== "A") resetManualHeightLock();
 }
 
 /* ================= Manual panes switch (Mode A/B) ================= */
@@ -556,6 +559,12 @@ function toggleCtl(btn, body){
 
 /* ================= Height sync: manual follows risk ================= */
 function syncManualToRiskHeight(){
+  // ✅ only in Mode A: keep manual box same height as risk box
+  if (lastStage3Mode !== "A") {
+    resetManualHeightLock();
+    return;
+  }
+
   const riskBody = $("riskBody");
   const manualBody = $("manualBody");
   if (!riskBody || !manualBody) return;
