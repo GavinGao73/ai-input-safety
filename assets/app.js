@@ -268,6 +268,9 @@ function markHitsInOriginal(text){
     "url",
     "phone",
     "company",
+    "handle_label",
+    "ref_label",
+    "address_cn",
     "money",
     "address_de_street",
     "handle",
@@ -300,6 +303,21 @@ function markHitsInOriginal(text){
       s = s.replace(r.pattern, (m, p1, p2) => {
         const label = p1 || "";
         const val = p2 || "";
+        return `${label}${S1}${val}${S2}`;
+      });
+      continue;
+    }
+
+    // ✅ address_cn_partial highlight: highlight only the "road+no" segment when present; else whole value
+    if (r.mode === "address_cn_partial") {
+      s = s.replace(r.pattern, (m, p1, p2) => {
+        const label = p1 || "";
+        const val = p2 || "";
+        const reRoadNo = /([\u4E00-\u9FFF]{1,20}(?:路|街|道|大道|巷|弄))\s*(\d{1,6}\s*号)/g;
+        if (reRoadNo.test(val)) {
+          const markedVal = val.replace(reRoadNo, (mm, a, b) => `${a}${S1}${b}${S2}`);
+          return `${label}${markedVal}`;
+        }
         return `${label}${S1}${val}${S2}`;
       });
       continue;
@@ -367,6 +385,9 @@ const RISK_WEIGHTS = {
   secret: 30,
   phone: 16,
   address_de_street: 18,
+  address_cn: 18,
+  handle_label: 10,
+  ref_label: 6,
   handle: 10,
   ref: 6,
   title: 4,
@@ -425,6 +446,9 @@ function labelForKey(k) {
       secret: "密码/验证码",
       phone: "电话",
       address_de_street: "地址（街道门牌）",
+      address_cn: "地址（路号）",
+      handle_label: "账号名/登录/IM",
+      ref_label: "编号（申请/订单/参考）",
       handle: "账号名/Handle",
       ref: "编号/引用",
       title: "称谓",
@@ -441,6 +465,9 @@ function labelForKey(k) {
       secret: "Passwort/Code",
       phone: "Telefon",
       address_de_street: "Adresse (Straße/Nr.)",
+      address_cn: "Adresse (Straße/Nr.)",
+      handle_label: "Handle/Account",
+      ref_label: "Referenz",
       handle: "Handle/Account",
       ref: "Referenz",
       title: "Anrede",
@@ -457,6 +484,9 @@ function labelForKey(k) {
       secret: "Password/OTP",
       phone: "Phone",
       address_de_street: "Address (street/no.)",
+      address_cn: "Address (street/no.)",
+      handle_label: "Handle/Account",
+      ref_label: "Reference",
       handle: "Handle/Account",
       ref: "Reference",
       title: "Title",
@@ -793,6 +823,9 @@ function applyRules(text) {
     "url",
     "phone",
     "company",
+    "handle_label",
+    "ref_label",
+    "address_cn",
     "money",
     "address_de_street",
     "handle",
@@ -914,6 +947,22 @@ function applyRules(text) {
         const label = args[1] || "";
         addHit(key);
         return `${label}${placeholder(r.tag)}`;
+      }
+
+      // ✅ CN address partial: keep label + value; only mask "号" portion when possible
+      if (r.mode === "address_cn_partial") {
+        const label = args[1] || "";
+        const val = args[2] || "";
+        const reRoadNo = /([\u4E00-\u9FFF]{1,20}(?:路|街|道|大道|巷|弄))\s*(\d{1,6}\s*号)/g;
+
+        if (reRoadNo.test(val)) {
+          addHit(key);
+          const v2 = val.replace(reRoadNo, (m2, a, b) => `${a}${placeholder("ADDRESS")}`);
+          return `${label}${v2}`;
+        }
+
+        // no road/no pattern -> keep as-is (do not change unrelated content)
+        return match;
       }
 
       // 2) phone: keep label if possible; guard card/account digits (>=16)
