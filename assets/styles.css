@@ -510,11 +510,11 @@ textarea{
   margin:4px 0;
 }
 
-/* ✅ hint text (smaller, wraps, line breaks) */
+/* ✅ hint text (more readable on desktop; keep style) */
 .side-rail-note{
-  font-size:11px;
-  line-height:1.45;
-  color:rgba(255,255,255,.72);
+  font-size:12px;             /* was 11px */
+  line-height:1.5;            /* slightly clearer */
+  color:rgba(255,255,255,.82);/* was .72 */
   white-space:pre-line;
   overflow-wrap:anywhere;
   word-break:break-word;
@@ -789,6 +789,12 @@ textarea{
   color: rgba(255,255,255,.92);
   text-align:center;
   margin-bottom:8px;
+}
+
+/* ✅ FIX: if i18n sets title to "", don't reserve blank space */
+.manual-redact-title:empty{
+  display:none;
+  margin:0;
 }
 
 .manual-redact-note{
