@@ -7,10 +7,12 @@
 // - ✅ Mode B export uses SAME top "红删PDF" button (no extra export button)
 // - ✅ RedactUI no longer exports; it stores selection; main button exports
 // - FIX (mobile): progress injected if no exportStatus slot
-// - Keep: expand after file upload; collapse on Clear; height sync via ResizeObserver
+// - ✅ FIX (2026-02-21a2): Always auto-expand on ANY upload (A/B, desktop/mobile)
+// - ✅ FIX (2026-02-21a2): Keep Manual/Risk equal height when expanded (A/B)
+// - Keep: collapse on Clear; height sync via ResizeObserver
 // =========================
 
-console.log("[APP] loaded v20260221a1-unified-export+rail-split+upload-split");
+console.log("[APP] loaded v20260221a2-auto-expand-any-upload+equal-height");
 
 let currentLang = "zh";
 window.currentLang = currentLang;
@@ -514,9 +516,6 @@ function setStage3Ui(mode){
   // ✅ hard fallback (fix: mobile button text occasionally empty)
   if (btnPdf && !String(btnPdf.textContent || "").trim()) btnPdf.textContent = stage3Text("btnExportPdf");
   if (btnMan && !String(btnMan.textContent || "").trim()) btnMan.textContent = stage3Text("btnManual");
-
-  // ✅ Mode B / none: do NOT lock manual height to risk box
-  if (lastStage3Mode !== "A") resetManualHeightLock();
 }
 
 /* ================= Manual panes switch (Mode A/B) ================= */
@@ -570,51 +569,66 @@ function toggleCtl(btn, body){
   setCtlExpanded(btn, body, !cur);
 }
 
-/* ================= Height sync: manual follows risk ================= */
-function syncManualToRiskHeight(){
-  // ✅ only in Mode A: keep manual box same height as risk box
-  if (lastStage3Mode !== "A") {
-    resetManualHeightLock();
+/* ================= Height sync: Manual/Risk equal height (A/B) ================= */
+function resetIoHeightLock(){
+  const manualBody = $("manualBody");
+  const riskBody = $("riskBody");
+  if (manualBody) {
+    manualBody.style.height = "";
+    manualBody.style.maxHeight = "";
+    manualBody.style.overflow = "";
+  }
+  if (riskBody) {
+    riskBody.style.height = "";
+    riskBody.style.maxHeight = "";
+    riskBody.style.overflow = "";
+  }
+}
+
+function syncIoBodiesEqualHeight(){
+  const manualBody = $("manualBody");
+  const riskBody = $("riskBody");
+  if (!manualBody || !riskBody) return;
+
+  const manOpen  = $("btnToggleManual")?.getAttribute("aria-expanded") === "true";
+  const riskOpen = $("btnToggleRisk")?.getAttribute("aria-expanded") === "true";
+
+  if (!manOpen || !riskOpen) {
+    resetIoHeightLock();
     return;
   }
 
-  const riskBody = $("riskBody");
-  const manualBody = $("manualBody");
-  if (!riskBody || !manualBody) return;
+  // ✅ baseline to avoid “empty risk box collapses”
+  const BASE = 220;
 
-  const riskOpen = $("btnToggleRisk")?.getAttribute("aria-expanded") === "true";
-  const manOpen  = $("btnToggleManual")?.getAttribute("aria-expanded") === "true";
-  if (!riskOpen || !manOpen) return;
+  const mh = Math.max(BASE, manualBody.scrollHeight || 0);
+  const rh = Math.max(BASE, riskBody.scrollHeight || 0);
+  const H  = Math.ceil(Math.max(mh, rh));
 
-  const riskH = riskBody.getBoundingClientRect().height;
-  if (!riskH || riskH < 40) return;
-
-  manualBody.style.height = `${Math.ceil(riskH)}px`;
-  manualBody.style.maxHeight = `${Math.ceil(riskH)}px`;
+  manualBody.style.height = `${H}px`;
+  manualBody.style.maxHeight = `${H}px`;
   manualBody.style.overflow = "auto";
+
+  riskBody.style.height = `${H}px`;
+  riskBody.style.maxHeight = `${H}px`;
+  riskBody.style.overflow = "auto";
 }
 
-function resetManualHeightLock(){
-  const manualBody = $("manualBody");
-  if (!manualBody) return;
-  manualBody.style.height = "";
-  manualBody.style.maxHeight = "";
-  manualBody.style.overflow = "";
-}
-
-/* ✅ live observer: riskBody resize => manualBody sync */
-let __riskResizeObs = null;
+/* ✅ live observer: either side resize => equalize */
+let __ioResizeObs = null;
 function initRiskResizeObserver(){
+  const manualBody = $("manualBody");
   const riskBody = $("riskBody");
-  if (!riskBody || !("ResizeObserver" in window)) return;
+  if (!manualBody || !riskBody || !("ResizeObserver" in window)) return;
 
-  if (__riskResizeObs) __riskResizeObs.disconnect();
+  if (__ioResizeObs) __ioResizeObs.disconnect();
 
-  __riskResizeObs = new ResizeObserver(() => {
-    requestAnimationFrame(syncManualToRiskHeight);
+  __ioResizeObs = new ResizeObserver(() => {
+    requestAnimationFrame(syncIoBodiesEqualHeight);
   });
 
-  __riskResizeObs.observe(riskBody);
+  __ioResizeObs.observe(manualBody);
+  __ioResizeObs.observe(riskBody);
 }
 
 function expandManualArea(){
@@ -636,6 +650,12 @@ function collapseRiskArea(){
   const btn = $("btnToggleRisk");
   const body = $("riskBody");
   if (btn && body) { setCtlExpanded(btn, body, false); return; }
+}
+
+function autoExpandAfterUpload(){
+  expandManualArea();
+  expandRiskArea();
+  requestAnimationFrame(syncIoBodiesEqualHeight);
 }
 
 /* ================= Progress area (prefer HTML slot #exportStatus) ================= */
@@ -808,15 +828,6 @@ function applyRules(text) {
       manualTerms: manualTerms.slice(0)
     };
 
-    requestAnimationFrame(() => {
-      // ✅ desktop: do NOT auto expand for non-readable uploads (Mode B)
-      if (lastUploadedFile && (lastRunMeta.fromPdf || isSmallScreen())) {
-        expandRiskArea();
-        expandManualArea();
-        syncManualToRiskHeight();
-      }
-    });
-
     window.dispatchEvent(new Event("safe:updated"));
     return out;
   }
@@ -887,15 +898,6 @@ function applyRules(text) {
     manualTerms: manualTerms.slice(0)
   };
 
-  requestAnimationFrame(() => {
-    // ✅ desktop: do NOT auto expand for non-readable uploads (Mode B)
-    if (lastUploadedFile && (lastRunMeta.fromPdf || isSmallScreen())) {
-      expandRiskArea();
-      expandManualArea();
-      syncManualToRiskHeight();
-    }
-  });
-
   window.dispatchEvent(new Event("safe:updated"));
   return out;
 }
@@ -924,14 +926,8 @@ async function handleFile(file) {
     setManualPanesForMode("B");
     setManualRailTextByMode();
 
-    // ✅ desktop: Mode B 不自动展开；mobile 仍展开以减少操作步数
-    if (isSmallScreen()) {
-      requestAnimationFrame(() => {
-        expandManualArea();
-        expandRiskArea();
-        syncManualToRiskHeight();
-      });
-    }
+    // ✅ ALWAYS auto-expand after any upload (desktop/mobile)
+    requestAnimationFrame(autoExpandAfterUpload);
     return;
   }
 
@@ -944,13 +940,7 @@ async function handleFile(file) {
       setManualPanesForMode("B");
       setManualRailTextByMode();
 
-      if (isSmallScreen()) {
-        requestAnimationFrame(() => {
-          expandManualArea();
-          expandRiskArea();
-          syncManualToRiskHeight();
-        });
-      }
+      requestAnimationFrame(autoExpandAfterUpload);
       return;
     }
 
@@ -964,13 +954,7 @@ async function handleFile(file) {
       setManualPanesForMode("B");
       setManualRailTextByMode();
 
-      if (isSmallScreen()) {
-        requestAnimationFrame(() => {
-          expandManualArea();
-          expandRiskArea();
-          syncManualToRiskHeight();
-        });
-      }
+      requestAnimationFrame(autoExpandAfterUpload);
       return;
     }
 
@@ -983,15 +967,6 @@ async function handleFile(file) {
     const text = String(probe.text || "").trim();
     lastPdfOriginalText = text;
 
-    if (!text) {
-      requestAnimationFrame(() => {
-        expandManualArea();
-        expandRiskArea();
-        syncManualToRiskHeight();
-      });
-      return;
-    }
-
     const ta = $("inputText");
     if (ta) {
       ta.value = text;
@@ -1000,23 +975,21 @@ async function handleFile(file) {
 
     updateInputWatermarkVisibility();
 
-    applyRules(text);
-    renderInputOverlayForPdf(text);
+    if (text) {
+      applyRules(text);
+      renderInputOverlayForPdf(text);
+      window.dispatchEvent(new Event("safe:updated"));
+    }
 
-    window.dispatchEvent(new Event("safe:updated"));
+    // ✅ ALWAYS auto-expand after any upload (desktop/mobile)
+    requestAnimationFrame(autoExpandAfterUpload);
   } catch (e) {
     lastRunMeta.fromPdf = false;
     setStage3Ui("B");
     setManualPanesForMode("B");
     setManualRailTextByMode();
 
-    if (isSmallScreen()) {
-      requestAnimationFrame(() => {
-        expandManualArea();
-        expandRiskArea();
-        syncManualToRiskHeight();
-      });
-    }
+    requestAnimationFrame(autoExpandAfterUpload);
   }
 }
 
@@ -1064,7 +1037,7 @@ function bind() {
 
       if (ta) renderInputOverlayForPdf(ta.value || "");
 
-      requestAnimationFrame(syncManualToRiskHeight);
+      requestAnimationFrame(syncIoBodiesEqualHeight);
     };
   });
 
@@ -1072,20 +1045,20 @@ function bind() {
   const btnToggleManual = $("btnToggleManual");
   const manualBody = $("manualBody");
   if (btnToggleManual && manualBody) {
-    setCtlExpanded(btnToggleManual, manualBody, false);
+    setCtlExpanded(btnToggleManual, manualBody, false); // ✅ default collapsed
     btnToggleManual.onclick = () => {
       toggleCtl(btnToggleManual, manualBody);
-      requestAnimationFrame(syncManualToRiskHeight);
+      requestAnimationFrame(syncIoBodiesEqualHeight);
     };
   }
 
   const btnToggleRisk = $("btnToggleRisk");
   const riskBody = $("riskBody");
   if (btnToggleRisk && riskBody) {
-    setCtlExpanded(btnToggleRisk, riskBody, false);
+    setCtlExpanded(btnToggleRisk, riskBody, false); // ✅ default collapsed
     btnToggleRisk.onclick = () => {
       toggleCtl(btnToggleRisk, riskBody);
-      requestAnimationFrame(syncManualToRiskHeight);
+      requestAnimationFrame(syncIoBodiesEqualHeight);
     };
   }
 
@@ -1103,7 +1076,7 @@ function bind() {
       else window.dispatchEvent(new Event("safe:updated"));
 
       renderInputOverlayForPdf(($("inputText") && $("inputText").value) || "");
-      requestAnimationFrame(syncManualToRiskHeight);
+      requestAnimationFrame(syncIoBodiesEqualHeight);
     });
 
     setManualTermsFromText(termInput.value || "");
@@ -1128,7 +1101,7 @@ function bind() {
       collapseManualArea();
       collapseRiskArea();
       clearProgress();
-      resetManualHeightLock();
+      resetIoHeightLock();
 
       const rb = $("riskBox");
       if (rb) rb.innerHTML = "";
@@ -1239,8 +1212,7 @@ function bind() {
         if (window.__manual_redact_last) __manualRedactResult = window.__manual_redact_last;
       } catch (_) {}
 
-      // keep heights stable
-      requestAnimationFrame(syncManualToRiskHeight);
+      requestAnimationFrame(syncIoBodiesEqualHeight);
     };
   }
 
@@ -1248,8 +1220,8 @@ function bind() {
   const btnExportRasterPdf = $("btnExportRasterPdf");
   if (btnExportRasterPdf) {
     btnExportRasterPdf.onclick = async () => {
-      expandRiskArea();
-      requestAnimationFrame(syncManualToRiskHeight);
+      // ✅ always show both panes, keep equal height
+      autoExpandAfterUpload();
 
       const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
 
@@ -1290,7 +1262,7 @@ function bind() {
           await window.RasterExport.exportRasterSecurePdfFromVisual(res);
 
           setProgressText(t.progressDone || "Done ✅ Download started.", false);
-          requestAnimationFrame(syncManualToRiskHeight);
+          requestAnimationFrame(syncIoBodiesEqualHeight);
           return;
         }
 
@@ -1329,12 +1301,12 @@ function bind() {
         });
 
         setProgressText(t.progressDone || "Done ✅ Download started.", false);
-        requestAnimationFrame(syncManualToRiskHeight);
+        requestAnimationFrame(syncIoBodiesEqualHeight);
       } catch (e) {
         const msg = (e && (e.message || String(e))) || "Unknown error";
         const t2 = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
         setProgressText(`${t2.progressFailed || "Export failed:"}\n${msg}`, true);
-        requestAnimationFrame(syncManualToRiskHeight);
+        requestAnimationFrame(syncIoBodiesEqualHeight);
       }
     };
   }
