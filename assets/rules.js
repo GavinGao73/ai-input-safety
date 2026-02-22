@@ -67,8 +67,8 @@ const RULES_BY_KEY = {
         // g4: legal suffix
         String.raw`(` + String.raw`` + String.raw`)` +
         String.raw`((?=[\p{Script=Han}A-Za-z])[\p{Script=Han}A-Za-z0-9·&\-]{2,12}` +
-          // ✅ FIX: was \))) -> invalid regex; correct closing paren is \))
-          String.raw`(?:（[\p{Script=Han}]{2,10}）|\([\p{Script=Han}]{2,10}\))` +
+          // ✅ FIX: close the (?: ... ) group properly (add one extra ')')
+          String.raw`(?:（[\p{Script=Han}]{2,10}）|\([\p{Script=Han}]{2,10}\)))` +
         String.raw`([\p{Script=Han}A-Za-z0-9（）()·&\-\s]{0,40}?)` +
         String.raw`(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)` +
       String.raw`)` +
