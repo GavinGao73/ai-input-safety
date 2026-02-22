@@ -8,6 +8,7 @@
 // - ✅ Skip secondary matching on already-inserted placeholders (anti "串味"/二次污染)
 // - ✅ Phone digit-count guard (>=16 digits => do NOT treat as phone; prevents card/account shredding)
 // - ✅ markHitsInOriginal sync with applyRules logic (priority + digit guard)
+// - ✅ FIX (2026-02-22): company masking keeps FULL legal suffix; no invalid continue in replace-callback
 // =========================
 
 console.log("[APP] loaded v20260221a3-mobile-single-upload+tabs-text");
@@ -349,35 +350,35 @@ function markHitsInOriginal(text){
       continue;
     }
 
-     // ✅ company highlight: highlight only the identifiable part, keep FULL legal suffix visible
-if (r.mode === "company") {
-  s = s.replace(r.pattern, (...args) => {
-    const m = String(args[0] || "");
+    // ✅ company highlight: highlight only the identifiable part, keep FULL legal suffix visible
+    if (r.mode === "company") {
+      s = s.replace(r.pattern, (...args) => {
+        const m = String(args[0] || "");
 
-    // preserve trailing punctuation (readability)
-    const punctMatch = m.match(/[。．.，,;；!！?？)）】\]\s]+$/u);
-    const punct = punctMatch ? punctMatch[0] : "";
-    const coreStr = punct ? m.slice(0, -punct.length) : m;
+        // preserve trailing punctuation (readability)
+        const punctMatch = m.match(/[。．.，,;；!！?？)）】\]\s]+$/u);
+        const punct = punctMatch ? punctMatch[0] : "";
+        const coreStr = punct ? m.slice(0, -punct.length) : m;
 
-    // ✅ extract FULL legal suffix only from the end (CN)
-    const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
-    if (sufMatch) {
-      const suffix = sufMatch[1];
-      const head = coreStr.slice(0, coreStr.length - suffix.length);
-      return `${S1}${head}${S2}${suffix}${punct}`;
+        // ✅ extract FULL legal suffix only from the end (CN)
+        const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
+        if (sufMatch) {
+          const suffix = sufMatch[1];
+          const head = coreStr.slice(0, coreStr.length - suffix.length);
+          return `${S1}${head}${S2}${suffix}${punct}`;
+        }
+
+        // --- DE/EN fallback: keep legal form visible, highlight name ---
+        const groups = args[args.length - 1];
+        if (groups && typeof groups === "object" && groups.legal) {
+          return `${S1}${groups.name || ""}${S2}${groups.legal || ""}${punct}`;
+        }
+
+        // fallback: highlight whole match
+        return `${S1}${m}${S2}`;
+      });
+      continue;
     }
-
-    // --- DE/EN fallback: keep legal form visible, highlight name ---
-    const groups = args[args.length - 1];
-    if (groups && typeof groups === "object" && groups.legal) {
-      return `${S1}${groups.name || ""}${S2}${groups.legal || ""}${punct}`;
-    }
-
-    // fallback: highlight whole match
-    return `${S1}${m}${S2}`;
-  });
-  continue;
-}
 
     // default highlight: whole match
     s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
@@ -1017,47 +1018,31 @@ function applyRules(text) {
         return placeholder(r.tag);
       }
 
-       // 3) company: ✅ keep FULL legal suffix (CN), tolerate masking geo/industry
-if (r.mode === "company") {
-  const raw = String(match || "");
+      // 3) company: ✅ keep FULL legal suffix (CN), tolerate masking geo/industry
+      if (r.mode === "company") {
+        const raw = String(match || "");
 
-  // preserve trailing punctuation
-  const punctMatch = raw.match(/[。．.，,;；!！?？)）】\]\s]+$/u);
-  const punct = punctMatch ? punctMatch[0] : "";
-  const coreStr = punct ? raw.slice(0, -punct.length) : raw;
+        // preserve trailing punctuation
+        const punctMatch = raw.match(/[。．.，,;；!！?？)）】\]\s]+$/u);
+        const punct = punctMatch ? punctMatch[0] : "";
+        const coreStr = punct ? raw.slice(0, -punct.length) : raw;
 
-  // CN: keep FULL legal suffix (must be完整保留)
-  const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
-
-  addHit(key);
-
-  if (sufMatch) {
-    return `${placeholder(r.tag)}${sufMatch[1]}${punct}`;
-  }
-
-  // DE/EN: if named groups exist, keep legal form
-  const groups = args[args.length - 1];
-  if (groups && typeof groups === "object" && groups.legal) {
-    return `${placeholder(r.tag)}${groups.legal}${punct}`;
-  }
-
-  // unknown shape -> mask whole
-  return placeholder(r.tag);
-}
-
-        // fallback to old indexed groups (rare)
-        const g1 = args[1], g2 = args[2], g3 = args[3], g4 = args[4];
-        if (g4) {
-          addHit(key);
-          return `${g1 || ""}${placeholder(r.tag)}${g3 || ""}${g4 || ""}`;
-        }
-        const g5 = args[5], g6 = args[6];
-        if (g6) {
-          addHit(key);
-          return `${placeholder(r.tag)}${g6 || ""}`;
-        }
+        // CN: keep FULL legal suffix (must be完整保留)
+        const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
 
         addHit(key);
+
+        if (sufMatch) {
+          return `${placeholder(r.tag)}${sufMatch[1]}${punct}`;
+        }
+
+        // DE/EN: if named groups exist, keep legal form
+        const groups = args[args.length - 1];
+        if (groups && typeof groups === "object" && groups.legal) {
+          return `${placeholder(r.tag)}${groups.legal}${punct}`;
+        }
+
+        // unknown shape -> mask whole
         return placeholder(r.tag);
       }
 
