@@ -4,7 +4,11 @@
 // Goals:
 // - Keep document readable for AI/humans (labels remain, values masked)
 // - ✅ URL handling enabled (full replace)
-// - Company name: mask ONLY the core identifying word (brand/主体词), keep suffix + region/type
+// - Company name (CN): follow 2 dominant formats
+//    1) 地名 + 品牌词 + 行业通用词 + 公司类型：仅遮“品牌词”（不向前）
+//       例：上海赛行文化传媒有限公司 → 上海【公司】文化传媒有限公司（允许多遮后面一两个字，但禁止向前）
+//    2) 品牌词（地名） + 行业通用词 + 公司类型：仅遮“品牌词（地名）”
+//       例：赛行（上海）文化传媒有限公司 → 【公司】文化传媒有限公司（括号内覆盖不全也可）
 // - Person name: mask names with strong context to avoid false positives
 // - ✅ Strong context labels first (password/otp/account...)
 
@@ -42,25 +46,48 @@ const RULES_BY_KEY = {
       /(?:^|[^\p{L}])(?:姓名|联系人|联\s*系\s*人|Ansprechpartner(?:in)?|Kontakt(?:person)?|Name|Contact)\s*[:：]?\s*([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}){1,2})|([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30}\s+[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'.-]{1,30})/gu
   },
 
-  /* ===================== COMPANY (SAFER) ===================== */
+  /* ===================== COMPANY (CN + DE/EN) ===================== */
   company: {
+    // CN formats supported:
+    // (F2) 品牌（地名）... + 公司后缀 → 遮“品牌（地名）”
+    // (F1) 地名 + 品牌 + ... + 公司后缀 → 遮“品牌”（不向前遮地名）
+    //
+    // NOTE:
+    // - 这里的捕获组顺序必须与 app.js 的 company mode replacement 对齐：
+    //   CN: (g1 prefix)(g2 core_to_mask)(g3 tail)(g4 suffix)
+    //   DE/EN: (g5 name)(g6 legal_form)
     pattern: new RegExp(
       String.raw`(?:` +
-        // CN company: optional 2–3 Han prefix + core(2–12, MUST contain Han/Letter) + tail + legal suffix
-        String.raw`((?:[\p{Script=Han}]{2,3})?)` +
-        // ✅ core must contain at least one Han OR letter (blocks pure numbers / garbage)
-        String.raw`((?=[\p{Script=Han}A-Za-z])[\p{Script=Han}A-Za-z0-9·&\-]{2,12})` +
-        // tail: keep short, avoid swallowing whole sentences
+        // =================== CN format 2: Brand(Region) ... Suffix ===================
+        // g1: "" (no prefix)
+        // g2: brand + (region)  -> allow full-width and half-width parens
+        // g3: tail
+        // g4: legal suffix
+        String.raw`(` + String.raw`` + String.raw`)` +
+        String.raw`((?=[\p{Script=Han}A-Za-z])[\p{Script=Han}A-Za-z0-9·&\-]{2,12}` +
+          String.raw`(?:（[\p{Script=Han}]{2,10}）|\([\p{Script=Han}]{2,10}\)))` +
         String.raw`([\p{Script=Han}A-Za-z0-9（）()·&\-\s]{0,40}?)` +
-        // ✅ prefer longer legal suffix first
         String.raw`(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)` +
-        String.raw`)` +
-        String.raw`|` +
-        // DE/EN company: name + legal form
-        String.raw`(?:` +
-          String.raw`\b([A-Za-z][A-Za-z0-9&.\-]{1,40}?)\b` +
-          String.raw`(\s+(?:GmbH(?:\s*&\s*Co\.\s*KG)?|AG|UG|KG|GbR|e\.K\.|Ltd\.?|Inc\.?|LLC|S\.?A\.?|S\.?r\.?l\.?|B\.?V\.?))\b` +
-        String.raw`)`,
+
+      String.raw`)` +
+      String.raw`|` +
+      String.raw`(?:` +
+        // =================== CN format 1: Region + Brand + ... Suffix ===================
+        // g1: region prefix (keep, NEVER mask forward)
+        // g2: brand core (mask)
+        // g3: tail
+        // g4: legal suffix
+        String.raw`((?:[\p{Script=Han}]{2,6}(?:市|省|自治区|特别行政区|区|县|州|盟)?)?)` +
+        String.raw`((?=[\p{Script=Han}A-Za-z])[\p{Script=Han}A-Za-z0-9·&\-]{2,12})` +
+        String.raw`([\p{Script=Han}A-Za-z0-9（）()·&\-\s]{0,40}?)` +
+        String.raw`(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)` +
+      String.raw`)` +
+      String.raw`|` +
+      // =================== DE/EN company: name + legal form ===================
+      String.raw`(?:` +
+        String.raw`\b([A-Za-z][A-Za-z0-9&.\-]{1,40}?)\b` +
+        String.raw`(\s+(?:GmbH(?:\s*&\s*Co\.\s*KG)?|AG|UG|KG|GbR|e\.K\.|Ltd\.?|Inc\.?|LLC|S\.?A\.?|S\.?r\.?l\.?|B\.?V\.?))\b` +
+      String.raw`)`,
       "giu"
     ),
     tag: "COMPANY",
