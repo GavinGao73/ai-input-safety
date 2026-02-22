@@ -349,34 +349,36 @@ function markHitsInOriginal(text){
       continue;
     }
 
-    // ✅ company highlight: highlight ONLY the core word (主体词 / name)
-    if (r.mode === "company") {
-      s = s.replace(r.pattern, (...args) => {
-        const groups = args[args.length - 1];
-        if (groups && typeof groups === "object") {
-          // CN form 1
-          if (groups.suffix) {
-            return `${groups.prefix || ""}${S1}${groups.core || ""}${S2}${groups.tail || ""}${groups.suffix || ""}`;
-          }
-          // CN form 2
-          if (groups.suffix2) {
-            return `${S1}${groups.core2 || ""}${S2}${groups.tail2 || ""}${groups.suffix2 || ""}`;
-          }
-          // DE/EN
-          if (groups.legal) {
-            return `${S1}${groups.name || ""}${S2}${groups.legal || ""}`;
-          }
-        }
+// ✅ company highlight: highlight only the identifiable part, keep FULL legal suffix visible
+if (r.mode === "company") {
+  s = s.replace(r.pattern, (...args) => {
+    const m = String(args[0] || "");
 
-        // fallback: keep old behavior (should rarely happen)
-        const m = args[0];
-        const g1 = args[1], g2 = args[2], g3 = args[3], g4 = args[4], g5 = args[5], g6 = args[6];
-        if (g4) return `${g1 || ""}${S1}${g2 || ""}${S2}${g3 || ""}${g4 || ""}`;
-        if (g6) return `${S1}${g5 || ""}${S2}${g6 || ""}`;
-        return `${S1}${m}${S2}`;
-      });
-      continue;
+    // preserve trailing punctuation (readability)
+    const punctMatch = m.match(/[。．.，,;；!！?？)）】\]\s]+$/u);
+    const punct = punctMatch ? punctMatch[0] : "";
+    const coreStr = punct ? m.slice(0, -punct.length) : m;
+
+    // ✅ extract FULL legal suffix only from the end (CN)
+    const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
+    if (sufMatch) {
+      const suffix = sufMatch[1];
+      const head = coreStr.slice(0, coreStr.length - suffix.length);
+      // highlight head (identifiable part), keep suffix intact
+      return `${S1}${head}${S2}${suffix}${punct}`;
     }
+
+    // --- DE/EN fallback: keep legal form visible, highlight name ---
+    const groups = args[args.length - 1];
+    if (groups && typeof groups === "object" && groups.legal) {
+      return `${S1}${groups.name || ""}${S2}${groups.legal || ""}${punct}`;
+    }
+
+    // fallback: highlight whole match
+    return `${S1}${m}${S2}`;
+  });
+  continue;
+}
 
     // default highlight: whole match
     s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
@@ -1016,26 +1018,37 @@ function applyRules(text) {
         return placeholder(r.tag);
       }
 
-      // 3) company: mask only core word (CN rules per your spec), keep legal suffix
-      if (r.mode === "company") {
-        const groups = args[args.length - 1];
-        if (groups && typeof groups === "object") {
-          // CN form 1: 地名 + 主体词 + ... + 后缀
-          if (groups.suffix) {
-            addHit(key);
-            return `${groups.prefix || ""}${placeholder(r.tag)}${groups.tail || ""}${groups.suffix || ""}`;
-          }
-          // CN form 2: 主体词（地名） + ... + 后缀
-          if (groups.suffix2) {
-            addHit(key);
-            return `${placeholder(r.tag)}${groups.tail2 || ""}${groups.suffix2 || ""}`;
-          }
-          // DE/EN: name + legal form
-          if (groups.legal) {
-            addHit(key);
-            return `${placeholder(r.tag)}${groups.legal || ""}`;
-          }
-        }
+      // 3) company: ✅ keep FULL legal suffix (CN), tolerate masking geo/industry
+if (r.mode === "company") {
+  // --- CN: preserve trailing legal suffix fully ---
+  // match may end with punctuation like "。" "." "，" etc; preserve it too.
+  const raw = String(match || "");
+
+  // split trailing punctuation (keep readable)
+  const punctMatch = raw.match(/[。．.，,;；!！?？)）】\]\s]+$/u);
+  const punct = punctMatch ? punctMatch[0] : "";
+  const coreStr = punct ? raw.slice(0, -punct.length) : raw;
+
+  // extract legal suffix ONLY from the end (must be完整)
+  const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
+
+  if (sufMatch) {
+    addHit(key);
+    // you said geo/industry masking is OK, so we output only placeholder + full legal suffix
+    return `${placeholder(r.tag)}${sufMatch[1]}${punct}`;
+  }
+
+  // --- DE/EN fallback (keep legal form) ---
+  const g6 = args[6]; // legal form like GmbH/AG...
+  if (g6) {
+    addHit(key);
+    return `${placeholder(r.tag)}${g6}${punct}`;
+  }
+
+  // unknown shape -> mask whole
+  addHit(key);
+  return placeholder(r.tag);
+}
 
         // fallback to old indexed groups (rare)
         const g1 = args[1], g2 = args[2], g3 = args[3], g4 = args[4];
