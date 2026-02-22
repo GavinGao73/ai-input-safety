@@ -231,3 +231,38 @@ function setText() {
 
   setStage3Ui(lastStage3Mode);
 }
+
+// =========================
+// UI boot patch (restored from app.js boot responsibility)
+// Purpose: ensure UI texts are applied once DOM+i18n are ready,
+// even after app.js is split into multiple files.
+// NOTE: does NOT change any existing logic; only triggers setText/setStage3Ui safely.
+// =========================
+(function uiBootPatch(){
+  function safeApplyTexts(){
+    try {
+      // i18n not ready -> skip
+      if (!(window.I18N && window.I18N[currentLang])) return;
+
+      // apply all UI texts (includes stage3 buttons)
+      if (typeof setText === "function") setText();
+      else if (typeof setStage3Ui === "function") setStage3Ui(lastStage3Mode);
+
+    } catch (_) {}
+  }
+
+  // If DOM already parsed, run ASAP; otherwise wait for DOMContentLoaded.
+  if (document.readyState === "interactive" || document.readyState === "complete") {
+    // defer one frame to let other scripts define globals (engine/stage3/main)
+    requestAnimationFrame(safeApplyTexts);
+  } else {
+    document.addEventListener("DOMContentLoaded", () => {
+      requestAnimationFrame(safeApplyTexts);
+    }, { once: true });
+  }
+
+  // Also listen for i18n late-load edge case
+  window.addEventListener("load", () => {
+    requestAnimationFrame(safeApplyTexts);
+  }, { once: true });
+})();
