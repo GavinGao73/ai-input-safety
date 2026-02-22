@@ -4,8 +4,12 @@
 
 console.log("[engine.js] loaded v20260222a1");
 
-let currentLang = "zh";
-window.currentLang = currentLang;
+// ✅ Language is owned by UI / i18n.js.
+// ✅ engine.js must NEVER overwrite window.currentLang
+function getLang() {
+  const l = String(window.currentLang || "").toLowerCase();
+  return (l === "en" || l === "de" || l === "zh") ? l : "zh";
+}
 
 const enabled = new Set();
 
@@ -152,7 +156,9 @@ function placeholder(key) {
       TERM: "[REDACTED]"
     }
   };
-  return (map[currentLang] && map[currentLang][key]) || `[${key}]`;
+
+  const lang = getLang();
+  return (map[lang] && map[lang][key]) || `[${key}]`;
 }
 
 // ================= output render =================
@@ -509,7 +515,7 @@ function labelForKey(k) {
       manual_term: "Extra (manual)"
     }
   };
-  const m = map[currentLang] || map.zh;
+  const m = map[getLang()] || map.zh;
   return m[k] || k;
 }
 
@@ -551,7 +557,7 @@ function renderRiskBox(report, meta) {
   const box = $("riskBox");
   if (!box) return;
 
-  const t = riskI18n(currentLang);
+  const t = riskI18n(getLang());
   const levelText = report.level === "high" ? t.high : report.level === "mid" ? t.mid : t.low;
 
   const topHtml = (report.top && report.top.length)
@@ -665,7 +671,7 @@ function applyRules(text) {
   lastRunMeta.inputLen = (String(text || "")).length;
   lastRunMeta.enabledCount = enabledSet.size;
   lastRunMeta.moneyMode = "m1";
-  lastRunMeta.lang = currentLang;
+  lastRunMeta.lang = getLang();
 
   if (!rules) {
     out = applyManualTermsMask(out, () => addHit("manual_term"));
@@ -694,7 +700,7 @@ function applyRules(text) {
     window.__export_snapshot = {
       enabledKeys: enabledKeysArr,
       moneyMode: "m1",
-      lang: currentLang,
+      lang: getLang(),
       fromPdf: !!lastRunMeta.fromPdf,
       manualTerms: manualTerms.slice(0)
     };
@@ -855,7 +861,7 @@ function applyRules(text) {
   window.__export_snapshot = {
     enabledKeys: enabledKeysArr,
     moneyMode: "m1",
-    lang: currentLang,
+    lang: getLang(),
     fromPdf: !!lastRunMeta.fromPdf,
     manualTerms: manualTerms.slice(0)
   };
