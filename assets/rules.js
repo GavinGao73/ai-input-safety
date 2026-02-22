@@ -85,12 +85,6 @@ const RULES_BY_KEY = {
       String.raw`)` +
       String.raw`|` +
       // =================== DE/EN company: multi-word name + legal form ===================
-      // ✅ EN/DE expanded: allow multiple tokens, optional comma before legal
-      // Examples:
-      // - Acme Trading Group LLC
-      // - ACME International, Inc.
-      // - Foo Bar GmbH & Co. KG
-      // - The Example Company Ltd.
       String.raw`(?:` +
         String.raw`\b(?<name>` +
           String.raw`[A-Za-z][A-Za-z0-9&.\-]{1,40}` +
@@ -170,16 +164,8 @@ const RULES_BY_KEY = {
 
   /* ===================== MONEY (STEADY / LOW-FP) ===================== */
   money: {
-    // 只在“明确货币标识”出现时命中（更稳态，降低误伤）：
-    // - 货币代码/符号在前：EUR 1.234,56 / $1,234.56 / ¥ 12,000
-    // - 单位在后：1,234.56 USD / 12000 元 / 199 RMB
-    //
-    // 约束：
-    // - 金额主体至少 2 位数字
-    // - 支持千分位（, . 空格）+ 可选小数（.xx 或 ,xx）
     pattern: new RegExp(
       String.raw`(?:` +
-        // prefix: code/symbol + amount
         String.raw`(?:\b(?:EUR|USD|RMB|CNY|HKD|GBP|CHF)\b|[€$¥£])\s*` +
           String.raw`(` +
             String.raw`\d{2,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?` +
@@ -188,7 +174,6 @@ const RULES_BY_KEY = {
         String.raw`)` +
       String.raw`|` +
       String.raw`(?:` +
-        // suffix: amount + unit/code
         String.raw`(` +
           String.raw`\d{2,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?` +
           String.raw`|\d{4,18}(?:[.,]\d{2})?` +
@@ -203,17 +188,12 @@ const RULES_BY_KEY = {
 
   /* ===================== ADDRESS (DE fallback + EN label-driven) ===================== */
   address_de_street: {
-    // ✅ EN v1: prefer label-driven address to avoid FP (still keep DE street+no fallback)
-    // - If label exists -> prefix-mode keeps label, masks value
-    // - If no label but looks like a street+number -> also masks (label is empty)
     pattern: new RegExp(
       String.raw`(` +
-        // label group (optional)
         String.raw`(?:Address|Shipping\s*Address|Billing\s*Address|Street\s*Address|Address\s*Line\s*1|Address\s*Line\s*2|` +
         String.raw`Wohnadresse|Anschrift|Adresse|Straße|Str\.?)\s*[:：]?\s*` +
       String.raw`)?` +
       String.raw`(` +
-        // value: either EN/DE street patterns with number (reasonably bounded)
         String.raw`[\p{L}ÄÖÜäöüß0-9.\-,'/ ]{2,80}` +
         String.raw`(?:str\.?|straße|weg|platz|allee|gasse|street|st\.?|road|rd\.?|avenue|ave\.?|boulevard|blvd\.?|lane|ln\.?|drive|dr\.?|way|court|ct\.?)` +
         String.raw`[\p{L}ÄÖÜäöüß0-9.\-,'/ ]{0,20}` +
@@ -225,7 +205,7 @@ const RULES_BY_KEY = {
     mode: "prefix"
   },
 
-  // ✅ CN address (label-driven; partial masking handled in app.js)
+  /* ===================== CN address (label-driven; partial masking handled in engine.js) ===================== */
   address_cn: {
     pattern:
       /((?:办公地址|通信地址|联系地址|地址)\s*[:：]\s*)([^\n\r]{1,160})/giu,
@@ -239,12 +219,11 @@ const RULES_BY_KEY = {
     tag: "HANDLE"
   },
 
-  // ✅ username / login / IM id (label-driven)
+  /* ===================== HANDLE label-driven ===================== */
   handle_label: {
-    // ✅ EN expanded: username / user id / login / account id + common IM ids
+    // ✅ FIX: no string concatenation inside regex literal (was causing SyntaxError)
     pattern:
-      /((?:用户名|用\s*户\s*名|登录账号|登\s*录\s*账\s*号|账号名|账\s*号\s*名|账户名|帐户名|支付账号|支付账户|微信号|WeChat\s*ID|wxid|` +
-        String.raw`username|user\s*name|user\s*id|login|login\s*id|account\s*id|telegram|signal|whatsapp)\s*[:：]\s*)([A-Za-z0-9_@.\-]{3,80})/giu,
+      /((?:用户名|用\s*户\s*名|登录账号|登\s*录\s*账\s*号|账号名|账\s*号\s*名|账户名|帐户名|支付账号|支付账户|微信号|WeChat\s*ID|wxid|username|user\s*name|user\s*id|login|login\s*id|account\s*id|telegram|signal|whatsapp)\s*[:：]\s*)([A-Za-z0-9_@.\-]{3,80})/giu,
     tag: "HANDLE",
     mode: "prefix"
   },
@@ -255,12 +234,11 @@ const RULES_BY_KEY = {
     tag: "REF"
   },
 
-  // ✅ CN + EN business refs (label-driven)
+  /* ===================== REF label-driven ===================== */
   ref_label: {
-    // ✅ EN expanded: order id / invoice / reference / ticket / case / tracking
+    // ✅ FIX: no string concatenation inside regex literal (was causing SyntaxError)
     pattern:
-      /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|` +
-        String.raw`order\s*(?:id|no\.?|number)|invoice\s*(?:id|no\.?|number)|reference|ref\.?|tracking\s*(?:id|no\.?|number)|ticket\s*(?:id|no\.?|number)|case\s*(?:id|no\.?|number)|application\s*(?:id|no\.?|number))\s*[:：]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,80})/giu,
+      /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|order\s*(?:id|no\.?|number)|invoice\s*(?:id|no\.?|number)|reference|ref\.?|tracking\s*(?:id|no\.?|number)|ticket\s*(?:id|no\.?|number)|case\s*(?:id|no\.?|number)|application\s*(?:id|no\.?|number))\s*[:：]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,80})/giu,
     tag: "REF",
     mode: "prefix"
   },
