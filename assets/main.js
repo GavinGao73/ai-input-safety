@@ -292,8 +292,14 @@ function bind() {
 }
 
 // ================= boot =================
-initEnabled();
-setText();
-bind();
-updateInputWatermarkVisibility();
-initRiskResizeObserver();
+(function boot(){
+  try {
+    if (typeof initEnabled === "function") initEnabled();
+    if (typeof setText === "function") setText();
+    if (typeof bind === "function") bind();
+    if (typeof updateInputWatermarkVisibility === "function") updateInputWatermarkVisibility();
+    if (typeof initRiskResizeObserver === "function") initRiskResizeObserver();
+  } catch (e) {
+    console.error("[boot] failed:", e);
+  }
+})();
