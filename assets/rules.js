@@ -1,5 +1,5 @@
 // rules.js
-// v1.7 — privacy rules tuned for "personal / readable" redaction
+// v1.8 — privacy rules tuned for "personal / readable" redaction (EN-first expansion)
 //
 // Goals:
 // - Keep document readable for AI/humans (labels remain, values masked)
@@ -11,6 +11,7 @@
 //       例：赛行（上海）文化传媒有限公司 → 【公司】文化传媒有限公司（括号内覆盖不全也可）
 // - Person name: mask names with strong context to avoid false positives
 // - ✅ Strong context labels first (password/otp/account...)
+// - ✅ EN v1: prioritize label-driven fields (ref/handle/account/bank/address) to avoid false positives
 
 const RULES_BY_KEY = {
   /* ===================== EMAIL ===================== */
@@ -30,8 +31,9 @@ const RULES_BY_KEY = {
   /* ===================== SECRET (password / otp) ===================== */
   secret: {
     // keep label, mask value until end-of-line (avoid over-capturing multi-line)
+    // ✅ EN expanded: passcode / verification code / security code / one-time code / CVV/CVC
     pattern:
-      /((?:密码|口令|登录密码|支付密码|PIN|Passwort|Password|验证码|校验码|动态码|OTP|2FA|短信验证码)\s*[:：]\s*)([^\n\r]{1,120})/giu,
+      /((?:密码|口令|登录密码|支付密码|PIN|Passwort|Password|passcode|验证码|校验码|动态码|verification\s*code|security\s*code|one[-\s]?time\s*code|OTP|2FA|短信验证码|CVV|CVC)\s*[:：]\s*)([^\n\r]{1,120})/giu,
     tag: "SECRET",
     mode: "prefix"
   },
@@ -53,9 +55,9 @@ const RULES_BY_KEY = {
     // (F1) 地名 + 品牌 + ... + 公司后缀 → 遮“品牌”（不向前遮地名）
     //
     // NOTE:
-    // - 这里的捕获组顺序必须与 app.js 的 company mode replacement 对齐：
+    // - 捕获组/命名组需与 engine.js 的 company-mode 对齐：
     //   CN: (g1 prefix)(g2 core_to_mask)(g3 tail)(g4 suffix)
-    //   DE/EN: (g5 name)(g6 legal_form)
+    //   DE/EN: named groups { name, legal }  (engine.js reads groups.legal/groups.name)
     pattern: new RegExp(
       String.raw`(?:` +
         // =================== CN format 2: Brand(Region) ... Suffix ===================
@@ -68,7 +70,6 @@ const RULES_BY_KEY = {
           String.raw`(?:（[\p{Script=Han}]{2,10}）|\([\p{Script=Han}]{2,10}\)))` +
         String.raw`([\p{Script=Han}A-Za-z0-9（）()·&\-\s]{0,40}?)` +
         String.raw`(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)` +
-
       String.raw`)` +
       String.raw`|` +
       String.raw`(?:` +
@@ -83,10 +84,24 @@ const RULES_BY_KEY = {
         String.raw`(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)` +
       String.raw`)` +
       String.raw`|` +
-      // =================== DE/EN company: name + legal form ===================
+      // =================== DE/EN company: multi-word name + legal form ===================
+      // ✅ EN/DE expanded: allow multiple tokens, optional comma before legal
+      // Examples:
+      // - Acme Trading Group LLC
+      // - ACME International, Inc.
+      // - Foo Bar GmbH & Co. KG
+      // - The Example Company Ltd.
       String.raw`(?:` +
-        String.raw`\b([A-Za-z][A-Za-z0-9&.\-]{1,40}?)\b` +
-        String.raw`(\s+(?:GmbH(?:\s*&\s*Co\.\s*KG)?|AG|UG|KG|GbR|e\.K\.|Ltd\.?|Inc\.?|LLC|S\.?A\.?|S\.?r\.?l\.?|B\.?V\.?))\b` +
+        String.raw`\b(?<name>` +
+          String.raw`[A-Za-z][A-Za-z0-9&.\-]{1,40}` +
+          String.raw`(?:\s+[A-Za-z0-9&.\-]{1,40}){0,4}` +
+        String.raw`)` +
+        String.raw`\s*,?\s*` +
+        String.raw`(?<legal>` +
+          String.raw`(?:GmbH(?:\s*&\s*Co\.\s*KG)?|AG|UG|KG|GbR|e\.K\.|` +
+          String.raw`Ltd\.?|Inc\.?|LLC|S\.?A\.?|S\.?r\.?l\.?|B\.?V\.?)` +
+        String.raw`)` +
+        String.raw`\b` +
       String.raw`)`,
       "giu"
     ),
@@ -94,16 +109,39 @@ const RULES_BY_KEY = {
     mode: "company"
   },
 
-  /* ===================== BANK / IBAN ===================== */
+  /* ===================== BANK (IBAN / BIC / Routing / Sort Code) ===================== */
   bank: {
-    pattern: /\b[A-Z]{2}\d{2}(?:\s?\d{4}){3,7}\b/g,
-    tag: "ACCOUNT"
+    // ✅ EN v1: cover common bank identifiers; prefer label-driven when present
+    // NOTE: keep tag as "ACCOUNT" to reuse existing placeholder mapping in engine.js
+    pattern: new RegExp(
+      String.raw`(` +
+        String.raw`(?:IBAN|BIC|SWIFT|SWIFT\s*Code|Routing\s*Number|Sort\s*Code|Bank\s*Account|Bank\s*Details|` +
+        String.raw`银行|银行信息|银行账户|支付信息)\s*[:：]?\s*` +
+      String.raw`)?` +
+      String.raw`(` +
+        // IBAN (allow spaces)
+        String.raw`[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}` +
+        String.raw`|` +
+        // BIC/SWIFT
+        String.raw`[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?` +
+        String.raw`|` +
+        // Routing number (US) - 9 digits (allow spaces/dashes)
+        String.raw`\b\d{3}[\s-]?\d{3}[\s-]?\d{3}\b` +
+        String.raw`|` +
+        // Sort code (UK) - 6 digits as 12-34-56 or 123456
+        String.raw`\b\d{2}[\s-]?\d{2}[\s-]?\d{2}\b` +
+      String.raw`)`,
+      "giu"
+    ),
+    tag: "ACCOUNT",
+    mode: "prefix"
   },
 
   /* ===================== ACCOUNT (label + value) ===================== */
   account: {
+    // ✅ EN expanded: card number / account number / tax id (label-driven)
     pattern:
-      /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|对公账户|對公賬戶|Kontonummer|Account(?:\s*No\.)?|IBAN)\s*[:：]?\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{10,40}\d)/giu,
+      /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|对公账户|對公賬戶|Kontonummer|Account(?:\s*No\.)?|Account\s*Number|Card\s*Number|Credit\s*Card|Debit\s*Card|Tax\s*ID|TIN|EIN|IBAN)\s*[:：]?\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{10,40}\d)/giu,
     tag: "ACCOUNT",
     mode: "prefix"
   },
@@ -113,7 +151,7 @@ const RULES_BY_KEY = {
     pattern: new RegExp(
       [
         // A) labeled phone
-        String.raw`((?:tel|telefon|phone|mobile|handy|kontakt|whatsapp|wechat|telegram|` +
+        String.raw`((?:tel|telefon|phone|mobile|handy|kontakt|whatsapp|wechat|telegram|signal|` +
           String.raw`联系方式|联系电话|电话|手機|手机|联系人|聯繫方式)\s*[:：]?\s*)` +
           String.raw`((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})?[\d\s().-]{6,}\d)`,
 
@@ -163,11 +201,28 @@ const RULES_BY_KEY = {
     mode: "money"
   },
 
-  /* ===================== ADDRESS ===================== */
+  /* ===================== ADDRESS (DE fallback + EN label-driven) ===================== */
   address_de_street: {
-    pattern:
-      /\b[\p{L}ÄÖÜäöüß.\- ]{2,60}\b(?:str\.?|straße|weg|platz|allee|gasse)\s*\d{1,4}\w?\b/giu,
-    tag: "ADDRESS"
+    // ✅ EN v1: prefer label-driven address to avoid FP (still keep DE street+no fallback)
+    // - If label exists -> prefix-mode keeps label, masks value
+    // - If no label but looks like a street+number -> also masks (label is empty)
+    pattern: new RegExp(
+      String.raw`(` +
+        // label group (optional)
+        String.raw`(?:Address|Shipping\s*Address|Billing\s*Address|Street\s*Address|Address\s*Line\s*1|Address\s*Line\s*2|` +
+        String.raw`Wohnadresse|Anschrift|Adresse|Straße|Str\.?)\s*[:：]?\s*` +
+      String.raw`)?` +
+      String.raw`(` +
+        // value: either EN/DE street patterns with number (reasonably bounded)
+        String.raw`[\p{L}ÄÖÜäöüß0-9.\-,'/ ]{2,80}` +
+        String.raw`(?:str\.?|straße|weg|platz|allee|gasse|street|st\.?|road|rd\.?|avenue|ave\.?|boulevard|blvd\.?|lane|ln\.?|drive|dr\.?|way|court|ct\.?)` +
+        String.raw`[\p{L}ÄÖÜäöüß0-9.\-,'/ ]{0,20}` +
+        String.raw`\s+\d{1,6}\w?` +
+      String.raw`)`,
+      "giu"
+    ),
+    tag: "ADDRESS",
+    mode: "prefix"
   },
 
   // ✅ CN address (label-driven; partial masking handled in app.js)
@@ -186,8 +241,10 @@ const RULES_BY_KEY = {
 
   // ✅ username / login / IM id (label-driven)
   handle_label: {
+    // ✅ EN expanded: username / user id / login / account id + common IM ids
     pattern:
-      /((?:用户名|用\s*户\s*名|登录账号|登\s*录\s*账\s*号|账号名|账\s*号\s*名|账户名|帐户名|支付账号|支付账户|微信号|WeChat\s*ID|wxid)\s*[:：]\s*)([A-Za-z0-9_@.\-]{3,80})/giu,
+      /((?:用户名|用\s*户\s*名|登录账号|登\s*录\s*账\s*号|账号名|账\s*号\s*名|账户名|帐户名|支付账号|支付账户|微信号|WeChat\s*ID|wxid|` +
+        String.raw`username|user\s*name|user\s*id|login|login\s*id|account\s*id|telegram|signal|whatsapp)\s*[:：]\s*)([A-Za-z0-9_@.\-]{3,80})/giu,
     tag: "HANDLE",
     mode: "prefix"
   },
@@ -198,10 +255,12 @@ const RULES_BY_KEY = {
     tag: "REF"
   },
 
-  // ✅ CN business refs (label-driven)
+  // ✅ CN + EN business refs (label-driven)
   ref_label: {
+    // ✅ EN expanded: order id / invoice / reference / ticket / case / tracking
     pattern:
-      /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号)\s*[:：]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,80})/giu,
+      /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|` +
+        String.raw`order\s*(?:id|no\.?|number)|invoice\s*(?:id|no\.?|number)|reference|ref\.?|tracking\s*(?:id|no\.?|number)|ticket\s*(?:id|no\.?|number)|case\s*(?:id|no\.?|number)|application\s*(?:id|no\.?|number))\s*[:：]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,80})/giu,
     tag: "REF",
     mode: "prefix"
   },
