@@ -2,7 +2,7 @@
 // assets/engine.js (from app.js)
 // =========================
 
-console.log("[APP] loaded v20260221a3-mobile-single-upload+tabs-text");
+console.log("[engine.js] loaded v20260222a1");
 
 let currentLang = "zh";
 window.currentLang = currentLang;
