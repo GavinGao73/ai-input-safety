@@ -193,12 +193,17 @@
     </div>
   </div>
 
-  <script src="./assets/i18n.js" defer></script>
+    <script src="./assets/i18n.js" defer></script>
   <script src="./assets/catalog.js" defer></script>
   <script src="./assets/rules.js" defer></script>
   <script src="./assets/pdf.js" defer></script>
   <script src="./assets/raster-export.js" defer></script>
   <script src="./assets/redact-ui.js" defer></script>
-  <script src="./assets/app.js?v=20260221a2" defer></script>
+
+  <!-- ✅ split from app.js: order is critical -->
+  <script src="./assets/engine.js?v=20260222a1"></script>
+  <script src="./assets/ui.js?v=20260222a1"></script>
+  <script src="./assets/stage3.js?v=20260222a1"></script>
+  <script src="./assets/main.js?v=20260222a1"></script>
 </body>
 </html>
