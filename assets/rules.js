@@ -67,7 +67,8 @@ const RULES_BY_KEY = {
         // g4: legal suffix
         String.raw`(` + String.raw`` + String.raw`)` +
         String.raw`((?=[\p{Script=Han}A-Za-z])[\p{Script=Han}A-Za-z0-9·&\-]{2,12}` +
-          String.raw`(?:（[\p{Script=Han}]{2,10}）|\([\p{Script=Han}]{2,10}\)))` +
+          // ✅ FIX: was \))) -> invalid regex; correct closing paren is \))
+          String.raw`(?:（[\p{Script=Han}]{2,10}）|\([\p{Script=Han}]{2,10}\))` +
         String.raw`([\p{Script=Han}A-Za-z0-9（）()·&\-\s]{0,40}?)` +
         String.raw`(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)` +
       String.raw`)` +
@@ -221,7 +222,6 @@ const RULES_BY_KEY = {
 
   /* ===================== HANDLE label-driven ===================== */
   handle_label: {
-    // ✅ FIX: no string concatenation inside regex literal (was causing SyntaxError)
     pattern:
       /((?:用户名|用\s*户\s*名|登录账号|登\s*录\s*账\s*号|账号名|账\s*号\s*名|账户名|帐户名|支付账号|支付账户|微信号|WeChat\s*ID|wxid|username|user\s*name|user\s*id|login|login\s*id|account\s*id|telegram|signal|whatsapp)\s*[:：]\s*)([A-Za-z0-9_@.\-]{3,80})/giu,
     tag: "HANDLE",
@@ -236,7 +236,6 @@ const RULES_BY_KEY = {
 
   /* ===================== REF label-driven ===================== */
   ref_label: {
-    // ✅ FIX: no string concatenation inside regex literal (was causing SyntaxError)
     pattern:
       /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|order\s*(?:id|no\.?|number)|invoice\s*(?:id|no\.?|number)|reference|ref\.?|tracking\s*(?:id|no\.?|number)|ticket\s*(?:id|no\.?|number)|case\s*(?:id|no\.?|number)|application\s*(?:id|no\.?|number))\s*[:：]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,80})/giu,
     tag: "REF",
