@@ -258,7 +258,19 @@ function markHitsInOriginal(text){
   const enabledSet = new Set(enabledKeysArr);
 
   // ✅ Always-on for zh-stable build (UI fixed, but coverage must be stable)
-  const ALWAYS_ON = new Set(["secret", "url", "email", "phone", "account", "bank", "company"]);
+  // ✅ include label-driven keys so they always work in zh build
+  const ALWAYS_ON = new Set([
+    "secret",
+    "url",
+    "email",
+    "phone",
+    "account",
+    "bank",
+    "company",
+    "handle_label",
+    "ref_label",
+    "address_cn"
+  ]);
 
   const PRIORITY = [
     "secret",
@@ -339,20 +351,28 @@ function markHitsInOriginal(text){
 
     // ✅ company highlight: highlight ONLY the core word (主体词 / name)
     if (r.mode === "company") {
-      s = s.replace(r.pattern, (m, g1, g2, g3, g4, g5, g6) => {
-        // CN: g2 is core
-        if (g4) {
-          const prefixHan = g1 || "";
-          const core = g2 || "";
-          const tail = g3 || "";
-          const suffix = g4 || "";
-          return `${prefixHan}${S1}${core}${S2}${tail}${suffix}`;
+      s = s.replace(r.pattern, (...args) => {
+        const groups = args[args.length - 1];
+        if (groups && typeof groups === "object") {
+          // CN form 1
+          if (groups.suffix) {
+            return `${groups.prefix || ""}${S1}${groups.core || ""}${S2}${groups.tail || ""}${groups.suffix || ""}`;
+          }
+          // CN form 2
+          if (groups.suffix2) {
+            return `${S1}${groups.core2 || ""}${S2}${groups.tail2 || ""}${groups.suffix2 || ""}`;
+          }
+          // DE/EN
+          if (groups.legal) {
+            return `${S1}${groups.name || ""}${S2}${groups.legal || ""}`;
+          }
         }
-        // DE/EN: g5 is name, g6 is legal form
-        if (g6) {
-          const name = g5 || "";
-          return `${S1}${name}${S2}${g6}`;
-        }
+
+        // fallback: keep old behavior (should rarely happen)
+        const m = args[0];
+        const g1 = args[1], g2 = args[2], g3 = args[3], g4 = args[4], g5 = args[5], g6 = args[6];
+        if (g4) return `${g1 || ""}${S1}${g2 || ""}${S2}${g3 || ""}${g4 || ""}`;
+        if (g6) return `${S1}${g5 || ""}${S2}${g6 || ""}`;
         return `${S1}${m}${S2}`;
       });
       continue;
@@ -835,7 +855,19 @@ function applyRules(text) {
   ];
 
   // ✅ Always-on keys for zh-stable build (UI fixed, but coverage must be stable)
-  const ALWAYS_ON = new Set(["secret", "url", "email", "phone", "account", "bank", "company"]);
+  // ✅ include label-driven keys so they always work in zh build
+  const ALWAYS_ON = new Set([
+    "secret",
+    "url",
+    "email",
+    "phone",
+    "account",
+    "bank",
+    "company",
+    "handle_label",
+    "ref_label",
+    "address_cn"
+  ]);
 
   function addHit(key) {
     hits++;
@@ -984,14 +1016,33 @@ function applyRules(text) {
         return placeholder(r.tag);
       }
 
-      // 3) company: mask only core word, keep legal suffix
+      // 3) company: mask only core word (CN rules per your spec), keep legal suffix
       if (r.mode === "company") {
+        const groups = args[args.length - 1];
+        if (groups && typeof groups === "object") {
+          // CN form 1: 地名 + 主体词 + ... + 后缀
+          if (groups.suffix) {
+            addHit(key);
+            return `${groups.prefix || ""}${placeholder(r.tag)}${groups.tail || ""}${groups.suffix || ""}`;
+          }
+          // CN form 2: 主体词（地名） + ... + 后缀
+          if (groups.suffix2) {
+            addHit(key);
+            return `${placeholder(r.tag)}${groups.tail2 || ""}${groups.suffix2 || ""}`;
+          }
+          // DE/EN: name + legal form
+          if (groups.legal) {
+            addHit(key);
+            return `${placeholder(r.tag)}${groups.legal || ""}`;
+          }
+        }
+
+        // fallback to old indexed groups (rare)
         const g1 = args[1], g2 = args[2], g3 = args[3], g4 = args[4];
         if (g4) {
           addHit(key);
           return `${g1 || ""}${placeholder(r.tag)}${g3 || ""}${g4 || ""}`;
         }
-
         const g5 = args[5], g6 = args[6];
         if (g6) {
           addHit(key);
