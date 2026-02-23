@@ -2,7 +2,7 @@
 // assets/engine.js (from app.js)
 // =========================
 
-console.log("[engine.js] loaded v20260222a1");
+console.log("[engine.js] loaded v20260222a1-metaLang");
 
 // ✅ Language is owned by UI / i18n.js.
 // ✅ engine.js must NEVER overwrite window.currentLang
@@ -93,10 +93,70 @@ function escapeHTML(s){
     .replaceAll("'", "&#039;");
 }
 
-// ================= RULES SAFE ACCESS =================
-function getRulesSafe() {
+/* ===================== RULES SAFE ACCESS (lang-aware) ===================== */
+function getRulesSafeForLang(lang) {
+  const L = (lang || getLang());
+
+  // Preferred: registry (rules.js v2.0)
+  const reg = window.RULES_REGISTRY;
+  if (reg && typeof reg === "object") {
+    const global = (reg.global && typeof reg.global === "object") ? reg.global : {};
+    const bucket = (reg[L] && typeof reg[L] === "object") ? reg[L] : {};
+    return { ...global, ...bucket };
+  }
+
+  // Fallback: legacy flat map
   const r = window.RULES_BY_KEY;
   return (r && typeof r === "object") ? r : null;
+}
+
+/* ===================== POLICY (PRIORITY / ALWAYS_ON) ===================== */
+function getPolicyForLang(lang) {
+  const L = (lang || getLang());
+  const meta = window.RULES_META;
+
+  // Preferred: rules.js owns the policy
+  if (meta && typeof meta === "object") {
+    const p = meta.priorityByLang && meta.priorityByLang[L];
+    const a = meta.alwaysOnByLang && meta.alwaysOnByLang[L];
+    if (Array.isArray(p) && Array.isArray(a)) {
+      return { PRIORITY: p.slice(0), ALWAYS_ON: new Set(a) };
+    }
+  }
+
+  // Fallback baseline (should rarely be used)
+  const PRIORITY = [
+    "secret",
+    "account",
+    "bank",
+    "email",
+    "url",
+    "phone",
+    "company",
+    "handle_label",
+    "ref_label",
+    "address_cn",
+    "money",
+    "address_de_street",
+    "handle",
+    "ref",
+    "title",
+    "number"
+  ];
+
+  const ALWAYS_ON = new Set([
+    "secret",
+    "url",
+    "email",
+    "account",
+    "bank",
+    "company",
+    "handle_label",
+    "ref_label",
+    "address_cn"
+  ]);
+
+  return { PRIORITY, ALWAYS_ON };
 }
 
 // ================= ENABLED KEYS FOR EXPORT =================
@@ -255,39 +315,8 @@ function markHitsInOriginal(text){
 
   const enabledSet = new Set(enabledKeysArr);
 
-  // ✅ Always-on for zh-stable build (UI fixed, but coverage must be stable)
-  // ✅ include label-driven keys so they always work in zh build
-  const ALWAYS_ON = new Set([
-    "secret",
-    "url",
-    "email",
-    "phone",
-    "account",
-    "bank",
-    "company",
-    "handle_label",
-    "ref_label",
-    "address_cn"
-  ]);
-
-  const PRIORITY = [
-    "secret",
-    "account",
-    "bank",
-    "email",
-    "url",
-    "phone",
-    "company",
-    "handle_label",
-    "ref_label",
-    "address_cn",
-    "money",
-    "address_de_street",
-    "handle",
-    "ref",
-    "title",
-    "number"
-  ];
+  // ✅ lang-aware policy
+  const { PRIORITY, ALWAYS_ON } = getPolicyForLang(getLang());
 
   if (manualTerms && manualTerms.length) {
     for (const tm of manualTerms) {
@@ -302,10 +331,12 @@ function markHitsInOriginal(text){
     }
   }
 
+  const rules = getRulesSafeForLang(getLang());
+
   for (const key of PRIORITY) {
     if (key !== "money" && !enabledSet.has(key) && !ALWAYS_ON.has(key)) continue;
 
-    const r = window.RULES_BY_KEY && window.RULES_BY_KEY[key];
+    const r = rules && rules[key];
     if (!r || !r.pattern) continue;
 
     // ✅ prefix highlight: keep label, highlight ONLY value group
@@ -604,39 +635,8 @@ function applyRules(text) {
   let hits = 0;
   const hitsByKey = {};
 
-  const PRIORITY = [
-    "secret",
-    "account",
-    "bank",
-    "email",
-    "url",
-    "phone",
-    "company",
-    "handle_label",
-    "ref_label",
-    "address_cn",
-    "money",
-    "address_de_street",
-    "handle",
-    "ref",
-    "title",
-    "number"
-  ];
-
-  // ✅ Always-on keys for zh-stable build (UI fixed, but coverage must be stable)
-  // ✅ include label-driven keys so they always work in zh build
-  const ALWAYS_ON = new Set([
-    "secret",
-    "url",
-    "email",
-    "phone",
-    "account",
-    "bank",
-    "company",
-    "handle_label",
-    "ref_label",
-    "address_cn"
-  ]);
+  // ✅ lang-aware policy
+  const { PRIORITY, ALWAYS_ON } = getPolicyForLang(getLang());
 
   function addHit(key) {
     hits++;
@@ -663,7 +663,7 @@ function applyRules(text) {
     return t;
   }
 
-  const rules = getRulesSafe();
+  const rules = getRulesSafeForLang(getLang());
 
   const enabledKeysArr = effectiveEnabledKeys();
   const enabledSet = new Set(enabledKeysArr);
