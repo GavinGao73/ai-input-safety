@@ -1,5 +1,5 @@
 // =========================
-// assets/engine.js — CONTENT STRATEGY ROUTER (zh/en/de) + stable masking core
+// assets/engine.js — ROUTER + STABLE CORE (no lang rules inside)
 // - UI language: window.currentLang (UI only)
 // - Content strategy language: window.ruleEngine (+ window.ruleEngineMode)
 //
@@ -8,19 +8,12 @@
 // - then lock (no drift)
 // - Clear resets to (mode=auto, ruleEngine="")
 //
-// ✅ Isolation (RULES):
-// - NO RULES_COMMON / NO RULES_BY_LANG / NO RULES_BY_KEY
-// - rules are loaded ONLY from language packs: window.__ENGINE_LANG_PACKS__[lang].rules
-//
-// ✅ Isolation (LANG-SPECIFIC LOGIC):
-// - PRIORITY / alwaysOn / phone guard / company formatting / address_cn_partial formatting
-//   are all in language packs, so zh/en/de can be tuned independently.
-//
-// ✅ Compatibility:
-// - keep getLangContent() / resetContentLang() / setLangContentAuto() names
+// ✅ ISOLATION (HARD):
+// - NO zh/en/de rules/priority/alwaysOn/formatters in engine.js
+// - ALL language-specific logic must live in packs: window.__ENGINE_LANG_PACKS__[lang]
 // =========================
 
-console.log("[engine.js] loaded v20260223-router-a3-pack-hooks");
+console.log("[engine.js] loaded v20260223-router-a4-pack-fully-isolated");
 
 "use strict";
 
@@ -103,7 +96,7 @@ function setLangContentAuto(text) {
 
 /**
  * Detect content strategy language using registered packs first,
- * fallback to conservative heuristic.
+ * fallback to conservative heuristic (minimal, not language-rules).
  */
 function detectRuleEngine(text) {
   const s0 = String(text || "");
@@ -112,8 +105,9 @@ function detectRuleEngine(text) {
 
   const PACKS = window.__ENGINE_LANG_PACKS__ || {};
 
-  // Try pack detectors (conservative)
+  // 1) Prefer pack detectors
   try {
+    // order: zh -> de -> en (stable preference)
     if (PACKS.zh && typeof PACKS.zh.detect === "function") {
       const r = normLang(PACKS.zh.detect(s));
       if (r === "zh") return "zh";
@@ -128,39 +122,35 @@ function detectRuleEngine(text) {
     }
   } catch (_) {}
 
-  // Fallback heuristic (stable, low FP)
+  // 2) Minimal fallback: character-class only (avoid injecting language rules here)
   const han = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
   const total = Math.max(1, s.length);
-  const hanRatio = han / total;
-
-  if (hanRatio > 0.06) return "zh";
-  if (/(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号|开户银行|对公账户|收款账号)/.test(s))
-    return "zh";
-
+  if (han / total > 0.06) return "zh";
   if (/[äöüÄÖÜß]/.test(s)) return "de";
-  if (/\b(Straße|Strasse|PLZ|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Kundennummer)\b/i.test(s))
-    return "de";
-
   return "en";
 }
 
 /* =========================
-   0.1) Pack accessors (RULES + UI)
+   0.1) Pack accessors
    ========================= */
 
+function getPacks() {
+  return window.__ENGINE_LANG_PACKS__ || {};
+}
+
 function getContentPack() {
-  const PACKS = window.__ENGINE_LANG_PACKS__ || {};
+  const PACKS = getPacks();
   const lang = getLangContent();
   return PACKS[lang] || null;
 }
 
 function getUiPack() {
-  const UI = window.__ENGINE_UI_PACKS__ || {};
+  const PACKS = getPacks();
   const lang = getLangUI();
-  return UI[lang] || null;
+  return PACKS[lang] || null;
 }
 
-// ================= RULES SAFE ACCESS (PACK ONLY) =================
+// rules are loaded ONLY from language packs
 function getRulesSafe() {
   const pack = getContentPack();
   const rules = pack && pack.rules && typeof pack.rules === "object" ? pack.rules : null;
@@ -168,7 +158,7 @@ function getRulesSafe() {
 }
 
 /* =========================
-   1) Core state (unchanged)
+   1) Core state (language-agnostic)
    ========================= */
 
 const enabled = new Set();
@@ -266,12 +256,12 @@ function effectiveEnabledKeys() {
 
 // ================= placeholders (follow CONTENT STRATEGY language) =================
 function placeholder(key) {
-  const pack = getContentPack() || (window.__ENGINE_LANG_PACKS__ || {}).zh;
+  const pack = getContentPack() || (getPacks().zh || null);
   const table = pack && pack.placeholders ? pack.placeholders : null;
 
   if (table && table[key]) return table[key];
 
-  // last resort (shouldn't happen if packs are loaded)
+  // last resort
   const fallback = {
     PHONE: "[Phone]",
     EMAIL: "[Email]",
@@ -355,13 +345,13 @@ function applyManualTermsMask(out, addHit) {
    2) Pack-driven execution policy
    ========================= */
 
-// stable, non-language-specific always-on baseline (can be overridden/extended by pack.alwaysOn)
+// stable base always-on; packs can add more via pack.alwaysOn (language-specific)
 function getAlwaysOnBaseSet() {
   return new Set(["secret", "url", "email", "phone", "account", "bank", "company", "money"]);
 }
 
-// fallback order (only used if pack.priority missing)
 function getPriorityFallback() {
+  // only to avoid crash if pack missing
   return [
     "secret",
     "account",
@@ -396,7 +386,6 @@ function getAlwaysOnSet() {
   if (Array.isArray(extra)) {
     for (const k of extra) base.add(k);
   } else if (extra && typeof extra.forEach === "function") {
-    // allow Set
     try {
       extra.forEach((k) => base.add(k));
     } catch (_) {}
@@ -405,7 +394,7 @@ function getAlwaysOnSet() {
 }
 
 /* =========================
-   3) PDF overlay highlight
+   3) PDF overlay highlight (language hooks live in pack)
    ========================= */
 
 function renderInputOverlayForPdf(originalText) {
@@ -431,16 +420,15 @@ function renderInputOverlayForPdf(originalText) {
 
 function markHitsInOriginal(text) {
   let s = String(text || "");
-
   const S1 = "⟦HIT⟧";
   const S2 = "⟦/HIT⟧";
 
   const snap = window.__export_snapshot || null;
   const enabledKeysArr =
     snap && Array.isArray(snap.enabledKeys) ? snap.enabledKeys : Array.from(enabled || []);
-
   const enabledSet = new Set(enabledKeysArr);
 
+  // manual terms highlight
   if (manualTerms && manualTerms.length) {
     for (const tm of manualTerms) {
       const hasCjk = /[\u4E00-\u9FFF]/.test(tm);
@@ -478,15 +466,12 @@ function markHitsInOriginal(text) {
       s = s.replace(r.pattern, (m, p1, p2) => {
         const label = p1 || "";
         const val = p2 || "";
-
         if (pack && typeof pack.highlightAddressCnPartial === "function") {
           try {
             const res = pack.highlightAddressCnPartial({ label, val, S1, S2 });
             if (typeof res === "string" && res) return res;
           } catch (_) {}
         }
-
-        // fallback: highlight whole address value
         return `${label}${S1}${val}${S2}`;
       });
       continue;
@@ -524,18 +509,11 @@ function markHitsInOriginal(text) {
         const coreStr = punct ? m.slice(0, -punct.length) : m;
 
         const groups = args[args.length - 1];
-        if (groups && typeof groups === "object" && groups.legal) {
-          return `${S1}${groups.name || ""}${S2}${groups.legal || ""}${punct}`;
-        }
+        const legal = groups && typeof groups === "object" && groups.legal ? String(groups.legal) : "";
+        const name = groups && typeof groups === "object" && groups.name ? String(groups.name) : coreStr;
 
-        // generic split: keep legal suffix separate (if any)
-        const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
-        if (sufMatch) {
-          const suffix = sufMatch[1];
-          const head = coreStr.slice(0, coreStr.length - suffix.length);
-          return `${S1}${head}${S2}${suffix}${punct}`;
-        }
-
+        // allow pack to highlight name part only
+        if (legal) return `${S1}${name}${S2}${legal}${punct}`;
         return `${S1}${m}${S2}`;
       });
       continue;
@@ -559,7 +537,7 @@ function initEnabled() {
 }
 
 /* =========================
-   4) Risk scoring (core logic stable; UI strings in UI pack)
+   4) Risk scoring (core stable; UI text from packs)
    ========================= */
 
 const RISK_WEIGHTS = {
@@ -586,27 +564,27 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
-function riskI18n() {
-  const ui = getUiPack();
-  if (ui && ui.riskI18n) return ui.riskI18n;
+function getRiskI18n() {
+  const pack = getUiPack();
+  if (pack && pack.ui && pack.ui.riskI18n) return pack.ui.riskI18n;
 
-  // hard fallback only (should be overridden by engine.ui.js)
+  // hard fallback only
   return {
-    low: "低风险",
-    mid: "中风险",
-    high: "高风险",
-    top: "主要风险来源",
-    advice: "建议",
-    adviceLow: "可以继续使用；金额保护已默认开启。",
-    adviceMid: "建议检查 Top 项；必要时加严遮盖或手工涂抹。",
-    adviceHigh: "不建议直接发送：请删除签名落款/账号信息，并加严遮盖后再试。",
-    meta: (m) => `命中 ${m.hits}｜金额 M1${m.fromPdf ? "｜文件" : ""}`
+    low: "Low",
+    mid: "Medium",
+    high: "High",
+    top: "Top risk sources",
+    advice: "Advice",
+    adviceLow: "Ok to use. Money protection is on by default.",
+    adviceMid: "Review top risks; consider stronger masking or manual redaction.",
+    adviceHigh: "Do not send as-is: remove signature/account details and mask more.",
+    meta: (m) => `Hits ${m.hits}｜Money M1${m.fromPdf ? "｜File" : ""}`
   };
 }
 
 function labelForKey(k) {
-  const ui = getUiPack();
-  const labels = ui && ui.labels ? ui.labels : null;
+  const pack = getUiPack();
+  const labels = pack && pack.ui && pack.ui.labels ? pack.ui.labels : null;
   if (labels && labels[k]) return labels[k];
   return k;
 }
@@ -648,7 +626,7 @@ function renderRiskBox(report, meta) {
   const box = $("riskBox");
   if (!box) return;
 
-  const t = riskI18n();
+  const t = getRiskI18n();
   const levelText = report.level === "high" ? t.high : report.level === "mid" ? t.mid : t.low;
 
   const topHtml =
@@ -699,7 +677,7 @@ function applyRules(text) {
   let hits = 0;
   const hitsByKey = {};
 
-  // ✅ RULE B: one-shot auto detect (only when mode=auto && ruleEngine=="")
+  // ✅ one-shot auto detect
   setLangContentAuto(out);
 
   const PRIORITY = getPriority();
@@ -742,8 +720,7 @@ function applyRules(text) {
   lastRunMeta.langUI = getLangUI();
   lastRunMeta.langContent = getLangContent();
 
-  // NOTE: in pack-only build, rules SHOULD exist once packs are loaded.
-  // If not loaded yet, we fall back to manualTerms only.
+  // If packs not loaded, only manual terms
   if (!rules) {
     out = applyManualTermsMask(out, () => addHit("manual_term"));
     renderOutput(out);
@@ -768,7 +745,6 @@ function applyRules(text) {
     const ta = $("inputText");
     if (ta) renderInputOverlayForPdf(ta.value || "");
 
-    // ✅ snapshot isolation by lang
     const _lc = getLangContent();
     const snap = {
       enabledKeys: enabledKeysArr,
@@ -795,7 +771,7 @@ function applyRules(text) {
   // manual first
   out = applyManualTermsMask(out, () => addHit("manual_term"));
 
-  // protect already-inserted placeholders
+  // protect existing placeholders
   const p0 = protectPlaceholders(out);
   out = p0.t;
 
@@ -805,7 +781,6 @@ function applyRules(text) {
     const r = rules[key];
     if (!r || !r.pattern) continue;
 
-    // ✅ money always mask whole amount
     if (key === "money") {
       out = out.replace(r.pattern, () => {
         addHit("money");
@@ -826,7 +801,6 @@ function applyRules(text) {
       if (r.mode === "address_cn_partial") {
         const label = args[1] || "";
         const val = args[2] || "";
-
         if (pack && typeof pack.formatAddressCnPartial === "function") {
           try {
             const res = pack.formatAddressCnPartial({ label, val, match, placeholder });
@@ -836,8 +810,6 @@ function applyRules(text) {
             }
           } catch (_) {}
         }
-
-        // fallback: mask full value
         addHit(key);
         return `${label}${placeholder("ADDRESS")}`;
       }
@@ -874,10 +846,8 @@ function applyRules(text) {
         const coreStr = punct ? raw.slice(0, -punct.length) : raw;
 
         const groups = args[args.length - 1];
-        const legal =
-          groups && typeof groups === "object" && groups.legal ? String(groups.legal) : "";
-        const name =
-          groups && typeof groups === "object" && groups.name ? String(groups.name) : coreStr;
+        const legal = groups && typeof groups === "object" && groups.legal ? String(groups.legal) : "";
+        const name = groups && typeof groups === "object" && groups.name ? String(groups.name) : coreStr;
 
         addHit("company");
 
@@ -888,7 +858,6 @@ function applyRules(text) {
           } catch (_) {}
         }
 
-        // fallback: conservative
         if (legal) return `${placeholder("COMPANY")}${legal}${punct}`;
         return placeholder("COMPANY");
       }
@@ -938,7 +907,6 @@ function applyRules(text) {
   const ta = $("inputText");
   if (ta) renderInputOverlayForPdf(ta.value || "");
 
-  // ✅ snapshot isolation by lang
   const _lc = getLangContent();
   const snap2 = {
     enabledKeys: enabledKeysArr,
@@ -986,16 +954,12 @@ try {
   if (typeof window.resetRuleEngine !== "function") window.resetRuleEngine = resetRuleEngine;
   if (typeof window.resetContentLang !== "function") window.resetContentLang = resetContentLang;
 
-  if (typeof window.getContentPack !== "function") window.getContentPack = getContentPack;
-
-  // optional debug
   if (typeof window.__detectRuleEngine !== "function") window.__detectRuleEngine = detectRuleEngine;
+  if (typeof window.getContentPack !== "function") window.getContentPack = getContentPack;
 } catch (_) {}
 
 /* =========================
    ✅ BOOT INIT (RULE A)
-   - first-enter: ruleEngineMode="auto", ruleEngine=""
-   - if someone pre-set ruleEngine (non-empty), force lock to avoid drift
    ========================= */
 (function bootRuleEngineInit() {
   try {
