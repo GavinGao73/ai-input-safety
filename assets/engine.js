@@ -1,5 +1,6 @@
 // =========================
-// assets/engine.js — ROUTER + STABLE CORE (no lang rules inside)
+// assets/engine.js (FULL)
+// ROUTER + STABLE CORE (no lang rules/priority/alwaysOn/formatters inside)
 // - UI language: window.currentLang (UI only)
 // - Content strategy language: window.ruleEngine (+ window.ruleEngineMode)
 //
@@ -11,20 +12,29 @@
 // ✅ ISOLATION (HARD):
 // - NO zh/en/de rules/priority/alwaysOn/formatters in engine.js
 // - ALL language-specific logic must live in packs: window.__ENGINE_LANG_PACKS__[lang]
+// - ALL non-language strategy must live in window.__ENGINE_POLICY__
 // =========================
 
-console.log("[engine.js] loaded v20260223-router-a4-pack-fully-isolated");
+console.log("[engine.js] loaded v20260223-engine-a5-policy-split");
 
 "use strict";
 
 /* =========================
-   0) Language helpers (UI vs Content Strategy)
+   0) Policy access (NON-language)
    ========================= */
+
+function getPolicy() {
+  return window.__ENGINE_POLICY__ || {};
+}
 
 function normLang(l) {
   const s = String(l || "").toLowerCase();
   return s === "en" || s === "de" || s === "zh" ? s : "";
 }
+
+/* =========================
+   1) Language helpers (UI vs Content Strategy)
+   ========================= */
 
 function getLangUI() {
   return normLang(window.currentLang) || "zh";
@@ -48,9 +58,7 @@ function resetRuleEngine() {
     window.ruleEngine = "";
     window.ruleEngineMode = "auto";
     try {
-      window.dispatchEvent(
-        new CustomEvent("ruleengine:changed", { detail: { lang: getLangContent() } })
-      );
+      window.dispatchEvent(new CustomEvent("ruleengine:changed", { detail: { lang: getLangContent() } }));
     } catch (_) {}
   } catch (_) {}
 }
@@ -82,9 +90,7 @@ function setRuleEngineAuto(text) {
     window.ruleEngineMode = "lock";
 
     try {
-      window.dispatchEvent(
-        new CustomEvent("ruleengine:changed", { detail: { lang: detected } })
-      );
+      window.dispatchEvent(new CustomEvent("ruleengine:changed", { detail: { lang: detected } }));
     } catch (_) {}
   } catch (_) {}
 }
@@ -95,19 +101,19 @@ function setLangContentAuto(text) {
 }
 
 /**
- * Detect content strategy language using registered packs first,
- * fallback to conservative heuristic (minimal, not language-rules).
+ * Detect content strategy language:
+ * - ask pack detectors only
+ * - fallback via policy (no char-heuristics here)
  */
 function detectRuleEngine(text) {
   const s0 = String(text || "");
   const s = s0.slice(0, 2600);
   if (!s.trim()) return "";
 
-  const PACKS = window.__ENGINE_LANG_PACKS__ || {};
+  const PACKS = getPacks();
 
-  // 1) Prefer pack detectors
+  // prefer pack detectors; order: zh -> de -> en (stable preference)
   try {
-    // order: zh -> de -> en (stable preference)
     if (PACKS.zh && typeof PACKS.zh.detect === "function") {
       const r = normLang(PACKS.zh.detect(s));
       if (r === "zh") return "zh";
@@ -122,16 +128,16 @@ function detectRuleEngine(text) {
     }
   } catch (_) {}
 
-  // 2) Minimal fallback: character-class only (avoid injecting language rules here)
-  const han = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
-  const total = Math.max(1, s.length);
-  if (han / total > 0.06) return "zh";
-  if (/[äöüÄÖÜß]/.test(s)) return "de";
+  // fallback policy
+  const pol = getPolicy();
+  const fb = String(pol.detectFallback || "en").toLowerCase();
+  if (fb === "ui") return getLangUI();
+  if (fb === "zh" || fb === "de" || fb === "en") return fb;
   return "en";
 }
 
 /* =========================
-   0.1) Pack accessors
+   1.1) Pack accessors
    ========================= */
 
 function getPacks() {
@@ -158,7 +164,7 @@ function getRulesSafe() {
 }
 
 /* =========================
-   1) Core state (language-agnostic)
+   2) Core state (language-agnostic)
    ========================= */
 
 const enabled = new Set();
@@ -342,44 +348,14 @@ function applyManualTermsMask(out, addHit) {
 }
 
 /* =========================
-   2) Pack-driven execution policy
+   3) Policy-driven execution (NON-language strategy read from policy)
    ========================= */
 
-// stable base always-on; packs can add more via pack.alwaysOn (language-specific)
-function getAlwaysOnBaseSet() {
-  return new Set(["secret", "url", "email", "phone", "account", "bank", "company", "money"]);
-}
-
-function getPriorityFallback() {
-  // only to avoid crash if pack missing
-  return [
-    "secret",
-    "account",
-    "bank",
-    "email",
-    "url",
-    "handle_label",
-    "ref_label",
-    "money",
-    "phone",
-    "company",
-    "address_cn",
-    "address_de_street",
-    "handle",
-    "ref",
-    "title",
-    "number"
-  ];
-}
-
-function getPriority() {
-  const pack = getContentPack();
-  if (pack && Array.isArray(pack.priority) && pack.priority.length) return pack.priority.slice(0);
-  return getPriorityFallback();
-}
-
 function getAlwaysOnSet() {
-  const base = getAlwaysOnBaseSet();
+  const pol = getPolicy();
+  const baseArr = Array.isArray(pol.baseAlwaysOn) ? pol.baseAlwaysOn : [];
+  const base = new Set(baseArr);
+
   const pack = getContentPack();
   const extra = pack && pack.alwaysOn ? pack.alwaysOn : null;
 
@@ -393,8 +369,40 @@ function getAlwaysOnSet() {
   return base;
 }
 
+function getPriority() {
+  const pack = getContentPack();
+  if (pack && Array.isArray(pack.priority) && pack.priority.length) return pack.priority.slice(0);
+
+  const pol = getPolicy();
+  const fb = Array.isArray(pol.defaultPriority) ? pol.defaultPriority : [];
+  return fb.slice(0);
+}
+
+function phoneGuardOk({ label, value, match }) {
+  const pack = getContentPack();
+  if (pack && typeof pack.phoneGuard === "function") {
+    try {
+      return !!pack.phoneGuard({ label, value, match });
+    } catch (_) {
+      return true;
+    }
+  }
+
+  const pol = getPolicy();
+  if (pol && typeof pol.phoneGuardDefault === "function") {
+    try {
+      return !!pol.phoneGuardDefault({ label, value, match });
+    } catch (_) {
+      return true;
+    }
+  }
+
+  // last resort safe permissive
+  return true;
+}
+
 /* =========================
-   3) PDF overlay highlight (language hooks live in pack)
+   4) PDF overlay highlight (language hooks in packs)
    ========================= */
 
 function renderInputOverlayForPdf(originalText) {
@@ -424,8 +432,7 @@ function markHitsInOriginal(text) {
   const S2 = "⟦/HIT⟧";
 
   const snap = window.__export_snapshot || null;
-  const enabledKeysArr =
-    snap && Array.isArray(snap.enabledKeys) ? snap.enabledKeys : Array.from(enabled || []);
+  const enabledKeysArr = snap && Array.isArray(snap.enabledKeys) ? snap.enabledKeys : Array.from(enabled || []);
   const enabledSet = new Set(enabledKeysArr);
 
   // manual terms highlight
@@ -468,7 +475,7 @@ function markHitsInOriginal(text) {
         const val = p2 || "";
         if (pack && typeof pack.highlightAddressCnPartial === "function") {
           try {
-            const res = pack.highlightAddressCnPartial({ label, val, S1, S2 });
+            const res = pack.highlightAddressCnPartial({ label, val, S1, S2, match: m });
             if (typeof res === "string" && res) return res;
           } catch (_) {}
         }
@@ -481,19 +488,7 @@ function markHitsInOriginal(text) {
       s = s.replace(r.pattern, (m, p1, p2, p3, p4) => {
         const label = p1 || "";
         const value = p2 || p3 || p4 || m;
-
-        let ok = true;
-        if (pack && typeof pack.phoneGuard === "function") {
-          try {
-            ok = !!pack.phoneGuard({ label, value, match: m });
-          } catch (_) {
-            ok = true;
-          }
-        } else {
-          const digits = String(value).replace(/\D+/g, "");
-          ok = digits.length < 16;
-        }
-        if (!ok) return m;
+        if (!phoneGuardOk({ label, value, match: m })) return m;
 
         if (label) return `${label}${S1}${m.slice(label.length)}${S2}`;
         return `${S1}${m}${S2}`;
@@ -503,18 +498,24 @@ function markHitsInOriginal(text) {
 
     if (r.mode === "company") {
       s = s.replace(r.pattern, (...args) => {
-        const m = String(args[0] || "");
-        const punctMatch = m.match(/[。．.，,;；!！?？)）】\]\s]+$/u);
+        const match = String(args[0] || "");
+        const punctMatch = match.match(/[。．.，,;；!！?？)）】\]\s]+$/u);
         const punct = punctMatch ? punctMatch[0] : "";
-        const coreStr = punct ? m.slice(0, -punct.length) : m;
+        const coreStr = punct ? match.slice(0, -punct.length) : match;
 
         const groups = args[args.length - 1];
         const legal = groups && typeof groups === "object" && groups.legal ? String(groups.legal) : "";
         const name = groups && typeof groups === "object" && groups.name ? String(groups.name) : coreStr;
 
-        // allow pack to highlight name part only
-        if (legal) return `${S1}${name}${S2}${legal}${punct}`;
-        return `${S1}${m}${S2}`;
+        if (pack && typeof pack.highlightCompany === "function") {
+          try {
+            const res = pack.highlightCompany({ match, coreStr, punct, groups, name, legal, S1, S2 });
+            if (typeof res === "string" && res) return res;
+          } catch (_) {}
+        }
+
+        // conservative fallback (no splitting)
+        return `${S1}${match}${S2}`;
       });
       continue;
     }
@@ -537,28 +538,8 @@ function initEnabled() {
 }
 
 /* =========================
-   4) Risk scoring (core stable; UI text from packs)
+   5) Risk scoring (policy weights; UI text from packs)
    ========================= */
-
-const RISK_WEIGHTS = {
-  bank: 28,
-  account: 26,
-  email: 14,
-  url: 10,
-  secret: 30,
-  phone: 16,
-  address_de_street: 18,
-  address_cn: 18,
-  handle_label: 10,
-  ref_label: 6,
-  handle: 10,
-  ref: 6,
-  title: 4,
-  number: 2,
-  money: 0,
-  company: 8,
-  manual_term: 10
-};
 
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
@@ -590,30 +571,40 @@ function labelForKey(k) {
 }
 
 function computeRiskReport(hitsByKey, meta) {
+  const pol = getPolicy();
+  const R = (pol && pol.risk) ? pol.risk : {};
+  const W = (R && R.weights) ? R.weights : {};
+  const T = (R && R.thresholds) ? R.thresholds : { mid: 35, high: 70 };
+  const B = (R && R.bonus) ? R.bonus : { base: 10, len1500: 6, len4000: 8, fromPdf: 6 };
+
+  const cap = Number(R.capPerKey || 12);
+  const clampMin = Number(R.clampMin ?? 0);
+  const clampMax = Number(R.clampMax ?? 100);
+
   let score = 0;
 
   for (const [k, c] of Object.entries(hitsByKey || {})) {
     if (!c) continue;
-    const w = RISK_WEIGHTS[k] || 0;
-    const capped = Math.min(c, 12);
+    const w = Number(W[k] || 0);
+    const capped = Math.min(Number(c || 0), cap);
     score += w * capped;
   }
 
-  score += 10;
-  if (meta.inputLen >= 1500) score += 6;
-  if (meta.inputLen >= 4000) score += 8;
-  if (meta.fromPdf) score += 6;
+  score += Number(B.base || 0);
+  if (meta.inputLen >= 1500) score += Number(B.len1500 || 0);
+  if (meta.inputLen >= 4000) score += Number(B.len4000 || 0);
+  if (meta.fromPdf) score += Number(B.fromPdf || 0);
 
-  score = clamp(Math.round(score), 0, 100);
+  score = clamp(Math.round(score), clampMin, clampMax);
 
   let level = "low";
-  if (score >= 70) level = "high";
-  else if (score >= 35) level = "mid";
+  if (score >= Number(T.high || 70)) level = "high";
+  else if (score >= Number(T.mid || 35)) level = "mid";
 
   const pairs = Object.entries(hitsByKey || {})
     .filter(([, c]) => c > 0)
     .map(([k, c]) => {
-      const w = RISK_WEIGHTS[k] || 0;
+      const w = Number(W[k] || 0);
       return { k, c, w, s: c * w };
     })
     .sort((a, b) => b.s - a.s)
@@ -641,8 +632,7 @@ function renderRiskBox(report, meta) {
           .join("")
       : `<div class="tiny muted">-</div>`;
 
-  const advice =
-    report.level === "high" ? t.adviceHigh : report.level === "mid" ? t.adviceMid : t.adviceLow;
+  const advice = report.level === "high" ? t.adviceHigh : report.level === "mid" ? t.adviceMid : t.adviceLow;
 
   box.innerHTML = `
     <div class="riskhead">
@@ -669,7 +659,7 @@ function renderRiskBox(report, meta) {
 }
 
 /* =========================
-   5) Rule application (pack-driven)
+   6) Rule application (pack-driven; strategy from policy)
    ========================= */
 
 function applyRules(text) {
@@ -801,6 +791,7 @@ function applyRules(text) {
       if (r.mode === "address_cn_partial") {
         const label = args[1] || "";
         const val = args[2] || "";
+
         if (pack && typeof pack.formatAddressCnPartial === "function") {
           try {
             const res = pack.formatAddressCnPartial({ label, val, match, placeholder });
@@ -810,6 +801,8 @@ function applyRules(text) {
             }
           } catch (_) {}
         }
+
+        // conservative fallback
         addHit(key);
         return `${label}${placeholder("ADDRESS")}`;
       }
@@ -821,18 +814,7 @@ function applyRules(text) {
         const vC = args[4] || "";
         const value = vA || vB || vC || match;
 
-        let ok = true;
-        if (pack && typeof pack.phoneGuard === "function") {
-          try {
-            ok = !!pack.phoneGuard({ label, value, match });
-          } catch (_) {
-            ok = true;
-          }
-        } else {
-          const digits = String(value).replace(/\D+/g, "");
-          ok = digits.length < 16;
-        }
-        if (!ok) return match;
+        if (!phoneGuardOk({ label, value, match })) return match;
 
         addHit(key);
         if (label) return `${label}${placeholder(r.tag)}`;
@@ -858,8 +840,8 @@ function applyRules(text) {
           } catch (_) {}
         }
 
-        if (legal) return `${placeholder("COMPANY")}${legal}${punct}`;
-        return placeholder("COMPANY");
+        // conservative fallback: mask whole company token
+        return `${placeholder("COMPANY")}${punct}`;
       }
 
       addHit(key);
@@ -927,11 +909,12 @@ function applyRules(text) {
   try {
     window.dispatchEvent(new Event("safe:updated"));
   } catch (_) {}
+
   return out;
 }
 
 /* =========================
-   ✅ STABILITY PATCHES (safe no-op)
+   7) Stability patches (safe no-op)
    ========================= */
 try {
   if (typeof window.$ !== "function") window.$ = $;
@@ -955,11 +938,23 @@ try {
   if (typeof window.resetContentLang !== "function") window.resetContentLang = resetContentLang;
 
   if (typeof window.__detectRuleEngine !== "function") window.__detectRuleEngine = detectRuleEngine;
+
+  // Debug pack access
   if (typeof window.getContentPack !== "function") window.getContentPack = getContentPack;
+  if (typeof window.getPolicy !== "function") window.getPolicy = getPolicy;
+
+  // Main entry
+  if (typeof window.applyRules !== "function") window.applyRules = applyRules;
+
+  // manual terms setter (if main.js uses it)
+  if (typeof window.setManualTermsFromText !== "function") window.setManualTermsFromText = setManualTermsFromText;
+
+  // init enabled (if main.js uses it)
+  if (typeof window.initEnabled !== "function") window.initEnabled = initEnabled;
 } catch (_) {}
 
 /* =========================
-   ✅ BOOT INIT (RULE A)
+   8) BOOT INIT (RULE A)
    ========================= */
 (function bootRuleEngineInit() {
   try {
@@ -980,9 +975,9 @@ try {
   } catch (_) {}
 })();
 
-// =========================
-// Content strategy: manual switch (NO CLEAR, keep file)
-// =========================
+/* =========================
+   9) Content strategy: manual switch (NO CLEAR, keep file)
+   ========================= */
 function setRuleEngineManual(lang) {
   const L = normLang(lang);
   if (!L) return;
@@ -991,7 +986,7 @@ function setRuleEngineManual(lang) {
     window.ruleEngine = L;
     window.ruleEngineMode = "lock";
 
-    // compatibility
+    // compatibility (if some older code reads contentLang)
     try {
       window.contentLang = L;
       window.contentLangMode = "lock";
