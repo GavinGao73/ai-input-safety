@@ -1,5 +1,8 @@
 // =========================
-// assets/stage3.js (from app.js)
+// assets/stage3.js (FULL)
+// v20260223-lang-split-stable-a2
+// ✅ Mode A (readable PDF): detect from RAW pdf text, then LOCK for session
+// ✅ Mode B (image / unreadable): keep auto (no lock)
 // =========================
 
 // ================= Stage 3 file handler =================
@@ -20,6 +23,10 @@ async function handleFile(file) {
 
   if (lastFileKind === "image") {
     lastRunMeta.fromPdf = false;
+
+    // ✅ Mode B: do NOT lock contentLang (keep auto)
+    try { window.contentLangMode = "auto"; } catch (_) {}
+
     setStage3Ui("B");
     setManualPanesForMode("B");
     setManualRailTextByMode();
@@ -37,6 +44,10 @@ async function handleFile(file) {
   try {
     if (!window.probePdfTextLayer) {
       lastRunMeta.fromPdf = false;
+
+      // ✅ No probe => treat as Mode B; do NOT lock
+      try { window.contentLangMode = "auto"; } catch (_) {}
+
       setStage3Ui("B");
       setManualPanesForMode("B");
       setManualRailTextByMode();
@@ -54,6 +65,10 @@ async function handleFile(file) {
 
     if (!probe || !probe.hasTextLayer) {
       lastRunMeta.fromPdf = false;
+
+      // ✅ Unreadable => Mode B; do NOT lock
+      try { window.contentLangMode = "auto"; } catch (_) {}
+
       setStage3Ui("B");
       setManualPanesForMode("B");
       setManualRailTextByMode();
@@ -66,6 +81,7 @@ async function handleFile(file) {
       return;
     }
 
+    // ✅ Readable PDF => Mode A
     lastRunMeta.fromPdf = true;
     setStage3Ui("A");
     setManualPanesForMode("A");
@@ -73,6 +89,12 @@ async function handleFile(file) {
 
     const text = String(probe.text || "").trim();
     lastPdfOriginalText = text;
+
+    // ✅ Detect contentLang from RAW pdf text then LOCK (session stability)
+    try {
+      if (typeof setLangContentAutoFromRaw === "function") setLangContentAutoFromRaw(text);
+      if (typeof lockContentLangForSession === "function") lockContentLangForSession(window.contentLang || "");
+    } catch (_) {}
 
     const ta = $("inputText");
     if (ta) {
@@ -96,6 +118,10 @@ async function handleFile(file) {
     window.dispatchEvent(new Event("safe:updated"));
   } catch (e) {
     lastRunMeta.fromPdf = false;
+
+    // ✅ Failure => Mode B; do NOT lock
+    try { window.contentLangMode = "auto"; } catch (_) {}
+
     setStage3Ui("B");
     setManualPanesForMode("B");
     setManualRailTextByMode();
