@@ -1,13 +1,14 @@
 // =========================
-// assets/engine.js
+// assets/engine.js (FULL)
+// v20260223-lang-split-stable-a2
+// ✅ UI language: window.currentLang
+// ✅ Content language: window.contentLang + window.contentLangMode ("auto" | "lock")
+// ✅ contentLang detection ONLY uses RAW input (never masked output)
 // =========================
 
-console.log("[engine.js] loaded v20260223-lang-split-a1");
+console.log("[engine.js] loaded v20260223-lang-split-stable-a2");
 
-// ✅ UI language is owned by i18n.js (window.currentLang)
-// ✅ Content language drives rule selection (window.contentLang)
-// ✅ engine.js must NEVER overwrite window.currentLang
-
+// ===================== lang helpers =====================
 function normLang(l) {
   const s = String(l || "").toLowerCase();
   return (s === "en" || s === "de" || s === "zh") ? s : "";
@@ -17,56 +18,103 @@ function getLangUI() {
   return normLang(window.currentLang) || "zh";
 }
 
-// contentLang can be auto-detected from input/PDF text.
-// default: follow UI at boot, then auto updates on content changes.
+// contentLang drives RULE selection
 function getLangContent() {
-  const m = String(window.contentLangMode || "auto").toLowerCase();
   const v = normLang(window.contentLang);
   if (v) return v;
-  // fallback: follow UI
+
+  // fallback: follow UI if not set
   return getLangUI();
 }
 
-function setLangContentAuto(text) {
+/**
+ * Remove placeholders / hit markers before language detection,
+ * to prevent drift caused by masked outputs.
+ */
+function stripForLangDetect(s) {
+  return String(s || "")
+    .replace(/(【[^【】]{1,36}】|\[[^\[\]]{1,36}\])/g, " ") // placeholders (zh/de/en)
+    .replace(/⟦HIT⟧|⟦\/HIT⟧/g, " ")                      // overlay markers (defensive)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Lightweight heuristic:
+ * - zh: higher Han ratio OR strong zh labels
+ * - de: umlauts/ß OR strong German keywords
+ * - else en
+ *
+ * ✅ Strong-signal thresholds to avoid "1 Chinese company name => zh".
+ */
+function detectContentLang(text) {
+  const s0 = String(text || "");
+  const s = s0.slice(0, 3200);
+  if (!s.trim()) return "";
+
+  // zh strong labels
+  if (/(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|开户银行|密码|验证码|登录账号|微信号|收款账号|对公账户)/.test(s)) {
+    return "zh";
+  }
+
+  // Han ratio
+  const han = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
+  const total = Math.max(1, s.length);
+  const hanRatio = han / total;
+  if (hanRatio > 0.12) return "zh"; // stronger threshold
+
+  // German strong signals
+  if (/[äöüÄÖÜß]/.test(s)) return "de";
+  if (/\b(Straße|Strasse|PLZ|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Kundennummer|Adresse|Telefon)\b/i.test(s)) {
+    return "de";
+  }
+
+  return "en";
+}
+
+/**
+ * Auto-detect content language from RAW text (never masked output).
+ * - only works when contentLangMode !== "lock"
+ * - updates window.contentLang and fires contentlang:changed
+ */
+function setLangContentAutoFromRaw(rawText) {
   try {
     const mode = String(window.contentLangMode || "auto").toLowerCase();
     if (mode === "lock") return;
 
-    const s = String(text || "");
-    const detected = detectContentLang(s);
+    const clean = stripForLangDetect(rawText);
+    if (!clean) return;
+
+    const detected = detectContentLang(clean);
     if (!detected) return;
 
     if (window.contentLang !== detected) {
       window.contentLang = detected;
       try {
-        window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: detected } }));
+        window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: detected, mode: "auto" } }));
       } catch (_) {}
     }
   } catch (_) {}
 }
 
-// Lightweight heuristic: zh if Han ratio/keywords; de if ß/äöü or German keywords; else en.
-function detectContentLang(text) {
-  const s0 = String(text || "");
-  const s = s0.slice(0, 2600); // cap
-  if (!s.trim()) return "";
-
-  // zh: Han ratio OR strong zh labels
-  const han = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
-  const letters = (s.match(/[A-Za-z]/g) || []).length;
-  const total = Math.max(1, s.length);
-  const hanRatio = han / total;
-
-  if (hanRatio > 0.06) return "zh";
-  if (/(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号)/.test(s)) return "zh";
-
-  // de: umlauts/ß or German keywords
-  if (/[äöüÄÖÜß]/.test(s)) return "de";
-  if (/\b(Straße|Strasse|PLZ|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Kundennummer)\b/i.test(s)) return "de";
-
-  return "en";
+function lockContentLangForSession(lang) {
+  const v = normLang(lang) || getLangContent();
+  window.contentLang = v;
+  window.contentLangMode = "lock";
+  try {
+    window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: v, mode: "lock" } }));
+  } catch (_) {}
 }
 
+function resetContentLang() {
+  window.contentLang = getLangUI();
+  window.contentLangMode = "auto";
+  try {
+    window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: window.contentLang, mode: "auto" } }));
+  } catch (_) {}
+}
+
+// ===================== runtime states =====================
 const enabled = new Set();
 
 // ✅ Money protection always ON (M1). No UI selector.
@@ -668,8 +716,8 @@ function applyRules(text) {
   let hits = 0;
   const hitsByKey = {};
 
-  // ✅ contentLang auto detect (only in auto mode)
-  setLangContentAuto(out);
+  // ✅ ONLY detect from RAW input (never from masked output)
+  setLangContentAutoFromRaw(out);
 
   const PRIORITY = [
     "secret",
@@ -787,8 +835,10 @@ function applyRules(text) {
     return out;
   }
 
+  // manual first
   out = applyManualTermsMask(out, () => addHit("manual_term"));
 
+  // protect placeholders
   const p0 = protectPlaceholders(out);
   out = p0.t;
 
@@ -869,6 +919,7 @@ function applyRules(text) {
     });
   }
 
+  // restore placeholders
   out = restorePlaceholders(out, p0.map);
 
   const report = computeRiskReport(hitsByKey, {
