@@ -34,7 +34,12 @@
       if (!s.trim()) return "";
 
       if (/[äöüÄÖÜß]/.test(s)) return "de";
-      if (/\b(Straße|Strasse|PLZ|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Kundennummer)\b/i.test(s)) return "de";
+      if (
+        /\b(Straße|Strasse|PLZ|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Kundennummer)\b/i.test(
+          s
+        )
+      )
+        return "de";
 
       return "";
     },
@@ -67,11 +72,22 @@
     },
 
     // ✅ company formatting (de): conservative
-    formatCompany: function ({ legal, punct, placeholder }) {
+    // Signature aligned with core call-site: ({ raw, name, legal, punct, coreStr, placeholder })
+    formatCompany: function ({ raw, name, legal, punct, coreStr, placeholder }) {
       const rawLegal = String(legal || "");
       const rawPunct = String(punct || "");
       if (rawLegal) return `${placeholder("COMPANY")}${rawLegal}${rawPunct}`;
       return `${placeholder("COMPANY")}${rawPunct}`;
+    },
+
+    // ✅ company highlight for pdf overlay (de): conservative
+    highlightCompany: function ({ match, name, legal, punct, S1, S2 }) {
+      const rawName = String(name || "");
+      const rawLegal = String(legal || "");
+      const rawPunct = String(punct || "");
+      if (rawName && rawLegal) return `${S1}${rawName}${S2}${rawLegal}${rawPunct}`;
+      const m = String(match || rawName || "");
+      return `${S1}${m}${S2}${rawPunct}`;
     },
 
     rules: {
