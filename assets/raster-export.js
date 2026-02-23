@@ -284,9 +284,35 @@
     try { return new RegExp(`(^|[^\\u4E00-\\u9FFF])(${src})(?=$|[^\\u4E00-\\u9FFF])`, "u"); } catch (_) { return null; }
   }
 
-  // --------- Rules -> matchers ----------
-  function buildRuleMatchers(enabledKeys, moneyMode, manualTerms) {
-    const PRIORITY = [
+  // --------- Packs/Policy accessors (NO rules.js dependency) ----------
+  function getEnginePolicy() {
+    return window.__ENGINE_POLICY__ || {};
+  }
+
+  function normLang(l) {
+    const s = String(l || "").toLowerCase();
+    return (s === "zh" || s === "en" || s === "de") ? s : "";
+  }
+
+  function getPacks() {
+    return window.__ENGINE_LANG_PACKS__ || {};
+  }
+
+  function getPackForLang(lang) {
+    const L = normLang(lang) || "zh";
+    const PACKS = getPacks();
+    return PACKS[L] || PACKS.zh || null;
+  }
+
+  function getPriorityForLang(lang) {
+    const pack = getPackForLang(lang);
+    if (pack && Array.isArray(pack.priority) && pack.priority.length) return pack.priority.slice(0);
+
+    const pol = getEnginePolicy();
+    if (Array.isArray(pol.defaultPriority) && pol.defaultPriority.length) return pol.defaultPriority.slice(0);
+
+    // last resort: keep old behavior
+    return [
       "person_name",
       "company",
       "email",
@@ -301,8 +327,32 @@
       "title",
       "number"
     ];
+  }
 
-    const rules = window.RULES_BY_KEY || {};
+  function getAlwaysOnSetForLang(lang) {
+    const pol = getEnginePolicy();
+    const baseArr = Array.isArray(pol.baseAlwaysOn) ? pol.baseAlwaysOn : [];
+    const s = new Set(baseArr);
+
+    const pack = getPackForLang(lang);
+    const extra = pack && pack.alwaysOn ? pack.alwaysOn : null;
+
+    if (Array.isArray(extra)) {
+      for (const k of extra) s.add(k);
+    } else if (extra && typeof extra.forEach === "function") {
+      try { extra.forEach((k) => s.add(k)); } catch (_) {}
+    }
+
+    return s;
+  }
+
+  // --------- Rules -> matchers (from packs/policy) ----------
+  function buildRuleMatchers(lang, enabledKeys, moneyMode, manualTerms) {
+    const PRIORITY = getPriorityForLang(lang);
+    const ALWAYS_ON = getAlwaysOnSetForLang(lang);
+
+    const pack = getPackForLang(lang);
+    const rules = (pack && pack.rules && typeof pack.rules === "object") ? pack.rules : {};
     const matchers = [];
     const enabledSet = new Set(Array.isArray(enabledKeys) ? enabledKeys : []);
 
@@ -355,7 +405,6 @@
       if (k === "money") {
         if (!moneyMode || moneyMode === "off") continue;
       } else {
-        const ALWAYS_ON = new Set(["phone", "account", "email", "bank"]);
         if (!enabledSet.has(k) && !ALWAYS_ON.has(k)) continue;
       }
 
@@ -836,20 +885,24 @@
     const pdfjsLib = await loadPdfJsIfNeeded();
     const { pdf, pages } = await renderPdfToCanvases(file, dpi || DEFAULT_DPI);
 
-    const matchers = buildRuleMatchers(enabledKeys, moneyMode, manualTerms);
+    const matchers = buildRuleMatchers(lang, enabledKeys, moneyMode, manualTerms);
     const _placeholder = langPlaceholder(lang); // kept for compat (not used)
 
     // ---- status snapshot (no logs) ----
     try {
+      const PACKS = window.__ENGINE_LANG_PACKS__ || {};
+      const pack = PACKS[lang] || PACKS.zh || null;
+
       window.__RasterExportLast = {
         when: Date.now(),
         phase: "autoRedactReadablePdf",
-        hasRules: !!(window.RULES_BY_KEY && typeof window.RULES_BY_KEY === "object"),
+        hasRules: !!(pack && pack.rules),
         enabledKeys: Array.isArray(enabledKeys) ? enabledKeys.slice() : [],
         moneyMode: moneyMode || "off",
         manualTerms: Array.isArray(manualTerms) ? manualTerms.slice() : [],
         matcherKeys: (matchers || []).map(m => m.key),
-        pages: (pages || []).length
+        pages: (pages || []).length,
+        lang
       };
     } catch (_) {}
 
@@ -954,10 +1007,13 @@
 
       // ---- status snapshot before work ----
       try {
+        const PACKS = window.__ENGINE_LANG_PACKS__ || {};
+        const pack = PACKS[lang] || PACKS.zh || null;
+
         window.__RasterExportLast = {
           when: Date.now(),
           phase: "exportRasterSecurePdfFromReadablePdf:begin",
-          hasRules: !!(window.RULES_BY_KEY && typeof window.RULES_BY_KEY === "object"),
+          hasRules: !!(pack && pack.rules),
           enabledKeys: Array.isArray(opts && opts.enabledKeys) ? (opts.enabledKeys || []).slice() : [],
           moneyMode: (opts && opts.moneyMode) || "off",
           manualTerms: manualTerms.slice(),
@@ -1035,12 +1091,16 @@
 
   // ---- minimal status beacon (no logs, in-memory only) ----
   try {
+    const PACKS = window.__ENGINE_LANG_PACKS__ || {};
+    const pack = PACKS.zh || null;
+
     window.__RasterExportStatus = {
       loaded: true,
-      hasRules: !!(window.RULES_BY_KEY && typeof window.RULES_BY_KEY === "object"),
+      hasRules: !!(pack && pack.rules),
       time: Date.now()
     };
   } catch (_) {}
 
   window.RasterExport = RasterExport;
 })();
+
