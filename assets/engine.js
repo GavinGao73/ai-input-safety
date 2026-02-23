@@ -311,10 +311,13 @@ function markHitsInOriginal(text){
     }
   }
 
+  // ✅ FIX: use the same rules source as applyRules()
+  const rules = getRulesSafe();
+
   for (const key of PRIORITY) {
     if (key !== "money" && !enabledSet.has(key) && !ALWAYS_ON.has(key)) continue;
 
-    const r = window.RULES_BY_KEY && window.RULES_BY_KEY[key];
+    const r = rules && rules[key];
     if (!r || !r.pattern) continue;
 
     // ✅ prefix highlight: keep label, highlight ONLY value group
