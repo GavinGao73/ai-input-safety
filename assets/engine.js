@@ -877,3 +877,22 @@ function applyRules(text) {
   window.dispatchEvent(new Event("safe:updated"));
   return out;
 }
+
+/* =========================
+   ✅ STABILITY PATCHES (no behavior change)
+   - ensure window.$ exists (for console debug and other scripts)
+   - avoid hard crash if some UI helpers are loaded elsewhere but missing due to order
+   ========================= */
+try {
+  if (typeof window.$ !== "function") window.$ = $;
+} catch (_) {}
+
+try {
+  if (typeof window.expandManualArea !== "function") window.expandManualArea = function(){};
+  if (typeof window.expandRiskArea !== "function") window.expandRiskArea = function(){};
+  if (typeof window.syncManualRiskHeights !== "function") window.syncManualRiskHeights = function(){};
+  // If they exist globally under window, prefer those
+  if (typeof expandManualArea !== "function") var expandManualArea = window.expandManualArea;
+  if (typeof expandRiskArea !== "function") var expandRiskArea = window.expandRiskArea;
+  if (typeof syncManualRiskHeights !== "function") var syncManualRiskHeights = window.syncManualRiskHeights;
+} catch (_) {}
