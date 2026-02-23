@@ -264,3 +264,37 @@ window.RULES_META = {
   const L = (lang === "en" || lang === "de" || lang === "zh") ? lang : "zh";
   window.RULES_BY_KEY = { ...(RULES_GLOBAL || {}), ...((window.RULES_REGISTRY && window.RULES_REGISTRY[L]) || {}) };
 })();
+
+/* ===================== COMPAT VIEW (RULES_BY_KEY) ===================== */
+(function () {
+  function normLang(x) {
+    const l = String(x || "").toLowerCase();
+    return (l === "en" || l === "de" || l === "zh") ? l : "zh";
+  }
+
+  function getRulesForLang(lang) {
+    const L = normLang(lang);
+    const reg = window.RULES_REGISTRY || {};
+    const global = (reg.global && typeof reg.global === "object") ? reg.global : {};
+    const bucket = (reg[L] && typeof reg[L] === "object") ? reg[L] : {};
+    return { ...global, ...bucket };
+  }
+
+  // expose helpers for engine / ui (safe)
+  window.getRulesForLang = getRulesForLang;
+
+  function refreshRulesByKey() {
+    window.RULES_BY_KEY = getRulesForLang(window.currentLang);
+  }
+
+  // ✅ build once on load (so UI init won't crash)
+  refreshRulesByKey();
+
+  // ✅ refresh on lang changes (whenever UI toggles window.currentLang)
+  // If you already dispatch a specific event, keep it; otherwise this is harmless.
+  window.addEventListener("safe:lang-changed", refreshRulesByKey);
+  window.addEventListener("languagechange", refreshRulesByKey);
+
+  // Optional: if UI sets currentLang without events, allow manual call
+  window.__refreshRulesByKey = refreshRulesByKey;
+})();
