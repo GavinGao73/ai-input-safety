@@ -3,6 +3,8 @@
 // ✅ UI copy polish (2026-02-21)
 // - Mode B manualRedactNote: clearer, shorter, consistent wording (ZH/EN/DE)
 // - Keep all keys/structure unchanged
+// - ✅ v2026-02-23: UI language auto-pick from browser/system; still allows manual override via buttons (setLang)
+// - ✅ adds contentLang defaults (engine uses it) without changing any existing I18N keys
 // =========================
 const I18N = {
   zh: {
@@ -228,24 +230,76 @@ window.I18N = I18N;
 (function bootstrapI18n() {
   try {
     var KEY = "__safe_lang";
+
+    function norm(s){ return String(s || "").toLowerCase(); }
+    function pick(v){ return (v === "zh" || v === "en" || v === "de") ? v : ""; }
+
+    // ✅ auto UI language from browser/system
+    function detectUiLang(){
+      try {
+        var cand = "";
+        if (Array.isArray(navigator.languages) && navigator.languages.length) {
+          cand = String(navigator.languages[0] || "");
+        } else {
+          cand = String(navigator.language || "");
+        }
+        cand = norm(cand);
+        if (cand.startsWith("de")) return "de";
+        if (cand.startsWith("zh")) return "zh";
+        return "en";
+      } catch (_) {
+        return "zh";
+      }
+    }
+
+    // 1) stored manual choice
     var stored = "";
     try { stored = localStorage.getItem(KEY) || ""; } catch (_) {}
 
-    function norm(s){ return String(s || "").toLowerCase(); }
-    function pick(v){ return (v === "zh" || v === "en" || v === "de") ? v : "zh"; }
+    // 2) window.currentLang if preset by HTML
+    // 3) navigator detection
+    // 4) fallback zh
+    var initial =
+      pick(norm(stored)) ||
+      pick(norm(window.currentLang)) ||
+      detectUiLang() ||
+      "zh";
 
-    var initial = pick(norm(window.currentLang || stored || "zh"));
     window.currentLang = initial;
+
+    // ✅ contentLang defaults used by lang-split engine (no UI binding)
+    // - engine may update contentLang in auto mode based on input/PDF text
+    if (!window.contentLangMode) window.contentLangMode = "auto"; // "auto" | "lock"
+    if (!window.contentLang) window.contentLang = initial;        // default follow UI at boot
 
     if (typeof window.setLang !== "function") {
       window.setLang = function (lang) {
-        var next = pick(norm(lang));
+        var next = pick(norm(lang)) || "zh";
         window.currentLang = next;
         try { localStorage.setItem(KEY, next); } catch (_) {}
         try {
           window.dispatchEvent(new CustomEvent("lang:changed", { detail: { lang: next } }));
         } catch (_) {}
         return next;
+      };
+    }
+
+    // optional helpers (non-breaking)
+    if (typeof window.setContentLang !== "function") {
+      window.setContentLang = function(lang){
+        var next = pick(norm(lang)) || "";
+        if (!next) return window.contentLang || initial;
+        window.contentLang = next;
+        window.contentLangMode = "lock";
+        try { window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: next } })); } catch (_) {}
+        return next;
+      };
+    }
+    if (typeof window.setContentLangAuto !== "function") {
+      window.setContentLangAuto = function(){
+        window.contentLangMode = "auto";
+        try { window.dispatchEvent(new CustomEvent("contentlang:mode", { detail: { mode: "auto" } })); } catch (_) {}
+        return "auto";
       };
     }
 
