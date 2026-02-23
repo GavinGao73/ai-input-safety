@@ -8,11 +8,15 @@
 // - then lock (no drift)
 // - Clear resets to (mode=auto, ruleEngine="")
 //
+// ✅ Isolation:
+// - NO RULES_COMMON / NO RULES_BY_LANG / NO RULES_BY_KEY
+// - rules are loaded ONLY from language packs: window.__ENGINE_LANG_PACKS__[lang].rules
+//
 // ✅ Compatibility:
 // - keep getLangContent() / resetContentLang() / setLangContentAuto() names
 // =========================
 
-console.log("[engine.js] loaded v20260223-router-a1-full");
+console.log("[engine.js] loaded v20260223-router-a2-pack-rules-only");
 
 /* =========================
    0) Language helpers (UI vs Content Strategy)
@@ -20,7 +24,7 @@ console.log("[engine.js] loaded v20260223-router-a1-full");
 
 function normLang(l) {
   const s = String(l || "").toLowerCase();
-  return (s === "en" || s === "de" || s === "zh") ? s : "";
+  return s === "en" || s === "de" || s === "zh" ? s : "";
 }
 
 function getLangUI() {
@@ -34,8 +38,7 @@ function getLangUI() {
  */
 function getLangContent() {
   const v = normLang(window.ruleEngine);
-  if (v) return v;
-  return getLangUI();
+  return v || getLangUI();
 }
 
 /**
@@ -46,7 +49,9 @@ function resetRuleEngine() {
     window.ruleEngine = "";
     window.ruleEngineMode = "auto";
     try {
-      window.dispatchEvent(new CustomEvent("ruleengine:changed", { detail: { lang: getLangContent() } }));
+      window.dispatchEvent(
+        new CustomEvent("ruleengine:changed", { detail: { lang: getLangContent() } })
+      );
     } catch (_) {}
   } catch (_) {}
 }
@@ -78,7 +83,9 @@ function setRuleEngineAuto(text) {
     window.ruleEngineMode = "lock";
 
     try {
-      window.dispatchEvent(new CustomEvent("ruleengine:changed", { detail: { lang: detected } }));
+      window.dispatchEvent(
+        new CustomEvent("ruleengine:changed", { detail: { lang: detected } })
+      );
     } catch (_) {}
   } catch (_) {}
 }
@@ -121,10 +128,16 @@ function detectRuleEngine(text) {
   const hanRatio = han / total;
 
   if (hanRatio > 0.06) return "zh";
-  if (/(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号|开户银行|对公账户|收款账号)/.test(s)) return "zh";
+  if (
+    /(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号|开户银行|对公账户|收款账号)/.test(
+      s
+    )
+  )
+    return "zh";
 
   if (/[äöüÄÖÜß]/.test(s)) return "de";
-  if (/\b(Straße|Strasse|PLZ|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Kundennummer)\b/i.test(s)) return "de";
+  if (/\b(Straße|Strasse|PLZ|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Kundennummer)\b/i.test(s))
+    return "de";
 
   return "en";
 }
@@ -142,11 +155,11 @@ window.__safe_moneyMode = moneyMode;
 let lastOutputPlain = "";
 
 // ================= Stage 3 state =================
-let lastUploadedFile = null;       // File object (pdf or image)
-let lastFileKind = "";             // "pdf" | "image" | ""
-let lastProbe = null;              // { hasTextLayer, text }
-let lastPdfOriginalText = "";      // extracted text for readable PDF
-let lastStage3Mode = "none";       // "A" | "B" | "none"
+let lastUploadedFile = null; // File object (pdf or image)
+let lastFileKind = ""; // "pdf" | "image" | ""
+let lastProbe = null; // { hasTextLayer, text }
+let lastPdfOriginalText = ""; // extracted text for readable PDF
+let lastStage3Mode = "none"; // "A" | "B" | "none"
 
 // store manual redaction session/result (Mode B export via main button)
 let __manualRedactSession = null;
@@ -155,7 +168,7 @@ let __manualRedactResult = null;
 // ================= Manual terms =================
 let manualTerms = [];
 
-function normalizeTerm(s){
+function normalizeTerm(s) {
   return String(s || "").trim();
 }
 
@@ -164,7 +177,7 @@ function normalizeTerm(s){
  * - dedup case-insensitive
  * - cap 24
  */
-function setManualTermsFromText(raw){
+function setManualTermsFromText(raw) {
   const s = String(raw || "");
   const parts = s
     .split(/[\n\r,，;；、]+/g)
@@ -182,12 +195,12 @@ function setManualTermsFromText(raw){
   manualTerms = out.slice(0, 24);
 }
 
-function show(el, yes){
+function show(el, yes) {
   if (!el) return;
   el.style.display = yes ? "" : "none";
 }
 
-function isSmallScreen(){
+function isSmallScreen() {
   try {
     return !!(window.matchMedia && window.matchMedia("(max-width: 560px)").matches);
   } catch (_) {
@@ -205,9 +218,11 @@ let lastRunMeta = {
   langContent: "zh"
 };
 
-function $(id) { return document.getElementById(id); }
+function $(id) {
+  return document.getElementById(id);
+}
 
-function escapeHTML(s){
+function escapeHTML(s) {
   return String(s || "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -216,19 +231,14 @@ function escapeHTML(s){
     .replaceAll("'", "&#039;");
 }
 
-// ================= RULES SAFE ACCESS =================
+// ================= RULES SAFE ACCESS (PACK ONLY) =================
 function getRulesSafe() {
-  // New build: RULES_BY_LANG + RULES_COMMON
-  if (window.RULES_BY_LANG && window.RULES_COMMON) {
-    const lang = getLangContent();
-    const spec = window.RULES_BY_LANG[lang] || {};
-    const merged = Object.assign({}, window.RULES_COMMON, spec);
-    return (merged && typeof merged === "object") ? merged : null;
-  }
+  const PACKS = window.__ENGINE_LANG_PACKS__ || {};
+  const lang = getLangContent();
+  const pack = PACKS[lang] || null;
 
-  // Old build: RULES_BY_KEY (default zh-stable)
-  const r = window.RULES_BY_KEY;
-  return (r && typeof r === "object") ? r : null;
+  const rules = pack && pack.rules && typeof pack.rules === "object" ? pack.rules : null;
+  return rules && Object.keys(rules).length ? rules : null;
 }
 
 // ================= ENABLED KEYS FOR EXPORT =================
@@ -244,7 +254,7 @@ function placeholder(key) {
   const PACKS = window.__ENGINE_LANG_PACKS__ || {};
   const lang = getLangContent();
   const pack = PACKS[lang] || PACKS.zh;
-  const table = (pack && pack.placeholders) ? pack.placeholders : null;
+  const table = pack && pack.placeholders ? pack.placeholders : null;
 
   if (table && table[key]) return table[key];
 
@@ -268,19 +278,21 @@ function placeholder(key) {
 }
 
 // ================= output render =================
-function renderOutput(outPlain){
+function renderOutput(outPlain) {
   lastOutputPlain = String(outPlain || "");
   const host = $("outputText");
   if (!host) return;
 
-  const html = escapeHTML(lastOutputPlain)
-    .replace(/(【[^【】]{1,36}】|\[[^\[\]]{1,36}\])/g, `<span class="hl">$1</span>`);
+  const html = escapeHTML(lastOutputPlain).replace(
+    /(【[^【】]{1,36}】|\[[^\[\]]{1,36}\])/g,
+    `<span class="hl">$1</span>`
+  );
 
   host.innerHTML = html;
 }
 
 // ================= input watermark hide =================
-function updateInputWatermarkVisibility(){
+function updateInputWatermarkVisibility() {
   const ta = $("inputText");
   const wrap = $("inputWrap");
   if (!ta || !wrap) return;
@@ -289,19 +301,19 @@ function updateInputWatermarkVisibility(){
 }
 
 // ================= Manual terms masking =================
-function escapeRegExp(s){
+function escapeRegExp(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-function makeLatinTermRegex(term){
+function makeLatinTermRegex(term) {
   const n = escapeRegExp(term);
   return new RegExp(`\\b${n}\\b`, "gi");
 }
-function makeCjkTermRegex(term){
+function makeCjkTermRegex(term) {
   const n = escapeRegExp(term);
   return new RegExp(`(^|[^\\u4E00-\\u9FFF])(${n})(?=$|[^\\u4E00-\\u9FFF])`, "g");
 }
 
-function applyManualTermsMask(out, addHit){
+function applyManualTermsMask(out, addHit) {
   if (!manualTerms || !manualTerms.length) return out;
 
   let s = String(out || "");
@@ -327,7 +339,7 @@ function applyManualTermsMask(out, addHit){
 }
 
 // ================= PDF overlay highlight =================
-function renderInputOverlayForPdf(originalText){
+function renderInputOverlayForPdf(originalText) {
   const overlay = $("inputOverlay");
   const ta = $("inputText");
   const wrap = $("inputWrap");
@@ -348,31 +360,20 @@ function renderInputOverlayForPdf(originalText){
   overlay.scrollLeft = ta.scrollLeft;
 }
 
-function markHitsInOriginal(text){
+function markHitsInOriginal(text) {
   let s = String(text || "");
 
   const S1 = "⟦HIT⟧";
   const S2 = "⟦/HIT⟧";
 
   const snap = window.__export_snapshot || null;
-  const enabledKeysArr = (snap && Array.isArray(snap.enabledKeys))
-    ? snap.enabledKeys
-    : Array.from(enabled || []);
+  const enabledKeysArr =
+    snap && Array.isArray(snap.enabledKeys) ? snap.enabledKeys : Array.from(enabled || []);
 
   const enabledSet = new Set(enabledKeysArr);
-
   const langContent = getLangContent();
 
-  const ALWAYS_ON_COMMON = new Set([
-    "secret",
-    "url",
-    "email",
-    "phone",
-    "account",
-    "bank",
-    "company",
-    "money"
-  ]);
+  const ALWAYS_ON_COMMON = new Set(["secret", "url", "email", "phone", "account", "bank", "company", "money"]);
 
   const ALWAYS_ON_BY_LANG = {
     zh: new Set(["handle_label", "ref_label", "address_cn"]),
@@ -382,7 +383,7 @@ function markHitsInOriginal(text){
 
   const ALWAYS_ON = new Set([
     ...Array.from(ALWAYS_ON_COMMON),
-    ...Array.from((ALWAYS_ON_BY_LANG[langContent] || new Set()))
+    ...Array.from(ALWAYS_ON_BY_LANG[langContent] || new Set())
   ]);
 
   // ✅ PRIORITY: structured keys BEFORE phone (fix FP on refs)
@@ -392,16 +393,13 @@ function markHitsInOriginal(text){
     "bank",
     "email",
     "url",
-
     "handle_label",
     "ref_label",
     "money",
-
     "phone",
     "company",
     "address_cn",
     "address_de_street",
-
     "handle",
     "ref",
     "title",
@@ -455,7 +453,7 @@ function markHitsInOriginal(text){
     if (r.mode === "phone") {
       s = s.replace(r.pattern, (m, p1, p2, p3, p4) => {
         const label = p1 || "";
-        const value = (p2 || p3 || p4 || m);
+        const value = p2 || p3 || p4 || m;
         const digits = String(value).replace(/\D+/g, "");
         if (digits.length >= 16) return m;
 
@@ -493,17 +491,17 @@ function markHitsInOriginal(text){
   }
 
   const esc = escapeHTML(s);
-  return esc
-    .replaceAll(S1, `<span class="hit">`)
-    .replaceAll(S2, `</span>`);
+  return esc.replaceAll(S1, `<span class="hit">`).replaceAll(S2, `</span>`);
 }
 
 // ================= init enabled =================
 function initEnabled() {
   enabled.clear();
-  Object.values(window.DETECTION_ITEMS || {}).flat().forEach(i => {
-    if (i && i.defaultOn) enabled.add(i.key);
-  });
+  Object.values(window.DETECTION_ITEMS || {})
+    .flat()
+    .forEach((i) => {
+      if (i && i.defaultOn) enabled.add(i.key);
+    });
 }
 
 // ================= Risk scoring =================
@@ -527,7 +525,9 @@ const RISK_WEIGHTS = {
   manual_term: 10
 };
 
-function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+function clamp(n, a, b) {
+  return Math.max(a, Math.min(b, n));
+}
 
 function riskI18n(langUI) {
   const zh = {
@@ -563,7 +563,7 @@ function riskI18n(langUI) {
     adviceHigh: "Do not send as-is: remove signature/account details and mask more.",
     meta: (m) => `Hits ${m.hits}｜Money M1${m.fromPdf ? "｜File" : ""}`
   };
-  return (langUI === "de") ? de : (langUI === "en") ? en : zh;
+  return langUI === "de" ? de : langUI === "en" ? en : zh;
 }
 
 function labelForKey(k) {
@@ -670,19 +670,19 @@ function renderRiskBox(report, meta) {
   const t = riskI18n(getLangUI());
   const levelText = report.level === "high" ? t.high : report.level === "mid" ? t.mid : t.low;
 
-  const topHtml = (report.top && report.top.length)
-    ? report.top.map(x => {
-      return `<div class="riskitem">
+  const topHtml =
+    report.top && report.top.length
+      ? report.top
+          .map((x) => {
+            return `<div class="riskitem">
         <span class="rk">${labelForKey(x.k)}</span>
         <span class="rv">${x.c}</span>
       </div>`;
-    }).join("")
-    : `<div class="tiny muted">-</div>`;
+          })
+          .join("")
+      : `<div class="tiny muted">-</div>`;
 
-  const advice =
-    report.level === "high" ? t.adviceHigh :
-    report.level === "mid" ? t.adviceMid :
-    t.adviceLow;
+  const advice = report.level === "high" ? t.adviceHigh : report.level === "mid" ? t.adviceMid : t.adviceLow;
 
   box.innerHTML = `
     <div class="riskhead">
@@ -724,16 +724,13 @@ function applyRules(text) {
     "bank",
     "email",
     "url",
-
     "handle_label",
     "ref_label",
     "money",
-
     "phone",
     "company",
     "address_cn",
     "address_de_street",
-
     "handle",
     "ref",
     "title",
@@ -742,16 +739,7 @@ function applyRules(text) {
 
   const langContent = getLangContent();
 
-  const ALWAYS_ON_COMMON = new Set([
-    "secret",
-    "url",
-    "email",
-    "phone",
-    "account",
-    "bank",
-    "company",
-    "money"
-  ]);
+  const ALWAYS_ON_COMMON = new Set(["secret", "url", "email", "phone", "account", "bank", "company", "money"]);
 
   const ALWAYS_ON_BY_LANG = {
     zh: new Set(["handle_label", "ref_label", "address_cn"]),
@@ -761,7 +749,7 @@ function applyRules(text) {
 
   const ALWAYS_ON = new Set([
     ...Array.from(ALWAYS_ON_COMMON),
-    ...Array.from((ALWAYS_ON_BY_LANG[langContent] || new Set()))
+    ...Array.from(ALWAYS_ON_BY_LANG[langContent] || new Set())
   ]);
 
   function addHit(key) {
@@ -769,7 +757,7 @@ function applyRules(text) {
     hitsByKey[key] = (hitsByKey[key] || 0) + 1;
   }
 
-  function protectPlaceholders(s){
+  function protectPlaceholders(s) {
     const map = [];
     const re = /(【[^【】]{1,36}】|\[[^\[\]]{1,36}\])/g;
     const t = String(s || "").replace(re, (m) => {
@@ -780,7 +768,7 @@ function applyRules(text) {
     return { t, map };
   }
 
-  function restorePlaceholders(s, map){
+  function restorePlaceholders(s, map) {
     let t = String(s || "");
     for (let i = 0; i < (map || []).length; i++) {
       const token = new RegExp(`\\uE000${i}\\uE001`, "g");
@@ -794,12 +782,14 @@ function applyRules(text) {
   const enabledKeysArr = effectiveEnabledKeys();
   const enabledSet = new Set(enabledKeysArr);
 
-  lastRunMeta.inputLen = (String(text || "")).length;
+  lastRunMeta.inputLen = String(text || "").length;
   lastRunMeta.enabledCount = enabledSet.size;
   lastRunMeta.moneyMode = "m1";
   lastRunMeta.langUI = getLangUI();
   lastRunMeta.langContent = getLangContent();
 
+  // NOTE: in pack-only build, rules SHOULD exist once packs are loaded.
+  // If not loaded yet, we fall back to manualTerms only.
   if (!rules) {
     out = applyManualTermsMask(out, () => addHit("manual_term"));
     renderOutput(out);
@@ -831,13 +821,9 @@ function applyRules(text) {
       moneyMode: "m1",
       langUI: getLangUI(),
       langContent: _lc,
-
       ruleEngine: _lc,
       ruleEngineMode: String(window.ruleEngineMode || "auto"),
-
-      // keep old name to avoid breaking any consumer
       contentLangMode: String(window.ruleEngineMode || "auto"),
-
       fromPdf: !!lastRunMeta.fromPdf,
       manualTerms: manualTerms.slice(0)
     };
@@ -846,7 +832,9 @@ function applyRules(text) {
     if (!window.__export_snapshot_byLang) window.__export_snapshot_byLang = {};
     window.__export_snapshot_byLang[_lc] = snap;
 
-    try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
+    try {
+      window.dispatchEvent(new Event("safe:updated"));
+    } catch (_) {}
     return out;
   }
 
@@ -917,15 +905,43 @@ function applyRules(text) {
         const coreStr = punct ? raw.slice(0, -punct.length) : raw;
 
         const groups = args[args.length - 1];
-        const legal = (groups && typeof groups === "object" && groups.legal) ? String(groups.legal) : "";
-        const name = (groups && typeof groups === "object" && groups.name) ? String(groups.name) : coreStr;
+        const legal =
+          groups && typeof groups === "object" && groups.legal ? String(groups.legal) : "";
+        const name =
+          groups && typeof groups === "object" && groups.name ? String(groups.name) : coreStr;
 
         addHit("company");
 
         if (legal) {
           const INDUSTRY = [
-            "网络科技","科技","数据服务","品牌管理","创新股份","创新","信息技术","技术","咨询","服务","贸易","传媒","物流","电子","软件","金融",
-            "投资","实业","工程","建筑","教育","医疗","广告","文化","餐饮","供应链","电商","互联网"
+            "网络科技",
+            "科技",
+            "数据服务",
+            "品牌管理",
+            "创新股份",
+            "创新",
+            "信息技术",
+            "技术",
+            "咨询",
+            "服务",
+            "贸易",
+            "传媒",
+            "物流",
+            "电子",
+            "软件",
+            "金融",
+            "投资",
+            "实业",
+            "工程",
+            "建筑",
+            "教育",
+            "医疗",
+            "广告",
+            "文化",
+            "餐饮",
+            "供应链",
+            "电商",
+            "互联网"
           ];
 
           let keep = "";
@@ -1000,12 +1016,9 @@ function applyRules(text) {
     moneyMode: "m1",
     langUI: getLangUI(),
     langContent: _lc,
-
     ruleEngine: _lc,
     ruleEngineMode: String(window.ruleEngineMode || "auto"),
-
     contentLangMode: String(window.ruleEngineMode || "auto"),
-
     fromPdf: !!lastRunMeta.fromPdf,
     manualTerms: manualTerms.slice(0)
   };
@@ -1014,7 +1027,9 @@ function applyRules(text) {
   if (!window.__export_snapshot_byLang) window.__export_snapshot_byLang = {};
   window.__export_snapshot_byLang[_lc] = snap2;
 
-  try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
+  try {
+    window.dispatchEvent(new Event("safe:updated"));
+  } catch (_) {}
   return out;
 }
 
@@ -1026,12 +1041,14 @@ try {
 } catch (_) {}
 
 try {
-  if (typeof window.expandManualArea !== "function") window.expandManualArea = function(){};
-  if (typeof window.expandRiskArea !== "function") window.expandRiskArea = function(){};
-  if (typeof window.syncManualRiskHeights !== "function") window.syncManualRiskHeights = function(){};
+  if (typeof window.expandManualArea !== "function") window.expandManualArea = function () {};
+  if (typeof window.expandRiskArea !== "function") window.expandRiskArea = function () {};
+  if (typeof window.syncManualRiskHeights !== "function")
+    window.syncManualRiskHeights = function () {};
   if (typeof expandManualArea !== "function") var expandManualArea = window.expandManualArea;
   if (typeof expandRiskArea !== "function") var expandRiskArea = window.expandRiskArea;
-  if (typeof syncManualRiskHeights !== "function") var syncManualRiskHeights = window.syncManualRiskHeights;
+  if (typeof syncManualRiskHeights !== "function")
+    var syncManualRiskHeights = window.syncManualRiskHeights;
 } catch (_) {}
 
 // expose helpers
@@ -1051,10 +1068,9 @@ try {
    - first-enter: ruleEngineMode="auto", ruleEngine=""
    - if someone pre-set ruleEngine (non-empty), force lock to avoid drift
    ========================= */
-(function bootRuleEngineInit(){
+(function bootRuleEngineInit() {
   try {
     const m = String(window.ruleEngineMode || "").trim().toLowerCase();
-
     if (!m) window.ruleEngineMode = "auto";
 
     if (String(window.ruleEngineMode || "").toLowerCase() === "auto") {
@@ -1083,7 +1099,10 @@ function setRuleEngineManual(lang) {
     window.ruleEngineMode = "lock";
 
     // compatibility
-    try { window.contentLang = L; window.contentLangMode = "lock"; } catch (_) {}
+    try {
+      window.contentLang = L;
+      window.contentLangMode = "lock";
+    } catch (_) {}
 
     // re-apply rules to current input
     const ta = document.getElementById("inputText");
