@@ -35,7 +35,12 @@
 
       // If strong German signals exist, do NOT claim en
       if (/[äöüÄÖÜß]/.test(s)) return "";
-      if (/\b(Straße|Strasse|PLZ|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Kundennummer)\b/i.test(s)) return "";
+      if (
+        /\b(Straße|Strasse|PLZ|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Kundennummer)\b/i.test(
+          s
+        )
+      )
+        return "";
 
       // If strong Chinese signals exist, do NOT claim en
       const han = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
@@ -43,7 +48,8 @@
       if (han / total > 0.03) return "";
 
       // English hints (keep lightweight to reduce FP)
-      if (/\b(Invoice|Order ID|Account Number|Username|Address|Phone|Email|Customer|Payment|Bank)\b/i.test(s)) return "en";
+      if (/\b(Invoice|Order ID|Account Number|Username|Address|Phone|Email|Customer|Payment|Bank)\b/i.test(s))
+        return "en";
       if (/[A-Za-z]/.test(s) && !/[\u4E00-\u9FFF]/.test(s)) return "en";
 
       return "";
@@ -79,11 +85,22 @@
     },
 
     // ✅ company formatting (en): conservative (no partial keep; avoid fancy heuristics)
-    formatCompany: function ({ legal, punct, placeholder }) {
+    // Signature aligned with core call-site: ({ raw, name, legal, punct, coreStr, placeholder })
+    formatCompany: function ({ raw, name, legal, punct, coreStr, placeholder }) {
       const rawLegal = String(legal || "");
       const rawPunct = String(punct || "");
       if (rawLegal) return `${placeholder("COMPANY")}${rawLegal}${rawPunct}`;
       return `${placeholder("COMPANY")}${rawPunct}`;
+    },
+
+    // ✅ company highlight for pdf overlay (en): conservative
+    highlightCompany: function ({ match, name, legal, punct, S1, S2 }) {
+      const rawName = String(name || "");
+      const rawLegal = String(legal || "");
+      const rawPunct = String(punct || "");
+      if (rawName && rawLegal) return `${S1}${rawName}${S2}${rawLegal}${rawPunct}`;
+      const m = String(match || rawName || "");
+      return `${S1}${m}${S2}${rawPunct}`;
     },
 
     rules: {
