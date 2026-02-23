@@ -224,3 +224,35 @@ const I18N = {
 };
 
 window.I18N = I18N;
+
+(function bootstrapI18n() {
+  try {
+    var KEY = "__safe_lang";
+    var stored = "";
+    try { stored = localStorage.getItem(KEY) || ""; } catch (_) {}
+
+    function norm(s){ return String(s || "").toLowerCase(); }
+    function pick(v){ return (v === "zh" || v === "en" || v === "de") ? v : "zh"; }
+
+    var initial = pick(norm(window.currentLang || stored || "zh"));
+    window.currentLang = initial;
+
+    if (typeof window.setLang !== "function") {
+      window.setLang = function (lang) {
+        var next = pick(norm(lang));
+        window.currentLang = next;
+        try { localStorage.setItem(KEY, next); } catch (_) {}
+        try {
+          window.dispatchEvent(new CustomEvent("lang:changed", { detail: { lang: next } }));
+        } catch (_) {}
+        return next;
+      };
+    }
+
+    window.__i18n_boot_ok = true;
+    window.__i18n_boot_lang = window.currentLang;
+  } catch (e) {
+    window.__i18n_boot_ok = false;
+    window.__i18n_boot_err = String(e && e.message ? e.message : e);
+  }
+})();
