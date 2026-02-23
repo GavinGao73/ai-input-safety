@@ -1,8 +1,10 @@
-// rules.js v2.1 — LANG-AWARE (contentLang) + stable fallback
+// =========================
+// assets/rules.js v2.2 — LANG-AWARE (contentLang) + stable fallback
 // - RULES_COMMON: truly cross-language stable patterns
 // - RULES_BY_LANG: language-specific label dictionaries / address patterns
 // - RULES_BY_KEY: backward-compatible DEFAULT (common + zh) ONLY
 //   (prevents en/de overwriting zh keys in old builds)
+// =========================
 
 (function () {
   "use strict";
@@ -37,7 +39,7 @@
 
     /* ===================== MONEY (explicit currency only, low FP) ===================== */
     money: {
-      pattern: /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥])\s*\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?/giu,
+      pattern: /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥])\s*\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?/giu,
       tag: "MONEY"
     },
 
@@ -74,9 +76,14 @@
         mode: "prefix"
       },
 
-      /* PHONE (label-driven + unlabeled handled by engine digit-guard) */
+      /* ✅ PHONE (label-driven only + allow intl prefix)
+         - Fix: avoid masking refs like CN-2026-xxxx / ORD-xxxx / wxid_xxxx
+         - Two branches:
+           A) labeled phone: (label)(value)
+           B) explicit intl prefix phone: +xx... or 00xx...
+      */
       phone: {
-        pattern: /((?:联系方式|联系电话|电话|手機|手机|联系人|聯繫方式|tel|telefon|phone|mobile|handy|kontakt)\s*[:：=]?\s*)?((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})?[\d\s().-]{6,}\d)/giu,
+        pattern: /((?:联系方式|联系电话|电话|手機|手机|联系人|聯繫方式|tel|telefon|phone|mobile|handy|kontakt)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(\b(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
         tag: "PHONE",
         mode: "phone"
       },
@@ -102,10 +109,19 @@
         mode: "address_cn_partial"
       },
 
-      /* CN/EN/DE company (simple placeholder masking handled in engine company-mode; suffix-preserve is done in engine) */
+      /* ✅ MONEY (ZH)
+         - cover "人民币 128,500.00 元" / "CNY 128,500.00" / "￥128,500.00"
+      */
+      money: {
+        pattern: /((?:人民币|CNY|RMB)\s*)?([¥￥]?\s*\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?)\s*(?:元|rmb|cny)?/giu,
+        tag: "MONEY"
+      },
+
+      /* ✅ COMPANY (ZH) — capture name + legal suffix (named groups)
+         - matches: 上海赛行网络科技有限公司 / 赛行（上海）网络科技有限公司 / 北京星舟科技有限公司
+      */
       company: {
-        // keep your previous simple latin company too (will be okay for zh content)
-        pattern: /\b([A-Za-z][A-Za-z0-9&.\- ]{1,60})\s+(GmbH|AG|UG|LLC|Ltd\.?|Inc\.?)\b/g,
+        pattern: /(?<name>[\u4E00-\u9FFF][\u4E00-\u9FFF0-9（）()·&\-\s]{1,60}?)(?<legal>集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)\b/gu,
         tag: "COMPANY",
         mode: "company"
       },
