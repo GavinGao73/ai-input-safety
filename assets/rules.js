@@ -1,8 +1,11 @@
 // =========================
-// assets/rules.js v2.3 — LANG-AWARE (contentLang) + stable fallback
-// FIXES:
-// - zh.money: MUST have currency indicator (人民币/CNY/RMB/¥/￥/元) -> stops masking phones/house numbers
-// - zh.company: remove \b, use lookahead -> matches Chinese company names reliably
+// assets/rules.js v2.4 — LANG-AWARE (contentLang) + stable fallback
+// FIXES (EN/DE stability):
+// - en/de.phone: label-driven only + explicit intl prefix branch (+ / 00)
+//   -> prevents ref-like IDs (EN-2026-...) from being masked as PHONE
+// - en/de.address: label-driven only, capture full line after Address/Adresse
+//   -> prevents "Amount 2" / other "Word + number" from being masked as ADDRESS
+// - en.ref_label: add Application No / Case / Ticket / Request ID
 // =========================
 
 (function () {
@@ -54,72 +57,56 @@
   // =========================
   const RULES_BY_LANG = {
     zh: {
-      /* SECRET (label-driven) */
       secret: {
         pattern: /((?:密码|口令|登录密码|支付密码|PIN|验证码|校验码|动态码|短信验证码|OTP|2FA)\s*[:：=]\s*)([^\n\r]{1,120})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
-      /* ACCOUNT (label-driven) */
       account: {
         pattern: /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|对公账户|對公賬戶)\s*[:：=]?\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{6,40}\d)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
 
-      /* BANK (label-driven) */
       bank: {
         pattern: /((?:开户银行|開戶銀行|银行|銀行|BIC|SWIFT)\s*[:：=]?\s*)([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?|\d{6,12})/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
 
-      /* ✅ PHONE (label-driven only + explicit intl prefix)
-         Fix: avoid masking refs like CN-2026-xxxx / ORD-xxxx / wxid_xxxx
-      */
+      // ✅ PHONE (label-driven only + explicit intl prefix)
       phone: {
         pattern: /((?:联系方式|联系电话|电话|手機|手机|联系人|聯繫方式|tel|telefon|phone|mobile|handy|kontakt)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(\b(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
         tag: "PHONE",
         mode: "phone"
       },
 
-      /* HANDLE label-driven */
       handle_label: {
         pattern: /((?:用户名|用\s*户\s*名|登录账号|登\s*录\s*账\s*号|账号名|账\s*号\s*名|账户名|帐户名|支付账号|支付账户|微信号|WeChat\s*ID|wxid)\s*[:：=]\s*)([A-Za-z0-9_@.\-]{3,80})/giu,
         tag: "HANDLE",
         mode: "prefix"
       },
 
-      /* REF label-driven */
       ref_label: {
         pattern: /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,80})/giu,
         tag: "REF",
         mode: "prefix"
       },
 
-      /* CN address (partial masking in engine) */
       address_cn: {
         pattern: /((?:地址|住址|办公地址|通信地址|收货地址|居住地址|单位地址)\s*[:：=]?\s*)([^\n\r]{2,120})/giu,
         tag: "ADDRESS",
         mode: "address_cn_partial"
       },
 
-      /* ✅ MONEY (ZH) — REQUIRE currency indicator
-         Matches only if:
-         - has 人民币/CNY/RMB prefix, OR
-         - has ¥/￥ symbol, OR
-         - ends with 元
-      */
+      // ✅ MONEY (ZH) — REQUIRE currency indicator
       money: {
         pattern: /(?:((?:人民币|CNY|RMB)\s*)(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?)(?:\s*元)?)|(?:([¥￥])\s*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?))|(?:(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?)\s*元)/giu,
         tag: "MONEY"
       },
 
-      /* ✅ COMPANY (ZH) — reliable matching
-         - remove \b; use lookahead to avoid swallowing extra Han chars
-         - supports: 上海云桥数据服务有限公司 / 赛行（上海）网络科技有限公司 / 北京星舟科技有限公司
-      */
+      // ✅ COMPANY (ZH)
       company: {
         pattern: /(?<name>[\u4E00-\u9FFF][\u4E00-\u9FFF0-9（）()·&\-\s]{1,60}?)(?<legal>集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)(?=$|[^\u4E00-\u9FFF])/gu,
         tag: "COMPANY",
@@ -151,14 +138,16 @@
         mode: "prefix"
       },
 
+      // ✅ DE PHONE: label-driven only + explicit intl prefix (+ / 00)
       phone: {
-        pattern: /((?:tel|telefon|handy|kontakt|phone|mobile|whatsapp|telegram|signal)\s*[:：=]?\s*)?((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})?[\d\s().-]{6,}\d)/giu,
+        pattern: /((?:tel|telefon|handy|kontakt|phone|mobile|whatsapp|telegram|signal)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(\b(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
         tag: "PHONE",
         mode: "phone"
       },
 
+      // ✅ DE ADDRESS: label-driven only (capture full line)
       address_de_street: {
-        pattern: /((?:Adresse|Address|Straße|Strasse)\s*[:：=]?\s*)?([\p{L}0-9.\-,'/ ]{2,80}\s+\d{1,6}\w?)/giu,
+        pattern: /((?:Adresse|Address|Straße|Strasse)\s*[:：=]?\s*)([^\n\r]{2,120})/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
@@ -194,14 +183,16 @@
         mode: "prefix"
       },
 
+      // ✅ EN PHONE: label-driven only + explicit intl prefix (+ / 00)
       phone: {
-        pattern: /((?:phone|mobile|contact|tel|whatsapp|telegram|signal)\s*[:：=]?\s*)?((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})?[\d\s().-]{6,}\d)/giu,
+        pattern: /((?:phone|mobile|contact|tel|whatsapp|telegram|signal)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(\b(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
         tag: "PHONE",
         mode: "phone"
       },
 
+      // ✅ EN ADDRESS: label-driven only (capture full line)
       address_de_street: {
-        pattern: /((?:Address|Shipping\s*Address|Billing\s*Address|Street)\s*[:：=]?\s*)?([A-Za-z0-9.\-,'/ ]{2,80}\s+\d{1,6}\w?)/g,
+        pattern: /((?:Address|Shipping\s*Address|Billing\s*Address|Street)\s*[:：=]?\s*)([^\n\r]{2,120})/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
@@ -212,8 +203,9 @@
         mode: "company"
       },
 
+      // ✅ EN REF (label-driven): includes Application No / Case / Ticket / Request ID
       ref_label: {
-        pattern: /((?:Order\s*(?:ID|No\.?|Number)|Invoice\s*(?:ID|No\.?|Number)|Reference|Ref\.?)\s*(?:[:：=]|-)\s*)([A-Za-z0-9\-_.]{3,80})/giu,
+        pattern: /((?:Application\s*(?:ID|No\.?|Number)|Order\s*(?:ID|No\.?|Number)|Invoice\s*(?:ID|No\.?|Number)|Reference|Ref\.?|Case\s*(?:ID|No\.?|Number)|Ticket\s*(?:ID|No\.?|Number)|Request\s*(?:ID|No\.?|Number))\s*(?:[:：=]|-)\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{2,80})/giu,
         tag: "REF",
         mode: "prefix"
       },
