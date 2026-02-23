@@ -1,15 +1,22 @@
 // =========================
-// assets/engine.js — LANG SPLIT (UI vs Content) + stable masking
-// - UI language: window.currentLang
-// - Content language: window.contentLang (+ window.contentLangMode)
+// assets/engine.js — CONTENT STRATEGY ROUTER (zh/en/de) + stable masking core
+// - UI language: window.currentLang (UI only)
+// - Content strategy language: window.ruleEngine (+ window.ruleEngineMode)
 //
-// ✅ STABILITY GOAL:
-// - auto 只在第一次需要时生效：仅当 contentLang=="" 时检测一次
-// - 一旦检测到，就立刻 contentLangMode="lock"（避免漂移）
-// - Clear 后必须回到：contentLangMode="auto", contentLang=""
+// ✅ GOAL:
+// - auto only runs ONCE when ruleEngine=="" (first real applyRules after boot/Clear)
+// - then lock (no drift)
+// - Clear resets to (mode=auto, ruleEngine="")
+//
+// ✅ Compatibility:
+// - keep getLangContent() / resetContentLang() / setLangContentAuto() names
 // =========================
 
-console.log("[engine.js] loaded v20260223-lang-split-a4-state-machine");
+console.log("[engine.js] loaded v20260223-router-a1-full");
+
+/* =========================
+   0) Language helpers (UI vs Content Strategy)
+   ========================= */
 
 function normLang(l) {
   const s = String(l || "").toLowerCase();
@@ -21,66 +28,94 @@ function getLangUI() {
 }
 
 /**
- * Content language chooser:
- * - if contentLang is set -> use it
- * - else -> fallback to UI (for placeholder display only until detected)
+ * Content strategy language (rules/placeholder), NOT UI language.
+ * - if ruleEngine set -> use it
+ * - else -> fallback to UI (display only until one-shot detect)
  */
 function getLangContent() {
-  const v = normLang(window.contentLang);
+  const v = normLang(window.ruleEngine);
   if (v) return v;
   return getLangUI();
 }
 
 /**
- * RULE C: Clear resets to first-enter start:
- * - contentLang="" enables one-shot auto on next real applyRules()
- * - contentLangMode="auto"
+ * RULE C: Clear resets content strategy language to first-enter start.
  */
-function resetContentLang() {
+function resetRuleEngine() {
   try {
-    window.contentLang = "";
-    window.contentLangMode = "auto";
+    window.ruleEngine = "";
+    window.ruleEngineMode = "auto";
     try {
-      window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: getLangContent() } }));
+      window.dispatchEvent(new CustomEvent("ruleengine:changed", { detail: { lang: getLangContent() } }));
     } catch (_) {}
   } catch (_) {}
+}
+
+// Backward compatible name (main.js may call this)
+function resetContentLang() {
+  resetRuleEngine();
 }
 
 /**
- * RULE B: on first real applyRules()
- * - if mode=auto && contentLang=="" -> detect once -> set contentLang -> lock
- * - if contentLang already set -> ensure lock
+ * One-shot auto detect, only when:
+ * - mode=auto AND ruleEngine==""
+ * After detect: lock.
  */
-function setLangContentAuto(text) {
+function setRuleEngineAuto(text) {
   try {
-    const mode = String(window.contentLangMode || "auto").toLowerCase();
+    const mode = String(window.ruleEngineMode || "auto").toLowerCase();
     if (mode !== "auto") return;
 
-    // One-shot guard: only run when contentLang is empty
-    if (normLang(window.contentLang)) {
-      window.contentLangMode = "lock";
+    if (normLang(window.ruleEngine)) {
+      window.ruleEngineMode = "lock";
       return;
     }
 
-    const s = String(text || "");
-    const detected = detectContentLang(s);
+    const detected = detectRuleEngine(text);
     if (!detected) return;
 
-    window.contentLang = detected;
-    window.contentLangMode = "lock";
+    window.ruleEngine = detected;
+    window.ruleEngineMode = "lock";
 
     try {
-      window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: detected } }));
+      window.dispatchEvent(new CustomEvent("ruleengine:changed", { detail: { lang: detected } }));
     } catch (_) {}
   } catch (_) {}
 }
 
-// Lightweight heuristic: zh if Han ratio/keywords; de if ß/äöü or German keywords; else en.
-function detectContentLang(text) {
+// Compatibility wrapper (old name used in applyRules)
+function setLangContentAuto(text) {
+  setRuleEngineAuto(text);
+}
+
+/**
+ * Detect content strategy language using registered packs first,
+ * fallback to conservative heuristic.
+ */
+function detectRuleEngine(text) {
   const s0 = String(text || "");
   const s = s0.slice(0, 2600);
   if (!s.trim()) return "";
 
+  const PACKS = window.__ENGINE_LANG_PACKS__ || {};
+
+  // Try pack detectors (conservative)
+  try {
+    if (PACKS.zh && typeof PACKS.zh.detect === "function") {
+      const r = normLang(PACKS.zh.detect(s));
+      if (r === "zh") return "zh";
+    }
+    if (PACKS.de && typeof PACKS.de.detect === "function") {
+      const r = normLang(PACKS.de.detect(s));
+      if (r === "de") return "de";
+    }
+    if (PACKS.en && typeof PACKS.en.detect === "function") {
+      const r = normLang(PACKS.en.detect(s));
+      if (r === "en") return "en";
+    }
+  } catch (_) {}
+
+  // Fallback heuristic (stable, low FP)
   const han = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
   const total = Math.max(1, s.length);
   const hanRatio = han / total;
@@ -93,6 +128,10 @@ function detectContentLang(text) {
 
   return "en";
 }
+
+/* =========================
+   1) Core state (unchanged)
+   ========================= */
 
 const enabled = new Set();
 
@@ -200,58 +239,32 @@ function effectiveEnabledKeys() {
   return Array.from(base);
 }
 
-// ================= placeholders (follow CONTENT language) =================
+// ================= placeholders (follow CONTENT STRATEGY language) =================
 function placeholder(key) {
-  const map = {
-    zh: {
-      PHONE: "【电话】",
-      EMAIL: "【邮箱】",
-      URL: "【网址】",
-      SECRET: "【敏感】",
-      ACCOUNT: "【账号】",
-      ADDRESS: "【地址】",
-      HANDLE: "【账号名】",
-      REF: "【编号】",
-      TITLE: "【称谓】",
-      NUMBER: "【数字】",
-      MONEY: "【金额】",
-      COMPANY: "【公司】",
-      TERM: "【遮盖】"
-    },
-    de: {
-      PHONE: "[Telefon]",
-      EMAIL: "[E-Mail]",
-      URL: "[URL]",
-      SECRET: "[Geheim]",
-      ACCOUNT: "[Konto]",
-      ADDRESS: "[Adresse]",
-      HANDLE: "[Handle]",
-      REF: "[Referenz]",
-      TITLE: "[Anrede]",
-      NUMBER: "[Zahl]",
-      MONEY: "[Betrag]",
-      COMPANY: "[Firma]",
-      TERM: "[REDACTED]"
-    },
-    en: {
-      PHONE: "[Phone]",
-      EMAIL: "[Email]",
-      URL: "[URL]",
-      SECRET: "[Secret]",
-      ACCOUNT: "[Account]",
-      ADDRESS: "[Address]",
-      HANDLE: "[Handle]",
-      REF: "[Ref]",
-      TITLE: "[Title]",
-      NUMBER: "[Number]",
-      MONEY: "[Amount]",
-      COMPANY: "[Company]",
-      TERM: "[REDACTED]"
-    }
-  };
-
+  const PACKS = window.__ENGINE_LANG_PACKS__ || {};
   const lang = getLangContent();
-  return (map[lang] && map[lang][key]) || `[${key}]`;
+  const pack = PACKS[lang] || PACKS.zh;
+  const table = (pack && pack.placeholders) ? pack.placeholders : null;
+
+  if (table && table[key]) return table[key];
+
+  // last resort (shouldn't happen if packs are loaded)
+  const fallback = {
+    PHONE: "[Phone]",
+    EMAIL: "[Email]",
+    URL: "[URL]",
+    SECRET: "[Secret]",
+    ACCOUNT: "[Account]",
+    ADDRESS: "[Address]",
+    HANDLE: "[Handle]",
+    REF: "[Ref]",
+    TITLE: "[Title]",
+    NUMBER: "[Number]",
+    MONEY: "[Amount]",
+    COMPANY: "[Company]",
+    TERM: "[REDACTED]"
+  };
+  return fallback[key] || `[${key}]`;
 }
 
 // ================= output render =================
@@ -701,7 +714,7 @@ function applyRules(text) {
   let hits = 0;
   const hitsByKey = {};
 
-  // ✅ RULE B: one-shot auto detect (only when mode=auto && contentLang=="")
+  // ✅ RULE B: one-shot auto detect (only when mode=auto && ruleEngine=="")
   setLangContentAuto(out);
 
   // ✅ PRIORITY: structured keys BEFORE phone (fix FP on refs)
@@ -811,15 +824,27 @@ function applyRules(text) {
     const ta = $("inputText");
     if (ta) renderInputOverlayForPdf(ta.value || "");
 
-    window.__export_snapshot = {
+    // ✅ snapshot isolation by lang
+    const _lc = getLangContent();
+    const snap = {
       enabledKeys: enabledKeysArr,
       moneyMode: "m1",
       langUI: getLangUI(),
-      langContent: getLangContent(),
-      contentLangMode: String(window.contentLangMode || "auto"),
+      langContent: _lc,
+
+      ruleEngine: _lc,
+      ruleEngineMode: String(window.ruleEngineMode || "auto"),
+
+      // keep old name to avoid breaking any consumer
+      contentLangMode: String(window.ruleEngineMode || "auto"),
+
       fromPdf: !!lastRunMeta.fromPdf,
       manualTerms: manualTerms.slice(0)
     };
+
+    window.__export_snapshot = snap;
+    if (!window.__export_snapshot_byLang) window.__export_snapshot_byLang = {};
+    window.__export_snapshot_byLang[_lc] = snap;
 
     try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
     return out;
@@ -968,15 +993,26 @@ function applyRules(text) {
   const ta = $("inputText");
   if (ta) renderInputOverlayForPdf(ta.value || "");
 
-  window.__export_snapshot = {
+  // ✅ snapshot isolation by lang
+  const _lc = getLangContent();
+  const snap2 = {
     enabledKeys: enabledKeysArr,
     moneyMode: "m1",
     langUI: getLangUI(),
-    langContent: getLangContent(),
-    contentLangMode: String(window.contentLangMode || "auto"),
+    langContent: _lc,
+
+    ruleEngine: _lc,
+    ruleEngineMode: String(window.ruleEngineMode || "auto"),
+
+    contentLangMode: String(window.ruleEngineMode || "auto"),
+
     fromPdf: !!lastRunMeta.fromPdf,
     manualTerms: manualTerms.slice(0)
   };
+
+  window.__export_snapshot = snap2;
+  if (!window.__export_snapshot_byLang) window.__export_snapshot_byLang = {};
+  window.__export_snapshot_byLang[_lc] = snap2;
 
   try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
   return out;
@@ -1002,30 +1038,35 @@ try {
 try {
   if (typeof window.getLangUI !== "function") window.getLangUI = getLangUI;
   if (typeof window.getLangContent !== "function") window.getLangContent = getLangContent;
+
+  if (typeof window.resetRuleEngine !== "function") window.resetRuleEngine = resetRuleEngine;
   if (typeof window.resetContentLang !== "function") window.resetContentLang = resetContentLang;
+
+  // optional debug
+  if (typeof window.__detectRuleEngine !== "function") window.__detectRuleEngine = detectRuleEngine;
 } catch (_) {}
 
 /* =========================
    ✅ BOOT INIT (RULE A)
-   - first-enter: contentLangMode="auto", contentLang=""
-   - if someone pre-set contentLang (non-empty), force lock to avoid drift
+   - first-enter: ruleEngineMode="auto", ruleEngine=""
+   - if someone pre-set ruleEngine (non-empty), force lock to avoid drift
    ========================= */
-(function bootContentLangInit(){
+(function bootRuleEngineInit(){
   try {
-    const m = String(window.contentLangMode || "").trim().toLowerCase();
+    const m = String(window.ruleEngineMode || "").trim().toLowerCase();
 
-    if (!m) window.contentLangMode = "auto";
+    if (!m) window.ruleEngineMode = "auto";
 
-    if (String(window.contentLangMode || "").toLowerCase() === "auto") {
-      if (normLang(window.contentLang)) {
-        window.contentLangMode = "lock";
+    if (String(window.ruleEngineMode || "").toLowerCase() === "auto") {
+      if (normLang(window.ruleEngine)) {
+        window.ruleEngineMode = "lock";
       } else {
-        window.contentLang = "";
+        window.ruleEngine = "";
       }
     }
 
-    if (String(window.contentLangMode || "").toLowerCase() === "lock" && !normLang(window.contentLang)) {
-      window.contentLang = getLangUI();
+    if (String(window.ruleEngineMode || "").toLowerCase() === "lock" && !normLang(window.ruleEngine)) {
+      window.ruleEngine = getLangUI(); // safe fallback
     }
   } catch (_) {}
 })();
