@@ -8,15 +8,21 @@
 // - then lock (no drift)
 // - Clear resets to (mode=auto, ruleEngine="")
 //
-// ✅ Isolation:
+// ✅ Isolation (RULES):
 // - NO RULES_COMMON / NO RULES_BY_LANG / NO RULES_BY_KEY
 // - rules are loaded ONLY from language packs: window.__ENGINE_LANG_PACKS__[lang].rules
+//
+// ✅ Isolation (LANG-SPECIFIC LOGIC):
+// - PRIORITY / alwaysOn / phone guard / company formatting / address_cn_partial formatting
+//   are all in language packs, so zh/en/de can be tuned independently.
 //
 // ✅ Compatibility:
 // - keep getLangContent() / resetContentLang() / setLangContentAuto() names
 // =========================
 
-console.log("[engine.js] loaded v20260223-router-a2-pack-rules-only");
+console.log("[engine.js] loaded v20260223-router-a3-pack-hooks");
+
+"use strict";
 
 /* =========================
    0) Language helpers (UI vs Content Strategy)
@@ -128,11 +134,7 @@ function detectRuleEngine(text) {
   const hanRatio = han / total;
 
   if (hanRatio > 0.06) return "zh";
-  if (
-    /(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号|开户银行|对公账户|收款账号)/.test(
-      s
-    )
-  )
+  if (/(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号|开户银行|对公账户|收款账号)/.test(s))
     return "zh";
 
   if (/[äöüÄÖÜß]/.test(s)) return "de";
@@ -140,6 +142,29 @@ function detectRuleEngine(text) {
     return "de";
 
   return "en";
+}
+
+/* =========================
+   0.1) Pack accessors (RULES + UI)
+   ========================= */
+
+function getContentPack() {
+  const PACKS = window.__ENGINE_LANG_PACKS__ || {};
+  const lang = getLangContent();
+  return PACKS[lang] || null;
+}
+
+function getUiPack() {
+  const UI = window.__ENGINE_UI_PACKS__ || {};
+  const lang = getLangUI();
+  return UI[lang] || null;
+}
+
+// ================= RULES SAFE ACCESS (PACK ONLY) =================
+function getRulesSafe() {
+  const pack = getContentPack();
+  const rules = pack && pack.rules && typeof pack.rules === "object" ? pack.rules : null;
+  return rules && Object.keys(rules).length ? rules : null;
 }
 
 /* =========================
@@ -231,16 +256,6 @@ function escapeHTML(s) {
     .replaceAll("'", "&#039;");
 }
 
-// ================= RULES SAFE ACCESS (PACK ONLY) =================
-function getRulesSafe() {
-  const PACKS = window.__ENGINE_LANG_PACKS__ || {};
-  const lang = getLangContent();
-  const pack = PACKS[lang] || null;
-
-  const rules = pack && pack.rules && typeof pack.rules === "object" ? pack.rules : null;
-  return rules && Object.keys(rules).length ? rules : null;
-}
-
 // ================= ENABLED KEYS FOR EXPORT =================
 function effectiveEnabledKeys() {
   const MUST_INCLUDE = ["company"]; // keep as-is (your build choice)
@@ -251,9 +266,7 @@ function effectiveEnabledKeys() {
 
 // ================= placeholders (follow CONTENT STRATEGY language) =================
 function placeholder(key) {
-  const PACKS = window.__ENGINE_LANG_PACKS__ || {};
-  const lang = getLangContent();
-  const pack = PACKS[lang] || PACKS.zh;
+  const pack = getContentPack() || (window.__ENGINE_LANG_PACKS__ || {}).zh;
   const table = pack && pack.placeholders ? pack.placeholders : null;
 
   if (table && table[key]) return table[key];
@@ -338,7 +351,63 @@ function applyManualTermsMask(out, addHit) {
   return s;
 }
 
-// ================= PDF overlay highlight =================
+/* =========================
+   2) Pack-driven execution policy
+   ========================= */
+
+// stable, non-language-specific always-on baseline (can be overridden/extended by pack.alwaysOn)
+function getAlwaysOnBaseSet() {
+  return new Set(["secret", "url", "email", "phone", "account", "bank", "company", "money"]);
+}
+
+// fallback order (only used if pack.priority missing)
+function getPriorityFallback() {
+  return [
+    "secret",
+    "account",
+    "bank",
+    "email",
+    "url",
+    "handle_label",
+    "ref_label",
+    "money",
+    "phone",
+    "company",
+    "address_cn",
+    "address_de_street",
+    "handle",
+    "ref",
+    "title",
+    "number"
+  ];
+}
+
+function getPriority() {
+  const pack = getContentPack();
+  if (pack && Array.isArray(pack.priority) && pack.priority.length) return pack.priority.slice(0);
+  return getPriorityFallback();
+}
+
+function getAlwaysOnSet() {
+  const base = getAlwaysOnBaseSet();
+  const pack = getContentPack();
+  const extra = pack && pack.alwaysOn ? pack.alwaysOn : null;
+
+  if (Array.isArray(extra)) {
+    for (const k of extra) base.add(k);
+  } else if (extra && typeof extra.forEach === "function") {
+    // allow Set
+    try {
+      extra.forEach((k) => base.add(k));
+    } catch (_) {}
+  }
+  return base;
+}
+
+/* =========================
+   3) PDF overlay highlight
+   ========================= */
+
 function renderInputOverlayForPdf(originalText) {
   const overlay = $("inputOverlay");
   const ta = $("inputText");
@@ -371,40 +440,6 @@ function markHitsInOriginal(text) {
     snap && Array.isArray(snap.enabledKeys) ? snap.enabledKeys : Array.from(enabled || []);
 
   const enabledSet = new Set(enabledKeysArr);
-  const langContent = getLangContent();
-
-  const ALWAYS_ON_COMMON = new Set(["secret", "url", "email", "phone", "account", "bank", "company", "money"]);
-
-  const ALWAYS_ON_BY_LANG = {
-    zh: new Set(["handle_label", "ref_label", "address_cn"]),
-    de: new Set(["address_de_street"]),
-    en: new Set(["address_de_street", "handle_label", "ref_label"])
-  };
-
-  const ALWAYS_ON = new Set([
-    ...Array.from(ALWAYS_ON_COMMON),
-    ...Array.from(ALWAYS_ON_BY_LANG[langContent] || new Set())
-  ]);
-
-  // ✅ PRIORITY: structured keys BEFORE phone (fix FP on refs)
-  const PRIORITY = [
-    "secret",
-    "account",
-    "bank",
-    "email",
-    "url",
-    "handle_label",
-    "ref_label",
-    "money",
-    "phone",
-    "company",
-    "address_cn",
-    "address_de_street",
-    "handle",
-    "ref",
-    "title",
-    "number"
-  ];
 
   if (manualTerms && manualTerms.length) {
     for (const tm of manualTerms) {
@@ -420,6 +455,9 @@ function markHitsInOriginal(text) {
   }
 
   const rules = getRulesSafe();
+  const PRIORITY = getPriority();
+  const ALWAYS_ON = getAlwaysOnSet();
+  const pack = getContentPack();
 
   for (const key of PRIORITY) {
     if (key !== "money" && !enabledSet.has(key) && !ALWAYS_ON.has(key)) continue;
@@ -440,11 +478,15 @@ function markHitsInOriginal(text) {
       s = s.replace(r.pattern, (m, p1, p2) => {
         const label = p1 || "";
         const val = p2 || "";
-        const reRoadNo = /([\u4E00-\u9FFF]{1,20}(?:路|街|道|大道|巷|弄))\s*(\d{1,6}\s*号)/g;
-        if (reRoadNo.test(val)) {
-          const markedVal = val.replace(reRoadNo, (mm, a, b) => `${a}${S1}${b}${S2}`);
-          return `${label}${markedVal}`;
+
+        if (pack && typeof pack.highlightAddressCnPartial === "function") {
+          try {
+            const res = pack.highlightAddressCnPartial({ label, val, S1, S2 });
+            if (typeof res === "string" && res) return res;
+          } catch (_) {}
         }
+
+        // fallback: highlight whole address value
         return `${label}${S1}${val}${S2}`;
       });
       continue;
@@ -454,8 +496,19 @@ function markHitsInOriginal(text) {
       s = s.replace(r.pattern, (m, p1, p2, p3, p4) => {
         const label = p1 || "";
         const value = p2 || p3 || p4 || m;
-        const digits = String(value).replace(/\D+/g, "");
-        if (digits.length >= 16) return m;
+
+        let ok = true;
+        if (pack && typeof pack.phoneGuard === "function") {
+          try {
+            ok = !!pack.phoneGuard({ label, value, match: m });
+          } catch (_) {
+            ok = true;
+          }
+        } else {
+          const digits = String(value).replace(/\D+/g, "");
+          ok = digits.length < 16;
+        }
+        if (!ok) return m;
 
         if (label) return `${label}${S1}${m.slice(label.length)}${S2}`;
         return `${S1}${m}${S2}`;
@@ -475,6 +528,7 @@ function markHitsInOriginal(text) {
           return `${S1}${groups.name || ""}${S2}${groups.legal || ""}${punct}`;
         }
 
+        // generic split: keep legal suffix separate (if any)
         const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
         if (sufMatch) {
           const suffix = sufMatch[1];
@@ -504,7 +558,10 @@ function initEnabled() {
     });
 }
 
-// ================= Risk scoring =================
+/* =========================
+   4) Risk scoring (core logic stable; UI strings in UI pack)
+   ========================= */
+
 const RISK_WEIGHTS = {
   bank: 28,
   account: 26,
@@ -529,8 +586,12 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
-function riskI18n(langUI) {
-  const zh = {
+function riskI18n() {
+  const ui = getUiPack();
+  if (ui && ui.riskI18n) return ui.riskI18n;
+
+  // hard fallback only (should be overridden by engine.ui.js)
+  return {
     low: "低风险",
     mid: "中风险",
     high: "高风险",
@@ -541,93 +602,13 @@ function riskI18n(langUI) {
     adviceHigh: "不建议直接发送：请删除签名落款/账号信息，并加严遮盖后再试。",
     meta: (m) => `命中 ${m.hits}｜金额 M1${m.fromPdf ? "｜文件" : ""}`
   };
-  const de = {
-    low: "Niedrig",
-    mid: "Mittel",
-    high: "Hoch",
-    top: "Top-Risiken",
-    advice: "Empfehlung",
-    adviceLow: "Kann verwendet werden. Betragsschutz ist standardmäßig aktiv.",
-    adviceMid: "Top-Risiken prüfen; ggf. stärker maskieren oder manuell schwärzen.",
-    adviceHigh: "Nicht direkt senden: Signatur/Kontodaten entfernen und mehr Maskierung aktivieren.",
-    meta: (m) => `Treffer ${m.hits}｜Betrag M1${m.fromPdf ? "｜Datei" : ""}`
-  };
-  const en = {
-    low: "Low",
-    mid: "Medium",
-    high: "High",
-    top: "Top risk sources",
-    advice: "Advice",
-    adviceLow: "Ok to use. Money protection is on by default.",
-    adviceMid: "Review top risks; consider stronger masking or manual redaction.",
-    adviceHigh: "Do not send as-is: remove signature/account details and mask more.",
-    meta: (m) => `Hits ${m.hits}｜Money M1${m.fromPdf ? "｜File" : ""}`
-  };
-  return langUI === "de" ? de : langUI === "en" ? en : zh;
 }
 
 function labelForKey(k) {
-  const map = {
-    zh: {
-      bank: "银行/支付信息",
-      account: "账号/卡号",
-      email: "邮箱",
-      url: "网址/链接",
-      secret: "密码/验证码",
-      phone: "电话",
-      address_de_street: "地址（街道门牌）",
-      address_cn: "地址（路号）",
-      handle_label: "账号名/登录/IM",
-      ref_label: "编号（申请/订单/参考）",
-      handle: "账号名/Handle",
-      ref: "编号/引用",
-      title: "称谓",
-      number: "数字",
-      money: "金额",
-      company: "公司",
-      manual_term: "补充遮盖（手工词条）"
-    },
-    de: {
-      bank: "Bank/Payment",
-      account: "Konto/Nummer",
-      email: "E-Mail",
-      url: "URL/Link",
-      secret: "Passwort/Code",
-      phone: "Telefon",
-      address_de_street: "Adresse (Straße/Nr.)",
-      address_cn: "Adresse (Straße/Nr.)",
-      handle_label: "Handle/Account",
-      ref_label: "Referenz",
-      handle: "Handle/Account",
-      ref: "Referenz",
-      title: "Anrede",
-      number: "Zahl",
-      money: "Betrag",
-      company: "Firma",
-      manual_term: "Zusatz (manuell)"
-    },
-    en: {
-      bank: "Bank/Payment",
-      account: "Account/Number",
-      email: "Email",
-      url: "URL/Link",
-      secret: "Password/OTP",
-      phone: "Phone",
-      address_de_street: "Address (street/no.)",
-      address_cn: "Address (street/no.)",
-      handle_label: "Handle/Account",
-      ref_label: "Reference",
-      handle: "Handle/Account",
-      ref: "Reference",
-      title: "Title",
-      number: "Numbers",
-      money: "Money",
-      company: "Company",
-      manual_term: "Extra (manual)"
-    }
-  };
-  const m = map[getLangUI()] || map.zh;
-  return m[k] || k;
+  const ui = getUiPack();
+  const labels = ui && ui.labels ? ui.labels : null;
+  if (labels && labels[k]) return labels[k];
+  return k;
 }
 
 function computeRiskReport(hitsByKey, meta) {
@@ -667,7 +648,7 @@ function renderRiskBox(report, meta) {
   const box = $("riskBox");
   if (!box) return;
 
-  const t = riskI18n(getLangUI());
+  const t = riskI18n();
   const levelText = report.level === "high" ? t.high : report.level === "mid" ? t.mid : t.low;
 
   const topHtml =
@@ -682,7 +663,8 @@ function renderRiskBox(report, meta) {
           .join("")
       : `<div class="tiny muted">-</div>`;
 
-  const advice = report.level === "high" ? t.adviceHigh : report.level === "mid" ? t.adviceMid : t.adviceLow;
+  const advice =
+    report.level === "high" ? t.adviceHigh : report.level === "mid" ? t.adviceMid : t.adviceLow;
 
   box.innerHTML = `
     <div class="riskhead">
@@ -708,7 +690,10 @@ function renderRiskBox(report, meta) {
   `;
 }
 
-// ================= rule application =================
+/* =========================
+   5) Rule application (pack-driven)
+   ========================= */
+
 function applyRules(text) {
   let out = String(text || "");
   let hits = 0;
@@ -717,40 +702,8 @@ function applyRules(text) {
   // ✅ RULE B: one-shot auto detect (only when mode=auto && ruleEngine=="")
   setLangContentAuto(out);
 
-  // ✅ PRIORITY: structured keys BEFORE phone (fix FP on refs)
-  const PRIORITY = [
-    "secret",
-    "account",
-    "bank",
-    "email",
-    "url",
-    "handle_label",
-    "ref_label",
-    "money",
-    "phone",
-    "company",
-    "address_cn",
-    "address_de_street",
-    "handle",
-    "ref",
-    "title",
-    "number"
-  ];
-
-  const langContent = getLangContent();
-
-  const ALWAYS_ON_COMMON = new Set(["secret", "url", "email", "phone", "account", "bank", "company", "money"]);
-
-  const ALWAYS_ON_BY_LANG = {
-    zh: new Set(["handle_label", "ref_label", "address_cn"]),
-    de: new Set(["address_de_street"]),
-    en: new Set(["address_de_street", "handle_label", "ref_label"])
-  };
-
-  const ALWAYS_ON = new Set([
-    ...Array.from(ALWAYS_ON_COMMON),
-    ...Array.from(ALWAYS_ON_BY_LANG[langContent] || new Set())
-  ]);
+  const PRIORITY = getPriority();
+  const ALWAYS_ON = getAlwaysOnSet();
 
   function addHit(key) {
     hits++;
@@ -778,6 +731,7 @@ function applyRules(text) {
   }
 
   const rules = getRulesSafe();
+  const pack = getContentPack();
 
   const enabledKeysArr = effectiveEnabledKeys();
   const enabledSet = new Set(enabledKeysArr);
@@ -872,14 +826,20 @@ function applyRules(text) {
       if (r.mode === "address_cn_partial") {
         const label = args[1] || "";
         const val = args[2] || "";
-        const reRoadNo = /([\u4E00-\u9FFF]{1,20}(?:路|街|道|大道|巷|弄))\s*(\d{1,6}\s*号)/g;
 
-        if (reRoadNo.test(val)) {
-          addHit(key);
-          const v2 = val.replace(reRoadNo, (m2, a, b) => `${a}${placeholder("ADDRESS")}`);
-          return `${label}${v2}`;
+        if (pack && typeof pack.formatAddressCnPartial === "function") {
+          try {
+            const res = pack.formatAddressCnPartial({ label, val, match, placeholder });
+            if (typeof res === "string" && res) {
+              addHit(key);
+              return res;
+            }
+          } catch (_) {}
         }
-        return match;
+
+        // fallback: mask full value
+        addHit(key);
+        return `${label}${placeholder("ADDRESS")}`;
       }
 
       if (r.mode === "phone") {
@@ -889,8 +849,18 @@ function applyRules(text) {
         const vC = args[4] || "";
         const value = vA || vB || vC || match;
 
-        const digits = String(value).replace(/\D+/g, "");
-        if (digits.length >= 16) return match;
+        let ok = true;
+        if (pack && typeof pack.phoneGuard === "function") {
+          try {
+            ok = !!pack.phoneGuard({ label, value, match });
+          } catch (_) {
+            ok = true;
+          }
+        } else {
+          const digits = String(value).replace(/\D+/g, "");
+          ok = digits.length < 16;
+        }
+        if (!ok) return match;
 
         addHit(key);
         if (label) return `${label}${placeholder(r.tag)}`;
@@ -899,7 +869,6 @@ function applyRules(text) {
 
       if (r.mode === "company") {
         const raw = String(match || "");
-
         const punctMatch = raw.match(/[。．.，,;；!！?？)）】\]\s]+$/u);
         const punct = punctMatch ? punctMatch[0] : "";
         const coreStr = punct ? raw.slice(0, -punct.length) : raw;
@@ -912,55 +881,15 @@ function applyRules(text) {
 
         addHit("company");
 
-        if (legal) {
-          const INDUSTRY = [
-            "网络科技",
-            "科技",
-            "数据服务",
-            "品牌管理",
-            "创新股份",
-            "创新",
-            "信息技术",
-            "技术",
-            "咨询",
-            "服务",
-            "贸易",
-            "传媒",
-            "物流",
-            "电子",
-            "软件",
-            "金融",
-            "投资",
-            "实业",
-            "工程",
-            "建筑",
-            "教育",
-            "医疗",
-            "广告",
-            "文化",
-            "餐饮",
-            "供应链",
-            "电商",
-            "互联网"
-          ];
-
-          let keep = "";
-          for (const kw of INDUSTRY) {
-            const i = name.lastIndexOf(kw);
-            if (i >= 0 && i >= Math.max(0, name.length - 10)) {
-              keep = name.slice(i);
-              break;
-            }
-          }
-
-          if (!keep && name.length > 4) keep = name.slice(-4);
-
-          return `${placeholder("COMPANY")}${keep}${legal}${punct}`;
+        if (pack && typeof pack.formatCompany === "function") {
+          try {
+            const res = pack.formatCompany({ raw, name, legal, punct, coreStr, placeholder });
+            if (typeof res === "string" && res) return res;
+          } catch (_) {}
         }
 
-        const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
-        if (sufMatch) return `${placeholder("COMPANY")}${sufMatch[1]}${punct}`;
-
+        // fallback: conservative
+        if (legal) return `${placeholder("COMPANY")}${legal}${punct}`;
         return placeholder("COMPANY");
       }
 
@@ -1043,12 +972,10 @@ try {
 try {
   if (typeof window.expandManualArea !== "function") window.expandManualArea = function () {};
   if (typeof window.expandRiskArea !== "function") window.expandRiskArea = function () {};
-  if (typeof window.syncManualRiskHeights !== "function")
-    window.syncManualRiskHeights = function () {};
+  if (typeof window.syncManualRiskHeights !== "function") window.syncManualRiskHeights = function () {};
   if (typeof expandManualArea !== "function") var expandManualArea = window.expandManualArea;
   if (typeof expandRiskArea !== "function") var expandRiskArea = window.expandRiskArea;
-  if (typeof syncManualRiskHeights !== "function")
-    var syncManualRiskHeights = window.syncManualRiskHeights;
+  if (typeof syncManualRiskHeights !== "function") var syncManualRiskHeights = window.syncManualRiskHeights;
 } catch (_) {}
 
 // expose helpers
@@ -1058,6 +985,8 @@ try {
 
   if (typeof window.resetRuleEngine !== "function") window.resetRuleEngine = resetRuleEngine;
   if (typeof window.resetContentLang !== "function") window.resetContentLang = resetContentLang;
+
+  if (typeof window.getContentPack !== "function") window.getContentPack = getContentPack;
 
   // optional debug
   if (typeof window.__detectRuleEngine !== "function") window.__detectRuleEngine = detectRuleEngine;
