@@ -28,8 +28,9 @@ function getLangContent() {
 
 function setLangContentAuto(text) {
   try {
-    const mode = String(window.contentLangMode || "auto").toLowerCase();
-    if (mode === "lock") return;
+    // ✅ default LOCK: no auto unless explicitly enabled
+    const mode = String(window.contentLangMode || "lock").toLowerCase();
+    if (mode !== "auto") return;
 
     const s = String(text || "");
     const detected = detectContentLang(s);
@@ -37,6 +38,10 @@ function setLangContentAuto(text) {
 
     if (window.contentLang !== detected) {
       window.contentLang = detected;
+
+      // ✅ auto runs ONCE then locks (prevents drift)
+      window.contentLangMode = "lock";
+
       try {
         window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: detected } }));
       } catch (_) {}
