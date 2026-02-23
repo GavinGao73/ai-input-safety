@@ -1,7 +1,6 @@
 // rules.js v1.9 — STABLE BUILD (no RegExp constructor, no syntax traps)
 
 const RULES_BY_KEY = {
-
   /* ===================== EMAIL ===================== */
   email: {
     pattern: /\b[A-Z0-9._%+-]+\s*@\s*[A-Z0-9.-]+\s*\.\s*[A-Z]{2,}\b/gi,
@@ -16,42 +15,48 @@ const RULES_BY_KEY = {
 
   /* ===================== SECRET / PASSCODE ===================== */
   secret: {
-    pattern: /((?:密码|PIN|Passwort|Password|passcode|verification\s*code|security\s*code|one[-\s]?time\s*code|OTP|2FA|CVV|CVC)\s*[:：=]\s*)([^\n\r]{1,120})/giu,
+    pattern:
+      /((?:密码|PIN|Passwort|Password|passcode|verification\s*code|security\s*code|one[-\s]?time\s*code|OTP|2FA|CVV|CVC)\s*[:：=]\s*)([^\n\r]{1,120})/giu,
     tag: "SECRET",
     mode: "prefix"
   },
 
   /* ===================== ACCOUNT / CARD ===================== */
   account: {
-    pattern: /((?:账号|账户|Account(?:\s*Number)?|Card\s*Number|Credit\s*Card|Debit\s*Card|IBAN|Tax\s*(?:ID|Number)|VAT\s*(?:ID|Number))\s*[:：=]\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{6,40}\d)/giu,
+    pattern:
+      /((?:账号|账户|Account(?:\s*Number)?|Card\s*Number|Credit\s*Card|Debit\s*Card|IBAN|Tax\s*(?:ID|Number)|VAT\s*(?:ID|Number))\s*[:：=]\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{6,40}\d)/giu,
     tag: "ACCOUNT",
     mode: "prefix"
   },
 
   /* ===================== BANK / SWIFT / ROUTING ===================== */
   bank: {
-    pattern: /((?:IBAN|BIC|SWIFT|SWIFT\s*Code|Routing\s*Number|Sort\s*Code|Bank\s*(?:Account|Details))\s*[:：=]?\s*)([A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}|[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?|\d{6,12})/giu,
+    pattern:
+      /((?:IBAN|BIC|SWIFT|SWIFT\s*Code|Routing\s*Number|Sort\s*Code|Bank\s*(?:Account|Details))\s*[:：=]?\s*)([A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}|[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?|\d{6,12})/giu,
     tag: "ACCOUNT",
     mode: "prefix"
   },
 
   /* ===================== PHONE ===================== */
   phone: {
-    pattern: /((?:tel|telefon|phone|mobile|handy|kontakt|contact|whatsapp|telegram|signal)\s*[:：=]?\s*)?((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})?[\d\s().-]{6,}\d)/giu,
+    pattern:
+      /((?:tel|telefon|phone|mobile|handy|kontakt|contact|whatsapp|telegram|signal)\s*[:：=]?\s*)?((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})?[\d\s().-]{6,}\d)/giu,
     tag: "PHONE",
     mode: "phone"
   },
 
   /* ===================== ADDRESS ===================== */
   address_de_street: {
-    pattern: /((?:Address|Shipping\s*Address|Billing\s*Address|Street)\s*[:：=]?\s*)?([\p{L}0-9.\-,'/ ]{2,80}\s+\d{1,6}\w?)/giu,
+    pattern:
+      /((?:Address|Shipping\s*Address|Billing\s*Address|Street)\s*[:：=]?\s*)?([\p{L}0-9.\-,'/ ]{2,80}\s+\d{1,6}\w?)/giu,
     tag: "ADDRESS",
     mode: "prefix"
   },
 
   /* ===================== HANDLE / USERNAME ===================== */
   handle_label: {
-    pattern: /((?:用户名|username|user\s*id|login|account\s*id|handle|telegram|signal|whatsapp)\s*(?:[:：=]|-)\s*)([A-Za-z0-9_@.\-]{3,80})/giu,
+    pattern:
+      /((?:用户名|username|user\s*id|login|account\s*id|handle|telegram|signal|whatsapp)\s*(?:[:：=]|-)\s*)([A-Za-z0-9_@.\-]{3,80})/giu,
     tag: "HANDLE",
     mode: "prefix"
   },
@@ -63,7 +68,8 @@ const RULES_BY_KEY = {
 
   /* ===================== REF / ORDER / INVOICE ===================== */
   ref_label: {
-    pattern: /((?:Order\s*(?:ID|No\.?|Number)|Invoice\s*(?:ID|No\.?|Number)|Reference|Ref\.?)\s*(?:[:：=]|-)\s*)([A-Za-z0-9\-_.]{3,80})/giu,
+    pattern:
+      /((?:Order\s*(?:ID|No\.?|Number)|Invoice\s*(?:ID|No\.?|Number)|Reference|Ref\.?)\s*(?:[:：=]|-)\s*)([A-Za-z0-9\-_.]{3,80})/giu,
     tag: "REF",
     mode: "prefix"
   },
