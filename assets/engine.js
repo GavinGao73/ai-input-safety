@@ -3,9 +3,14 @@
 // - UI language: window.currentLang
 // - Content language: window.contentLang (+ window.contentLangMode)
 // - Fix: priority order + zh money + zh company partial mask + phone FP reduction
+//
+// ✅ STABILITY GOAL (per your ask):
+// - “auto” 只在第一次需要时生效：仅当 contentLang 为空时才检测一次
+// - 一旦检测到，就立刻 contentLangMode="lock"（避免漂移）
+// - 即便你后续手动把 contentLangMode 改回 "auto"，也不会反复自动切换（因为 contentLang 已经有值）
 // =========================
 
-console.log("[engine.js] loaded v20260223-lang-split-a2");
+console.log("[engine.js] loaded v20260223-lang-split-a3");
 
 function normLang(l) {
   const s = String(l || "").toLowerCase();
@@ -16,14 +21,29 @@ function getLangUI() {
   return normLang(window.currentLang) || "zh";
 }
 
-// contentLang can be auto-detected from input/PDF text.
-// default: follow UI at boot, then auto updates on content changes.
+/**
+ * Content language chooser:
+ * - if contentLang is set -> use it
+ * - else -> follow UI
+ */
 function getLangContent() {
-  const m = String(window.contentLangMode || "auto").toLowerCase();
   const v = normLang(window.contentLang);
   if (v) return v;
-  // fallback: follow UI
   return getLangUI();
+}
+
+/**
+ * Reset helper (used by main.js Clear; safe if main.js calls it)
+ * Predictable start: contentLang follows UI and mode=auto (so it can detect once when needed)
+ */
+function resetContentLang() {
+  try {
+    window.contentLang = getLangUI();
+    window.contentLangMode = "auto";
+    try {
+      window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: window.contentLang } }));
+    } catch (_) {}
+  } catch (_) {}
 }
 
 function setLangContentAuto(text) {
@@ -32,20 +52,25 @@ function setLangContentAuto(text) {
     const mode = String(window.contentLangMode || "lock").toLowerCase();
     if (mode !== "auto") return;
 
+    // ✅ auto-detect runs ONLY if contentLang is empty (ONE-SHOT)
+    if (normLang(window.contentLang)) {
+      // already has value -> lock to prevent drift
+      window.contentLangMode = "lock";
+      return;
+    }
+
     const s = String(text || "");
     const detected = detectContentLang(s);
     if (!detected) return;
 
-    if (window.contentLang !== detected) {
-      window.contentLang = detected;
+    window.contentLang = detected;
 
-      // ✅ auto runs ONCE then locks (prevents drift)
-      window.contentLangMode = "lock";
+    // ✅ auto runs ONCE then locks (prevents drift)
+    window.contentLangMode = "lock";
 
-      try {
-        window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: detected } }));
-      } catch (_) {}
-    }
+    try {
+      window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: detected } }));
+    } catch (_) {}
   } catch (_) {}
 }
 
@@ -679,7 +704,7 @@ function applyRules(text) {
   let hits = 0;
   const hitsByKey = {};
 
-  // ✅ contentLang auto detect (only in auto mode)
+  // ✅ contentLang auto detect (only in auto mode, only when contentLang is empty)
   setLangContentAuto(out);
 
   // ✅ PRIORITY: structured keys BEFORE phone (fix FP on refs)
@@ -981,4 +1006,11 @@ try {
   if (typeof expandManualArea !== "function") var expandManualArea = window.expandManualArea;
   if (typeof expandRiskArea !== "function") var expandRiskArea = window.expandRiskArea;
   if (typeof syncManualRiskHeights !== "function") var syncManualRiskHeights = window.syncManualRiskHeights;
+} catch (_) {}
+
+// expose a couple helpers (optional; safe)
+try {
+  if (typeof window.getLangUI !== "function") window.getLangUI = getLangUI;
+  if (typeof window.getLangContent !== "function") window.getLangContent = getLangContent;
+  if (typeof window.resetContentLang !== "function") window.resetContentLang = resetContentLang;
 } catch (_) {}
