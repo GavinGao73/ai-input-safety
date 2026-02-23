@@ -2,9 +2,12 @@
 // assets/engine.en.js
 // Content-strategy pack: en (NOT UI language)
 // - placeholders + detect + rules (FULL, no common)
+// - pack policy hooks: priority / alwaysOn / phoneGuard / company formatting
 // =========================
 
 (function () {
+  "use strict";
+
   const PACKS = (window.__ENGINE_LANG_PACKS__ = window.__ENGINE_LANG_PACKS__ || {});
 
   PACKS.en = {
@@ -44,6 +47,43 @@
       if (/[A-Za-z]/.test(s) && !/[\u4E00-\u9FFF]/.test(s)) return "en";
 
       return "";
+    },
+
+    // ✅ language-specific execution order
+    priority: [
+      "secret",
+      "account",
+      "bank",
+      "email",
+      "url",
+      "handle_label",
+      "ref_label",
+      "money",
+      "phone",
+      "company",
+      "address_de_street",
+      "handle",
+      "ref",
+      "title",
+      "number"
+    ],
+
+    // ✅ language-specific always-on
+    alwaysOn: ["address_de_street", "handle_label", "ref_label"],
+
+    // ✅ phone FP guard (en): prevent ref-like IDs being masked
+    phoneGuard: function ({ label, value, match }) {
+      const digits = String(value || "").replace(/\D+/g, "");
+      if (digits.length >= 16) return false;
+      return true;
+    },
+
+    // ✅ company formatting (en): conservative (no partial keep; avoid fancy heuristics)
+    formatCompany: function ({ legal, punct, placeholder }) {
+      const rawLegal = String(legal || "");
+      const rawPunct = String(punct || "");
+      if (rawLegal) return `${placeholder("COMPANY")}${rawLegal}${rawPunct}`;
+      return `${placeholder("COMPANY")}${rawPunct}`;
     },
 
     rules: {
