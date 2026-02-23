@@ -2,9 +2,12 @@
 // assets/engine.zh.js
 // Content-strategy pack: zh (NOT UI language)
 // - placeholders + detect + rules (FULL, no common)
+// - pack policy hooks: priority / alwaysOn / phoneGuard / company formatting / address partial formatting
 // =========================
 
 (function () {
+  "use strict";
+
   const PACKS = (window.__ENGINE_LANG_PACKS__ = window.__ENGINE_LANG_PACKS__ || {});
 
   PACKS.zh = {
@@ -39,6 +42,110 @@
         return "zh";
       }
       return "";
+    },
+
+    // ✅ language-specific execution order (tuned independently)
+    priority: [
+      "secret",
+      "account",
+      "bank",
+      "email",
+      "url",
+      "handle_label",
+      "ref_label",
+      "money",
+      "phone",
+      "company",
+      "address_cn",
+      "handle",
+      "ref",
+      "title",
+      "number"
+    ],
+
+    // ✅ language-specific always-on (beyond core base)
+    alwaysOn: ["handle_label", "ref_label", "address_cn"],
+
+    // ✅ phone FP guard (zh): prevent long numeric IDs/refs being treated as phone
+    phoneGuard: function ({ label, value, match }) {
+      const digits = String(value || "").replace(/\D+/g, "");
+      if (digits.length >= 16) return false;
+      return true;
+    },
+
+    // ✅ address_cn_partial formatting (zh-only)
+    formatAddressCnPartial: function ({ label, val, placeholder }) {
+      const reRoadNo = /([\u4E00-\u9FFF]{1,20}(?:路|街|道|大道|巷|弄))\s*(\d{1,6}\s*号)/g;
+      if (reRoadNo.test(val)) {
+        const v2 = String(val || "").replace(reRoadNo, (m2, a, b) => `${a}${placeholder("ADDRESS")}`);
+        return `${label}${v2}`;
+      }
+      return `${label}${placeholder("ADDRESS")}`;
+    },
+
+    // ✅ highlight helper for pdf overlay (zh-only)
+    highlightAddressCnPartial: function ({ label, val, S1, S2 }) {
+      const reRoadNo = /([\u4E00-\u9FFF]{1,20}(?:路|街|道|大道|巷|弄))\s*(\d{1,6}\s*号)/g;
+      const v = String(val || "");
+      if (reRoadNo.test(v)) {
+        const markedVal = v.replace(reRoadNo, (mm, a, b) => `${a}${S1}${b}${S2}`);
+        return `${label}${markedVal}`;
+      }
+      return `${label}${S1}${v}${S2}`;
+    },
+
+    // ✅ company formatting strategy (zh-only): keep partial industry tail + legal suffix
+    formatCompany: function ({ name, legal, punct, placeholder }) {
+      const rawName = String(name || "");
+      const rawLegal = String(legal || "");
+      const rawPunct = String(punct || "");
+
+      // if no legal, just mask whole company token
+      if (!rawLegal) return `${placeholder("COMPANY")}${rawPunct}`;
+
+      const INDUSTRY = [
+        "网络科技",
+        "科技",
+        "数据服务",
+        "品牌管理",
+        "创新股份",
+        "创新",
+        "信息技术",
+        "技术",
+        "咨询",
+        "服务",
+        "贸易",
+        "传媒",
+        "物流",
+        "电子",
+        "软件",
+        "金融",
+        "投资",
+        "实业",
+        "工程",
+        "建筑",
+        "教育",
+        "医疗",
+        "广告",
+        "文化",
+        "餐饮",
+        "供应链",
+        "电商",
+        "互联网"
+      ];
+
+      let keep = "";
+      for (const kw of INDUSTRY) {
+        const i = rawName.lastIndexOf(kw);
+        if (i >= 0 && i >= Math.max(0, rawName.length - 10)) {
+          keep = rawName.slice(i);
+          break;
+        }
+      }
+
+      if (!keep && rawName.length > 4) keep = rawName.slice(-4);
+
+      return `${placeholder("COMPANY")}${keep}${rawLegal}${rawPunct}`;
     },
 
     rules: {
