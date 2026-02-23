@@ -8,9 +8,13 @@
 // - “auto” 只在第一次需要时生效：仅当 contentLang 为空时才检测一次
 // - 一旦检测到，就立刻 contentLangMode="lock"（避免漂移）
 // - 即便你后续手动把 contentLangMode 改回 "auto"，也不会反复自动切换（因为 contentLang 已经有值）
+//
+// ✅ IMPORTANT FIXES (must-have for your goal):
+// - resetContentLang(): set contentLang="" so auto can actually run once after Clear
+// - boot init: if user never set contentLang/mode, default to (mode=auto, contentLang="")
 // =========================
 
-console.log("[engine.js] loaded v20260223-lang-split-a3");
+console.log("[engine.js] loaded v20260223-lang-split-a3-fixed");
 
 function normLang(l) {
   const s = String(l || "").toLowerCase();
@@ -34,14 +38,18 @@ function getLangContent() {
 
 /**
  * Reset helper (used by main.js Clear; safe if main.js calls it)
- * Predictable start: contentLang follows UI and mode=auto (so it can detect once when needed)
+ * Predictable start:
+ * - contentLang cleared -> auto can run ONCE when user provides real content
+ * - mode=auto
+ * Note: getLangContent() will still fallback to UI until detected.
  */
 function resetContentLang() {
   try {
-    window.contentLang = getLangUI();
-    window.contentLangMode = "auto";
+    window.contentLang = "";          // ✅ MUST be empty, otherwise auto never runs
+    window.contentLangMode = "auto";  // ✅ allow one-shot detect on next applyRules()
+
     try {
-      window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: window.contentLang } }));
+      window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: getLangContent() } }));
     } catch (_) {}
   } catch (_) {}
 }
@@ -201,7 +209,7 @@ function effectiveEnabledKeys() {
   return Array.from(base);
 }
 
-// ================= placeholders (UI language) =================
+// ================= placeholders (follow CONTENT language) =================
 function placeholder(key) {
   const map = {
     zh: {
@@ -1014,3 +1022,33 @@ try {
   if (typeof window.getLangContent !== "function") window.getLangContent = getLangContent;
   if (typeof window.resetContentLang !== "function") window.resetContentLang = resetContentLang;
 } catch (_) {}
+
+/* =========================
+   ✅ BOOT INIT (must-have for one-shot auto)
+   - If user never set anything, default to auto + empty contentLang
+   - This ensures first real input can detect once, then lock.
+   ========================= */
+(function bootContentLangInit(){
+  try {
+    const m = String(window.contentLangMode || "").trim().toLowerCase();
+
+    // If unset, allow one-shot auto
+    if (!m) window.contentLangMode = "auto";
+
+    // If mode is auto, contentLang must be empty to allow detect-once
+    if (String(window.contentLangMode || "").toLowerCase() === "auto") {
+      if (normLang(window.contentLang)) {
+        // if someone pre-set contentLang, immediately lock (avoid drift)
+        window.contentLangMode = "lock";
+      } else {
+        // keep empty; fallback to UI via getLangContent()
+        window.contentLang = "";
+      }
+    }
+
+    // If mode is lock but contentLang is empty, make it follow UI (safe fallback)
+    if (String(window.contentLangMode || "").toLowerCase() === "lock" && !normLang(window.contentLang)) {
+      window.contentLang = getLangUI();
+    }
+  } catch (_) {}
+})();
