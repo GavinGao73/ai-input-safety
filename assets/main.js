@@ -1,9 +1,11 @@
 // =========================
 // assets/main.js (FULL)
-// v20260223-lang-split-stable-a2
+// v20260223-lang-split-stable-a3
 // ✅ UI language switch: only affects window.currentLang
+// ✅ Content language default LOCK (stable, no drift)
+// ✅ When switching UI language with EMPTY input: contentLang follows UI + locks
 // ✅ Export Mode A uses langContent (rule language) rather than UI lang
-// ✅ Clear resets contentLang to UI + auto
+// ✅ Clear resets contentLang to UI + lock
 // =========================
 
 // ================= bind =================
@@ -19,6 +21,16 @@ function bind() {
 
       const ta = $("inputText");
       const inTxt = (ta && ta.value) ? String(ta.value).trim() : "";
+
+      // ✅ Stable rule language: only follow UI when input is empty (first-open-like behavior)
+      if (!inTxt) {
+        try {
+          window.contentLang = (typeof normLang === "function")
+            ? (normLang(currentLang) || "zh")
+            : (String(currentLang || "zh").toLowerCase() || "zh");
+          window.contentLangMode = "lock";
+        } catch (_) {}
+      }
 
       if (inTxt) applyRules(inTxt);
       else window.dispatchEvent(new Event("safe:updated"));
@@ -121,12 +133,15 @@ function bind() {
 
       window.__export_snapshot = null;
 
-      // ✅ reset contentLang to UI + auto (predictable start)
+      // ✅ reset contentLang to UI + lock (predictable, no drift)
       try {
-        if (typeof resetContentLang === "function") resetContentLang();
-        else {
-          window.contentLang = (typeof getLangUI === "function") ? getLangUI() : (String(window.currentLang || "zh").toLowerCase() || "zh");
-          window.contentLangMode = "auto";
+        if (typeof resetContentLang === "function") {
+          resetContentLang();
+        } else {
+          window.contentLang = (typeof getLangUI === "function")
+            ? getLangUI()
+            : (String(window.currentLang || "zh").toLowerCase() || "zh");
+          window.contentLangMode = "lock";
         }
       } catch (_) {}
 
@@ -320,10 +335,14 @@ function bind() {
     if (typeof updateInputWatermarkVisibility === "function") updateInputWatermarkVisibility();
     if (typeof initRiskResizeObserver === "function") initRiskResizeObserver();
 
-    // ✅ ensure contentLang has predictable initial state
+    // ✅ ensure contentLang has predictable initial state (LOCK by default)
     try {
-      if (!normLang(window.contentLang)) window.contentLang = (typeof getLangUI === "function") ? getLangUI() : "zh";
-      if (!String(window.contentLangMode || "").trim()) window.contentLangMode = "auto";
+      if (typeof normLang === "function") {
+        if (!normLang(window.contentLang)) window.contentLang = (typeof getLangUI === "function") ? getLangUI() : "zh";
+      } else {
+        if (!String(window.contentLang || "").trim()) window.contentLang = (typeof getLangUI === "function") ? getLangUI() : "zh";
+      }
+      if (!String(window.contentLangMode || "").trim()) window.contentLangMode = "lock";
     } catch (_) {}
   } catch (e) {
     console.error("[boot] failed:", e);
