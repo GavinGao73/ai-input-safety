@@ -1,5 +1,9 @@
 // =========================
-// assets/main.js (from app.js)
+// assets/main.js (FULL)
+// v20260223-lang-split-stable-a2
+// ✅ UI language switch: only affects window.currentLang
+// ✅ Export Mode A uses langContent (rule language) rather than UI lang
+// ✅ Clear resets contentLang to UI + auto
 // =========================
 
 // ================= bind =================
@@ -117,6 +121,15 @@ function bind() {
 
       window.__export_snapshot = null;
 
+      // ✅ reset contentLang to UI + auto (predictable start)
+      try {
+        if (typeof resetContentLang === "function") resetContentLang();
+        else {
+          window.contentLang = (typeof getLangUI === "function") ? getLangUI() : (String(window.currentLang || "zh").toLowerCase() || "zh");
+          window.contentLangMode = "auto";
+        }
+      } catch (_) {}
+
       window.dispatchEvent(new Event("safe:updated"));
     };
   }
@@ -179,7 +192,7 @@ function bind() {
       __manualRedactSession = await window.RedactUI.start({
         file: f,
         fileKind: lastFileKind,
-        lang: currentLang
+        lang: currentLang // UI language only
       });
 
       try {
@@ -255,7 +268,14 @@ function bind() {
 
         const snap = window.__export_snapshot || {};
         const enabledKeys = Array.isArray(snap.enabledKeys) ? snap.enabledKeys : effectiveEnabledKeys();
-        const lang = snap.lang || currentLang;
+
+        // ✅ KEY FIX: export uses langContent (rule language), not UI language
+        const lang =
+          snap.langContent ||
+          snap.langUI ||
+          (typeof getLangContent === "function" ? getLangContent() : null) ||
+          currentLang;
+
         const manualTermsSafe = Array.isArray(snap.manualTerms) ? snap.manualTerms : [];
 
         setProgressText([
@@ -299,6 +319,12 @@ function bind() {
     if (typeof bind === "function") bind();
     if (typeof updateInputWatermarkVisibility === "function") updateInputWatermarkVisibility();
     if (typeof initRiskResizeObserver === "function") initRiskResizeObserver();
+
+    // ✅ ensure contentLang has predictable initial state
+    try {
+      if (!normLang(window.contentLang)) window.contentLang = (typeof getLangUI === "function") ? getLangUI() : "zh";
+      if (!String(window.contentLangMode || "").trim()) window.contentLangMode = "auto";
+    } catch (_) {}
   } catch (e) {
     console.error("[boot] failed:", e);
   }
