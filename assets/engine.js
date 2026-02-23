@@ -251,7 +251,7 @@ function placeholder(key) {
     }
   };
 
-  const lang = getLangUI();
+  const lang = getLangContent();
   return (map[lang] && map[lang][key]) || `[${key}]`;
 }
 
