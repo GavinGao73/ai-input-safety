@@ -225,6 +225,12 @@ const I18N = {
   }
 };
 
+window.__I18N__ = {
+  get(lang, key) {},
+  risk(lang) {},
+  labels(lang) {}
+};
+
 window.I18N = I18N;
 
 (function bootstrapI18n() {
