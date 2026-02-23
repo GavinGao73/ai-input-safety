@@ -2,7 +2,7 @@
 // assets/engine.js (from app.js)
 // =========================
 
-console.log("[engine.js] loaded v20260222a1-metaLang");
+console.log("[engine.js] loaded v20260222a1-metaLang-noDollar");
 
 // ✅ Language is owned by UI / i18n.js.
 // ✅ engine.js must NEVER overwrite window.currentLang
@@ -82,7 +82,8 @@ let lastRunMeta = {
   lang: "zh"
 };
 
-function $(id) { return document.getElementById(id); }
+// ✅ IMPORTANT: avoid polluting global "$" used by UI
+function byId(id) { return document.getElementById(id); }
 
 function escapeHTML(s){
   return String(s || "")
@@ -224,7 +225,7 @@ function placeholder(key) {
 // ================= output render =================
 function renderOutput(outPlain){
   lastOutputPlain = String(outPlain || "");
-  const host = $("outputText");
+  const host = byId("outputText");
   if (!host) return;
 
   const html = escapeHTML(lastOutputPlain)
@@ -235,8 +236,8 @@ function renderOutput(outPlain){
 
 // ================= input watermark hide =================
 function updateInputWatermarkVisibility(){
-  const ta = $("inputText");
-  const wrap = $("inputWrap");
+  const ta = byId("inputText");
+  const wrap = byId("inputWrap");
   if (!ta || !wrap) return;
   const has = String(ta.value || "").trim().length > 0;
   wrap.classList.toggle("has-content", has);
@@ -282,9 +283,9 @@ function applyManualTermsMask(out, addHit){
 
 // ================= PDF overlay highlight =================
 function renderInputOverlayForPdf(originalText){
-  const overlay = $("inputOverlay");
-  const ta = $("inputText");
-  const wrap = $("inputWrap");
+  const overlay = byId("inputOverlay");
+  const ta = byId("inputText");
+  const wrap = byId("inputWrap");
   if (!overlay || !ta || !wrap) return;
 
   if (!lastRunMeta.fromPdf) {
@@ -585,7 +586,7 @@ function computeRiskReport(hitsByKey, meta) {
 }
 
 function renderRiskBox(report, meta) {
-  const box = $("riskBox");
+  const box = byId("riskBox");
   if (!box) return;
 
   const t = riskI18n(getLang());
@@ -694,7 +695,7 @@ function applyRules(text) {
     });
 
     updateInputWatermarkVisibility();
-    const ta = $("inputText");
+    const ta = byId("inputText");
     if (ta) renderInputOverlayForPdf(ta.value || "");
 
     window.__export_snapshot = {
@@ -855,7 +856,7 @@ function applyRules(text) {
   });
 
   updateInputWatermarkVisibility();
-  const ta = $("inputText");
+  const ta = byId("inputText");
   if (ta) renderInputOverlayForPdf(ta.value || "");
 
   window.__export_snapshot = {
