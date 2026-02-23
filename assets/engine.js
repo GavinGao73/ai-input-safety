@@ -95,6 +95,15 @@ function escapeHTML(s){
 
 // ================= RULES SAFE ACCESS =================
 function getRulesSafe() {
+  // New build: RULES_BY_LANG + RULES_COMMON
+  if (window.RULES_BY_LANG && window.RULES_COMMON) {
+    const lang = getLang();
+    const spec = window.RULES_BY_LANG[lang] || {};
+    const merged = Object.assign({}, window.RULES_COMMON, spec);
+    return (merged && typeof merged === "object") ? merged : null;
+  }
+
+  // Old build: RULES_BY_KEY
   const r = window.RULES_BY_KEY;
   return (r && typeof r === "object") ? r : null;
 }
