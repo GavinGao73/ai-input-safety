@@ -3,6 +3,25 @@
 // =========================
 
 // ================= Stage 3 UI texts =================
+
+// Stable global DOM helpers (used by main.js bind())
+// $: CSS selector (querySelector)
+// $$: CSS selector all (array)
+(function () {
+  if (typeof window.$ !== "function") {
+    window.$ = function (sel, root) {
+      const r = root || document;
+      return r.querySelector(sel);
+    };
+  }
+  if (typeof window.$$ !== "function") {
+    window.$$ = function (sel, root) {
+      const r = root || document;
+      return Array.from(r.querySelectorAll(sel));
+    };
+  }
+})();
+
 function stage3Text(key){
   const map = {
     zh: { btnExportPdf: "红删PDF", btnManual: "手工涂抹" },
