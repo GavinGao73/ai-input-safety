@@ -1,11 +1,12 @@
 // =========================
 // assets/main.js (FULL)
-// v20260223-lang-split-stable-a3
-// ✅ UI language switch: only affects window.currentLang
-// ✅ Content language default LOCK (stable, no drift)
-// ✅ When switching UI language with EMPTY input: contentLang follows UI + locks
+// v20260223-lang-split-stable-a4
+//
+// ✅ UI language: window.currentLang 只影响 UI 文案
+// ✅ Content language: window.contentLang / window.contentLangMode 只由 engine.js 状态机控制
+// ✅ auto 仅在 contentLang=="" 时检测一次，检测后立即 lock
+// ✅ Clear 必须 resetContentLang(): mode=auto, contentLang=""
 // ✅ Export Mode A uses langContent (rule language) rather than UI lang
-// ✅ Clear resets contentLang to UI + lock
 // =========================
 
 // ================= bind =================
@@ -14,23 +15,19 @@ function bind() {
     b.onclick = () => {
       document.querySelectorAll(".lang button").forEach(x => x.classList.remove("active"));
       b.classList.add("active");
+
+      // UI language only
       currentLang = b.dataset.lang;
       window.currentLang = currentLang;
 
+      // refresh UI strings
       setText();
 
       const ta = $("inputText");
       const inTxt = (ta && ta.value) ? String(ta.value).trim() : "";
 
-      // ✅ Stable rule language: only follow UI when input is empty (first-open-like behavior)
-      if (!inTxt) {
-        try {
-          window.contentLang = (typeof normLang === "function")
-            ? (normLang(currentLang) || "zh")
-            : (String(currentLang || "zh").toLowerCase() || "zh");
-          window.contentLangMode = "lock";
-        } catch (_) {}
-      }
+      // ✅ IMPORTANT: UI switch MUST NOT overwrite contentLang/mode
+      // contentLang must be decided by content detection (engine.js)
 
       if (inTxt) applyRules(inTxt);
       else window.dispatchEvent(new Event("safe:updated"));
@@ -133,15 +130,13 @@ function bind() {
 
       window.__export_snapshot = null;
 
-      // ✅ reset contentLang to UI + lock (predictable, no drift)
+      // ✅ RULE C: Clear resets to "first-enter" start:
+      // contentLangMode="auto", contentLang=""
       try {
-        if (typeof resetContentLang === "function") {
-          resetContentLang();
-        } else {
-          window.contentLang = (typeof getLangUI === "function")
-            ? getLangUI()
-            : (String(window.currentLang || "zh").toLowerCase() || "zh");
-          window.contentLangMode = "lock";
+        if (typeof resetContentLang === "function") resetContentLang();
+        else {
+          window.contentLangMode = "auto";
+          window.contentLang = "";
         }
       } catch (_) {}
 
@@ -287,7 +282,6 @@ function bind() {
         // ✅ KEY FIX: export uses langContent (rule language), not UI language
         const lang =
           snap.langContent ||
-          snap.langUI ||
           (typeof getLangContent === "function" ? getLangContent() : null) ||
           currentLang;
 
@@ -335,15 +329,8 @@ function bind() {
     if (typeof updateInputWatermarkVisibility === "function") updateInputWatermarkVisibility();
     if (typeof initRiskResizeObserver === "function") initRiskResizeObserver();
 
-    // ✅ ensure contentLang has predictable initial state (LOCK by default)
-    try {
-      if (typeof normLang === "function") {
-        if (!normLang(window.contentLang)) window.contentLang = (typeof getLangUI === "function") ? getLangUI() : "zh";
-      } else {
-        if (!String(window.contentLang || "").trim()) window.contentLang = (typeof getLangUI === "function") ? getLangUI() : "zh";
-      }
-      if (!String(window.contentLangMode || "").trim()) window.contentLangMode = "lock";
-    } catch (_) {}
+    // ✅ IMPORTANT: do NOT force contentLang/contentLangMode here.
+    // engine.js owns content language state machine.
   } catch (e) {
     console.error("[boot] failed:", e);
   }
