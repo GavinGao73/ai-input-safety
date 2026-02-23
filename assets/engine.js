@@ -2,19 +2,14 @@
 // assets/engine.js — LANG SPLIT (UI vs Content) + stable masking
 // - UI language: window.currentLang
 // - Content language: window.contentLang (+ window.contentLangMode)
-// - Fix: priority order + zh money + zh company partial mask + phone FP reduction
 //
-// ✅ STABILITY GOAL (per your ask):
-// - “auto” 只在第一次需要时生效：仅当 contentLang 为空时才检测一次
+// ✅ STABILITY GOAL:
+// - auto 只在第一次需要时生效：仅当 contentLang=="" 时检测一次
 // - 一旦检测到，就立刻 contentLangMode="lock"（避免漂移）
-// - 即便你后续手动把 contentLangMode 改回 "auto"，也不会反复自动切换（因为 contentLang 已经有值）
-//
-// ✅ IMPORTANT FIXES (must-have for your goal):
-// - resetContentLang(): set contentLang="" so auto can actually run once after Clear
-// - boot init: if user never set contentLang/mode, default to (mode=auto, contentLang="")
+// - Clear 后必须回到：contentLangMode="auto", contentLang=""
 // =========================
 
-console.log("[engine.js] loaded v20260223-lang-split-a3-fixed");
+console.log("[engine.js] loaded v20260223-lang-split-a4-state-machine");
 
 function normLang(l) {
   const s = String(l || "").toLowerCase();
@@ -28,7 +23,7 @@ function getLangUI() {
 /**
  * Content language chooser:
  * - if contentLang is set -> use it
- * - else -> follow UI
+ * - else -> fallback to UI (for placeholder display only until detected)
  */
 function getLangContent() {
   const v = normLang(window.contentLang);
@@ -37,32 +32,32 @@ function getLangContent() {
 }
 
 /**
- * Reset helper (used by main.js Clear; safe if main.js calls it)
- * Predictable start:
- * - contentLang cleared -> auto can run ONCE when user provides real content
- * - mode=auto
- * Note: getLangContent() will still fallback to UI until detected.
+ * RULE C: Clear resets to first-enter start:
+ * - contentLang="" enables one-shot auto on next real applyRules()
+ * - contentLangMode="auto"
  */
 function resetContentLang() {
   try {
-    window.contentLang = "";          // ✅ MUST be empty, otherwise auto never runs
-    window.contentLangMode = "auto";  // ✅ allow one-shot detect on next applyRules()
-
+    window.contentLang = "";
+    window.contentLangMode = "auto";
     try {
       window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: getLangContent() } }));
     } catch (_) {}
   } catch (_) {}
 }
 
+/**
+ * RULE B: on first real applyRules()
+ * - if mode=auto && contentLang=="" -> detect once -> set contentLang -> lock
+ * - if contentLang already set -> ensure lock
+ */
 function setLangContentAuto(text) {
   try {
-    // ✅ default LOCK: no auto unless explicitly enabled
-    const mode = String(window.contentLangMode || "lock").toLowerCase();
+    const mode = String(window.contentLangMode || "auto").toLowerCase();
     if (mode !== "auto") return;
 
-    // ✅ auto-detect runs ONLY if contentLang is empty (ONE-SHOT)
+    // One-shot guard: only run when contentLang is empty
     if (normLang(window.contentLang)) {
-      // already has value -> lock to prevent drift
       window.contentLangMode = "lock";
       return;
     }
@@ -72,8 +67,6 @@ function setLangContentAuto(text) {
     if (!detected) return;
 
     window.contentLang = detected;
-
-    // ✅ auto runs ONCE then locks (prevents drift)
     window.contentLangMode = "lock";
 
     try {
@@ -85,10 +78,9 @@ function setLangContentAuto(text) {
 // Lightweight heuristic: zh if Han ratio/keywords; de if ß/äöü or German keywords; else en.
 function detectContentLang(text) {
   const s0 = String(text || "");
-  const s = s0.slice(0, 2600); // cap
+  const s = s0.slice(0, 2600);
   if (!s.trim()) return "";
 
-  // zh: Han ratio OR strong zh labels
   const han = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
   const total = Math.max(1, s.length);
   const hanRatio = han / total;
@@ -96,7 +88,6 @@ function detectContentLang(text) {
   if (hanRatio > 0.06) return "zh";
   if (/(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号|开户银行|对公账户|收款账号)/.test(s)) return "zh";
 
-  // de: umlauts/ß or German keywords
   if (/[äöüÄÖÜß]/.test(s)) return "de";
   if (/\b(Straße|Strasse|PLZ|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Kundennummer)\b/i.test(s)) return "de";
 
@@ -468,13 +459,11 @@ function markHitsInOriginal(text){
         const punct = punctMatch ? punctMatch[0] : "";
         const coreStr = punct ? m.slice(0, -punct.length) : m;
 
-        // Prefer named groups (zh.company)
         const groups = args[args.length - 1];
         if (groups && typeof groups === "object" && groups.legal) {
           return `${S1}${groups.name || ""}${S2}${groups.legal || ""}${punct}`;
         }
 
-        // CN suffix fallback
         const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
         if (sufMatch) {
           const suffix = sufMatch[1];
@@ -712,7 +701,7 @@ function applyRules(text) {
   let hits = 0;
   const hitsByKey = {};
 
-  // ✅ contentLang auto detect (only in auto mode, only when contentLang is empty)
+  // ✅ RULE B: one-shot auto detect (only when mode=auto && contentLang=="")
   setLangContentAuto(out);
 
   // ✅ PRIORITY: structured keys BEFORE phone (fix FP on refs)
@@ -773,7 +762,7 @@ function applyRules(text) {
     const t = String(s || "").replace(re, (m) => {
       const id = map.length;
       map.push(m);
-      return `\uE000${id}\uE001`; // sentinel
+      return `\uE000${id}\uE001`;
     });
     return { t, map };
   }
@@ -861,14 +850,12 @@ function applyRules(text) {
     out = out.replace(r.pattern, (...args) => {
       const match = args[0] || "";
 
-      // prefix: (label)(value)
       if (r.mode === "prefix") {
         const label = args[1] || "";
         addHit(key);
         return `${label}${placeholder(r.tag)}`;
       }
 
-      // CN address partial
       if (r.mode === "address_cn_partial") {
         const label = args[1] || "";
         const val = args[2] || "";
@@ -882,7 +869,6 @@ function applyRules(text) {
         return match;
       }
 
-      // phone: keep label if possible; guard card/account digits (>=16)
       if (r.mode === "phone") {
         const label = args[1] || "";
         const vA = args[2] || "";
@@ -898,7 +884,6 @@ function applyRules(text) {
         return placeholder(r.tag);
       }
 
-      // ✅ company: partial mask -> keep industry tail + legal suffix
       if (r.mode === "company") {
         const raw = String(match || "");
 
@@ -913,7 +898,6 @@ function applyRules(text) {
         addHit("company");
 
         if (legal) {
-          // Keep typical industry tail if present
           const INDUSTRY = [
             "网络科技","科技","数据服务","品牌管理","创新股份","创新","信息技术","技术","咨询","服务","贸易","传媒","物流","电子","软件","金融",
             "投资","实业","工程","建筑","教育","医疗","广告","文化","餐饮","供应链","电商","互联网"
@@ -933,14 +917,12 @@ function applyRules(text) {
           return `${placeholder("COMPANY")}${keep}${legal}${punct}`;
         }
 
-        // fallback: CN suffix preserve
         const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
         if (sufMatch) return `${placeholder("COMPANY")}${sufMatch[1]}${punct}`;
 
         return placeholder("COMPANY");
       }
 
-      // default: mask whole match
       addHit(key);
       return placeholder(r.tag);
     });
@@ -1001,7 +983,7 @@ function applyRules(text) {
 }
 
 /* =========================
-   ✅ STABILITY PATCHES (no behavior change)
+   ✅ STABILITY PATCHES (safe no-op)
    ========================= */
 try {
   if (typeof window.$ !== "function") window.$ = $;
@@ -1016,7 +998,7 @@ try {
   if (typeof syncManualRiskHeights !== "function") var syncManualRiskHeights = window.syncManualRiskHeights;
 } catch (_) {}
 
-// expose a couple helpers (optional; safe)
+// expose helpers
 try {
   if (typeof window.getLangUI !== "function") window.getLangUI = getLangUI;
   if (typeof window.getLangContent !== "function") window.getLangContent = getLangContent;
@@ -1024,29 +1006,24 @@ try {
 } catch (_) {}
 
 /* =========================
-   ✅ BOOT INIT (must-have for one-shot auto)
-   - If user never set anything, default to auto + empty contentLang
-   - This ensures first real input can detect once, then lock.
+   ✅ BOOT INIT (RULE A)
+   - first-enter: contentLangMode="auto", contentLang=""
+   - if someone pre-set contentLang (non-empty), force lock to avoid drift
    ========================= */
 (function bootContentLangInit(){
   try {
     const m = String(window.contentLangMode || "").trim().toLowerCase();
 
-    // If unset, allow one-shot auto
     if (!m) window.contentLangMode = "auto";
 
-    // If mode is auto, contentLang must be empty to allow detect-once
     if (String(window.contentLangMode || "").toLowerCase() === "auto") {
       if (normLang(window.contentLang)) {
-        // if someone pre-set contentLang, immediately lock (avoid drift)
         window.contentLangMode = "lock";
       } else {
-        // keep empty; fallback to UI via getLangContent()
         window.contentLang = "";
       }
     }
 
-    // If mode is lock but contentLang is empty, make it follow UI (safe fallback)
     if (String(window.contentLangMode || "").toLowerCase() === "lock" && !normLang(window.contentLang)) {
       window.contentLang = getLangUI();
     }
