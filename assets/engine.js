@@ -1,14 +1,70 @@
 // =========================
-// assets/engine.js (from app.js)
+// assets/engine.js
 // =========================
 
-console.log("[engine.js] loaded v20260222a1");
+console.log("[engine.js] loaded v20260223-lang-split-a1");
 
-// ✅ Language is owned by UI / i18n.js.
+// ✅ UI language is owned by i18n.js (window.currentLang)
+// ✅ Content language drives rule selection (window.contentLang)
 // ✅ engine.js must NEVER overwrite window.currentLang
-function getLang() {
-  const l = String(window.currentLang || "").toLowerCase();
-  return (l === "en" || l === "de" || l === "zh") ? l : "zh";
+
+function normLang(l) {
+  const s = String(l || "").toLowerCase();
+  return (s === "en" || s === "de" || s === "zh") ? s : "";
+}
+
+function getLangUI() {
+  return normLang(window.currentLang) || "zh";
+}
+
+// contentLang can be auto-detected from input/PDF text.
+// default: follow UI at boot, then auto updates on content changes.
+function getLangContent() {
+  const m = String(window.contentLangMode || "auto").toLowerCase();
+  const v = normLang(window.contentLang);
+  if (v) return v;
+  // fallback: follow UI
+  return getLangUI();
+}
+
+function setLangContentAuto(text) {
+  try {
+    const mode = String(window.contentLangMode || "auto").toLowerCase();
+    if (mode === "lock") return;
+
+    const s = String(text || "");
+    const detected = detectContentLang(s);
+    if (!detected) return;
+
+    if (window.contentLang !== detected) {
+      window.contentLang = detected;
+      try {
+        window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: detected } }));
+      } catch (_) {}
+    }
+  } catch (_) {}
+}
+
+// Lightweight heuristic: zh if Han ratio/keywords; de if ß/äöü or German keywords; else en.
+function detectContentLang(text) {
+  const s0 = String(text || "");
+  const s = s0.slice(0, 2600); // cap
+  if (!s.trim()) return "";
+
+  // zh: Han ratio OR strong zh labels
+  const han = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
+  const letters = (s.match(/[A-Za-z]/g) || []).length;
+  const total = Math.max(1, s.length);
+  const hanRatio = han / total;
+
+  if (hanRatio > 0.06) return "zh";
+  if (/(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号)/.test(s)) return "zh";
+
+  // de: umlauts/ß or German keywords
+  if (/[äöüÄÖÜß]/.test(s)) return "de";
+  if (/\b(Straße|Strasse|PLZ|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Kundennummer)\b/i.test(s)) return "de";
+
+  return "en";
 }
 
 const enabled = new Set();
@@ -79,7 +135,8 @@ let lastRunMeta = {
   inputLen: 0,
   enabledCount: 0,
   moneyMode: "m1",
-  lang: "zh"
+  langUI: "zh",
+  langContent: "zh"
 };
 
 function $(id) { return document.getElementById(id); }
@@ -97,13 +154,13 @@ function escapeHTML(s){
 function getRulesSafe() {
   // New build: RULES_BY_LANG + RULES_COMMON
   if (window.RULES_BY_LANG && window.RULES_COMMON) {
-    const lang = getLang();
+    const lang = getLangContent();
     const spec = window.RULES_BY_LANG[lang] || {};
     const merged = Object.assign({}, window.RULES_COMMON, spec);
     return (merged && typeof merged === "object") ? merged : null;
   }
 
-  // Old build: RULES_BY_KEY
+  // Old build: RULES_BY_KEY (default zh-stable)
   const r = window.RULES_BY_KEY;
   return (r && typeof r === "object") ? r : null;
 }
@@ -116,7 +173,7 @@ function effectiveEnabledKeys() {
   return Array.from(base);
 }
 
-// ================= placeholders =================
+// ================= placeholders (UI language) =================
 function placeholder(key) {
   const map = {
     zh: {
@@ -166,7 +223,7 @@ function placeholder(key) {
     }
   };
 
-  const lang = getLang();
+  const lang = getLangUI();
   return (map[lang] && map[lang][key]) || `[${key}]`;
 }
 
@@ -264,19 +321,27 @@ function markHitsInOriginal(text){
 
   const enabledSet = new Set(enabledKeysArr);
 
-  // ✅ Always-on for zh-stable build (UI fixed, but coverage must be stable)
-  // ✅ include label-driven keys so they always work in zh build
-  const ALWAYS_ON = new Set([
+  const langContent = getLangContent();
+
+  const ALWAYS_ON_COMMON = new Set([
     "secret",
     "url",
     "email",
     "phone",
     "account",
     "bank",
-    "company",
-    "handle_label",
-    "ref_label",
-    "address_cn"
+    "company"
+  ]);
+
+  const ALWAYS_ON_BY_LANG = {
+    zh: new Set(["handle_label", "ref_label", "address_cn"]),
+    de: new Set(["address_de_street"]),
+    en: new Set(["address_de_street", "handle_label", "ref_label"])
+  };
+
+  const ALWAYS_ON = new Set([
+    ...Array.from(ALWAYS_ON_COMMON),
+    ...Array.from((ALWAYS_ON_BY_LANG[langContent] || new Set()))
   ]);
 
   const PRIORITY = [
@@ -311,7 +376,6 @@ function markHitsInOriginal(text){
     }
   }
 
-  // ✅ FIX: use the same rules source as applyRules()
   const rules = getRulesSafe();
 
   for (const key of PRIORITY) {
@@ -320,7 +384,6 @@ function markHitsInOriginal(text){
     const r = rules && rules[key];
     if (!r || !r.pattern) continue;
 
-    // ✅ prefix highlight: keep label, highlight ONLY value group
     if (r.mode === "prefix") {
       s = s.replace(r.pattern, (m, p1, p2) => {
         const label = p1 || "";
@@ -330,7 +393,6 @@ function markHitsInOriginal(text){
       continue;
     }
 
-    // ✅ address_cn_partial highlight: highlight only the "road+no" segment when present; else whole value
     if (r.mode === "address_cn_partial") {
       s = s.replace(r.pattern, (m, p1, p2) => {
         const label = p1 || "";
@@ -345,7 +407,6 @@ function markHitsInOriginal(text){
       continue;
     }
 
-    // ✅ phone highlight: keep label if captured; skip if digits look like account/card (>=16)
     if (r.mode === "phone") {
       s = s.replace(r.pattern, (m, p1, p2, p3, p4) => {
         const label = p1 || "";
@@ -359,17 +420,13 @@ function markHitsInOriginal(text){
       continue;
     }
 
-    // ✅ company highlight: highlight only the identifiable part, keep FULL legal suffix visible
     if (r.mode === "company") {
       s = s.replace(r.pattern, (...args) => {
         const m = String(args[0] || "");
-
-        // preserve trailing punctuation (readability)
         const punctMatch = m.match(/[。．.，,;；!！?？)）】\]\s]+$/u);
         const punct = punctMatch ? punctMatch[0] : "";
         const coreStr = punct ? m.slice(0, -punct.length) : m;
 
-        // ✅ extract FULL legal suffix only from the end (CN)
         const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
         if (sufMatch) {
           const suffix = sufMatch[1];
@@ -377,19 +434,15 @@ function markHitsInOriginal(text){
           return `${S1}${head}${S2}${suffix}${punct}`;
         }
 
-        // --- DE/EN fallback: keep legal form visible, highlight name ---
         const groups = args[args.length - 1];
         if (groups && typeof groups === "object" && groups.legal) {
           return `${S1}${groups.name || ""}${S2}${groups.legal || ""}${punct}`;
         }
-
-        // fallback: highlight whole match
         return `${S1}${m}${S2}`;
       });
       continue;
     }
 
-    // default highlight: whole match
     s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
   }
 
@@ -430,7 +483,7 @@ const RISK_WEIGHTS = {
 
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
-function riskI18n(lang) {
+function riskI18n(langUI) {
   const zh = {
     low: "低风险",
     mid: "中风险",
@@ -464,7 +517,7 @@ function riskI18n(lang) {
     adviceHigh: "Do not send as-is: remove signature/account details and mask more.",
     meta: (m) => `Hits ${m.hits}｜Money M1${m.fromPdf ? "｜File" : ""}`
   };
-  return (lang === "de") ? de : (lang === "en") ? en : zh;
+  return (langUI === "de") ? de : (langUI === "en") ? en : zh;
 }
 
 function labelForKey(k) {
@@ -527,7 +580,7 @@ function labelForKey(k) {
       manual_term: "Extra (manual)"
     }
   };
-  const m = map[getLang()] || map.zh;
+  const m = map[getLangUI()] || map.zh;
   return m[k] || k;
 }
 
@@ -542,7 +595,6 @@ function computeRiskReport(hitsByKey, meta) {
   }
 
   score += 10;
-
   if (meta.inputLen >= 1500) score += 6;
   if (meta.inputLen >= 4000) score += 8;
   if (meta.fromPdf) score += 6;
@@ -569,7 +621,7 @@ function renderRiskBox(report, meta) {
   const box = $("riskBox");
   if (!box) return;
 
-  const t = riskI18n(getLang());
+  const t = riskI18n(getLangUI());
   const levelText = report.level === "high" ? t.high : report.level === "mid" ? t.mid : t.low;
 
   const topHtml = (report.top && report.top.length)
@@ -616,6 +668,9 @@ function applyRules(text) {
   let hits = 0;
   const hitsByKey = {};
 
+  // ✅ contentLang auto detect (only in auto mode)
+  setLangContentAuto(out);
+
   const PRIORITY = [
     "secret",
     "account",
@@ -635,19 +690,27 @@ function applyRules(text) {
     "number"
   ];
 
-  // ✅ Always-on keys for zh-stable build (UI fixed, but coverage must be stable)
-  // ✅ include label-driven keys so they always work in zh build
-  const ALWAYS_ON = new Set([
+  const langContent = getLangContent();
+
+  const ALWAYS_ON_COMMON = new Set([
     "secret",
     "url",
     "email",
     "phone",
     "account",
     "bank",
-    "company",
-    "handle_label",
-    "ref_label",
-    "address_cn"
+    "company"
+  ]);
+
+  const ALWAYS_ON_BY_LANG = {
+    zh: new Set(["handle_label", "ref_label", "address_cn"]),
+    de: new Set(["address_de_street"]),
+    en: new Set(["address_de_street", "handle_label", "ref_label"])
+  };
+
+  const ALWAYS_ON = new Set([
+    ...Array.from(ALWAYS_ON_COMMON),
+    ...Array.from((ALWAYS_ON_BY_LANG[langContent] || new Set()))
   ]);
 
   function addHit(key) {
@@ -683,7 +746,8 @@ function applyRules(text) {
   lastRunMeta.inputLen = (String(text || "")).length;
   lastRunMeta.enabledCount = enabledSet.size;
   lastRunMeta.moneyMode = "m1";
-  lastRunMeta.lang = getLang();
+  lastRunMeta.langUI = getLangUI();
+  lastRunMeta.langContent = getLangContent();
 
   if (!rules) {
     out = applyManualTermsMask(out, () => addHit("manual_term"));
@@ -712,27 +776,19 @@ function applyRules(text) {
     window.__export_snapshot = {
       enabledKeys: enabledKeysArr,
       moneyMode: "m1",
-      lang: getLang(),
+      langUI: getLangUI(),
+      langContent: getLangContent(),
+      contentLangMode: String(window.contentLangMode || "auto"),
       fromPdf: !!lastRunMeta.fromPdf,
       manualTerms: manualTerms.slice(0)
     };
 
-    requestAnimationFrame(() => {
-      if (lastUploadedFile) {
-        expandManualArea();
-        expandRiskArea();
-        syncManualRiskHeights();
-      }
-    });
-
-    window.dispatchEvent(new Event("safe:updated"));
+    try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
     return out;
   }
 
-  // manual first
   out = applyManualTermsMask(out, () => addHit("manual_term"));
 
-  // ✅ protect already-inserted placeholders against "串味" / second-pass matching
   const p0 = protectPlaceholders(out);
   out = p0.t;
 
@@ -742,7 +798,6 @@ function applyRules(text) {
     const r = rules[key];
     if (!r || !r.pattern) continue;
 
-    // ✅ money: keep steady mode (M1) — always mask whole amount
     if (key === "money") {
       out = out.replace(r.pattern, () => {
         addHit("money");
@@ -751,18 +806,15 @@ function applyRules(text) {
       continue;
     }
 
-    // ✅ mode-aware replacement:
     out = out.replace(r.pattern, (...args) => {
       const match = args[0] || "";
 
-      // 1) prefix: (label)(value)
       if (r.mode === "prefix") {
         const label = args[1] || "";
         addHit(key);
         return `${label}${placeholder(r.tag)}`;
       }
 
-      // ✅ CN address partial: keep label + value; only mask "号" portion when possible
       if (r.mode === "address_cn_partial") {
         const label = args[1] || "";
         const val = args[2] || "";
@@ -773,12 +825,9 @@ function applyRules(text) {
           const v2 = val.replace(reRoadNo, (m2, a, b) => `${a}${placeholder("ADDRESS")}`);
           return `${label}${v2}`;
         }
-
-        // no road/no pattern -> keep as-is (do not change unrelated content)
         return match;
       }
 
-      // 2) phone: keep label if possible; guard card/account digits (>=16)
       if (r.mode === "phone") {
         const label = args[1] || "";
         const vA = args[2] || "";
@@ -787,51 +836,39 @@ function applyRules(text) {
         const value = vA || vB || vC || match;
 
         const digits = String(value).replace(/\D+/g, "");
-        if (digits.length >= 16) {
-          // do not replace; let account/bank handle it
-          return match;
-        }
+        if (digits.length >= 16) return match;
 
         addHit(key);
         if (label) return `${label}${placeholder(r.tag)}`;
         return placeholder(r.tag);
       }
 
-      // 3) company: ✅ keep FULL legal suffix (CN), tolerate masking geo/industry
       if (r.mode === "company") {
         const raw = String(match || "");
 
-        // preserve trailing punctuation
         const punctMatch = raw.match(/[。．.，,;；!！?？)）】\]\s]+$/u);
         const punct = punctMatch ? punctMatch[0] : "";
         const coreStr = punct ? raw.slice(0, -punct.length) : raw;
 
-        // CN: keep FULL legal suffix (must be完整保留)
         const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
 
         addHit(key);
 
-        if (sufMatch) {
-          return `${placeholder(r.tag)}${sufMatch[1]}${punct}`;
-        }
+        if (sufMatch) return `${placeholder(r.tag)}${sufMatch[1]}${punct}`;
 
-        // DE/EN: if named groups exist, keep legal form
         const groups = args[args.length - 1];
         if (groups && typeof groups === "object" && groups.legal) {
           return `${placeholder(r.tag)}${groups.legal}${punct}`;
         }
 
-        // unknown shape -> mask whole
         return placeholder(r.tag);
       }
 
-      // default: mask whole match
       addHit(key);
       return placeholder(r.tag);
     });
   }
 
-  // ✅ restore placeholders after all rules
   out = restorePlaceholders(out, p0.map);
 
   const report = computeRiskReport(hitsByKey, {
@@ -854,7 +891,9 @@ function applyRules(text) {
     level: report.level,
     moneyMode: "m1",
     enabledCount: enabledSet.size,
-    fromPdf: lastRunMeta.fromPdf
+    fromPdf: lastRunMeta.fromPdf,
+    langUI: getLangUI(),
+    langContent: getLangContent()
   };
 
   renderOutput(out);
@@ -873,27 +912,19 @@ function applyRules(text) {
   window.__export_snapshot = {
     enabledKeys: enabledKeysArr,
     moneyMode: "m1",
-    lang: getLang(),
+    langUI: getLangUI(),
+    langContent: getLangContent(),
+    contentLangMode: String(window.contentLangMode || "auto"),
     fromPdf: !!lastRunMeta.fromPdf,
     manualTerms: manualTerms.slice(0)
   };
 
-  requestAnimationFrame(() => {
-    if (lastUploadedFile) {
-      expandManualArea();
-      expandRiskArea();
-      syncManualRiskHeights();
-    }
-  });
-
-  window.dispatchEvent(new Event("safe:updated"));
+  try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
   return out;
 }
 
 /* =========================
    ✅ STABILITY PATCHES (no behavior change)
-   - ensure window.$ exists (for console debug and other scripts)
-   - avoid hard crash if some UI helpers are loaded elsewhere but missing due to order
    ========================= */
 try {
   if (typeof window.$ !== "function") window.$ = $;
@@ -903,7 +934,6 @@ try {
   if (typeof window.expandManualArea !== "function") window.expandManualArea = function(){};
   if (typeof window.expandRiskArea !== "function") window.expandRiskArea = function(){};
   if (typeof window.syncManualRiskHeights !== "function") window.syncManualRiskHeights = function(){};
-  // If they exist globally under window, prefer those
   if (typeof expandManualArea !== "function") var expandManualArea = window.expandManualArea;
   if (typeof expandRiskArea !== "function") var expandRiskArea = window.expandRiskArea;
   if (typeof syncManualRiskHeights !== "function") var syncManualRiskHeights = window.syncManualRiskHeights;
