@@ -1,7 +1,8 @@
-// rules.js v2.0 — LANG-AWARE STABLE BUILD
-// - Provides RULES_COMMON + RULES_BY_LANG for language-specific rules.
-// - Keeps RULES_BY_KEY as backward-compatible merged map.
-// - Uses ONLY regex literals (no RegExp constructor) to avoid syntax traps.
+// rules.js v2.1 — LANG-AWARE (contentLang) + stable fallback
+// - RULES_COMMON: truly cross-language stable patterns
+// - RULES_BY_LANG: language-specific label dictionaries / address patterns
+// - RULES_BY_KEY: backward-compatible DEFAULT (common + zh) ONLY
+//   (prevents en/de overwriting zh keys in old builds)
 
 (function () {
   "use strict";
@@ -22,68 +23,21 @@
       tag: "URL"
     },
 
-    /* ===================== SECRET / PASSCODE ===================== */
-    secret: {
-      pattern: /((?:密码|PIN|Passwort|Password|passcode|verification\s*code|security\s*code|one[-\s]?time\s*code|OTP|2FA|CVV|CVC)\s*[:：=]\s*)([^\n\r]{1,120})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    /* ===================== ACCOUNT / CARD ===================== */
-    account: {
-      pattern: /((?:账号|账户|Account(?:\s*Number)?|Card\s*Number|Credit\s*Card|Debit\s*Card|IBAN|Tax\s*(?:ID|Number)|VAT\s*(?:ID|Number))\s*[:：=]\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{6,40}\d)/giu,
-      tag: "ACCOUNT",
-      mode: "prefix"
-    },
-
-    /* ===================== BANK / SWIFT / ROUTING ===================== */
-    bank: {
-      pattern: /((?:IBAN|BIC|SWIFT|SWIFT\s*Code|Routing\s*Number|Sort\s*Code|Bank\s*(?:Account|Details))\s*[:：=]?\s*)([A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}|[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?|\d{6,12})/giu,
-      tag: "ACCOUNT",
-      mode: "prefix"
-    },
-
-    /* ===================== PHONE ===================== */
-    phone: {
-      pattern: /((?:tel|telefon|phone|mobile|handy|kontakt|contact|whatsapp|telegram|signal)\s*[:：=]?\s*)?((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})?[\d\s().-]{6,}\d)/giu,
-      tag: "PHONE",
-      mode: "phone"
-    },
-
-    /* ===================== HANDLE / USERNAME ===================== */
-    handle_label: {
-      pattern: /((?:用户名|username|user\s*id|login|account\s*id|handle|telegram|signal|whatsapp)\s*(?:[:：=]|-)\s*)([A-Za-z0-9_@.\-]{3,80})/giu,
-      tag: "HANDLE",
-      mode: "prefix"
-    },
-
+    /* ===================== HANDLE ===================== */
     handle: {
       pattern: /@[A-Za-z0-9_]{2,32}\b/g,
       tag: "HANDLE"
     },
 
-    /* ===================== REF / ORDER / INVOICE ===================== */
-    ref_label: {
-      pattern: /((?:Order\s*(?:ID|No\.?|Number)|Invoice\s*(?:ID|No\.?|Number)|Reference|Ref\.?)\s*(?:[:：=]|-)\s*)([A-Za-z0-9\-_.]{3,80})/giu,
-      tag: "REF",
-      mode: "prefix"
-    },
-
+    /* ===================== REF (format-like) ===================== */
     ref: {
       pattern: /\b[A-Z]{2,6}-?\d{5,14}\b/g,
       tag: "REF"
     },
 
-    /* ===================== COMPANY ===================== */
-    company: {
-      pattern: /\b([A-Za-z][A-Za-z0-9&.\- ]{1,60})\s+(GmbH|AG|UG|LLC|Ltd\.?|Inc\.?)\b/g,
-      tag: "COMPANY",
-      mode: "company"
-    },
-
-    /* ===================== MONEY ===================== */
+    /* ===================== MONEY (explicit currency only, low FP) ===================== */
     money: {
-      pattern: /(?:\b(?:EUR|USD|GBP|CHF)\b|[€$£])\s*\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?/giu,
+      pattern: /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥])\s*\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?/giu,
       tag: "MONEY"
     },
 
@@ -95,18 +49,67 @@
   };
 
   // =========================
-  // LANGUAGE-SPECIFIC
+  // LANGUAGE-SPECIFIC RULES
   // =========================
   const RULES_BY_LANG = {
     zh: {
-      // 中文地址：只遮盖 “路/街/... + 号” 的号段（engine 里有 address_cn_partial 的专用逻辑）
+      /* SECRET (label-driven) */
+      secret: {
+        pattern: /((?:密码|口令|登录密码|支付密码|PIN|验证码|校验码|动态码|短信验证码|OTP|2FA)\s*[:：=]\s*)([^\n\r]{1,120})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      /* ACCOUNT (label-driven) */
+      account: {
+        pattern: /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|对公账户|對公賬戶)\s*[:：=]?\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{6,40}\d)/giu,
+        tag: "ACCOUNT",
+        mode: "prefix"
+      },
+
+      /* BANK (label-driven) */
+      bank: {
+        pattern: /((?:开户银行|開戶銀行|银行|銀行|BIC|SWIFT)\s*[:：=]?\s*)([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?|\d{6,12})/giu,
+        tag: "ACCOUNT",
+        mode: "prefix"
+      },
+
+      /* PHONE (label-driven + unlabeled handled by engine digit-guard) */
+      phone: {
+        pattern: /((?:联系方式|联系电话|电话|手機|手机|联系人|聯繫方式|tel|telefon|phone|mobile|handy|kontakt)\s*[:：=]?\s*)?((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})?[\d\s().-]{6,}\d)/giu,
+        tag: "PHONE",
+        mode: "phone"
+      },
+
+      /* HANDLE label-driven */
+      handle_label: {
+        pattern: /((?:用户名|用\s*户\s*名|登录账号|登\s*录\s*账\s*号|账号名|账\s*号\s*名|账户名|帐户名|支付账号|支付账户|微信号|WeChat\s*ID|wxid)\s*[:：=]\s*)([A-Za-z0-9_@.\-]{3,80})/giu,
+        tag: "HANDLE",
+        mode: "prefix"
+      },
+
+      /* REF label-driven */
+      ref_label: {
+        pattern: /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,80})/giu,
+        tag: "REF",
+        mode: "prefix"
+      },
+
+      /* CN address (partial masking in engine) */
       address_cn: {
         pattern: /((?:地址|住址|办公地址|通信地址|收货地址|居住地址|单位地址)\s*[:：=]?\s*)([^\n\r]{2,120})/giu,
         tag: "ADDRESS",
         mode: "address_cn_partial"
       },
 
-      // 中文称谓/头衔（保守：仅常见敬称，避免误伤）
+      /* CN/EN/DE company (simple placeholder masking handled in engine company-mode; suffix-preserve is done in engine) */
+      company: {
+        // keep your previous simple latin company too (will be okay for zh content)
+        pattern: /\b([A-Za-z][A-Za-z0-9&.\- ]{1,60})\s+(GmbH|AG|UG|LLC|Ltd\.?|Inc\.?)\b/g,
+        tag: "COMPANY",
+        mode: "company"
+      },
+
       title: {
         pattern: /\b(先生|女士|小姐|太太|老师|同学|经理|主任|总监|博士|教授)\b/gu,
         tag: "TITLE"
@@ -114,11 +117,40 @@
     },
 
     de: {
-      // 德语街道门牌（你 v1.9 的规则）
+      secret: {
+        pattern: /((?:Passwort|PIN|OTP|2FA|Sicherheitscode|verification\s*code|one[-\s]?time\s*code)\s*[:：=]\s*)([^\n\r]{1,120})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      account: {
+        pattern: /((?:Kontonummer|Account(?:\s*Number)?|IBAN|Steuer(?:\s*ID|nummer)?|USt-?IdNr\.?)\s*[:：=]\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{6,40}\d)/giu,
+        tag: "ACCOUNT",
+        mode: "prefix"
+      },
+
+      bank: {
+        pattern: /((?:IBAN|BIC|SWIFT|SWIFT\s*Code|Bank\s*(?:Account|Details))\s*[:：=]?\s*)([A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}|[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
+        tag: "ACCOUNT",
+        mode: "prefix"
+      },
+
+      phone: {
+        pattern: /((?:tel|telefon|handy|kontakt|phone|mobile|whatsapp|telegram|signal)\s*[:：=]?\s*)?((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})?[\d\s().-]{6,}\d)/giu,
+        tag: "PHONE",
+        mode: "phone"
+      },
+
       address_de_street: {
-        pattern: /((?:Address|Shipping\s*Address|Billing\s*Address|Street|Straße|Strasse|Adresse)\s*[:：=]?\s*)?([\p{L}0-9.\-,'/ ]{2,80}\s+\d{1,6}\w?)/giu,
+        pattern: /((?:Adresse|Address|Straße|Strasse)\s*[:：=]?\s*)?([\p{L}0-9.\-,'/ ]{2,80}\s+\d{1,6}\w?)/giu,
         tag: "ADDRESS",
         mode: "prefix"
+      },
+
+      company: {
+        pattern: /\b([A-Za-z][A-Za-z0-9&.\- ]{1,60})\s+(GmbH|AG|UG|KG|GbR|e\.K\.|Ltd\.?|Inc\.?|LLC)\b/gi,
+        tag: "COMPANY",
+        mode: "company"
       },
 
       title: {
@@ -128,9 +160,51 @@
     },
 
     en: {
+      secret: {
+        pattern: /((?:password|passcode|PIN|verification\s*code|security\s*code|one[-\s]?time\s*code|OTP|2FA|CVV|CVC)\s*[:：=]\s*)([^\n\r]{1,120})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      account: {
+        pattern: /((?:account(?:\s*number)?|card\s*number|credit\s*card|debit\s*card|iban|tax\s*(?:id|number)|vat\s*(?:id|number))\s*[:：=]\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{6,40}\d)/giu,
+        tag: "ACCOUNT",
+        mode: "prefix"
+      },
+
+      bank: {
+        pattern: /((?:iban|bic|swift|swift\s*code|routing\s*number|sort\s*code|bank\s*(?:account|details))\s*[:：=]?\s*)([A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}|[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?|\d{6,12})/giu,
+        tag: "ACCOUNT",
+        mode: "prefix"
+      },
+
+      phone: {
+        pattern: /((?:phone|mobile|contact|tel|whatsapp|telegram|signal)\s*[:：=]?\s*)?((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})?[\d\s().-]{6,}\d)/giu,
+        tag: "PHONE",
+        mode: "phone"
+      },
+
       address_de_street: {
         pattern: /((?:Address|Shipping\s*Address|Billing\s*Address|Street)\s*[:：=]?\s*)?([A-Za-z0-9.\-,'/ ]{2,80}\s+\d{1,6}\w?)/g,
         tag: "ADDRESS",
+        mode: "prefix"
+      },
+
+      company: {
+        pattern: /\b([A-Za-z][A-Za-z0-9&.\- ]{1,60})\s+(LLC|Ltd\.?|Inc\.?)\b/g,
+        tag: "COMPANY",
+        mode: "company"
+      },
+
+      ref_label: {
+        pattern: /((?:Order\s*(?:ID|No\.?|Number)|Invoice\s*(?:ID|No\.?|Number)|Reference|Ref\.?)\s*(?:[:：=]|-)\s*)([A-Za-z0-9\-_.]{3,80})/giu,
+        tag: "REF",
+        mode: "prefix"
+      },
+
+      handle_label: {
+        pattern: /((?:username|user\s*id|login|account\s*id|handle|telegram|signal|whatsapp)\s*(?:[:：=]|-)\s*)([A-Za-z0-9_@.\-]{3,80})/giu,
+        tag: "HANDLE",
         mode: "prefix"
       },
 
@@ -143,23 +217,13 @@
 
   // =========================
   // Backward compatibility: RULES_BY_KEY
-  // - merge common + all language rules into one map
-  // - later merges overwrite earlier if same key (acceptable for shared keys like address_de_street/title)
+  // DEFAULT = common + zh only (stable, prevents cross-lang overwrites)
   // =========================
-  const RULES_BY_KEY = Object.assign(
-    {},
-    RULES_COMMON,
-    RULES_BY_LANG.zh,
-    RULES_BY_LANG.de,
-    RULES_BY_LANG.en
-  );
+  const RULES_BY_KEY = Object.assign({}, RULES_COMMON, RULES_BY_LANG.zh);
 
   window.RULES_COMMON = RULES_COMMON;
   window.RULES_BY_LANG = RULES_BY_LANG;
   window.RULES_BY_KEY = RULES_BY_KEY;
 
-  // tiny debug
-  try {
-    window.__rules_boot_ok = true;
-  } catch (_) {}
+  try { window.__rules_boot_ok = true; } catch (_) {}
 })();
