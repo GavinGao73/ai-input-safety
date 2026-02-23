@@ -1070,3 +1070,28 @@ try {
     }
   } catch (_) {}
 })();
+
+// =========================
+// Content strategy: manual switch (NO CLEAR, keep file)
+// =========================
+function setRuleEngineManual(lang) {
+  const L = normLang(lang);
+  if (!L) return;
+
+  try {
+    window.ruleEngine = L;
+    window.ruleEngineMode = "lock";
+
+    // compatibility
+    try { window.contentLang = L; window.contentLangMode = "lock"; } catch (_) {}
+
+    // re-apply rules to current input
+    const ta = document.getElementById("inputText");
+    const v = ta ? String(ta.value || "") : "";
+    if (v.trim() && typeof applyRules === "function") applyRules(v);
+  } catch (_) {}
+}
+
+try {
+  if (typeof window.setRuleEngineManual !== "function") window.setRuleEngineManual = setRuleEngineManual;
+} catch (_) {}
