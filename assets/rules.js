@@ -1,9 +1,8 @@
 // =========================
-// assets/rules.js v2.2 — LANG-AWARE (contentLang) + stable fallback
-// - RULES_COMMON: truly cross-language stable patterns
-// - RULES_BY_LANG: language-specific label dictionaries / address patterns
-// - RULES_BY_KEY: backward-compatible DEFAULT (common + zh) ONLY
-//   (prevents en/de overwriting zh keys in old builds)
+// assets/rules.js v2.3 — LANG-AWARE (contentLang) + stable fallback
+// FIXES:
+// - zh.money: MUST have currency indicator (人民币/CNY/RMB/¥/￥/元) -> stops masking phones/house numbers
+// - zh.company: remove \b, use lookahead -> matches Chinese company names reliably
 // =========================
 
 (function () {
@@ -76,11 +75,8 @@
         mode: "prefix"
       },
 
-      /* ✅ PHONE (label-driven only + allow intl prefix)
-         - Fix: avoid masking refs like CN-2026-xxxx / ORD-xxxx / wxid_xxxx
-         - Two branches:
-           A) labeled phone: (label)(value)
-           B) explicit intl prefix phone: +xx... or 00xx...
+      /* ✅ PHONE (label-driven only + explicit intl prefix)
+         Fix: avoid masking refs like CN-2026-xxxx / ORD-xxxx / wxid_xxxx
       */
       phone: {
         pattern: /((?:联系方式|联系电话|电话|手機|手机|联系人|聯繫方式|tel|telefon|phone|mobile|handy|kontakt)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(\b(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
@@ -109,19 +105,23 @@
         mode: "address_cn_partial"
       },
 
-      /* ✅ MONEY (ZH)
-         - cover "人民币 128,500.00 元" / "CNY 128,500.00" / "￥128,500.00"
+      /* ✅ MONEY (ZH) — REQUIRE currency indicator
+         Matches only if:
+         - has 人民币/CNY/RMB prefix, OR
+         - has ¥/￥ symbol, OR
+         - ends with 元
       */
       money: {
-        pattern: /((?:人民币|CNY|RMB)\s*)?([¥￥]?\s*\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?)\s*(?:元|rmb|cny)?/giu,
+        pattern: /(?:((?:人民币|CNY|RMB)\s*)(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?)(?:\s*元)?)|(?:([¥￥])\s*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?))|(?:(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?)\s*元)/giu,
         tag: "MONEY"
       },
 
-      /* ✅ COMPANY (ZH) — capture name + legal suffix (named groups)
-         - matches: 上海赛行网络科技有限公司 / 赛行（上海）网络科技有限公司 / 北京星舟科技有限公司
+      /* ✅ COMPANY (ZH) — reliable matching
+         - remove \b; use lookahead to avoid swallowing extra Han chars
+         - supports: 上海云桥数据服务有限公司 / 赛行（上海）网络科技有限公司 / 北京星舟科技有限公司
       */
       company: {
-        pattern: /(?<name>[\u4E00-\u9FFF][\u4E00-\u9FFF0-9（）()·&\-\s]{1,60}?)(?<legal>集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)\b/gu,
+        pattern: /(?<name>[\u4E00-\u9FFF][\u4E00-\u9FFF0-9（）()·&\-\s]{1,60}?)(?<legal>集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)(?=$|[^\u4E00-\u9FFF])/gu,
         tag: "COMPANY",
         mode: "company"
       },
@@ -189,7 +189,7 @@
       },
 
       bank: {
-        pattern: /((?:iban|bic|swift|swift\s*code|routing\s*number|sort\s*code|bank\s*(?:account|details))\s*[:：=]?\s*)([A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}|[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?|\d{6,12})/giu,
+        pattern: /((?:iban|bic|swift|swift\s*code|routing\s*number|sort\s*code|bank\s*(?:account|details))\s*[:：=]?\s*)([A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}|[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Za-z0-9]{3})?|\d{6,12})/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
