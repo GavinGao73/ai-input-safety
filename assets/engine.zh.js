@@ -38,7 +38,11 @@
       const total = Math.max(1, s.length);
       if (han / total > 0.05) return "zh";
 
-      if (/(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号|开户银行|对公账户|收款账号)/.test(s)) {
+      if (
+        /(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号|开户银行|对公账户|收款账号)/.test(
+          s
+        )
+      ) {
         return "zh";
       }
       return "";
@@ -95,7 +99,8 @@
     },
 
     // ✅ company formatting strategy (zh-only): keep partial industry tail + legal suffix
-    formatCompany: function ({ name, legal, punct, placeholder }) {
+    // Signature aligned with core call-site: ({ raw, name, legal, punct, coreStr, placeholder })
+    formatCompany: function ({ raw, name, legal, punct, coreStr, placeholder }) {
       const rawName = String(name || "");
       const rawLegal = String(legal || "");
       const rawPunct = String(punct || "");
@@ -146,6 +151,18 @@
       if (!keep && rawName.length > 4) keep = rawName.slice(-4);
 
       return `${placeholder("COMPANY")}${keep}${rawLegal}${rawPunct}`;
+    },
+
+    // ✅ company highlight for pdf overlay (zh-only)
+    // Signature aligned with core call-site: ({ match, name, legal, punct, S1, S2 })
+    highlightCompany: function ({ match, name, legal, punct, S1, S2 }) {
+      const rawName = String(name || "");
+      const rawLegal = String(legal || "");
+      const rawPunct = String(punct || "");
+      if (rawLegal) return `${S1}${rawName}${S2}${rawLegal}${rawPunct}`;
+      // fallback: highlight whole token if no legal captured
+      const m = String(match || rawName || "");
+      return `${S1}${m}${S2}${rawPunct}`;
     },
 
     rules: {
