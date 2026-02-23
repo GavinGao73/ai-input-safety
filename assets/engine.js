@@ -1,14 +1,12 @@
 // =========================
-// assets/engine.js (FULL)
-// v20260223-lang-split-stable-a2
-// ✅ UI language: window.currentLang
-// ✅ Content language: window.contentLang + window.contentLangMode ("auto" | "lock")
-// ✅ contentLang detection ONLY uses RAW input (never masked output)
+// assets/engine.js — LANG SPLIT (UI vs Content) + stable masking
+// - UI language: window.currentLang
+// - Content language: window.contentLang (+ window.contentLangMode)
+// - Fix: priority order + zh money + zh company partial mask + phone FP reduction
 // =========================
 
-console.log("[engine.js] loaded v20260223-lang-split-stable-a2");
+console.log("[engine.js] loaded v20260223-lang-split-a2");
 
-// ===================== lang helpers =====================
 function normLang(l) {
   const s = String(l || "").toLowerCase();
   return (s === "en" || s === "de" || s === "zh") ? s : "";
@@ -18,103 +16,55 @@ function getLangUI() {
   return normLang(window.currentLang) || "zh";
 }
 
-// contentLang drives RULE selection
+// contentLang can be auto-detected from input/PDF text.
+// default: follow UI at boot, then auto updates on content changes.
 function getLangContent() {
+  const m = String(window.contentLangMode || "auto").toLowerCase();
   const v = normLang(window.contentLang);
   if (v) return v;
-
-  // fallback: follow UI if not set
+  // fallback: follow UI
   return getLangUI();
 }
 
-/**
- * Remove placeholders / hit markers before language detection,
- * to prevent drift caused by masked outputs.
- */
-function stripForLangDetect(s) {
-  return String(s || "")
-    .replace(/(【[^【】]{1,36}】|\[[^\[\]]{1,36}\])/g, " ") // placeholders (zh/de/en)
-    .replace(/⟦HIT⟧|⟦\/HIT⟧/g, " ")                      // overlay markers (defensive)
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
- * Lightweight heuristic:
- * - zh: higher Han ratio OR strong zh labels
- * - de: umlauts/ß OR strong German keywords
- * - else en
- *
- * ✅ Strong-signal thresholds to avoid "1 Chinese company name => zh".
- */
-function detectContentLang(text) {
-  const s0 = String(text || "");
-  const s = s0.slice(0, 3200);
-  if (!s.trim()) return "";
-
-  // zh strong labels
-  if (/(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|开户银行|密码|验证码|登录账号|微信号|收款账号|对公账户)/.test(s)) {
-    return "zh";
-  }
-
-  // Han ratio
-  const han = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
-  const total = Math.max(1, s.length);
-  const hanRatio = han / total;
-  if (hanRatio > 0.12) return "zh"; // stronger threshold
-
-  // German strong signals
-  if (/[äöüÄÖÜß]/.test(s)) return "de";
-  if (/\b(Straße|Strasse|PLZ|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Kundennummer|Adresse|Telefon)\b/i.test(s)) {
-    return "de";
-  }
-
-  return "en";
-}
-
-/**
- * Auto-detect content language from RAW text (never masked output).
- * - only works when contentLangMode !== "lock"
- * - updates window.contentLang and fires contentlang:changed
- */
-function setLangContentAutoFromRaw(rawText) {
+function setLangContentAuto(text) {
   try {
     const mode = String(window.contentLangMode || "auto").toLowerCase();
     if (mode === "lock") return;
 
-    const clean = stripForLangDetect(rawText);
-    if (!clean) return;
-
-    const detected = detectContentLang(clean);
+    const s = String(text || "");
+    const detected = detectContentLang(s);
     if (!detected) return;
 
     if (window.contentLang !== detected) {
       window.contentLang = detected;
       try {
-        window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: detected, mode: "auto" } }));
+        window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: detected } }));
       } catch (_) {}
     }
   } catch (_) {}
 }
 
-function lockContentLangForSession(lang) {
-  const v = normLang(lang) || getLangContent();
-  window.contentLang = v;
-  window.contentLangMode = "lock";
-  try {
-    window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: v, mode: "lock" } }));
-  } catch (_) {}
+// Lightweight heuristic: zh if Han ratio/keywords; de if ß/äöü or German keywords; else en.
+function detectContentLang(text) {
+  const s0 = String(text || "");
+  const s = s0.slice(0, 2600); // cap
+  if (!s.trim()) return "";
+
+  // zh: Han ratio OR strong zh labels
+  const han = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
+  const total = Math.max(1, s.length);
+  const hanRatio = han / total;
+
+  if (hanRatio > 0.06) return "zh";
+  if (/(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号|开户银行|对公账户|收款账号)/.test(s)) return "zh";
+
+  // de: umlauts/ß or German keywords
+  if (/[äöüÄÖÜß]/.test(s)) return "de";
+  if (/\b(Straße|Strasse|PLZ|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Kundennummer)\b/i.test(s)) return "de";
+
+  return "en";
 }
 
-function resetContentLang() {
-  window.contentLang = getLangUI();
-  window.contentLangMode = "auto";
-  try {
-    window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: window.contentLang, mode: "auto" } }));
-  } catch (_) {}
-}
-
-// ===================== runtime states =====================
 const enabled = new Set();
 
 // ✅ Money protection always ON (M1). No UI selector.
@@ -378,7 +328,8 @@ function markHitsInOriginal(text){
     "phone",
     "account",
     "bank",
-    "company"
+    "company",
+    "money"
   ]);
 
   const ALWAYS_ON_BY_LANG = {
@@ -392,19 +343,23 @@ function markHitsInOriginal(text){
     ...Array.from((ALWAYS_ON_BY_LANG[langContent] || new Set()))
   ]);
 
+  // ✅ PRIORITY: structured keys BEFORE phone (fix FP on refs)
   const PRIORITY = [
     "secret",
     "account",
     "bank",
     "email",
     "url",
-    "phone",
-    "company",
+
     "handle_label",
     "ref_label",
-    "address_cn",
     "money",
+
+    "phone",
+    "company",
+    "address_cn",
     "address_de_street",
+
     "handle",
     "ref",
     "title",
@@ -475,6 +430,13 @@ function markHitsInOriginal(text){
         const punct = punctMatch ? punctMatch[0] : "";
         const coreStr = punct ? m.slice(0, -punct.length) : m;
 
+        // Prefer named groups (zh.company)
+        const groups = args[args.length - 1];
+        if (groups && typeof groups === "object" && groups.legal) {
+          return `${S1}${groups.name || ""}${S2}${groups.legal || ""}${punct}`;
+        }
+
+        // CN suffix fallback
         const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
         if (sufMatch) {
           const suffix = sufMatch[1];
@@ -482,10 +444,6 @@ function markHitsInOriginal(text){
           return `${S1}${head}${S2}${suffix}${punct}`;
         }
 
-        const groups = args[args.length - 1];
-        if (groups && typeof groups === "object" && groups.legal) {
-          return `${S1}${groups.name || ""}${S2}${groups.legal || ""}${punct}`;
-        }
         return `${S1}${m}${S2}`;
       });
       continue;
@@ -716,22 +674,26 @@ function applyRules(text) {
   let hits = 0;
   const hitsByKey = {};
 
-  // ✅ ONLY detect from RAW input (never from masked output)
-  setLangContentAutoFromRaw(out);
+  // ✅ contentLang auto detect (only in auto mode)
+  setLangContentAuto(out);
 
+  // ✅ PRIORITY: structured keys BEFORE phone (fix FP on refs)
   const PRIORITY = [
     "secret",
     "account",
     "bank",
     "email",
     "url",
-    "phone",
-    "company",
+
     "handle_label",
     "ref_label",
-    "address_cn",
     "money",
+
+    "phone",
+    "company",
+    "address_cn",
     "address_de_street",
+
     "handle",
     "ref",
     "title",
@@ -747,7 +709,8 @@ function applyRules(text) {
     "phone",
     "account",
     "bank",
-    "company"
+    "company",
+    "money"
   ]);
 
   const ALWAYS_ON_BY_LANG = {
@@ -838,7 +801,7 @@ function applyRules(text) {
   // manual first
   out = applyManualTermsMask(out, () => addHit("manual_term"));
 
-  // protect placeholders
+  // protect already-inserted placeholders
   const p0 = protectPlaceholders(out);
   out = p0.t;
 
@@ -848,6 +811,7 @@ function applyRules(text) {
     const r = rules[key];
     if (!r || !r.pattern) continue;
 
+    // ✅ money always mask whole amount
     if (key === "money") {
       out = out.replace(r.pattern, () => {
         addHit("money");
@@ -859,12 +823,14 @@ function applyRules(text) {
     out = out.replace(r.pattern, (...args) => {
       const match = args[0] || "";
 
+      // prefix: (label)(value)
       if (r.mode === "prefix") {
         const label = args[1] || "";
         addHit(key);
         return `${label}${placeholder(r.tag)}`;
       }
 
+      // CN address partial
       if (r.mode === "address_cn_partial") {
         const label = args[1] || "";
         const val = args[2] || "";
@@ -878,6 +844,7 @@ function applyRules(text) {
         return match;
       }
 
+      // phone: keep label if possible; guard card/account digits (>=16)
       if (r.mode === "phone") {
         const label = args[1] || "";
         const vA = args[2] || "";
@@ -893,6 +860,7 @@ function applyRules(text) {
         return placeholder(r.tag);
       }
 
+      // ✅ company: partial mask -> keep industry tail + legal suffix
       if (r.mode === "company") {
         const raw = String(match || "");
 
@@ -900,26 +868,46 @@ function applyRules(text) {
         const punct = punctMatch ? punctMatch[0] : "";
         const coreStr = punct ? raw.slice(0, -punct.length) : raw;
 
-        const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
-
-        addHit(key);
-
-        if (sufMatch) return `${placeholder(r.tag)}${sufMatch[1]}${punct}`;
-
         const groups = args[args.length - 1];
-        if (groups && typeof groups === "object" && groups.legal) {
-          return `${placeholder(r.tag)}${groups.legal}${punct}`;
+        const legal = (groups && typeof groups === "object" && groups.legal) ? String(groups.legal) : "";
+        const name = (groups && typeof groups === "object" && groups.name) ? String(groups.name) : coreStr;
+
+        addHit("company");
+
+        if (legal) {
+          // Keep typical industry tail if present
+          const INDUSTRY = [
+            "网络科技","科技","数据服务","品牌管理","创新股份","创新","信息技术","技术","咨询","服务","贸易","传媒","物流","电子","软件","金融",
+            "投资","实业","工程","建筑","教育","医疗","广告","文化","餐饮","供应链","电商","互联网"
+          ];
+
+          let keep = "";
+          for (const kw of INDUSTRY) {
+            const i = name.lastIndexOf(kw);
+            if (i >= 0 && i >= Math.max(0, name.length - 10)) {
+              keep = name.slice(i);
+              break;
+            }
+          }
+
+          if (!keep && name.length > 4) keep = name.slice(-4);
+
+          return `${placeholder("COMPANY")}${keep}${legal}${punct}`;
         }
 
-        return placeholder(r.tag);
+        // fallback: CN suffix preserve
+        const sufMatch = coreStr.match(/(集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司)$/u);
+        if (sufMatch) return `${placeholder("COMPANY")}${sufMatch[1]}${punct}`;
+
+        return placeholder("COMPANY");
       }
 
+      // default: mask whole match
       addHit(key);
       return placeholder(r.tag);
     });
   }
 
-  // restore placeholders
   out = restorePlaceholders(out, p0.map);
 
   const report = computeRiskReport(hitsByKey, {
