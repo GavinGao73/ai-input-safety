@@ -3,6 +3,12 @@
 // Content-strategy pack: de (FULL – extended conservative German policy)
 // - placeholders + detect + rules
 // - high-sensitivity German document model
+//
+// PATCH (this file):
+// - D1: person_name now swallows optional titles (Frau/Herr/Dr./Prof.) inside labeled name fields,
+//       preventing "Name: [Name]: [Anrede] Li Na" style split-masking.
+// - D2: address_de_street label set expanded to include Rechnungsadresse/Lieferadresse/Zusatz (common form fields)
+// - D3: detect keywords expanded accordingly
 // =========================
 
 (function () {
@@ -36,7 +42,11 @@
 
       if (/[äöüÄÖÜß]/.test(s)) return "de";
 
-      if (/\b(Straße|Strasse|PLZ|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen)\b/i.test(s))
+      if (
+        /\b(Straße|Strasse|PLZ|Postleitzahl|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Geburtsdatum|USt-IdNr)\b/i.test(
+          s
+        )
+      )
         return "de";
 
       return "";
@@ -136,7 +146,7 @@
 
       // label indicates reference/ID -> not phone
       if (
-        /\b(?:aktenzeichen|geschäftszeichen|kundennummer|rechnungsnummer|vorgangs-?id|referenz|ticketnummer|bestellnummer)\b/i.test(
+        /\b(?:aktenzeichen|geschäftszeichen|kundennummer|rechnungsnummer|rechnungsnr|vorgangs-?id|referenz|ticketnummer|bestellnummer|antragsnummer)\b/i.test(
           lbl
         )
       )
@@ -169,7 +179,8 @@
 
       /* ===================== SECRET (label-driven) ===================== */
       secret: {
-        pattern: /((?:Passwort|Kennwort|PIN|TAN|OTP|2FA|Sicherheitscode|verification\s*code|one[-\s]?time\s*code)\s*[:：=]\s*)([^\n\r]{1,120})/giu,
+        pattern:
+          /((?:Passwort|Kennwort|PIN|TAN|OTP|2FA|Sicherheitscode|verification\s*code|one[-\s]?time\s*code)\s*[:：=]\s*)([^\n\r]{1,120})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -183,7 +194,8 @@
 
       /* ===================== ID / REF LABELS (always-on) ===================== */
       id_label: {
-        pattern: /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_\/:.]{3,80})/giu,
+        pattern:
+          /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_\/:.]{3,80})/giu,
         tag: "REF",
         mode: "prefix"
       },
@@ -203,7 +215,8 @@
 
       /* ===================== SOCIAL SECURITY (DE heuristic) ===================== */
       svnr: {
-        pattern: /((?:Sozialversicherungsnummer|SV-Nummer|Rentenversicherungsnummer)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9 \t\-]{5,40})/giu,
+        pattern:
+          /((?:Sozialversicherungsnummer|SV-Nummer|Rentenversicherungsnummer)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9 \t\-]{5,40})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -243,7 +256,8 @@
       /* ===================== FINANCIAL / BANKING ===================== */
       account: {
         // IBAN / Kontonummer / Account Number
-        pattern: /((?:IBAN|Kontonummer|Account(?:\s*Number)?)\s*[:：=]\s*)([A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
+        pattern:
+          /((?:IBAN|Kontonummer|Account(?:\s*Number)?)\s*[:：=]\s*)([A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -264,14 +278,16 @@
 
       creditcard: {
         // label-driven card number (avoid swallowing random IDs)
-        pattern: /((?:Kreditkarte|Kartennummer|Card(?:\s*Number)?|Visa|Mastercard|Amex)\s*[:：=]\s*)(\d(?:[ -]?\d){12,22}\d)/giu,
+        pattern:
+          /((?:Kreditkarte|Kartennummer|Card(?:\s*Number)?|Visa|Mastercard|Amex)\s*[:：=]\s*)(\d(?:[ -]?\d){12,22}\d)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
 
       /* ===================== MONEY (strict currency required) ===================== */
       money: {
-        pattern: /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b\s*(?:[€$£¥￥]\s*)?\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?\s*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥]\s*\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?\s*[€$£¥￥])/giu,
+        pattern:
+          /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b\s*(?:[€$£¥￥]\s*)?\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?\s*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥]\s*\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?\s*[€$£¥￥])/giu,
         tag: "MONEY"
       },
 
@@ -289,7 +305,8 @@
 
       phone: {
         // allow Telefon (Durchwahl): ...
-        pattern: /((?:tel|telefon|handy|kontakt|phone|mobile|mobil|whatsapp|telegram|signal|fax)(?:\s*\([^)]+\))?\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(?<![A-Za-z0-9_-])((?:[+＋]\s*\d{1,3}|00\s*[1-9]\d{0,2})[\d\s().-]{6,}\d)\b/giu,
+        pattern:
+          /((?:tel|telefon|handy|kontakt|phone|mobile|mobil|whatsapp|telegram|signal|fax)(?:\s*\([^)]+\))?\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(?<![A-Za-z0-9_-])((?:[+＋]\s*\d{1,3}|00\s*[1-9]\d{0,2})[\d\s().-]{6,}\d)\b/giu,
         tag: "PHONE",
         mode: "phone"
       },
@@ -297,16 +314,19 @@
       /* ===================== PERSON NAME (STRICT label-driven) ===================== */
       person_name: {
         // covers: Name:, Kontakt:, Ansprechpartner:, Empfänger:
-        // - Latin / German names + simple transliterations (Zhang Wei)
+        // - swallows optional titles to prevent split: "Frau Li Na" => [Name]
+        // - also supports apostrophes/hyphens (O'Neil, Müller-Lüdenscheidt)
         pattern:
-          /((?:Name|Kontakt|Ansprechpartner|Empfänger)\s*[:：=]\s*)([A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
+          /((?:Name|Kontakt|Ansprechpartner|Empfänger)\s*[:：=]\s*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)\s+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
         tag: "NAME",
         mode: "prefix"
       },
 
       /* ===================== ADDRESS (label-driven) ===================== */
       address_de_street: {
-        pattern: /((?:Adresse|Anschrift|Straße|Strasse|PLZ|Postleitzahl)\s*[:：=]\s*)([^\n\r]{4,140})/giu,
+        // expanded labels: Rechnungsadresse / Lieferadresse / Zusatz (common form fields)
+        pattern:
+          /((?:Adresse|Anschrift|Straße|Strasse|PLZ|Postleitzahl|Rechnungsadresse|Lieferadresse|Zusatz)\s*[:：=]\s*)([^\n\r]{4,140})/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
