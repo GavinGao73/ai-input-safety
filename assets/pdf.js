@@ -147,6 +147,9 @@ async function probePdfTextLayer(file) {
   let totalChars = 0;
   const pages = [];
 
+  // ✅ NEW: preserve raw glyph items per page (for later mapping)
+  const pagesItems = [];
+
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
 
@@ -164,12 +167,18 @@ async function probePdfTextLayer(file) {
       pages.push(pageText);
       totalChars += pageText.replace(/\s+/g, "").length; // count non-space for reliability
     }
+
+    // ✅ keep items for export-stage exact rect mapping
+    pagesItems.push({
+      pageNumber: p,
+      items
+    });
   }
 
-  if (totalChars < 20) return { hasTextLayer: false, text: "" };
+  if (totalChars < 20) return { hasTextLayer: false, text: "", pagesItems: [] };
 
   // pages separated by blank line (kept, readable)
-  return { hasTextLayer: true, text: pages.join("\n\n") };
+  return { hasTextLayer: true, text: pages.join("\n\n"), pagesItems };
 }
 
 window.probePdfTextLayer = probePdfTextLayer;
