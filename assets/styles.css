@@ -847,3 +847,18 @@ textarea{
   display:flex;
   justify-content:center;
 }
+
+/* =========================
+   Export status stability fix
+   ========================= */
+
+.export-status{
+  white-space: pre-wrap;
+  word-break: break-word;     /* 防止被整行裁切 */
+  overflow-wrap: anywhere;    /* 关键：允许断开 */
+  min-width: 0;               /* ⚠️ 在 flex 布局中极重要 */
+}
+
+.railcard{
+  min-width: 0;               /* 如果父级是 flex，必须有 */
+}
