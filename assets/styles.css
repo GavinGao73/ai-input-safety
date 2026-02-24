@@ -862,3 +862,38 @@ textarea{
 .railcard{
   min-width: 0;               /* 如果父级是 flex，必须有 */
 }
+
+/* =========================
+   FIX E: mid-filter bottom shadow overlay
+   - keep visual divider
+   - never cover/click-block left/right
+   ========================= */
+
+/* 1) mid column should not capture pointer events */
+.mid-filter{
+  pointer-events: none !important;
+  position: relative !important;
+  z-index: 0 !important;
+  overflow: hidden !important;   /* critical: clip any gradient shadow inside */
+}
+
+/* 2) if there is a pseudo-element doing fade/shadow, clip/disable it */
+.mid-filter::before,
+.mid-filter::after{
+  pointer-events: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  /* if your shadow is from a gradient mask, kill it */
+  background-image: none !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+
+/* 3) ensure left/right cards always render above mid column */
+#leftCard, #rightCard{
+  position: relative !important;
+  z-index: 2 !important;
+}
+
