@@ -57,6 +57,13 @@ function resetRuleEngine() {
   try {
     window.ruleEngine = "";
     window.ruleEngineMode = "auto";
+
+    // ✅ compatibility: keep old names in sync
+    try {
+      window.contentLang = "";
+      window.contentLangMode = "auto";
+    } catch (_) {}
+
     try {
       window.dispatchEvent(new CustomEvent("ruleengine:changed", { detail: { lang: getLangContent() } }));
     } catch (_) {}
@@ -80,6 +87,13 @@ function setRuleEngineAuto(text) {
 
     if (normLang(window.ruleEngine)) {
       window.ruleEngineMode = "lock";
+
+      // ✅ compatibility: lock old names too
+      try {
+        window.contentLang = window.ruleEngine;
+        window.contentLangMode = "lock";
+      } catch (_) {}
+
       return;
     }
 
@@ -88,6 +102,12 @@ function setRuleEngineAuto(text) {
 
     window.ruleEngine = detected;
     window.ruleEngineMode = "lock";
+
+    // ✅ compatibility: keep old names in sync
+    try {
+      window.contentLang = detected;
+      window.contentLangMode = "lock";
+    } catch (_) {}
 
     try {
       window.dispatchEvent(new CustomEvent("ruleengine:changed", { detail: { lang: detected } }));
@@ -572,10 +592,10 @@ function labelForKey(k) {
 
 function computeRiskReport(hitsByKey, meta) {
   const pol = getPolicy();
-  const R = (pol && pol.risk) ? pol.risk : {};
-  const W = (R && R.weights) ? R.weights : {};
-  const T = (R && R.thresholds) ? R.thresholds : { mid: 35, high: 70 };
-  const B = (R && R.bonus) ? R.bonus : { base: 10, len1500: 6, len4000: 8, fromPdf: 6 };
+  const R = pol && pol.risk ? pol.risk : {};
+  const W = R && R.weights ? R.weights : {};
+  const T = R && R.thresholds ? R.thresholds : { mid: 35, high: 70 };
+  const B = R && R.bonus ? R.bonus : { base: 10, len1500: 6, len4000: 8, fromPdf: 6 };
 
   const cap = Number(R.capPerKey || 12);
   const clampMin = Number(R.clampMin ?? 0);
@@ -964,13 +984,31 @@ try {
     if (String(window.ruleEngineMode || "").toLowerCase() === "auto") {
       if (normLang(window.ruleEngine)) {
         window.ruleEngineMode = "lock";
+
+        // ✅ compatibility: lock old names too
+        try {
+          window.contentLang = window.ruleEngine;
+          window.contentLangMode = "lock";
+        } catch (_) {}
       } else {
         window.ruleEngine = "";
+
+        // ✅ compatibility: reset old names too
+        try {
+          window.contentLang = "";
+          window.contentLangMode = "auto";
+        } catch (_) {}
       }
     }
 
     if (String(window.ruleEngineMode || "").toLowerCase() === "lock" && !normLang(window.ruleEngine)) {
       window.ruleEngine = getLangUI(); // safe fallback
+
+      // ✅ compatibility: keep old names in sync
+      try {
+        window.contentLang = window.ruleEngine;
+        window.contentLangMode = "lock";
+      } catch (_) {}
     }
   } catch (_) {}
 })();
@@ -1044,8 +1082,8 @@ try {
       hasPacks: hasPacksObj,
       missingPacks,
       // helpful runtime hints
-      langUI: (typeof window.getLangUI === "function") ? window.getLangUI() : (window.currentLang || ""),
-      langContent: (typeof window.getLangContent === "function") ? window.getLangContent() : (window.ruleEngine || ""),
+      langUI: typeof window.getLangUI === "function" ? window.getLangUI() : window.currentLang || "",
+      langContent: typeof window.getLangContent === "function" ? window.getLangContent() : window.ruleEngine || "",
       ruleEngineMode: String(window.ruleEngineMode || ""),
       engineVersion: "v20260223-engine-a5-policy-split"
     };
