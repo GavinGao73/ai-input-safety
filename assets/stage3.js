@@ -6,6 +6,7 @@
 // =========================
 
 // ✅ NEW: keep raw per-page text items (for Mode A export rect mapping later)
+// NOTE: must keep window pointer in sync whenever we re-assign array
 let lastPdfPagesItems = [];
 
 // ================= Stage 3 file handler =================
@@ -15,9 +16,12 @@ async function handleFile(file) {
   lastUploadedFile = file;
   lastProbe = null;
   lastPdfOriginalText = "";
-  lastPdfPagesItems = []; // ✅ reset every upload
+
+  // ✅ reset every upload
+  lastPdfPagesItems = [];
   try { window.lastPdfPagesItems = lastPdfPagesItems; } catch (_) {}
   try { window.__pdf_pages_items = lastPdfPagesItems; } catch (_) {}
+
   lastFileKind = (file.type === "application/pdf") ? "pdf"
               : (file.type && file.type.startsWith("image/") ? "image" : "");
 
@@ -75,6 +79,10 @@ async function handleFile(file) {
     } catch (_) {
       lastPdfPagesItems = [];
     }
+
+    // ✅ IMPORTANT: keep window pointers synced (because we re-assigned array)
+    try { window.lastPdfPagesItems = lastPdfPagesItems; } catch (_) {}
+    try { window.__pdf_pages_items = lastPdfPagesItems; } catch (_) {}
 
     if (!probe || !probe.hasTextLayer) {
       lastRunMeta.fromPdf = false;
