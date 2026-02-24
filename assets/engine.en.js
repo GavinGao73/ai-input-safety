@@ -1,11 +1,6 @@
 // =========================
 // assets/engine.en.js
-// UPGRADE v5 (unified fixes requested)
-// - Titles: do NOT mask Mr/Dr/Prof etc; mask names only
-// - DOB: mask month+day at minimum (keep year)
-// - Tax ID: mask
-// - Address: avoid "Billing/Shipping Address" label context; keep inline street+extras only
-// - Keep: tail-safe ID masking + ERR/SKU safe + banking + money
+// UPGRADE v5.1 (fix: name not masked + DOB grouping + address overmask + phone ID trap)
 // =========================
 
 (function () {
@@ -108,6 +103,9 @@
       "national_id",
       "tax_id",
 
+      // ✅ ensure names are always masked
+      "person_name",
+
       "address_en_inline_street",
       "address_en_extra",
 
@@ -122,15 +120,21 @@
       const val = String(value || "");
       const digits = val.replace(/\D+/g, "");
 
+      // long numeric IDs are not phones (also avoids card-like sequences)
       if (digits.length >= 16) return false;
 
+      // labels that are clearly IDs, not phones
       if (
         /\b(?:case|ticket|order|invoice|reference|ref|customer|application|request|account)\b/.test(lbl) &&
         /\b(?:id|no|number|#)\b/.test(lbl)
       )
         return false;
 
-      if (/\b[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{4,}\b/.test(val)) return false;
+      // ✅ hard-block: common ID prefixes should never be treated as phone (even in free text)
+      if (/\b(?:CUST|CASE|ORD|INV|APP|REF|ACC|MEM|INS)-/i.test(val)) return false;
+
+      // common ID-ish shapes should not be treated as phones
+      if (/\b[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{4,}\b/i.test(val)) return false;
 
       return true;
     },
@@ -190,12 +194,11 @@
       dob: {
         // Date of Birth: 1990-03-14  -> Date of Birth: 1990-[Secret]
         // DOB: 1990/03/14            -> DOB: 1990/[Secret]
+        // ✅ IMPORTANT: only TWO capture groups (engine prefix-mode replaces group2)
         pattern:
-          /((?:date\s*of\s*birth|dob)\s*[:：=]\s*)(\d{4}[-\/\.])(\d{2}[-\/\.]\d{2})/giu,
+          /((?:date\s*of\s*birth|dob)\s*[:：=]\s*\d{4}[-\/\.])(\d{2}[-\/\.]\d{2})/giu,
         tag: "SECRET",
         mode: "prefix"
-        // Note: engine's prefix-mode replaces the LAST capture group (group2) in most implementations.
-        // Our pattern makes group1 = label + year-sep, group2 = month+day.
       },
 
       /* ===================== IDENTITY (label-driven) ===================== */
@@ -271,8 +274,6 @@
 
       /* ===================== PERSON NAME (label-driven; KEEP title, mask name only) ===================== */
       person_name: {
-        // Name: Mr. John O'Neil -> Name: Mr. [Name]
-        // Account Holder: Prof. David Müller -> Account Holder: Prof. [Name]
         pattern:
           /((?:name|customer\s*name|account\s*holder|recipient|name\s*on\s*card)\s*[:：=]\s*(?:(?:mr|mrs|ms|miss|dr|prof)\.?\s+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})/giu,
         tag: "NAME",
@@ -296,8 +297,10 @@
 
       /* ===================== ADDRESS extras (apt/unit/suite/floor/room ONLY) ===================== */
       address_en_extra: {
+        // ✅ FIX: require whitespace or "#" between keyword and value
+        // prevents: United -> (unit + ed), flip -> (fl + ip)
         pattern:
-          /\b(?:apt|apartment|unit|suite|ste\.?|floor|fl\.?|room|rm\.?|building|bldg\.?|dept|department)\s*#?\s*[A-Za-z0-9.\-]{1,12}(?:\s*,\s*(?:floor|fl\.?)\s*#?\s*\d{1,3})?(?:\s*,\s*(?:room|rm\.?)\s*#?\s*[A-Za-z0-9.\-]{1,12})?\b/giu,
+          /\b(?:apt|apartment|unit|suite|ste\.?|floor|fl\.?|room|rm\.?|building|bldg\.?|dept|department)\b(?:\s+#?\s*|#\s*)([A-Za-z0-9.\-]{1,12})\b/giu,
         tag: "ADDRESS"
       },
 
