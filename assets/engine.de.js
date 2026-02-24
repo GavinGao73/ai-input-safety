@@ -56,6 +56,7 @@
       "email",
       "url",
       "money",
+      "id_label",
       "phone",
       "company",
       "address_de_street",
