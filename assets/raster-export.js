@@ -33,6 +33,169 @@
   }
 
   // ======================================================
+  // LANG_TUNING (zh/en/de)
+  // - MAX_MATCH_LEN per key (guard over-redaction)
+  // - bbox clamp (maxByPage/maxByEst multipliers)
+  // - padX/padY per key
+  // - shrinkByLabel label vocab per language (avoid masking labels)
+  // ======================================================
+  const LANG_TUNING = {
+    zh: {
+      maxMatchLen: {
+        manual_term: 90,
+        person_name: 32,
+        company: 60,
+        email: 80,
+        phone: 50,
+        account: 80,
+        bank: 120,
+        address_de_street: 140,
+        address_de_postal: 140,
+        handle: 80,
+        ref: 80,
+        title: 80,
+        money: 60,
+        number: 60
+      },
+
+      // bbox clamp multipliers (by key group)
+      bbox: {
+        // default clamps
+        default: {
+          maxByPage: 0.30,   // viewport.width * ratio
+          maxByEst: 1.45,    // est * multiplier
+          wHardCapEstRatio: 2.2, // if w > est*ratio -> clamp to est*soft
+          wSoftCapEstMul: 1.15
+        },
+        longValue: {
+          maxByPage: 0.55,
+          maxByEst: 2.20,
+          wHardCapEstRatio: 2.8,
+          wSoftCapEstMul: 1.60
+        },
+        address: {
+          maxByPage: 0.60,
+          maxByEst: 2.10,
+          wHardCapEstRatio: 3.2,
+          wSoftCapEstMul: 1.70
+        },
+        money: {
+          maxByPage: 0.35,
+          maxByEst: 1.80
+        },
+        manual_term: {
+          maxByPage: 0.40,
+          maxByEst: 1.80
+        }
+      },
+
+      pad: {
+        person_name: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
+        company:     { pxW: 0.0045, pyH: 0.032, minX: 0.55, minY: 0.60 },
+        manual_term: { pxW: 0.0040, pyH: 0.035, minX: 0.55, minY: 0.65 },
+        _default:    { pxW: 0.0050, pyH: 0.045, minX: 0.55, minY: 0.75 }
+      },
+
+      shrinkLabels: {
+        phone:   ["电话", "手机", "联系电话"],
+        account: ["银行账号", "账号", "卡号", "银行卡号"],
+        email:   ["邮箱"],
+        address: ["地址"],
+        bank:    ["开户行", "开户银行", "银行"]
+      }
+    },
+
+    en: {
+      maxMatchLen: {
+        manual_term: 90,
+        person_name: 40,
+        company: 70,
+        email: 90,
+        phone: 60,
+        account: 90,
+        bank: 140,
+        address_de_street: 160,
+        address_de_postal: 160,
+        handle: 90,
+        ref: 90,
+        title: 90,
+        money: 70,
+        number: 70
+      },
+
+      bbox: {
+        default:   { maxByPage: 0.30, maxByEst: 1.45, wHardCapEstRatio: 2.2, wSoftCapEstMul: 1.15 },
+        longValue: { maxByPage: 0.55, maxByEst: 2.20, wHardCapEstRatio: 2.8, wSoftCapEstMul: 1.60 },
+        address:   { maxByPage: 0.60, maxByEst: 2.10, wHardCapEstRatio: 3.2, wSoftCapEstMul: 1.70 },
+        money:     { maxByPage: 0.35, maxByEst: 1.80 },
+        manual_term:{ maxByPage: 0.40, maxByEst: 1.80 }
+      },
+
+      pad: {
+        person_name: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
+        company:     { pxW: 0.0045, pyH: 0.032, minX: 0.55, minY: 0.60 },
+        manual_term: { pxW: 0.0040, pyH: 0.035, minX: 0.55, minY: 0.65 },
+        _default:    { pxW: 0.0050, pyH: 0.045, minX: 0.55, minY: 0.75 }
+      },
+
+      shrinkLabels: {
+        phone:   ["Phone", "Mobile", "Tel", "Telephone"],
+        account: ["Account", "Account No", "Account Number", "IBAN"],
+        email:   ["Email", "E-mail"],
+        address: ["Address"],
+        bank:    ["Bank", "Bank Name"]
+      }
+    },
+
+    de: {
+      maxMatchLen: {
+        manual_term: 90,
+        person_name: 40,
+        company: 70,
+        email: 90,
+        phone: 60,
+        account: 90,
+        bank: 140,
+        address_de_street: 160,
+        address_de_postal: 160,
+        handle: 90,
+        ref: 90,
+        title: 90,
+        money: 70,
+        number: 70
+      },
+
+      bbox: {
+        default:   { maxByPage: 0.30, maxByEst: 1.45, wHardCapEstRatio: 2.2, wSoftCapEstMul: 1.15 },
+        longValue: { maxByPage: 0.55, maxByEst: 2.20, wHardCapEstRatio: 2.8, wSoftCapEstMul: 1.60 },
+        address:   { maxByPage: 0.60, maxByEst: 2.10, wHardCapEstRatio: 3.2, wSoftCapEstMul: 1.70 },
+        money:     { maxByPage: 0.35, maxByEst: 1.80 },
+        manual_term:{ maxByPage: 0.40, maxByEst: 1.80 }
+      },
+
+      pad: {
+        person_name: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
+        company:     { pxW: 0.0045, pyH: 0.032, minX: 0.55, minY: 0.60 },
+        manual_term: { pxW: 0.0040, pyH: 0.035, minX: 0.55, minY: 0.65 },
+        _default:    { pxW: 0.0050, pyH: 0.045, minX: 0.55, minY: 0.75 }
+      },
+
+      shrinkLabels: {
+        phone:   ["Telefon", "Tel", "Handy", "Mobil", "Mobile", "Phone"],
+        account: ["Konto", "Kontonummer", "Account", "IBAN"],
+        email:   ["E-mail", "Email"],
+        address: ["Anschrift", "Adresse", "Address"],
+        bank:    ["Bank", "Bankname"]
+      }
+    }
+  };
+
+  function getLangTuning(lang) {
+    const L = String(lang || "").toLowerCase();
+    return LANG_TUNING[L] || LANG_TUNING.zh;
+  }
+
+  // ======================================================
   // E) Phase beacon (UI language aligned, in-memory only)
   // - Updates window.__RasterExportLast.phase/phase2
   // - Also mirrors a concise line into #exportStatus if present
@@ -538,8 +701,10 @@
   }
 
   // --------- Text items -> rects (value-first, keep labels) ----------
-  function textItemsToRects(pdfjsLib, viewport, textContentOrItems, matchers) {
+  function textItemsToRects(pdfjsLib, viewport, textContentOrItems, matchers, lang) {
     const Util = pdfjsLib.Util;
+
+    const tuning = getLangTuning(lang);
 
     // accept either:
     // - textContent = { items:[...] }
@@ -552,22 +717,7 @@
     if (!items.length || !matchers || !matchers.length) return [];
 
     // ✅ hard guard: avoid over-redacting if a rule accidentally matches huge spans
-    const MAX_MATCH_LEN = {
-      manual_term: 90,
-      person_name: 40,
-      company: 60,
-      email: 80,
-      phone: 50,
-      account: 80,
-      bank: 120,
-      address_de_street: 140,
-      address_de_postal: 140,
-      handle: 80,
-      ref: 80,
-      title: 80,
-      money: 60,
-      number: 60
-    };
+    const MAX_MATCH_LEN = Object.assign({}, (tuning && tuning.maxMatchLen) || {});
 
     function isWs(ch) {
       return ch === " " || ch === "\n" || ch === "\t" || ch === "\r";
@@ -591,6 +741,19 @@
         out.push({ index: m.index, len: text.length, m });
       }
       return out;
+    }
+
+    function keyGroupForBBox(key) {
+      const isLongValueKey =
+        key === "account" || key === "phone" || key === "email" || key === "bank";
+      const isAddressKey =
+        key === "address_de_street" || key === "address_de_postal";
+
+      if (key === "money") return "money";
+      if (key === "manual_term") return "manual_term";
+      if (isLongValueKey) return "longValue";
+      if (isAddressKey) return "address";
+      return "default";
     }
 
     // ✅ Better bbox: derive width from it.width * scaleX when possible.
@@ -626,34 +789,21 @@
 
       const est = Math.max(10, s.length * fontH * 0.90);
 
-      if (w > est * 2.2) w = est * 1.15;
+      const group = keyGroupForBBox(key);
+      const bboxCfg = (tuning && tuning.bbox) || {};
+      const cfg = bboxCfg[group] || bboxCfg.default || { maxByPage: 0.30, maxByEst: 1.45, wHardCapEstRatio: 2.2, wSoftCapEstMul: 1.15 };
+
+      // hard cap extremely wide items
+      const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
+      const softMul = Number(cfg.wSoftCapEstMul || 1.15);
+      if (w > est * hardRatio) w = est * softMul;
+
+      const maxByPage = viewport.width * Number(cfg.maxByPage || 0.30);
+      const maxByEst = est * Number(cfg.maxByEst || 1.45);
+      w = clamp(w, 1, Math.min(maxByPage, maxByEst));
 
       const isLongValueKey =
-        key === "account" || key === "phone" || key === "email" || key === "bank";
-
-      const isAddressKey =
-        key === "address_de_street" || key === "address_de_postal";
-
-      let maxByPage = viewport.width * 0.30;
-      let maxByEst = est * 1.45;
-
-      if (isLongValueKey) {
-        maxByPage = viewport.width * 0.55;
-        maxByEst = est * 2.20;
-        if (w > est * 2.8) w = est * 1.60;
-      } else if (isAddressKey) {
-        maxByPage = viewport.width * 0.60;
-        maxByEst = est * 2.10;
-        if (w > est * 3.2) w = est * 1.70;
-      } else if (key === "money") {
-        maxByPage = viewport.width * 0.35;
-        maxByEst = est * 1.80;
-      } else if (key === "manual_term") {
-        maxByPage = viewport.width * 0.40;
-        maxByEst = est * 1.80;
-      }
-
-      w = clamp(w, 1, Math.min(maxByPage, maxByEst));
+        group === "longValue";
 
       const minW = isLongValueKey ? (est * 0.95) : (est * 0.85);
       w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.40 : 0.20)));
@@ -666,28 +816,24 @@
       return { x: rx, y: ry, w: rw, h: rh };
     }
 
+    // ✅ shrinkByLabel: language-split vocab (reduce masking labels)
     function shrinkByLabel(key, s, ls, le) {
-      // ✅ manual_term: DO NOT shrink; exact cover
-      if (key === "manual_term") return { ls, le };
+      if (key === "manual_term") return { ls, le }; // DO NOT shrink
 
       if (le <= ls) return { ls, le };
       const sub = s.slice(ls, le);
 
-      if (key === "phone") {
-        const mm = sub.match(/^(电话|手机|联系电话|Tel\.?|Telefon|Phone|Mobile|Handy)\s*[:：]?\s*/i);
-        if (mm && mm[0]) ls += mm[0].length;
-      } else if (key === "account") {
-        const mm = sub.match(/^(银行账号|账号|卡号|银行卡号|Konto|Account|IBAN)\s*[:：]?\s*/i);
-        if (mm && mm[0]) ls += mm[0].length;
-      } else if (key === "email") {
-        const mm = sub.match(/^(邮箱|E-?mail)\s*[:：]?\s*/i);
-        if (mm && mm[0]) ls += mm[0].length;
-      } else if (key === "address_de_street" || key === "address_de_postal") {
-        const mm = sub.match(/^(地址|Anschrift|Address)\s*[:：]?\s*/i);
-        if (mm && mm[0]) ls += mm[0].length;
-      } else if (key === "bank") {
-        const mm = sub.match(/^(开户行|开户银行|银行)\s*[:：]?\s*/i);
-        if (mm && mm[0]) ls += mm[0].length;
+      const labels = (tuning && tuning.shrinkLabels) || {};
+      function makeLabelPrefixRe(words) {
+        if (!Array.isArray(words) || !words.length) return null;
+        // Build: ^(?:A|B|C)\s*[:：]?\s*
+        const parts = words
+          .map((w) => String(w || "").trim())
+          .filter(Boolean)
+          .map(escapeRegExp);
+        if (!parts.length) return null;
+        const src = `^(?:${parts.join("|")})\\s*[:：]?\\s*`;
+        try { return new RegExp(src, "i"); } catch (_) { return null; }
       }
 
       const weakTrim = (ch) => {
@@ -695,10 +841,41 @@
         return ":：,，;；()（）[]【】<>《》\"'“”‘’".includes(ch);
       };
 
+      if (key === "phone") {
+        const re = makeLabelPrefixRe(labels.phone);
+        const mm = re ? sub.match(re) : null;
+        if (mm && mm[0]) ls += mm[0].length;
+
+      } else if (key === "account") {
+        const re = makeLabelPrefixRe(labels.account);
+        const mm = re ? sub.match(re) : null;
+        if (mm && mm[0]) ls += mm[0].length;
+
+      } else if (key === "email") {
+        const re = makeLabelPrefixRe(labels.email);
+        const mm = re ? sub.match(re) : null;
+        if (mm && mm[0]) ls += mm[0].length;
+
+      } else if (key === "address_de_street" || key === "address_de_postal") {
+        const re = makeLabelPrefixRe(labels.address);
+        const mm = re ? sub.match(re) : null;
+        if (mm && mm[0]) ls += mm[0].length;
+
+      } else if (key === "bank") {
+        const re = makeLabelPrefixRe(labels.bank);
+        const mm = re ? sub.match(re) : null;
+        if (mm && mm[0]) ls += mm[0].length;
+      }
+
       while (ls < le && weakTrim(s[ls])) ls++;
       while (le > ls && weakTrim(s[le - 1])) le--;
 
       return { ls, le };
+    }
+
+    function getPadForKey(key) {
+      const pad = (tuning && tuning.pad) || {};
+      return pad[key] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
     }
 
     // Build pageText + item ranges
@@ -911,25 +1088,10 @@
         const x1 = bb.x + bb.w * (ls / len);
         const x2 = bb.x + bb.w * (le / len);
 
-        // ✅ Key-aware padding
-        let padX, padY;
-
-        if (key === "person_name") {
-          padX = Math.max(0.25, bb.w * 0.002);
-          padY = Math.max(0.55, bb.h * 0.030);
-
-        } else if (key === "company") {
-          padX = Math.max(0.55, bb.w * 0.0045);
-          padY = Math.max(0.60, bb.h * 0.032);
-
-        } else if (key === "manual_term") {
-          padX = Math.max(0.55, bb.w * 0.0040);
-          padY = Math.max(0.65, bb.h * 0.035);
-
-        } else {
-          padX = Math.max(0.55, bb.w * 0.005);
-          padY = Math.max(0.75, bb.h * 0.045);
-        }
+        // ✅ Key-aware padding (language tunable)
+        const pcfg = getPadForKey(key);
+        const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
+        const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
 
         let rx = x1 - padX;
         let ry = bb.y - padY;
@@ -1063,7 +1225,7 @@
       }
 
       setRasterPhase("autoRedactReadablePdf:match", `p${p.pageNumber}`);
-      const rects = textItemsToRects(pdfjsLib, p.viewport, itemsOrTextContent, matchers);
+      const rects = textItemsToRects(pdfjsLib, p.viewport, itemsOrTextContent, matchers, lang);
 
       // ---- per-page debug snapshot (safe, in-memory only) ----
       try {
@@ -1157,6 +1319,23 @@
     downloadBlob(blob, filename || `raster_secure_${Date.now()}.pdf`);
 
     setRasterPhase("exportCanvasesToPdf:done", null);
+  }
+
+  // ======================================================
+  // Mode B visual tuning helper (optional UI hook)
+  // - If redact-ui.js / styles are not available here, UI can call this
+  //   to style selection rectangles for white backgrounds.
+  // ======================================================
+  function getModeBOverlayStyle() {
+    // High-contrast on white paper: vivid stroke + translucent fill + dashed edge
+    return {
+      stroke: "rgba(0, 255, 240, 0.95)",
+      strokeWidth: 2,
+      dash: [6, 4],
+      fill: "rgba(0, 255, 240, 0.18)",
+      shadow: "rgba(0,0,0,0.35)", // optional if UI uses canvas shadow
+      shadowBlur: 4
+    };
   }
 
   // ======================================================
@@ -1258,6 +1437,12 @@
       await exportCanvasesToPdf(pages, dpi, name);
       setRasterPhase("exportVisual:done", null);
     },
+
+    // UI helper for Mode B visibility
+    getModeBOverlayStyle,
+
+    // debugging/inspection hook (safe): expose tuning table
+    LANG_TUNING,
 
     renderPdfToCanvases,
     renderImageToCanvas,
