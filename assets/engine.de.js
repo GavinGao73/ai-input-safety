@@ -386,10 +386,9 @@
       },
 
       address_line: {
-        // e.g. Musterstraße 12 / Domkloster 4 / Hauptstr. 5a
-        // Conservative: requires a common street suffix and a house number.
-        pattern:
-          /\b([A-ZÄÖÜ][A-Za-zÄÖÜäöüß.\- ]{1,50}(?:straße|strasse|str\.|weg|platz|allee|gasse|ring|ufer|damm|promenade)\s+\d{1,6}[A-Za-z]?)\b/giu,
+      // e.g. Musterstraße 12 / Marienplatz 1
+      // Avoid false positives like "Lagerplatz 12-07-03", "Parkplatz 3"
+        pattern:/\b(?!Lagerplatz\b)(?!Parkplatz\b)(?!Stellplatz\b)([A-ZÄÖÜ][A-Za-zÄÖÜäöüß.\- ]{1,50}(?:straße|strasse|str\.|weg|platz|allee|gasse|ring|ufer|damm|promenade)\s+\d{1,6}[A-Za-z]?)\b/giu,
         tag: "ADDRESS"
       },
 
