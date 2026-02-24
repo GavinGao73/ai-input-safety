@@ -45,19 +45,35 @@
     },
 
     // ✅ language-specific execution order
-        priority: [
+    // - Put id_label BEFORE phone to avoid phone hitting inside IDs
+    // - Add birthdate + BLZ coverage
+    priority: [
       "secret",
+
+      // IDs / tax / documents (critical)
+      "id_label",
       "tax_id",
       "vat_id",
       "id_card",
       "passport",
+      "birthdate",
+
+      // bank/account
       "account",
       "bank",
+      "blz",
+
+      // comms + web
       "email",
       "url",
+
+      // money (always on via policy)
       "money",
-      "id_label",
+
+      // phone AFTER id_label
       "phone",
+
+      // remaining
       "company",
       "address_de_street",
       "handle",
@@ -67,8 +83,17 @@
     ],
 
     // ✅ language-specific always-on
-    // Fix: id_label must be always-on, otherwise phone rule will incorrectly hit inside IDs like "KND-0049..."
-    alwaysOn: ["address_de_street", "id_label"],
+    // - Ensure critical label-driven IDs & tax/doc/date/blz are masked without UI toggles
+    alwaysOn: [
+      "address_de_street",
+      "id_label",
+      "tax_id",
+      "vat_id",
+      "id_card",
+      "passport",
+      "birthdate",
+      "blz"
+    ],
 
     // ✅ phone FP guard (de): prevent ref/order/invoice/customer IDs being masked as phone
     phoneGuard: function ({ label, value, match }) {
@@ -127,9 +152,19 @@
         tag: "URL"
       },
 
-            /* ===================== TAX / ID (DE) ===================== */
+      /* ===================== ID / REF (label-driven, always-on) ===================== */
+      // Catch:
+      // - Antragsnummer / Kundennummer / Vorgangs-ID / Rechnungsnr. / Bestellnummer / Ticketnummer / Referenz
+      // and mask the whole token so phone regex never touches inner "00..." sequences.
+      id_label: {
+        pattern:
+          /((?:Antragsnummer|Kundennummer|Vorgangs-?ID|Vorgangsnummer|Rechnungsnr\.?|Rechnungsnummer|Bestellnummer|Ticketnummer|Referenz)\s*[:：=]\s*)([A-Za-z]{0,10}[A-Za-z0-9]*-?\d[\dA-Za-z\-_.]{3,80})/giu,
+        tag: "REF",
+        mode: "prefix"
+      },
+
+      /* ===================== TAX / ID (DE) ===================== */
       tax_id: {
-        // Covers:
         // Steuer-ID: 12 345 678 901
         // Steueridentifikationsnummer: 12345678901
         pattern: /((?:Steuer-?ID|Steueridentifikationsnummer)\s*[:：=]\s*)(\d[\d \t]{8,20}\d)/giu,
@@ -138,7 +173,6 @@
       },
 
       vat_id: {
-        // Covers:
         // USt-IdNr.: DE123456789
         // Umsatzsteuer-ID: DE123456789
         pattern: /((?:USt-?IdNr\.?|Umsatzsteuer-?ID)\s*[:：=]\s*)(DE\s?\d{8,12})/giu,
@@ -146,9 +180,9 @@
         mode: "prefix"
       },
 
+      /* ===================== DOC IDs (DE) ===================== */
       id_card: {
-        // Covers typical Personalausweis numbers (heuristic, conservative)
-        // Personalausweis-Nr.: L01X00T47
+        // Personalausweis-Nr.: L01X00T47 (heuristic)
         pattern: /((?:Personalausweis-?(?:Nr\.?|nummer)?)\s*[:：=]\s*)([A-Z0-9]{6,18})/giu,
         tag: "SECRET",
         mode: "prefix"
@@ -157,6 +191,13 @@
       passport: {
         // Reisepass-Nr.: C01X00047
         pattern: /((?:Reisepass-?(?:Nr\.?|nummer)?)\s*[:：=]\s*)([A-Z0-9]{6,18})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      birthdate: {
+        // Geburtsdatum: 1990-03-14 / 14.03.1990
+        pattern: /((?:Geburtsdatum|Geb\.?\s*Datum)\s*[:：=]\s*)(\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{2,4})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -171,16 +212,6 @@
         tag: "MONEY"
       },
 
-      /* ===================== ID / REF (label-driven, always-on) ===================== */
-      // Fix: catch KND-0049..., RE-2026-000..., ORD-..., V-..., AB-...
-      // so phone regex never touches inner "00..." sequences.
-      id_label: {
-        pattern:
-          /((?:Antragsnummer|Kundennummer|Vorgangs-?ID|Vorgangsnummer|Rechnungsnr\.?|Rechnungsnummer|Bestellnummer|Ticketnummer|Referenz)\s*[:：=]\s*)([A-Za-z]{0,10}[A-Za-z0-9]*-?\d[\dA-Za-z\-_.]{3,80})/giu,
-        tag: "REF",
-        mode: "prefix"
-      },
-
       /* ===================== SECRET (label-driven) ===================== */
       secret: {
         pattern: /((?:Passwort|PIN|OTP|2FA|Sicherheitscode|verification\s*code|one[-\s]?time\s*code)\s*[:：=]\s*)([^\n\r]{1,120})/giu,
@@ -190,7 +221,7 @@
 
       /* ===================== ACCOUNT (label-driven) ===================== */
       account: {
-        // ✅ Fix: DO NOT allow \n inside value (it was eating line breaks => "IBAN: [Konto]BIC: [Konto]")
+        // DO NOT allow \n inside value
         pattern: /((?:Kontonummer|Account(?:\s*Number)?|IBAN|Steuer(?:\s*ID|nummer)?|USt-?IdNr\.?)\s*[:：=]\s*)([A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
@@ -198,9 +229,16 @@
 
       /* ===================== BANK / SWIFT / BIC ===================== */
       bank: {
-        // ✅ Fix: DO NOT allow \n in the grouped blocks (use [ \t]? not \s?)
+        // DO NOT allow \n in the grouped blocks
         pattern:
           /((?:IBAN|BIC|SWIFT|SWIFT\s*Code|Bank\s*(?:Account|Details))\s*[:：=]?\s*)([A-Z]{2}\d{2}(?:[ \t]?[A-Z0-9]{4}){3,7}|[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
+        tag: "ACCOUNT",
+        mode: "prefix"
+      },
+
+      blz: {
+        // Bankleitzahl: 37040044 / BLZ: 37040044
+        pattern: /((?:Bankleitzahl|BLZ)\s*[:：=]\s*)(\d{5,12})/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
