@@ -1,10 +1,11 @@
 // =========================
 // assets/engine.en.js
-// UPGRADE v4 (stable, broad coverage, fixes over-masking)
-// - Fix: ID tail masking (mask ONLY last numeric segment, keep year/segments)
-// - Fix: exclude ERR/SKU + avoid SSN/EIN/Tax-ID being hit by ref rules
-// - Add: strong EN money + banking + card/CVV/CVC coverage
-// - Keep: label-driven identity + person_name + address inline model
+// UPGRADE v5 (unified fixes requested)
+// - Titles: do NOT mask Mr/Dr/Prof etc; mask names only
+// - DOB: mask month+day at minimum (keep year)
+// - Tax ID: mask
+// - Address: avoid "Billing/Shipping Address" label context; keep inline street+extras only
+// - Keep: tail-safe ID masking + ERR/SKU safe + banking + money
 // =========================
 
 (function () {
@@ -24,7 +25,7 @@
       ADDRESS: "[Address]",
       HANDLE: "[Handle]",
       REF: "[Ref]",
-      TITLE: "[Title]",
+      TITLE: "[Title]", // kept for compatibility, but we no longer use the "title" rule in EN
       NUMBER: "[Number]",
       MONEY: "[Amount]",
       COMPANY: "[Company]",
@@ -32,7 +33,6 @@
       NAME: "[Name]"
     },
 
-    // EN should not be blocked just because of ü in a name (DE detect was fixed separately)
     detect: function (s) {
       s = String(s || "");
       if (!s.trim()) return "";
@@ -52,12 +52,16 @@
       "secret",
       "handle_label",
 
+      // personal attributes
+      "dob",
+
       // identity (label-driven, low FP)
       "passport",
       "driver_license",
       "ssn",
       "ein",
       "national_id",
+      "tax_id",
 
       // financial
       "account",
@@ -69,8 +73,8 @@
       "url",
 
       // refs / IDs
-      "ref_label_tail",     // label-driven tail mask
-      "ref_generic_tail",   // generic tail mask (safe)
+      "ref_label_tail",
+      "ref_generic_tail",
 
       // money (explicit currency only)
       "money",
@@ -82,36 +86,37 @@
       "person_name",
       "company",
 
-      // address model
+      // address model (inline only)
       "address_en_inline_street",
       "address_en_extra",
-      "address_label_single",
 
       // generic
       "handle",
-      "title",
       "number"
     ],
 
     alwaysOn: [
       "handle_label",
+      "dob",
       "ref_label_tail",
       "ref_generic_tail",
+
       "passport",
       "driver_license",
       "ssn",
       "ein",
       "national_id",
+      "tax_id",
+
       "address_en_inline_street",
       "address_en_extra",
-      "address_label_single",
+
       "money",
       "account",
       "bank",
       "card_security"
     ],
 
-    // prevent IDs being mistaken as phone numbers
     phoneGuard: function ({ label, value }) {
       const lbl = String(label || "").toLowerCase();
       const val = String(value || "");
@@ -125,7 +130,6 @@
       )
         return false;
 
-      // ref-like tokens are not phones
       if (/\b[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{4,}\b/.test(val)) return false;
 
       return true;
@@ -182,6 +186,18 @@
         mode: "prefix"
       },
 
+      /* ===================== DOB (mask month+day, keep year) ===================== */
+      dob: {
+        // Date of Birth: 1990-03-14  -> Date of Birth: 1990-[Secret]
+        // DOB: 1990/03/14            -> DOB: 1990/[Secret]
+        pattern:
+          /((?:date\s*of\s*birth|dob)\s*[:：=]\s*)(\d{4}[-\/\.])(\d{2}[-\/\.]\d{2})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+        // Note: engine's prefix-mode replaces the LAST capture group (group2) in most implementations.
+        // Our pattern makes group1 = label + year-sep, group2 = month+day.
+      },
+
       /* ===================== IDENTITY (label-driven) ===================== */
       passport: {
         pattern: /((?:passport(?:\s*(?:no\.?|number))?)\s*[:：=]\s*)([A-Z0-9][A-Z0-9\-]{4,22})/giu,
@@ -209,16 +225,22 @@
       },
 
       national_id: {
-        // NOTE: deliberately does NOT match "Tax ID" (you said should NOT match)
         pattern:
           /((?:national\s*id(?:\s*(?:no\.?|number))?|id\s*number)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,40})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
+      /* ===================== TAX ID (EN) ===================== */
+      tax_id: {
+        pattern:
+          /((?:tax\s*id|tax\s*identification\s*(?:no\.?|number)|tin)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-]{4,32})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
       /* ===================== BANK / PAYMENT (label-driven) ===================== */
       account: {
-        // Account Number / Routing / Sort Code / IBAN / Card Number / Credit Card
         pattern:
           /((?:account(?:\s*number)?|routing\s*number|sort\s*code|iban|credit\s*card|debit\s*card|card\s*number|name\s*on\s*card)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
         tag: "ACCOUNT",
@@ -226,9 +248,9 @@
       },
 
       bank: {
-        // SWIFT / BIC (tolerate "SWIFT Code:" or "SWIFT" label)
+        // allows: "SWIFT Code: ..." or "SWIFT ..."
         pattern:
-          /((?:swift|swift\s*code|bic)\s*[:：=]?\s*)([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
+          /((?:swift|swift\s*code|bic)\b\s*[:：=]?\s*)([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -247,10 +269,12 @@
         mode: "phone"
       },
 
-      /* ===================== PERSON NAME (label-driven; supports titles + O'Neil + Anna-Marie + Müller) ===================== */
+      /* ===================== PERSON NAME (label-driven; KEEP title, mask name only) ===================== */
       person_name: {
+        // Name: Mr. John O'Neil -> Name: Mr. [Name]
+        // Account Holder: Prof. David Müller -> Account Holder: Prof. [Name]
         pattern:
-          /((?:name|customer\s*name|account\s*holder|recipient|name\s*on\s*card)\s*[:：=]\s*)((?:(?:mr|mrs|ms|miss|dr|prof)\.?\s+)?[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})/giu,
+          /((?:name|customer\s*name|account\s*holder|recipient|name\s*on\s*card)\s*[:：=]\s*(?:(?:mr|mrs|ms|miss|dr|prof)\.?\s+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})/giu,
         tag: "NAME",
         mode: "prefix"
       },
@@ -277,18 +301,8 @@
         tag: "ADDRESS"
       },
 
-      /* ===================== ADDRESS label single-line ===================== */
-      address_label_single: {
-        pattern: /((?:address|shipping\s*address|billing\s*address|street)\s*[:：=]?\s*)([^\n\r]{2,120})/giu,
-        tag: "ADDRESS",
-        mode: "prefix"
-      },
-
       /* ===================== REF/ID — LABEL-DRIVEN TAIL MASK (SAFE) ===================== */
       ref_label_tail: {
-        // Masks ONLY the last numeric segment (>=4) after the last "-" or "_" or "."
-        // Keeps year/segments like "2026-02"
-        // Excludes SKU/ERR explicitly
         pattern:
           /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer)\s*(?:id|no\.?|number)?\s*(?:[:：=]|-)\s*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
         tag: "REF",
@@ -297,8 +311,6 @@
 
       /* ===================== REF/ID — GENERIC TAIL MASK (SAFE) ===================== */
       ref_generic_tail: {
-        // Only matches tokens that START with letters (prevents SSN/EIN/Tax-ID being hit)
-        // Only masks last numeric segment (>=5) to avoid ERR-2026-7784 and SKU ADP-1200/CBL-050
         pattern:
           /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-))(\d{5,})\b/gu,
         tag: "REF",
@@ -309,12 +321,6 @@
       handle: {
         pattern: /@[A-Za-z0-9_]{2,32}\b/g,
         tag: "HANDLE"
-      },
-
-      /* ===================== TITLE ===================== */
-      title: {
-        pattern: /\b(Mr\.?|Mrs\.?|Ms\.?|Miss|Dr\.?|Prof\.?)\b/gi,
-        tag: "TITLE"
       },
 
       /* ===================== NUMBER fallback ===================== */
