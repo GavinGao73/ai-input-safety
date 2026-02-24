@@ -1002,3 +1002,55 @@ function setRuleEngineManual(lang) {
 try {
   if (typeof window.setRuleEngineManual !== "function") window.setRuleEngineManual = setRuleEngineManual;
 } catch (_) {}
+
+/* =========================
+   E) BOOT SELF-CHECK (in-memory only)
+   - Detect missing packs/policy early
+   - No console logs, no storage
+   ========================= */
+(function bootSelfCheck() {
+  try {
+    const packs = window.__ENGINE_LANG_PACKS__;
+    const policy = window.__ENGINE_POLICY__;
+
+    const hasPacksObj = !!(packs && typeof packs === "object");
+    const hasPolicyObj = !!(policy && typeof policy === "object");
+
+    const need = ["zh", "en", "de"];
+    const missingPacks = [];
+
+    if (hasPacksObj) {
+      for (const k of need) {
+        const p = packs[k];
+        const ok = !!(p && typeof p === "object" && p.rules && typeof p.rules === "object");
+        if (!ok) missingPacks.push(k);
+      }
+    } else {
+      missingPacks.push(...need);
+    }
+
+    const ok = hasPolicyObj && hasPacksObj && missingPacks.length === 0;
+
+    window.__BOOT_OK = {
+      ok,
+      when: Date.now(),
+      hasPolicy: hasPolicyObj,
+      hasPacks: hasPacksObj,
+      missingPacks,
+      // helpful runtime hints
+      langUI: (typeof window.getLangUI === "function") ? window.getLangUI() : (window.currentLang || ""),
+      langContent: (typeof window.getLangContent === "function") ? window.getLangContent() : (window.ruleEngine || ""),
+      ruleEngineMode: String(window.ruleEngineMode || ""),
+      engineVersion: "v20260223-engine-a5-policy-split"
+    };
+
+    try {
+      window.dispatchEvent(new CustomEvent("boot:checked", { detail: window.__BOOT_OK }));
+    } catch (_) {}
+  } catch (_) {
+    // even in failure: keep a minimal marker
+    try {
+      window.__BOOT_OK = { ok: false, when: Date.now(), error: "bootSelfCheck_failed" };
+    } catch (_) {}
+  }
+})();
