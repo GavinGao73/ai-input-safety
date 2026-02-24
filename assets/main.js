@@ -320,6 +320,52 @@ function bind() {
   bindPdfUI();
 }
 
+/* =========================
+   E) UI: show engine boot self-check (__BOOT_OK) in exportStatus
+   - in-memory only
+   - no dependency on rules.js
+   ========================= */
+(function bootCheckUiWire() {
+  function renderBootStatus() {
+    const el = document.getElementById("exportStatus");
+    if (!el) return;
+
+    const b = window.__BOOT_OK;
+    if (!b) {
+      // no status yet
+      return;
+    }
+
+    if (b.ok) {
+      // keep minimal, avoid noise
+      // (if you want more detail later, we can expand this)
+      el.textContent = "BOOT: OK";
+      return;
+    }
+
+    const lines = [];
+    lines.push("BOOT: NOT OK");
+    lines.push("hasPolicy: " + String(!!b.hasPolicy));
+    lines.push("hasPacks: " + String(!!b.hasPacks));
+    if (Array.isArray(b.missingPacks) && b.missingPacks.length) {
+      lines.push("missing packs: " + b.missingPacks.join(", "));
+    }
+    el.textContent = lines.join("\n");
+  }
+
+  // react to event from engine.js
+  try {
+    window.addEventListener("boot:checked", function () {
+      try { renderBootStatus(); } catch (_) {}
+    });
+  } catch (_) {}
+
+  // also try once on next tick (covers cases where engine fired before listener)
+  try {
+    setTimeout(() => { try { renderBootStatus(); } catch (_) {} }, 0);
+  } catch (_) {}
+})();
+
 // ================= boot =================
 (function boot(){
   try {
