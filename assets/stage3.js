@@ -16,6 +16,8 @@ async function handleFile(file) {
   lastProbe = null;
   lastPdfOriginalText = "";
   lastPdfPagesItems = []; // ✅ reset every upload
+  try { window.lastPdfPagesItems = lastPdfPagesItems; } catch (_) {}
+  try { window.__pdf_pages_items = lastPdfPagesItems; } catch (_) {}
   lastFileKind = (file.type === "application/pdf") ? "pdf"
               : (file.type && file.type.startsWith("image/") ? "image" : "");
 
