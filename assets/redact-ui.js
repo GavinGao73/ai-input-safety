@@ -103,15 +103,37 @@
 
     ctx.drawImage(baseCanvas, 0, 0);
 
+    // ✅ High-contrast selection box (works on white PDFs)
+    // - cyan translucent fill
+    // - dark outer stroke
+    // - cyan dashed inner stroke
+    const outerW = Math.max(3, Math.round(baseCanvas.width / 520));
+    const innerW = Math.max(2, Math.round(baseCanvas.width / 780));
+
     ctx.save();
-    ctx.lineWidth = Math.max(2, Math.round(baseCanvas.width / 500));
-    ctx.strokeStyle = "rgba(255,255,255,.90)";
-    ctx.fillStyle = "rgba(255,255,255,.14)";
 
     for (const r of (rects || [])) {
-      ctx.fillRect(r.x, r.y, r.w, r.h);
-      ctx.strokeRect(r.x, r.y, r.w, r.h);
+      const x = r.x, y = r.y, w = r.w, h = r.h;
+
+      // 1) fill
+      ctx.globalAlpha = 0.12;
+      ctx.fillStyle = "#00E5FF";
+      ctx.fillRect(x, y, w, h);
+
+      // 2) outer stroke
+      ctx.globalAlpha = 0.95;
+      ctx.setLineDash([]);
+      ctx.lineWidth = outerW;
+      ctx.strokeStyle = "rgba(0,0,0,0.85)";
+      ctx.strokeRect(x, y, w, h);
+
+      // 3) inner dashed stroke
+      ctx.setLineDash([6, 4]);
+      ctx.lineWidth = innerW;
+      ctx.strokeStyle = "rgba(0,229,255,0.95)";
+      ctx.strokeRect(x + 1, y + 1, Math.max(0, w - 2), Math.max(0, h - 2));
     }
+
     ctx.restore();
   }
 
