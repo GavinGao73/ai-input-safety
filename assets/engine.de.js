@@ -45,14 +45,17 @@
     },
 
     // ✅ language-specific execution order
-    priority: [
+        priority: [
       "secret",
+      "tax_id",
+      "vat_id",
+      "id_card",
+      "passport",
       "account",
       "bank",
       "email",
       "url",
       "money",
-      "id_label",
       "phone",
       "company",
       "address_de_street",
@@ -121,6 +124,40 @@
       url: {
         pattern: /\b(?:https?:\/\/|www\.)[^\s<>"'）)\]】]+/giu,
         tag: "URL"
+      },
+
+            /* ===================== TAX / ID (DE) ===================== */
+      tax_id: {
+        // Covers:
+        // Steuer-ID: 12 345 678 901
+        // Steueridentifikationsnummer: 12345678901
+        pattern: /((?:Steuer-?ID|Steueridentifikationsnummer)\s*[:：=]\s*)(\d[\d \t]{8,20}\d)/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      vat_id: {
+        // Covers:
+        // USt-IdNr.: DE123456789
+        // Umsatzsteuer-ID: DE123456789
+        pattern: /((?:USt-?IdNr\.?|Umsatzsteuer-?ID)\s*[:：=]\s*)(DE\s?\d{8,12})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      id_card: {
+        // Covers typical Personalausweis numbers (heuristic, conservative)
+        // Personalausweis-Nr.: L01X00T47
+        pattern: /((?:Personalausweis-?(?:Nr\.?|nummer)?)\s*[:：=]\s*)([A-Z0-9]{6,18})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      passport: {
+        // Reisepass-Nr.: C01X00047
+        pattern: /((?:Reisepass-?(?:Nr\.?|nummer)?)\s*[:：=]\s*)([A-Z0-9]{6,18})/giu,
+        tag: "SECRET",
+        mode: "prefix"
       },
 
       /* ===================== MONEY (strict currency required) ===================== */
