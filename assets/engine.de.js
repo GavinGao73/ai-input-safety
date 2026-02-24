@@ -103,9 +103,11 @@
         tag: "URL"
       },
 
-      /* ===================== MONEY (explicit currency only, low FP) ===================== */
+      /* ===================== MONEY (DE/EU formats) ===================== */
       money: {
-        pattern: /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥])\s*\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?/giu,
+        // ✅ Fix: support "1.250,00 €" (number-first) AND "$1,499.00" / "USD $1,499.00" (currency-first)
+        pattern:
+          /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b\s*)?(?:[€$£¥￥]\s*)?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?\s*(?:[€$£¥￥]|\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b)?/giu,
         tag: "MONEY"
       },
 
@@ -118,14 +120,16 @@
 
       /* ===================== ACCOUNT (label-driven) ===================== */
       account: {
-        pattern: /((?:Kontonummer|Account(?:\s*Number)?|IBAN|Steuer(?:\s*ID|nummer)?|USt-?IdNr\.?)\s*[:：=]\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{6,40}\d)/giu,
+        // ✅ Fix: DO NOT allow \n inside value (it was eating line breaks => "IBAN: [Konto]BIC: [Konto]")
+        pattern: /((?:Kontonummer|Account(?:\s*Number)?|IBAN|Steuer(?:\s*ID|nummer)?|USt-?IdNr\.?)\s*[:：=]\s*)([A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
 
       /* ===================== BANK / SWIFT / BIC ===================== */
       bank: {
-        pattern: /((?:IBAN|BIC|SWIFT|SWIFT\s*Code|Bank\s*(?:Account|Details))\s*[:：=]?\s*)([A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}|[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
+        // ✅ Fix: DO NOT allow \n in the grouped blocks (use [ \t]? not \s?)
+        pattern: /((?:IBAN|BIC|SWIFT|SWIFT\s*Code|Bank\s*(?:Account|Details))\s*[:：=]?\s*)([A-Z]{2}\d{2}(?:[ \t]?[A-Z0-9]{4}){3,7}|[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
