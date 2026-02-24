@@ -13,6 +13,10 @@
 // - NO zh/en/de rules/priority/alwaysOn/formatters in engine.js
 // - ALL language-specific logic must live in packs: window.__ENGINE_LANG_PACKS__[lang]
 // - ALL non-language strategy must live in window.__ENGINE_POLICY__
+//
+// ✅ PATCHES (this file):
+// - P1: Prefix-mode replacement preserves trailing whitespace/newlines (prevents line-merge when a pack regex accidentally eats \n)
+// - P2: Placeholder protection also shields Markdown links/text: [label](url) and (mailto:...) blocks to avoid breaking markup
 // =========================
 
 console.log("[engine.js] loaded v20260223-engine-a5-policy-split");
@@ -698,14 +702,27 @@ function applyRules(text) {
     hitsByKey[key] = (hitsByKey[key] || 0) + 1;
   }
 
+  // P2: protect markdown links and placeholders from being re-masked
   function protectPlaceholders(s) {
     const map = [];
-    const re = /(【[^【】]{1,36}】|\[[^\[\]]{1,36}\])/g;
-    const t = String(s || "").replace(re, (m) => {
+    let t = String(s || "");
+
+    // (A) Markdown links: [label](url) including mailto/http(s)/www/relative
+    //     Protect as a whole to avoid breaking brackets/parentheses structure.
+    t = t.replace(/\[[^\]\n\r]{1,240}\]\([^\)\n\r]{1,800}\)/g, (m) => {
       const id = map.length;
       map.push(m);
       return `\uE000${id}\uE001`;
     });
+
+    // (B) standalone placeholders: 【...】 or [...]
+    //     (keep conservative max len, but slightly wider than before)
+    t = t.replace(/(【[^【】]{1,80}】|\[[^\[\]\n\r]{1,80}\])/g, (m) => {
+      const id = map.length;
+      map.push(m);
+      return `\uE000${id}\uE001`;
+    });
+
     return { t, map };
   }
 
@@ -781,7 +798,7 @@ function applyRules(text) {
   // manual first
   out = applyManualTermsMask(out, () => addHit("manual_term"));
 
-  // protect existing placeholders
+  // protect existing placeholders + markdown links
   const p0 = protectPlaceholders(out);
   out = p0.t;
 
@@ -800,12 +817,17 @@ function applyRules(text) {
     }
 
     out = out.replace(r.pattern, (...args) => {
-      const match = args[0] || "";
+      const match = String(args[0] || "");
 
       if (r.mode === "prefix") {
-        const label = args[1] || "";
+        // P1: preserve suffix (incl. newline/whitespace) that the regex might have consumed.
+        // This prevents "Telefon: [Telefon]Telefon (Durchwahl): ..." line merges.
+        const label = String(args[1] || "");
+        const val = String(args[2] || "");
+        const consumed = (label + val).length;
+        const suffix = consumed > 0 && consumed <= match.length ? match.slice(consumed) : "";
         addHit(key);
-        return `${label}${placeholder(r.tag)}`;
+        return `${label}${placeholder(r.tag)}${suffix}`;
       }
 
       if (r.mode === "address_cn_partial") {
