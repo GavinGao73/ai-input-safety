@@ -152,7 +152,11 @@
 
       /* ===================== PHONE (label-driven + explicit intl prefix) ===================== */
       phone: {
-        pattern: /((?:tel|telefon|handy|kontakt|phone|mobile|whatsapp|telegram|signal)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(\b(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
+      // ✅ Fixes:
+      // 1) allow optional "(...)" between label and ":"  -> "Telefon (Durchwahl): ..."
+      // 2) remove leading \b for intl numbers starting with "+" -> "+49 ..."
+      // 3) include "mobil" + "fax" labels
+        pattern: /((?:tel|telefon|handy|kontakt|phone|mobile|mobil|whatsapp|telegram|signal|fax)(?:\s*\([^)]+\))?\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|((?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d)\b/giu,
         tag: "PHONE",
         mode: "phone"
       },
