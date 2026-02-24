@@ -13,6 +13,8 @@
 //       (b) split Zusatz into its own label-driven rule (always-on, conservative)
 //       (c) label-driven address now requires address-like value (digits/street/plz keywords) to avoid eating company lines
 // - D4: priority reordered: company BEFORE address rules; inline address BEFORE label-driven address.
+// - D5: inline street rule upgraded to handle German block addresses without suffix (e.g., "Domkloster 4"),
+//       line-anchored + negative keywords to reduce warehouse/sku false positives.
 // =========================
 
 (function () {
@@ -342,18 +344,26 @@
       /* ===================== COMPANY ===================== */
       company: {
         // Named groups enable formatCompany to keep legal suffix (GmbH/AG/...)
-        pattern:
-          /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)\s+(?<legal>GmbH|AG|UG|KG|GbR|e\.K\.)\b/gu,
+        pattern: /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)\s+(?<legal>GmbH|AG|UG|KG|GbR|e\.K\.)\b/gu,
         tag: "COMPANY",
         mode: "company"
       },
 
       /* ===================== ADDRESS (inline, no label) ===================== */
       address_de_inline_street: {
-        // Examples: Musterstraße 12 | Domkloster 4 | Hauptstr. 5a | Am Ring 12-14
-        // Conservative: requires street token + house number
+        // Block-style German address line (no label):
+        // - Musterstraße 12
+        // - Domkloster 4
+        // - Am Ring 12-14
+        // - Unter den Linden 77a
+        //
+        // Conservative:
+        // - requires house number
+        // - line-anchored to reduce accidental matches
+        // - negative keywords to avoid warehouse/sku/error-code lines
+        // - only allows at most one "-" range, so "12-07-03" won't match
         pattern:
-          /\b(?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß.\- ]{1,40}\s+)(?:straße|strasse|str\.|weg|platz|allee|gasse|ring|ufer|damm|chaussee|promenade|markt|hof|kai)\s+\d{1,4}(?:\s*[A-Za-z])?(?:-\d{1,4})?\b/giu,
+          /^(?!.*\b(?:Lagerplatz|Regal|Fach|SKU|Fehlercode|ERR|Testwert|Artikel|Gutschrift|Kontonummer|Bankleitzahl)\b)(?:[A-ZÄÖÜ][\p{L}.'\-]{1,40}(?:\s+[A-ZÄÖÜ][\p{L}.'\-]{1,40}){0,3})\s+\d{1,4}(?:\s*[A-Za-z])?(?:-\d{1,4})?$/gmu,
         tag: "ADDRESS"
       },
 
