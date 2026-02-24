@@ -32,6 +32,81 @@
     return new URL(`./pdfjs/${PDFJS_VERSION}/`, window.location.href).toString();
   }
 
+  // ======================================================
+  // E) Phase beacon (UI language aligned, in-memory only)
+  // - Updates window.__RasterExportLast.phase/phase2
+  // - Also mirrors a concise line into #exportStatus if present
+  // ======================================================
+  function uiLang() {
+    const l = String(window.currentLang || "").toLowerCase();
+    return (l === "de" || l === "en" || l === "zh") ? l : "zh";
+  }
+
+  function phaseText(lang) {
+    if (lang === "de") {
+      return {
+        phase: "Phase",
+        exporting: "Export",
+        rendering: "Rendern",
+        matching: "Treffer",
+        applying: "Schwärzen",
+        done: "Fertig"
+      };
+    }
+    if (lang === "en") {
+      return {
+        phase: "Phase",
+        exporting: "Export",
+        rendering: "Rendering",
+        matching: "Matching",
+        applying: "Redacting",
+        done: "Done"
+      };
+    }
+    return {
+      phase: "阶段",
+      exporting: "导出",
+      rendering: "渲染",
+      matching: "命中",
+      applying: "遮盖",
+      done: "完成"
+    };
+  }
+
+  function setRasterPhase(phase, phase2) {
+    try {
+      const last = window.__RasterExportLast || {};
+      const next = Object.assign({}, last, { when: Date.now() });
+      if (phase != null) next.phase = String(phase);
+      if (phase2 != null) next.phase2 = String(phase2);
+      window.__RasterExportLast = next;
+    } catch (_) {}
+
+    // mirror to exportStatus (prepend one line; keep existing)
+    try {
+      const el = document.getElementById("exportStatus");
+      if (!el) return;
+      const L = phaseText(uiLang());
+      const p = (phase != null) ? String(phase) : "";
+      const p2 = (phase2 != null) ? String(phase2) : "";
+      const line = p2 ? `${L.phase}: ${p} / ${p2}` : `${L.phase}: ${p}`;
+      const prev = String(el.textContent || "");
+      if (!prev) {
+        el.textContent = line;
+      } else {
+        // avoid infinite duplication
+        if (!prev.startsWith(line)) el.textContent = line + "\n" + prev;
+      }
+    } catch (_) {}
+
+    // optional event (in case main.js wants to listen later)
+    try {
+      window.dispatchEvent(new CustomEvent("raster:phase", {
+        detail: { when: Date.now(), phase: String(phase || ""), phase2: String(phase2 || "") }
+      }));
+    } catch (_) {}
+  }
+
   // --------- Safe dynamic loaders (no logs) ----------
   async function loadPdfJsIfNeeded() {
     if (window.pdfjsLib && window.pdfjsLib.getDocument) return window.pdfjsLib;
@@ -194,6 +269,8 @@
 
     const scale = (dpi || DEFAULT_DPI) / 72;
     const pages = [];
+
+    setRasterPhase("renderPdfToCanvases", null);
 
     for (let p = 1; p <= pdf.numPages; p++) {
       const page = await pdf.getPage(p);
@@ -429,10 +506,49 @@
     return matchers;
   }
 
+  // ======================================================
+  // Mode A improvement: prefer items from stage3 probe (if exposed)
+  // - stage3.js currently caches lastPdfPagesItems in-memory.
+  // - This exporter can optionally read:
+  //   window.lastPdfPagesItems OR window.__pdf_pages_items (compat).
+  // ======================================================
+  function getCachedPagesItems() {
+    try {
+      const a = window.lastPdfPagesItems;
+      if (Array.isArray(a) && a.length) return a;
+    } catch (_) {}
+    try {
+      const b = window.__pdf_pages_items;
+      if (Array.isArray(b) && b.length) return b;
+    } catch (_) {}
+    return [];
+  }
+
+  function findCachedItemsForPage(cached, pageNumber) {
+    if (!Array.isArray(cached) || !cached.length) return null;
+    for (const p of cached) {
+      if (!p) continue;
+      const pn = Number(p.pageNumber || p.p || 0);
+      if (pn === Number(pageNumber)) {
+        const items = p.items || p.textItems || null;
+        if (Array.isArray(items)) return items;
+      }
+    }
+    return null;
+  }
+
   // --------- Text items -> rects (value-first, keep labels) ----------
-  function textItemsToRects(pdfjsLib, viewport, textContent, matchers) {
+  function textItemsToRects(pdfjsLib, viewport, textContentOrItems, matchers) {
     const Util = pdfjsLib.Util;
-    const items = (textContent && textContent.items) ? textContent.items : [];
+
+    // accept either:
+    // - textContent = { items:[...] }
+    // - items = [...]
+    const items =
+      Array.isArray(textContentOrItems) ? textContentOrItems :
+      (textContentOrItems && Array.isArray(textContentOrItems.items)) ? textContentOrItems.items :
+      [];
+
     if (!items.length || !matchers || !matchers.length) return [];
 
     // ✅ hard guard: avoid over-redacting if a rule accidentally matches huge spans
@@ -477,18 +593,35 @@
       return out;
     }
 
+    // ✅ Better bbox: derive width from it.width * scaleX when possible.
     function bboxForItem(it, key) {
-      const tx = Util.transform(viewport.transform, it.transform);
+      const tx = Util.transform(viewport.transform, it.transform || [1, 0, 0, 1, 0, 0]);
 
-      const x = tx[4];
-      const y = tx[5];
+      const x = Number(tx[4] || 0);
+      const y = Number(tx[5] || 0);
 
-      let fontH = Math.hypot(tx[2], tx[3]) || Math.hypot(tx[0], tx[1]) || 10;
+      // scale factors
+      const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
+      const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
+
+      // font height estimate
+      let fontH = sy * 1.0;
+      if (!Number.isFinite(fontH) || fontH <= 0) {
+        fontH = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
+                Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 10;
+      }
       fontH = clamp(fontH * 1.12, 6, 110);
 
       const s = String(it.str || "");
 
-      let w = Number(it.width || 0);
+      // width: prefer it.width * sx (PDF.js width is in text space units)
+      let w = 0;
+      try {
+        const iw = Number(it.width || 0);
+        if (Number.isFinite(iw) && iw > 0) w = iw * sx;
+      } catch (_) {}
+
+      // fallback if width missing
       if (!Number.isFinite(w) || w <= 0) w = Math.max(8, s.length * fontH * 0.88);
 
       const est = Math.max(10, s.length * fontH * 0.90);
@@ -882,6 +1015,8 @@
   }
 
   async function autoRedactReadablePdf({ file, lang, enabledKeys, moneyMode, dpi, manualTerms }) {
+    setRasterPhase("autoRedactReadablePdf:begin", null);
+
     const pdfjsLib = await loadPdfJsIfNeeded();
     const { pdf, pages } = await renderPdfToCanvases(file, dpi || DEFAULT_DPI);
 
@@ -906,10 +1041,29 @@
       };
     } catch (_) {}
 
+    // ✅ Prefer cached items from stage3 probe if available
+    const cached = getCachedPagesItems();
+
     for (const p of pages) {
-      const page = await pdf.getPage(p.pageNumber);
-      const textContent = await page.getTextContent();
-      const rects = textItemsToRects(pdfjsLib, p.viewport, textContent, matchers);
+      setRasterPhase("autoRedactReadablePdf:page", `p${p.pageNumber}`);
+
+      // text items source
+      let itemsOrTextContent = null;
+
+      const cachedItems = findCachedItemsForPage(cached, p.pageNumber);
+      if (cachedItems && cachedItems.length) {
+        itemsOrTextContent = cachedItems;
+      } else {
+        // fallback: query PDF.js textContent with probe-like options (stability)
+        const page = await pdf.getPage(p.pageNumber);
+        itemsOrTextContent = await page.getTextContent({
+          normalizeWhitespace: true,
+          disableCombineTextItems: false
+        });
+      }
+
+      setRasterPhase("autoRedactReadablePdf:match", `p${p.pageNumber}`);
+      const rects = textItemsToRects(pdfjsLib, p.viewport, itemsOrTextContent, matchers);
 
       // ---- per-page debug snapshot (safe, in-memory only) ----
       try {
@@ -918,10 +1072,15 @@
 
         const rectCount = Array.isArray(rects) ? rects.length : 0;
 
+        const itemCount =
+          Array.isArray(itemsOrTextContent) ? itemsOrTextContent.length :
+          (itemsOrTextContent && Array.isArray(itemsOrTextContent.items)) ? itemsOrTextContent.items.length :
+          0;
+
         window.__RasterExportLast = Object.assign({}, last, {
           perPage: prevPerPage.concat([{
             pageNumber: p.pageNumber,
-            items: (textContent && textContent.items) ? textContent.items.length : 0,
+            items: itemCount,
             rectCount,
             rects: (Array.isArray(rects) ? rects.slice(0, 5) : [])
           }]),
@@ -929,9 +1088,11 @@
         });
       } catch (_) {}
 
+      setRasterPhase("autoRedactReadablePdf:apply", `p${p.pageNumber}`);
       drawRedactionsOnCanvas(p.canvas, rects);
     }
 
+    setRasterPhase("autoRedactReadablePdf:done", null);
     return pages;
   }
 
@@ -965,6 +1126,8 @@
   }
 
   async function exportCanvasesToPdf(pages, dpi, filename) {
+    setRasterPhase("exportCanvasesToPdf:begin", null);
+
     const PDFLib = await loadPdfLibIfNeeded();
     const { PDFDocument } = PDFLib;
 
@@ -987,9 +1150,13 @@
       page.drawImage(png, { x: 0, y: 0, width: pageWpt, height: pageHpt });
     }
 
+    setRasterPhase("exportCanvasesToPdf:save", null);
+
     const pdfBytes = await doc.save({ useObjectStreams: true });
     const blob = new Blob([pdfBytes], { type: "application/pdf" });
     downloadBlob(blob, filename || `raster_secure_${Date.now()}.pdf`);
+
+    setRasterPhase("exportCanvasesToPdf:done", null);
   }
 
   // ======================================================
@@ -1022,6 +1189,8 @@
         };
       } catch (_) {}
 
+      setRasterPhase("exportReadable:begin", null);
+
       const pages = await autoRedactReadablePdf({
         file,
         lang,
@@ -1044,7 +1213,9 @@
         });
       } catch (_) {}
 
+      setRasterPhase("exportReadable:export", null);
       await exportCanvasesToPdf(pages, dpi, name);
+      setRasterPhase("exportReadable:done", null);
     },
 
     async exportRasterSecurePdfFromVisual(result) {
@@ -1073,6 +1244,8 @@
         };
       } catch (_) {}
 
+      setRasterPhase("exportVisual:apply", null);
+
       const rectsByPage = (result && result.rectsByPage) ? result.rectsByPage : {};
       for (const p of pages) {
         const pn = p && p.pageNumber ? p.pageNumber : 1;
@@ -1081,7 +1254,9 @@
       }
 
       const name = (result && result.filename) ? result.filename : `raster_secure_${Date.now()}.pdf`;
+      setRasterPhase("exportVisual:export", null);
       await exportCanvasesToPdf(pages, dpi, name);
+      setRasterPhase("exportVisual:done", null);
     },
 
     renderPdfToCanvases,
@@ -1103,4 +1278,3 @@
 
   window.RasterExport = RasterExport;
 })();
-
