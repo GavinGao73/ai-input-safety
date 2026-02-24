@@ -5,10 +5,14 @@
 // - high-sensitivity German document model
 //
 // PATCH (this file):
-// - D1: person_name now swallows optional titles (Frau/Herr/Dr./Prof.) inside labeled name fields,
-//       preventing "Name: [Name]: [Anrede] Li Na" style split-masking.
-// - D2: address_de_street label set expanded to include Rechnungsadresse/Lieferadresse/Zusatz (common form fields)
-// - D3: detect keywords expanded accordingly
+// - D1: person_name swallows optional titles (Frau/Herr/Dr./Prof.) in labeled name fields,
+//       preventing split-masking like "Name: [Name]: [Anrede] Li Na".
+// - D2: company rule upgraded with named groups (?<name>, ?<legal>) so output keeps legal form (GmbH/AG/...).
+// - D3: address model fixed for real German address blocks:
+//       (a) add inline address lines (street+houseNo, PLZ+city) even without labels
+//       (b) split Zusatz into its own label-driven rule (always-on, conservative)
+//       (c) label-driven address now requires address-like value (digits/street/plz keywords) to avoid eating company lines
+// - D4: priority reordered: company BEFORE address rules; inline address BEFORE label-driven address.
 // =========================
 
 (function () {
@@ -43,7 +47,7 @@
       if (/[äöüÄÖÜß]/.test(s)) return "de";
 
       if (
-        /\b(Straße|Strasse|PLZ|Postleitzahl|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Geburtsdatum|USt-IdNr)\b/i.test(
+        /\b(Straße|Strasse|PLZ|Postleitzahl|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Zusatz|Geburtsdatum|Geburtsort|USt-IdNr)\b/i.test(
           s
         )
       )
@@ -92,11 +96,18 @@
       // person names (STRICT label-driven)
       "person_name",
 
-      // location / address
-      "address_de_street",
-
-      // organization
+      // ✅ organization BEFORE address (prevents company line being treated as address context)
       "company",
+
+      // ✅ address lines WITHOUT labels (common in forms: block-style addresses)
+      "address_de_inline_street",
+      "address_de_inline_plz_city",
+
+      // ✅ label-driven extras (conservative: Gebäude/OG/Zimmer...)
+      "address_de_extra",
+
+      // label-driven address (requires address-like value)
+      "address_de_street",
 
       // generic
       "handle",
@@ -132,6 +143,12 @@
       "phone",
 
       "person_name",
+
+      // ✅ keep company + addresses always-on for conservative German policy
+      "company",
+      "address_de_inline_street",
+      "address_de_inline_plz_city",
+      "address_de_extra",
       "address_de_street"
     ],
 
@@ -315,27 +332,52 @@
       person_name: {
         // covers: Name:, Kontakt:, Ansprechpartner:, Empfänger:
         // - swallows optional titles to prevent split: "Frau Li Na" => [Name]
-        // - also supports apostrophes/hyphens (O'Neil, Müller-Lüdenscheidt)
+        // - supports apostrophes/hyphens (O'Neil, Müller-Lüdenscheidt)
         pattern:
           /((?:Name|Kontakt|Ansprechpartner|Empfänger)\s*[:：=]\s*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)\s+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
         tag: "NAME",
         mode: "prefix"
       },
 
-      /* ===================== ADDRESS (label-driven) ===================== */
-      address_de_street: {
-        // expanded labels: Rechnungsadresse / Lieferadresse / Zusatz (common form fields)
+      /* ===================== COMPANY ===================== */
+      company: {
+        // Named groups enable formatCompany to keep legal suffix (GmbH/AG/...)
         pattern:
-          /((?:Adresse|Anschrift|Straße|Strasse|PLZ|Postleitzahl|Rechnungsadresse|Lieferadresse|Zusatz)\s*[:：=]\s*)([^\n\r]{4,140})/giu,
+          /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)\s+(?<legal>GmbH|AG|UG|KG|GbR|e\.K\.)\b/gu,
+        tag: "COMPANY",
+        mode: "company"
+      },
+
+      /* ===================== ADDRESS (inline, no label) ===================== */
+      address_de_inline_street: {
+        // Examples: Musterstraße 12 | Domkloster 4 | Hauptstr. 5a | Am Ring 12-14
+        // Conservative: requires street token + house number
+        pattern:
+          /\b(?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß.\- ]{1,40}\s+)(?:straße|strasse|str\.|weg|platz|allee|gasse|ring|ufer|damm|chaussee|promenade|markt|hof|kai)\s+\d{1,4}(?:\s*[A-Za-z])?(?:-\d{1,4})?\b/giu,
+        tag: "ADDRESS"
+      },
+
+      address_de_inline_plz_city: {
+        // Examples: 50667 Köln | 50667 Köln (NRW) | 10115 Berlin
+        pattern: /\b\d{5}\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß.\- ]{1,50}(?:\s*\([A-Z]{2,4}\))?\b/gu,
+        tag: "ADDRESS"
+      },
+
+      /* ===================== ADDRESS (label-driven extras) ===================== */
+      address_de_extra: {
+        // Zusatz: Gebäude A, 3. OG, Zimmer 3.12  (intentionally conservative)
+        pattern: /((?:Zusatz)\s*[:：=]\s*)([^\n\r]{2,140})/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
 
-      /* ===================== COMPANY ===================== */
-      company: {
-        pattern: /\b([A-Za-z][A-Za-z0-9&.\- ]{1,60})\s+(GmbH|AG|UG|KG|GbR|e\.K\.)\b/g,
-        tag: "COMPANY",
-        mode: "company"
+      /* ===================== ADDRESS (label-driven, requires address-like value) ===================== */
+      address_de_street: {
+        // Avoid eating company lines: value must look address-like (contains digits, PLZ, or street keywords)
+        pattern:
+          /((?:Adresse|Anschrift|Straße|Strasse|PLZ|Postleitzahl|Rechnungsadresse|Lieferadresse)\s*[:：=]\s*)((?=[^\n\r]{4,140}$)(?=[^\n\r]{0,140}(?:\d{5}\b|\d{1,4}\s*[A-Za-z]?\b|straße\b|strasse\b|str\.\b|weg\b|platz\b|allee\b|gasse\b|ring\b|ufer\b|damm\b|chaussee\b|promenade\b|markt\b|hof\b|kai\b))[^\n\r]{4,140})/giu,
+        tag: "ADDRESS",
+        mode: "prefix"
       },
 
       /* ===================== HANDLE ===================== */
