@@ -9,6 +9,72 @@
 // ✅ Export Mode A uses langContent (rule language) rather than UI lang
 // =========================
 
+/* =========================
+   E) Export progress mirror (UI language aligned)
+   - show RasterExport phases in exportStatus
+   - keep BOOT line without overwriting progress
+   ========================= */
+function i18nProgressLine(phase, t) {
+  const map = {
+    "exportRasterSecurePdfFromReadablePdf:begin": t.progressPhaseBegin || "开始准备…",
+    "autoRedactReadablePdf": t.progressPhaseScan || "扫描并计算遮盖区域…",
+    "exportRasterSecurePdfFromReadablePdf:export": t.progressPhaseExport || "生成安全PDF（纯图片）…",
+    "exportRasterSecurePdfFromVisual": t.progressPhaseExport || "生成安全PDF（纯图片）…"
+  };
+  return map[phase] || (t.progressPhaseWorking || "处理中…");
+}
+
+function renderExportStatusCombined() {
+  const el = document.getElementById("exportStatus");
+  if (!el) return;
+
+  const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
+  const s = window.__RasterExportLast || null;
+  const bootLine = window.__bootLine || "";
+
+  // If nothing to show, keep existing
+  if (!bootLine && !s) return;
+
+  const lines = [];
+  if (bootLine) lines.push(bootLine);
+
+  if (s) {
+    if (s.phase) lines.push(`${i18nProgressLine(s.phase, t)}  (${s.phase})`);
+    if (s.phase2) lines.push(`${t.progressPhase2 || "阶段2"}: ${s.phase2}`);
+
+    if (s.lang) lines.push(`lang=${s.lang}`);
+    if (s.dpi) lines.push(`dpi=${s.dpi}`);
+
+    if (typeof s.pages === "number") lines.push(`${t.progressPages || "页数"}=${s.pages}`);
+    if (typeof s.rectsTotal === "number") lines.push(`${t.progressRects || "遮盖块"}=${s.rectsTotal}`);
+
+    if (Array.isArray(s.perPage) && s.perPage.length) {
+      const last = s.perPage[s.perPage.length - 1];
+      if (last && last.pageNumber) {
+        lines.push(
+          `${t.progressPage || "当前页"}=${last.pageNumber}  items=${last.items || 0}  rects=${last.rectCount || 0}`
+        );
+      }
+    }
+  }
+
+  el.textContent = lines.join("\n");
+}
+
+function startExportStatusMirror() {
+  if (window.__exportStatusTimer) clearInterval(window.__exportStatusTimer);
+  window.__exportStatusTimer = setInterval(() => {
+    try { renderExportStatusCombined(); } catch (_) {}
+  }, 120);
+}
+
+function stopExportStatusMirror() {
+  if (window.__exportStatusTimer) {
+    clearInterval(window.__exportStatusTimer);
+    window.__exportStatusTimer = null;
+  }
+}
+
 // ================= bind =================
 function bind() {
   document.querySelectorAll(".lang button").forEach(b => {
@@ -35,6 +101,9 @@ function bind() {
       if (ta) renderInputOverlayForPdf(ta.value || "");
 
       requestAnimationFrame(syncManualRiskHeights);
+
+      // refresh export status language (same UI lang)
+      try { renderExportStatusCombined(); } catch (_) {}
     };
   });
 
@@ -140,6 +209,12 @@ function bind() {
         }
       } catch (_) {}
 
+      // also clear export status UI (but keep boot line)
+      try {
+        window.__RasterExportLast = null;
+        renderExportStatusCombined();
+      } catch (_) {}
+
       window.dispatchEvent(new Event("safe:updated"));
     };
   }
@@ -222,10 +297,16 @@ function bind() {
 
       const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
 
+      // ✅ start mirroring when user clicks export
+      try { startExportStatusMirror(); } catch (_) {}
+
       try {
         const f = lastUploadedFile;
 
-        if (!f) { setProgressText(t.progressNoFile || "未检测到文件，请先上传 PDF。", true); return; }
+        if (!f) {
+          setProgressText(t.progressNoFile || "未检测到文件，请先上传 PDF。", true);
+          return;
+        }
 
         if (lastStage3Mode === "B") {
           let res = __manualRedactResult || null;
@@ -265,7 +346,10 @@ function bind() {
           return;
         }
 
-        if (lastFileKind !== "pdf") { setProgressText(t.progressNotPdf || "当前不是 PDF 文件。", true); return; }
+        if (lastFileKind !== "pdf") {
+          setProgressText(t.progressNotPdf || "当前不是 PDF 文件。", true);
+          return;
+        }
         if (!lastProbe || !lastProbe.hasTextLayer) {
           setProgressText(t.progressNotReadable || "PDF 不可读（Mode B），请先手工涂抹并保存框选，然后再点红删PDF。", true);
           return;
@@ -313,6 +397,11 @@ function bind() {
         const t2 = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
         setProgressText(`${t2.progressFailed || "导出失败："}\n${msg}`, true);
         requestAnimationFrame(syncManualRiskHeights);
+      } finally {
+        // ✅ stop mirror after completion/failure/early return
+        try { stopExportStatusMirror(); } catch (_) {}
+        // render once at end
+        try { renderExportStatusCombined(); } catch (_) {}
       }
     };
   }
@@ -321,48 +410,47 @@ function bind() {
 }
 
 /* =========================
-   E) UI: show engine boot self-check (__BOOT_OK) in exportStatus
-   - in-memory only
-   - no dependency on rules.js
+   E) UI: show engine boot self-check (__BOOT_OK) as a single cached line
+   - does NOT overwrite export progress
    ========================= */
 (function bootCheckUiWire() {
-  function renderBootStatus() {
-    const el = document.getElementById("exportStatus");
-    if (!el) return;
-
+  function updateBootLine() {
     const b = window.__BOOT_OK;
-    if (!b) {
-      // no status yet
-      return;
-    }
+    if (!b) return;
 
     if (b.ok) {
-      // keep minimal, avoid noise
-      // (if you want more detail later, we can expand this)
-      el.textContent = "BOOT: OK";
+      window.__bootLine = "BOOT: OK";
       return;
     }
 
-    const lines = [];
-    lines.push("BOOT: NOT OK");
-    lines.push("hasPolicy: " + String(!!b.hasPolicy));
-    lines.push("hasPacks: " + String(!!b.hasPacks));
+    const parts = [];
+    parts.push("BOOT: NOT OK");
+    parts.push("hasPolicy=" + String(!!b.hasPolicy));
+    parts.push("hasPacks=" + String(!!b.hasPacks));
     if (Array.isArray(b.missingPacks) && b.missingPacks.length) {
-      lines.push("missing packs: " + b.missingPacks.join(", "));
+      parts.push("missing=" + b.missingPacks.join(","));
     }
-    el.textContent = lines.join("\n");
+    window.__bootLine = parts.join(" | ");
+  }
+
+  function rerender() {
+    try { renderExportStatusCombined(); } catch (_) {}
   }
 
   // react to event from engine.js
   try {
     window.addEventListener("boot:checked", function () {
-      try { renderBootStatus(); } catch (_) {}
+      try { updateBootLine(); } catch (_) {}
+      try { rerender(); } catch (_) {}
     });
   } catch (_) {}
 
   // also try once on next tick (covers cases where engine fired before listener)
   try {
-    setTimeout(() => { try { renderBootStatus(); } catch (_) {} }, 0);
+    setTimeout(() => {
+      try { updateBootLine(); } catch (_) {}
+      try { rerender(); } catch (_) {}
+    }, 0);
   } catch (_) {}
 })();
 
