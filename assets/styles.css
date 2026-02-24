@@ -897,3 +897,10 @@ textarea{
   z-index: 2 !important;
 }
 
+.mid-filter *{
+  box-shadow: none !important;
+  background-image: none !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+  filter: none !important;
+}
