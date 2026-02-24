@@ -64,12 +64,26 @@
     // ✅ language-specific always-on
     alwaysOn: ["address_de_street"],
 
-    // ✅ phone FP guard (de): prevent ref-like IDs being masked
-    phoneGuard: function ({ label, value, match }) {
-      const digits = String(value || "").replace(/\D+/g, "");
-      if (digits.length >= 16) return false;
-      return true;
-    },
+    // ✅ phone FP guard (de): prevent ref/order/invoice/customer IDs being masked as phone
+  phoneGuard: function ({ label, value, match }) {
+  const lbl = String(label || "").toLowerCase();
+  const val = String(value || "");
+
+  // 1) Strong ID prefixes -> NOT phone
+  // Covers: KND-xxxx, RE-2026-xxxx, ORD-..., AB-..., V-...
+  if (/\b(?:knd|re|ord|ab|ref|v)\s*[-:]\s*/i.test(val)) return false;
+
+  // 2) Label indicates ID/reference/invoice -> NOT phone
+  if (/\b(?:kundennummer|rechnungsnr|rechnungsnummer|bestellnummer|vorgangs-?id|antragsnummer|referenz|ticketnummer)\b/i.test(lbl)) {
+    return false;
+  }
+
+  // 3) Hard digit-length guard (keep your old rule)
+  const digits = val.replace(/\D+/g, "");
+  if (digits.length >= 16) return false;
+
+  return true;
+},
 
     // ✅ company formatting (de): conservative
     // Signature aligned with core call-site: ({ raw, name, legal, punct, coreStr, placeholder })
