@@ -5,6 +5,9 @@
 // ✅ Mode B (image / unreadable): keep auto (no lock)
 // =========================
 
+// ✅ NEW: keep raw per-page text items (for Mode A export rect mapping later)
+let lastPdfPagesItems = [];
+
 // ================= Stage 3 file handler =================
 async function handleFile(file) {
   if (!file) return;
@@ -12,6 +15,7 @@ async function handleFile(file) {
   lastUploadedFile = file;
   lastProbe = null;
   lastPdfOriginalText = "";
+  lastPdfPagesItems = []; // ✅ reset every upload
   lastFileKind = (file.type === "application/pdf") ? "pdf"
               : (file.type && file.type.startsWith("image/") ? "image" : "");
 
@@ -62,6 +66,13 @@ async function handleFile(file) {
 
     const probe = await window.probePdfTextLayer(file);
     lastProbe = probe || null;
+
+    // ✅ NEW: cache raw per-page items (even if unreadable, it'll be [])
+    try {
+      lastPdfPagesItems = (probe && Array.isArray(probe.pagesItems)) ? probe.pagesItems : [];
+    } catch (_) {
+      lastPdfPagesItems = [];
+    }
 
     if (!probe || !probe.hasTextLayer) {
       lastRunMeta.fromPdf = false;
