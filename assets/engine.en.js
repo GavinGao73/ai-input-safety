@@ -1,6 +1,6 @@
 // =========================
 // assets/engine.en.js
-// UPGRADE v5.1 (fix: name not masked + DOB grouping + address overmask + phone ID trap)
+// UPGRADE v5.2 (fix: name cross-line + address "ONLY" FP + phone ID trap)
 // =========================
 
 (function () {
@@ -20,7 +20,7 @@
       ADDRESS: "[Address]",
       HANDLE: "[Handle]",
       REF: "[Ref]",
-      TITLE: "[Title]", // kept for compatibility, but we no longer use the "title" rule in EN
+      TITLE: "[Title]",
       NUMBER: "[Number]",
       MONEY: "[Amount]",
       COMPANY: "[Company]",
@@ -43,14 +43,11 @@
     },
 
     priority: [
-      // secrets / auth first
       "secret",
       "handle_label",
 
-      // personal attributes
       "dob",
 
-      // identity (label-driven, low FP)
       "passport",
       "driver_license",
       "ssn",
@@ -58,34 +55,26 @@
       "national_id",
       "tax_id",
 
-      // financial
       "account",
       "bank",
-      "card_security", // CVV/CVC
+      "card_security",
 
-      // comms
       "email",
       "url",
 
-      // refs / IDs
       "ref_label_tail",
       "ref_generic_tail",
 
-      // money (explicit currency only)
       "money",
 
-      // phone AFTER refs/ids to reduce mis-hits
       "phone",
 
-      // person / org
       "person_name",
       "company",
 
-      // address model (inline only)
       "address_en_inline_street",
       "address_en_extra",
 
-      // generic
       "handle",
       "number"
     ],
@@ -103,7 +92,7 @@
       "national_id",
       "tax_id",
 
-      // ✅ ensure names are always masked
+      // ensure names always run
       "person_name",
 
       "address_en_inline_street",
@@ -120,20 +109,16 @@
       const val = String(value || "");
       const digits = val.replace(/\D+/g, "");
 
-      // long numeric IDs are not phones (also avoids card-like sequences)
       if (digits.length >= 16) return false;
 
-      // labels that are clearly IDs, not phones
       if (
         /\b(?:case|ticket|order|invoice|reference|ref|customer|application|request|account)\b/.test(lbl) &&
         /\b(?:id|no|number|#)\b/.test(lbl)
       )
         return false;
 
-      // ✅ hard-block: common ID prefixes should never be treated as phone (even in free text)
       if (/\b(?:CUST|CASE|ORD|INV|APP|REF|ACC|MEM|INS)-/i.test(val)) return false;
 
-      // common ID-ish shapes should not be treated as phones
       if (/\b[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{4,}\b/i.test(val)) return false;
 
       return true;
@@ -156,26 +141,22 @@
     },
 
     rules: {
-      /* ===================== EMAIL ===================== */
       email: {
         pattern: /\b[A-Z0-9._%+-]+\s*@\s*[A-Z0-9.-]+\s*\.\s*[A-Z]{2,}\b/gi,
         tag: "EMAIL"
       },
 
-      /* ===================== URL ===================== */
       url: {
         pattern: /\b(?:https?:\/\/|www\.)[^\s<>"'）)\]】]+/giu,
         tag: "URL"
       },
 
-      /* ===================== MONEY (explicit currency only) ===================== */
       money: {
         pattern:
           /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b\s*\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?\s*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥]\s*\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?)/giu,
         tag: "MONEY"
       },
 
-      /* ===================== SECRET (label-driven; full value) ===================== */
       secret: {
         pattern:
           /((?:password|passcode|pin|otp|2fa|verification\s*code|security\s*code|one[-\s]?time\s*code)\s*[:：=]\s*)([^\n\r]{1,120})/giu,
@@ -183,25 +164,19 @@
         mode: "prefix"
       },
 
-      /* ===================== HANDLE (label-driven) ===================== */
       handle_label: {
         pattern: /((?:username|user\s*id|login\s*id|login|account\s*id|handle)\s*(?:[:：=]|-)\s*)([A-Za-z0-9_@.\-]{3,80})/giu,
         tag: "HANDLE",
         mode: "prefix"
       },
 
-      /* ===================== DOB (mask month+day, keep year) ===================== */
+      // DOB: keep year, mask MM-DD (2 groups only, stable with prefix mode)
       dob: {
-        // Date of Birth: 1990-03-14  -> Date of Birth: 1990-[Secret]
-        // DOB: 1990/03/14            -> DOB: 1990/[Secret]
-        // ✅ IMPORTANT: only TWO capture groups (engine prefix-mode replaces group2)
-        pattern:
-          /((?:date\s*of\s*birth|dob)\s*[:：=]\s*\d{4}[-\/\.])(\d{2}[-\/\.]\d{2})/giu,
+        pattern: /((?:date\s*of\s*birth|dob)\s*[:：=]\s*\d{4}[-\/\.])(\d{2}[-\/\.]\d{2})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
-      /* ===================== IDENTITY (label-driven) ===================== */
       passport: {
         pattern: /((?:passport(?:\s*(?:no\.?|number))?)\s*[:：=]\s*)([A-Z0-9][A-Z0-9\-]{4,22})/giu,
         tag: "SECRET",
@@ -234,7 +209,6 @@
         mode: "prefix"
       },
 
-      /* ===================== TAX ID (EN) ===================== */
       tax_id: {
         pattern:
           /((?:tax\s*id|tax\s*identification\s*(?:no\.?|number)|tin)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-]{4,32})/giu,
@@ -242,7 +216,6 @@
         mode: "prefix"
       },
 
-      /* ===================== BANK / PAYMENT (label-driven) ===================== */
       account: {
         pattern:
           /((?:account(?:\s*number)?|routing\s*number|sort\s*code|iban|credit\s*card|debit\s*card|card\s*number|name\s*on\s*card)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
@@ -251,7 +224,6 @@
       },
 
       bank: {
-        // allows: "SWIFT Code: ..." or "SWIFT ..."
         pattern:
           /((?:swift|swift\s*code|bic)\b\s*[:：=]?\s*)([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
         tag: "ACCOUNT",
@@ -264,23 +236,22 @@
         mode: "prefix"
       },
 
-      /* ===================== PHONE ===================== */
+      // ✅ phone: add boundary so it won't match inside ID tokens like CUST-...
       phone: {
         pattern:
-          /((?:phone|mobile|contact|tel|whatsapp|telegram|signal|fax)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(\b(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
+          /((?:phone|mobile|contact|tel|whatsapp|telegram|signal|fax)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(?<![A-Za-z0-9_-])(\b(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
         tag: "PHONE",
         mode: "phone"
       },
 
-      /* ===================== PERSON NAME (label-driven; KEEP title, mask name only) ===================== */
+      // ✅ name: line-anchored, NO \s that can eat newlines (prevents cross-line field mixing)
       person_name: {
         pattern:
-          /((?:name|customer\s*name|account\s*holder|recipient|name\s*on\s*card)\s*[:：=]\s*(?:(?:mr|mrs|ms|miss|dr|prof)\.?\s+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})/giu,
+          /^((?:name|customer\s*name|account\s*holder|recipient|name\s*on\s*card)[ \t]*[:：=][ \t]*(?:(?:mr|mrs|ms|miss|dr|prof)\.?\s+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
 
-      /* ===================== COMPANY ===================== */
       company: {
         pattern:
           /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)\s+(?<legal>LLC|L\.?L\.?C\.?|Ltd\.?|Limited|Inc\.?|Incorporated|Corp\.?|Corporation|PLC|LLP|Co\.?|Company)\b/giu,
@@ -288,23 +259,19 @@
         mode: "company"
       },
 
-      /* ===================== ADDRESS inline (street+number ONLY) ===================== */
       address_en_inline_street: {
         pattern:
           /\b\d{1,5}[A-Za-z]?(?:-\d{1,5})?\s+(?:[A-Za-z0-9.'’\-]+\s+){0,6}(?:street|st\.?|avenue|ave\.?|road|rd\.?|boulevard|blvd\.?|lane|ln\.?|drive|dr\.?|way|parkway|pkwy\.?|court|ct\.?|place|pl\.?|square|sq\.?|highway|hwy\.?|terrace|ter\.?|crescent|cres\.?|close|cl\.?|gardens?|gdns?\.?|mews|row|alley|aly\.?)\b/giu,
         tag: "ADDRESS"
       },
 
-      /* ===================== ADDRESS extras (apt/unit/suite/floor/room ONLY) ===================== */
+      // ✅ extras: value MUST contain a digit (prevents "room ONLY" etc.)
       address_en_extra: {
-        // ✅ FIX: require whitespace or "#" between keyword and value
-        // prevents: United -> (unit + ed), flip -> (fl + ip)
         pattern:
-          /\b(?:apt|apartment|unit|suite|ste\.?|floor|fl\.?|room|rm\.?|building|bldg\.?|dept|department)\b(?:\s+#?\s*|#\s*)([A-Za-z0-9.\-]{1,12})\b/giu,
+          /\b(?:apt|apartment|unit|suite|ste\.?|floor|fl\.?|room|rm\.?|building|bldg\.?|dept|department)\b(?:\s+#?\s*|#\s*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu,
         tag: "ADDRESS"
       },
 
-      /* ===================== REF/ID — LABEL-DRIVEN TAIL MASK (SAFE) ===================== */
       ref_label_tail: {
         pattern:
           /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer)\s*(?:id|no\.?|number)?\s*(?:[:：=]|-)\s*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
@@ -312,21 +279,17 @@
         mode: "prefix"
       },
 
-      /* ===================== REF/ID — GENERIC TAIL MASK (SAFE) ===================== */
       ref_generic_tail: {
-        pattern:
-          /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-))(\d{5,})\b/gu,
+        pattern: /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-))(\d{5,})\b/gu,
         tag: "REF",
         mode: "prefix"
       },
 
-      /* ===================== HANDLE (generic) ===================== */
       handle: {
         pattern: /@[A-Za-z0-9_]{2,32}\b/g,
         tag: "HANDLE"
       },
 
-      /* ===================== NUMBER fallback ===================== */
       number: {
         pattern: /\b\d[\d\s-]{6,28}\d\b/g,
         tag: "NUMBER"
