@@ -381,3 +381,116 @@ function bind() {
     console.error("[boot] failed:", e);
   }
 })();
+
+// =========================
+// Shadow debug (no DevTools)
+// Toggle: press "D" (shift optional)
+// - outlines fixed/sticky layers
+// - can hide common gradient overlays
+// - dumps topmost element at screen bottom center
+// =========================
+(function shadowDebugBoot(){
+  try{
+    let on = false;
+
+    function markAll(){
+      const els = Array.from(document.querySelectorAll("*"));
+      for(const el of els){
+        const cs = getComputedStyle(el);
+        const pos = cs.position;
+
+        // mark only suspicious layers
+        if(pos === "fixed" || pos === "sticky"){
+          el.dataset.__dbg_shadow = "1";
+          el.style.outline = "2px solid rgba(255,0,0,.7)";
+          el.style.outlineOffset = "-2px";
+        }
+      }
+    }
+
+    function unmarkAll(){
+      const els = Array.from(document.querySelectorAll("[data-__dbg_shadow]"));
+      for(const el of els){
+        delete el.dataset.__dbg_shadow;
+        el.style.outline = "";
+        el.style.outlineOffset = "";
+      }
+    }
+
+    // hide common overlay patterns (gradient masks, pseudo overlays simulated by elements)
+    function hideOverlaysYes(){
+      const els = Array.from(document.querySelectorAll("*"));
+      for(const el of els){
+        const cs = getComputedStyle(el);
+
+        const bg = cs.backgroundImage || "";
+        const hasGrad = bg.includes("gradient");
+        const hasMask = (cs.maskImage && cs.maskImage !== "none") || (cs.webkitMaskImage && cs.webkitMaskImage !== "none");
+        const hasShadow = cs.boxShadow && cs.boxShadow !== "none";
+        const opaque = parseFloat(cs.opacity || "1") < 1;
+
+        // only target likely overlay layers
+        if(hasGrad || hasMask || (hasShadow && (cs.position==="fixed"||cs.position==="sticky")) || opaque){
+          el.dataset.__dbg_overlay = "1";
+          el.style.backgroundImage = "none";
+          el.style.webkitMaskImage = "none";
+          el.style.maskImage = "none";
+          el.style.boxShadow = "none";
+        }
+      }
+    }
+
+    function hideOverlaysNo(){
+      const els = Array.from(document.querySelectorAll("[data-__dbg_overlay]"));
+      for(const el of els){
+        delete el.dataset.__dbg_overlay;
+        el.style.backgroundImage = "";
+        el.style.webkitMaskImage = "";
+        el.style.maskImage = "";
+        el.style.boxShadow = "";
+      }
+    }
+
+    function probeBottomTop(){
+      // bottom-center point
+      const x = Math.floor(window.innerWidth / 2);
+      const y = Math.floor(window.innerHeight - 8);
+      const el = document.elementFromPoint(x, y);
+      const name = el ? (el.tagName.toLowerCase() + (el.id ? ("#" + el.id) : "") + (el.className ? ("." + String(el.className).trim().replace(/\s+/g,".")) : "")) : "(none)";
+
+      // show in your existing progress area if possible
+      const host = document.getElementById("exportStatus") || document.getElementById("riskBox");
+      if(host){
+        const prev = host.textContent || "";
+        host.textContent = `ShadowDebug: bottom-top = ${name}\n` + prev;
+      }else{
+        alert("ShadowDebug: bottom-top = " + name);
+      }
+    }
+
+    function apply(){
+      if(on){
+        markAll();
+        hideOverlaysYes();
+        probeBottomTop();
+      }else{
+        unmarkAll();
+        hideOverlaysNo();
+      }
+    }
+
+    window.addEventListener("keydown", (e)=>{
+      // press D to toggle
+      if(String(e.key||"").toLowerCase() !== "d") return;
+      on = !on;
+      apply();
+    });
+
+    // expose manual trigger
+    window.__shadowDebug = {
+      on(){ on=true; apply(); },
+      off(){ on=false; apply(); },
+      probe: probeBottomTop
+    };
+  }catch(_){}
+})();
