@@ -40,14 +40,18 @@
       s = String(s || "");
       if (!s.trim()) return "";
 
-      if (/[äöüÄÖÜß]/.test(s)) return "de";
-
+      // ✅ 不再因为一个 ü/ä/ö/ß 就直接判定德语
+      // 只有出现“明显德语关键词”才判定为 de
       if (
-        /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Zusatz|Geburtsdatum|Geburtsort|USt-IdNr)\b/i.test(
-          s
-        )
+      /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Zusatz|Geburtsdatum|Geburtsort|USt-IdNr)\b/i.test(
+      s
       )
-        return "de";
+    )
+      return "de";
+
+      // ✅ 兜底：如果德语字符很多（比如整段德语），也判 de（避免误判）
+      const umlauts = (s.match(/[äöüÄÖÜß]/g) || []).length;
+      if (umlauts >= 3) return "de";
 
       return "";
     },
