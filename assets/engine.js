@@ -16,7 +16,7 @@
 //
 // ✅ PATCHES (this file):
 // - P1: Prefix-mode replacement preserves trailing whitespace/newlines (prevents line-merge when a pack regex accidentally eats \n)
-// - P2: Placeholder protection also shields Markdown links/text: [label](url) and (mailto:...) blocks to avoid breaking markup
+// - P2: Placeholder protection ONLY shields engine-generated placeholders (avoid protecting arbitrary [..] such as Markdown links)
 // =========================
 
 console.log("[engine.js] loaded v20260223-engine-a5-policy-split");
@@ -702,22 +702,55 @@ function applyRules(text) {
     hitsByKey[key] = (hitsByKey[key] || 0) + 1;
   }
 
-  // P2: protect markdown links and placeholders from being re-masked
+  // P2: protect ONLY engine-generated placeholders (do NOT protect arbitrary [..] such as Markdown labels)
   function protectPlaceholders(s) {
     const map = [];
     let t = String(s || "");
 
-    // (A) Markdown links: [label](url) including mailto/http(s)/www/relative
-    //     Protect as a whole to avoid breaking brackets/parentheses structure.
-    t = t.replace(/\[[^\]\n\r]{1,240}\]\([^\)\n\r]{1,800}\)/g, (m) => {
+    // (A) Protect 【...】 blocks (these are explicitly placeholder-style in your UI)
+    t = t.replace(/【[^【】\n\r]{1,120}】/g, (m) => {
       const id = map.length;
       map.push(m);
       return `\uE000${id}\uE001`;
     });
 
-    // (B) standalone placeholders: 【...】 or [...]
-    //     (keep conservative max len, but slightly wider than before)
-    t = t.replace(/(【[^【】]{1,80}】|\[[^\[\]\n\r]{1,80}\])/g, (m) => {
+    // (B) Protect ONLY known placeholder tokens in square brackets
+    //     This prevents accidental shielding of Markdown like: [email](mailto:...) or [text](url)
+    //     while still preventing re-masking of already produced placeholders.
+    const PH = [
+      // DE
+      "Telefon",
+      "E-Mail",
+      "URL",
+      "Geheim",
+      "Konto",
+      "Adresse",
+      "Handle",
+      "Referenz",
+      "Anrede",
+      "Zahl",
+      "Betrag",
+      "Firma",
+      "Name",
+      // EN fallback tokens
+      "Phone",
+      "Email",
+      "Secret",
+      "Account",
+      "Address",
+      "Ref",
+      "Title",
+      "Number",
+      "Amount",
+      "Company",
+      // generic
+      "REDACTED"
+    ]
+      .map(escapeRegExp)
+      .join("|");
+
+    const rePH = new RegExp(`\\[(?:${PH})\\]`, "g");
+    t = t.replace(rePH, (m) => {
       const id = map.length;
       map.push(m);
       return `\uE000${id}\uE001`;
@@ -798,7 +831,7 @@ function applyRules(text) {
   // manual first
   out = applyManualTermsMask(out, () => addHit("manual_term"));
 
-  // protect existing placeholders + markdown links
+  // protect existing placeholders (ONLY known tokens)
   const p0 = protectPlaceholders(out);
   out = p0.t;
 
@@ -821,7 +854,6 @@ function applyRules(text) {
 
       if (r.mode === "prefix") {
         // P1: preserve suffix (incl. newline/whitespace) that the regex might have consumed.
-        // This prevents "Telefon: [Telefon]Telefon (Durchwahl): ..." line merges.
         const label = String(args[1] || "");
         const val = String(args[2] || "");
         const consumed = (label + val).length;
@@ -844,7 +876,6 @@ function applyRules(text) {
           } catch (_) {}
         }
 
-        // conservative fallback
         addHit(key);
         return `${label}${placeholder("ADDRESS")}`;
       }
@@ -882,7 +913,6 @@ function applyRules(text) {
           } catch (_) {}
         }
 
-        // conservative fallback: mask whole company token
         return `${placeholder("COMPANY")}${punct}`;
       }
 
