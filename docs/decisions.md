@@ -264,3 +264,121 @@ rules.js
 app.js
 
 任何修改必须进行回归验证。
+
+---
+
+## D16 Rule Engine Responsibility Boundary（HARD LOCK）
+
+状态：Accepted / Locked（架构稳定性约束）
+
+### Context
+
+随着多语种扩展，规则系统存在天然的“复杂度爆炸风险”：
+
+• engine.js 持续膨胀  
+• 语言规则相互污染（cross-language contamination）  
+• 修改引发非目标语种误伤（regression across packs）  
+• 调试成本指数级上升  
+
+Filter 的安全模型依赖 **可预测性（predictability）** 与 **隔离性（isolation）**，  
+因此必须明确规则引擎的职责边界。
+
+---
+
+### Decision
+
+**engine.js 是调度器（orchestrator），不是规则容器。**
+
+强制约束：
+
+• engine.js **不得包含语言特征规则**  
+• engine.js **不得包含语种相关 regex / 关键词 / 语义判断**  
+• engine.js 仅负责：
+
+  – 执行顺序控制（priority resolution）  
+  – pack 调用与路由（pack dispatch）  
+  – policy 应用（global policy layer）  
+  – 命中结果合并（hit aggregation）  
+
+---
+
+**语言相关逻辑必须完全内聚于语言包：**
+
+engine.<lang>.js 承载：
+
+• detect()  
+• rules{}  
+• placeholders  
+• phoneGuard / formatters  
+• 任何语种特有策略  
+
+禁止将以下内容写入 engine.js：
+
+• 德语 / 中文 / 英文关键词  
+• 本地化号码格式  
+• 国家证件模式  
+• 语言特定误伤修复  
+
+---
+
+**策略层隔离：**
+
+engine.policy.js 承载：
+
+• 非语言安全策略（language-agnostic policy）  
+• 权重 / 风险模型 / fallback  
+• 全局默认行为（defaultPriority / baseAlwaysOn）  
+
+policy 文件 **不得引入语言特征**。
+
+---
+
+**修改优先级（强制执行顺序）：**
+
+pack → policy → engine
+
+含义：
+
+✔ 优先在 engine.<lang>.js 修复问题  
+✔ 若属于产品策略，再改 engine.policy.js  
+✔ 仅当执行机制错误时，才允许修改 engine.js  
+
+---
+
+### Consequences
+
+✅ 优点
+
+• 多语种扩展不会导致 engine 膨胀  
+• 不同语言规则天然隔离  
+• 回归范围可控  
+• 调试路径清晰  
+• 风险模型稳定  
+
+---
+
+⚠️ 代价
+
+• 语言包文件数量增加  
+• 规则重复度提高（可接受的工程冗余）  
+• 需要严格遵守边界纪律  
+
+---
+
+### Rationale（不可变更理由）
+
+Filter 的核心不是“匹配能力最大化”，  
+而是 **稳定、安全、可预测的规则系统**。
+
+语言规则的集中化会导致：
+
+• 修改不可控  
+• 非目标语种误伤  
+• 行为漂移  
+• 安全语义失效  
+
+因此该边界属于 **系统级不变量（system invariant）**。
+
+---
+
+**违反该规则视为架构破坏，而非普通代码修改。**
