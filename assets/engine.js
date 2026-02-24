@@ -1022,7 +1022,13 @@ try {
     if (hasPacksObj) {
       for (const k of need) {
         const p = packs[k];
-        const ok = !!(p && typeof p === "object" && p.rules && typeof p.rules === "object");
+        const ok = !!(
+          p &&
+          typeof p === "object" &&
+          p.rules &&
+          typeof p.rules === "object" &&
+          Object.keys(p.rules).length > 0
+        );
         if (!ok) missingPacks.push(k);
       }
     } else {
