@@ -103,13 +103,13 @@
         tag: "URL"
       },
 
-      /* ===================== MONEY (DE/EU formats) ===================== */
-      money: {
-        // ✅ Fix: support "1.250,00 €" (number-first) AND "$1,499.00" / "USD $1,499.00" (currency-first)
-        pattern:
-          /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b\s*)?(?:[€$£¥￥]\s*)?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?\s*(?:[€$£¥￥]|\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b)?/giu,
+     // ✅ MONEY (strict currency required; avoids masking IDs/phones/dates/SKU)
+     // Covers:
+     //  - 1.250,00 € / € 99,90 / 12,50 EUR / EUR 12.500,00
+     //  - USD $1,499.00 / $2,050.75
+     //  - CHF 1'250.50
+        pattern: /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b\s*(?:[€$£¥￥]\s*)?\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?\s*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥]\s*\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?\s*[€$£¥￥])/giu,
         tag: "MONEY"
-      },
 
       /* ===================== SECRET (label-driven) ===================== */
       secret: {
