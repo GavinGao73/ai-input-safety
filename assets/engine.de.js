@@ -590,6 +590,7 @@
 // - Zusatz: mask only "Gebäude..., OG..., Zimmer..." and keep ", Klingel …"
 // - IMPORTANT: disable "title" key execution to prevent Herr/Frau/Dr/Prof -> [Anrede]
 // - IMPORTANT: disable full-line "address_de_extra" masking to avoid swallowing Klingel-tail after partial masking
+// - IMPORTANT: disable legacy full-line "address_de_street" execution to prevent losing PLZ/City/Country tail  ✅ FIX (ONLY CHANGE)
 // =========================
 (function () {
   "use strict";
@@ -666,6 +667,15 @@
   }
   if (Array.isArray(DE.alwaysOn)) {
     DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "address_de_extra");
+  }
+
+  // IMPORTANT: disable legacy full-line street masking to prevent losing PLZ/City/Country tail
+  // (rule definition remains for backward compatibility, but it will not run)
+  if (Array.isArray(DE.priority)) {
+    DE.priority = DE.priority.filter((k) => k !== "address_de_street");
+  }
+  if (Array.isArray(DE.alwaysOn)) {
+    DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "address_de_street");
   }
 
   Object.assign(DE.rules, {
