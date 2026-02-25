@@ -332,8 +332,9 @@
         // keep prefix segments, mask ONLY the last numeric segment (>=4 digits), even when prefix is numeric.
         // Ticket No.: 20260224-778421 -> Ticket No.: 20260224-【编号】
         // Case ID: CASE-2026-00078421 -> Case ID: CASE-2026-【编号】
+        // ✅ FIX (idempotent): if this line already contains 【编号】, skip to prevent repeated drift
         pattern:
-          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|合同号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?|Application\s*ID|Reference)\s*[:：=]\s*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+){0,10}[-_.]))(\d{4,})/giu,
+          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|合同号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?|Application\s*ID|Reference)\s*[:：=]\s*)(?![^\n\r]*【编号】)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+){0,10}[-_.])(\d{4,})/giu,
         tag: "REF",
         mode: "prefix"
       },
@@ -341,7 +342,8 @@
       /* ===================== REF TAIL (multi-segment IDs; generic) ===================== */
       ref_tail: {
         // keep prefix segments, mask ONLY the last numeric segment (>=4 digits)
-        pattern: /(?<=\b[A-Z][A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})*-)\d{4,}\b/g,
+        // ✅ FIX (idempotent): if this line already contains 【编号】, skip to prevent repeated drift
+        pattern: /^(?![^\n\r]*【编号】).*?(?<=\b[A-Z][A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})*-)\d{4,}\b/gmu,
         tag: "REF"
       },
 
@@ -404,7 +406,8 @@
       /* ===================== REF (label-driven) ===================== */
       ref_label: {
         // exclude '-' to avoid fighting with multi-segment tail rules
-        pattern: /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9_.]{3,80})/giu,
+        // ✅ FIX: require at least ONE letter in the value, so pure-numeric prefixes like "20260224" won't be redacted to 【编号】
+        pattern: /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?)\s*[:：=]\s*)(?=[A-Za-z0-9_.]{3,80}\b)(?=[A-Za-z0-9_.]*[A-Za-z])[A-Za-z0-9][A-Za-z0-9_.]{3,80}/giu,
         tag: "REF",
         mode: "prefix"
       },
