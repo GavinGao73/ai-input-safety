@@ -79,7 +79,7 @@
 
       // personal attributes
       "birthdate",
-      "birthplace",
+      "birthplace", // low priority; not forced always-on (see patch)
 
       // financial / banking
       "account",
@@ -110,6 +110,7 @@
       "address_de_extra",
 
       // ✅ label-driven address (street/strasse only; NO PLZ/City masking)
+      // NOTE: will be replaced by partial rule in fix patch
       "address_de_street",
 
       // generic
@@ -134,9 +135,8 @@
       "driver_license",
       "birthdate",
 
-      // birthplace is conservative in original; user says low priority (can mask, can keep).
-      // Keep it ON for now, but we will provide an optional downgrade patch below.
-      "birthplace",
+      // birthplace is low priority (user). DO NOT force it.
+      // (Removed in fix patch if present)
 
       "account",
       "bank",
@@ -272,9 +272,9 @@
       },
 
       birthplace: {
-        // NOTE (kept as-is in base pack). User says low priority; optional patch below can disable/relax it.
+        // Updated: if it masks, use SECRET placeholder (low priority; not forced always-on).
         pattern: /((?:Geburtsort)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
-        tag: "ADDRESS",
+        tag: "SECRET",
         mode: "prefix"
       },
 
@@ -338,7 +338,7 @@
 
       /* ===================== PERSON NAME (STRICT label-driven) ===================== */
       person_name: {
-        // NOTE: superseded by person_name_line patch (line-anchored) when present.
+        // NOTE: superseded by person_name_keep_title patch (line-anchored) when present.
         pattern:
           /((?:Name|Kontakt|Ansprechpartner|Empfänger)\s*[:：=]\s*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)\s+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
         tag: "NAME",
@@ -367,7 +367,8 @@
       },
 
       address_de_street: {
-        // NOTE: Full-line masking. Partial masking (street only, keep tail) needs engine support; provided as stub in fix patch.
+        // Legacy full-line masking (may include PLZ/City) => disabled by fix patch routing.
+        // Kept as definition only for backward compatibility.
         pattern:
           /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)\s*[:：=]\s*)((?=[^\n\r]{4,140}$)(?=[^\n\r]{0,140}(?:\d{1,4}\s*[A-Za-z]?\b|straße\b|strasse\b|str\.\b|weg\b|platz\b|allee\b|gasse\b|ring\b|ufer\b|damm\b|chaussee\b|promenade\b|markt\b|hof\b|kai\b))[^\n\r]{4,140})/giu,
         tag: "ADDRESS",
@@ -576,12 +577,13 @@
 })();
 
 // =========================
-// DE Fix Patch (ADD-ONLY) — v2.0.2 (UPDATED per user)
+// DE Fix Patch (UPDATED per user)
 // - Fix BLZ with parentheses: "Bankleitzahl (BLZ): ..."
 // - Add card expiry + CVC/CVV
 // - Fix Name masking: KEEP titles (Herr/Frau/Dr/Prof) in output; DO NOT emit [Anrede]; only mask name => [Name]
-// - Geburtsort: low priority; we will NOT force masking (remove from alwaysOn) but keep a rule as optional.
-// - Address partial masking requires engine support; rule stub included
+// - Geburtsort: low priority; do NOT force masking (remove from alwaysOn)
+// - Address: street-only masking while keeping tail (PLZ/City/Country) using mode "prefix_keep_tail"
+//   and disable legacy "address_de_street" execution to prevent tail loss.
 // =========================
 (function () {
   "use strict";
@@ -612,29 +614,41 @@
     "birthplace_optional_secret",
     "blz_paren",
     "card_expiry_de",
-    "card_security_de"
-    // "address_de_street_partial" // only if engine supports preserving tail
+    "card_security_de",
+    "address_de_street_partial"
   ];
 
   // Insert BEFORE existing keys where relevant
   DE.priority = insertBefore(DE.priority || [], "person_name", ["person_name_keep_title"]);
   DE.priority = insertBefore(DE.priority || [], "birthplace", ["birthplace_optional_secret"]);
   DE.priority = insertBefore(DE.priority || [], "blz", ["blz_paren"]);
+  DE.priority = insertBefore(DE.priority || [], "address_de_street", ["address_de_street_partial"]);
   DE.priority = insertBefore(DE.priority || [], "number", ["card_expiry_de", "card_security_de"]);
 
   // Always-on:
   // - keep person-name fix always on
   // - keep BLZ/expiry/CVC always on
+  // - keep address partial always on
   // - DO NOT force Geburtsort (user said low priority)
-  DE.alwaysOn = DE.alwaysOn || [];
+  DE.alwaysOn = Array.isArray(DE.alwaysOn) ? DE.alwaysOn : [];
   uniqPush(DE.alwaysOn, "person_name_keep_title");
   uniqPush(DE.alwaysOn, "blz_paren");
   uniqPush(DE.alwaysOn, "card_expiry_de");
   uniqPush(DE.alwaysOn, "card_security_de");
+  uniqPush(DE.alwaysOn, "address_de_street_partial");
 
-  // Remove birthplace from alwaysOn (soften: mask if matched in normal pass, but not forced)
+  // Remove birthplace from alwaysOn (soften: mask only if enabled by user or other strategy)
+  DE.alwaysOn = DE.alwaysOn.filter(
+    (k) => k !== "birthplace" && k !== "birthplace_secret" && k !== "birthplace_optional_secret"
+  );
+
+  // IMPORTANT: disable legacy full-line address masking key execution to prevent losing tail
+  // (rule definition remains for backward compatibility, but it will not run)
+  if (Array.isArray(DE.priority)) {
+    DE.priority = DE.priority.filter((k) => k !== "address_de_street");
+  }
   if (Array.isArray(DE.alwaysOn)) {
-    DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "birthplace" && k !== "birthplace_secret" && k !== "birthplace_optional_secret");
+    DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "address_de_street");
   }
 
   Object.assign(DE.rules, {
@@ -677,17 +691,19 @@
       pattern: /((?:CVC|CVV|CVC2|CAV2)\s*[:：=]\s*)(\d{3,4})/giu,
       tag: "SECRET",
       mode: "prefix"
-    }
+    },
 
-    /*
-    // 6) Address partial masking (street only, keep PLZ/City/Country)
-    // NOTE: This needs engine support (a mode that can keep the tail part).
+    /* 6) Address partial masking (street only, keep PLZ/City/Country)
+       Requires engine.js support: mode "prefix_keep_tail"
+       Example:
+       "Adresse: Musterstraße 12, 50667 Köln, Deutschland"
+       -> "Adresse: [Adresse], 50667 Köln, Deutschland"
+    */
     address_de_street_partial: {
       pattern:
-        /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)\s*[:：=]\s*)([^,\n\r]{4,80})([^\n\r]*)/giu,
+        /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)\s*[:：=]\s*)([^,\n\r]{4,120}?)(\s*,[^\n\r]{0,160})/giu,
       tag: "ADDRESS",
-      mode: "prefix_keep_tail" // <- only works if engine implements it
+      mode: "prefix_keep_tail"
     }
-    */
   });
 })();
