@@ -412,3 +412,95 @@
     }
   };
 })();
+
+
+// =========================
+// International ADD-ONLY Patch (UK/US/CA/AU common fields)
+// - SAFE: append priority/alwaysOn; add rules only
+// - DOES NOT modify existing rules
+// =========================
+(function () {
+  "use strict";
+
+  const PACKS = (window.__ENGINE_LANG_PACKS__ = window.__ENGINE_LANG_PACKS__ || {});
+  const EN = PACKS.en;
+  if (!EN) return;
+
+  // append-only
+  const addPrio = [
+    "intl_itin",
+    "intl_nino",
+    "intl_nhs",
+    "intl_sin",
+    "intl_tfn",
+    "intl_abn",
+    "uuid"
+  ];
+
+  EN.priority = (EN.priority || []).concat(addPrio);
+
+  const addAlways = [
+    "intl_itin",
+    "intl_nino",
+    "intl_nhs",
+    "intl_sin",
+    "intl_tfn",
+    "intl_abn",
+    "uuid"
+  ];
+
+  EN.alwaysOn = (EN.alwaysOn || []).concat(addAlways);
+
+  Object.assign(EN.rules, {
+
+    /* 🇺🇸 US ITIN (often formatted like SSN but starts with 9xx; keep simple and label-driven) */
+    intl_itin: {
+      pattern: /((?:us\s*)?itin\s*[:：=]\s*)(9\d{2}[-\s]?\d{2}[-\s]?\d{4})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* 🇬🇧 UK – National Insurance Number (NINO) */
+    intl_nino: {
+      pattern: /((?:uk\s*)?nino\s*[:：=]\s*)([A-CEGHJ-PR-TW-Z]{2}\s?\d{2}\s?\d{2}\s?\d{2}\s?[A-D])/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* 🇬🇧 UK – NHS Number (label-driven) */
+    intl_nhs: {
+      pattern: /((?:uk\s*)?nhs\s*number\s*[:：=]\s*)(\d{3}\s?\d{3}\s?\d{4})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* 🇨🇦 CA – SIN (label-driven) */
+    intl_sin: {
+      pattern: /((?:ca\s*)?sin\s*[:：=]\s*)(\d{3}\s?\d{3}\s?\d{3})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* 🇦🇺 AU – TFN (label-driven) */
+    intl_tfn: {
+      pattern: /((?:au\s*)?tfn\s*[:：=]\s*)(\d{3}\s?\d{3}\s?\d{3})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* 🇦🇺 AU – ABN (label-driven) */
+    intl_abn: {
+      pattern: /((?:au\s*)?abn\s*[:：=]\s*)(\d{2}\s?\d{3}\s?\d{3}\s?\d{3})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* 🌐 UUID / GUID */
+    uuid: {
+      pattern: /\b([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\b/giu,
+      tag: "SECRET"
+    }
+
+  });
+
+})();
