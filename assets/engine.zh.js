@@ -157,16 +157,8 @@
       if (digits.length >= 16) return false;
 
       const lbl = String(label || "").toLowerCase();
-
-      // labels that are usually IDs, not phones (CN)
+      // labels that are usually IDs, not phones
       if (/(编号|单号|订单|发票|合同|申请|工单|票据|客户|账号|账户|卡号|对公|税号)/i.test(lbl)) return false;
-
-      // labels that are usually IDs, not phones (EN) — prevent Customer ID / Application ID etc. from phone false-positives
-      if (
-        /\b(?:case|ticket|order|invoice|reference|ref|customer|application|request|account)\b/i.test(lbl) &&
-        /\b(?:id|no|number|#)\b/i.test(lbl)
-      )
-        return false;
 
       // value itself looks like typical ID prefix
       if (/\b(?:CUST|CASE|ORD|INV|APP|REF|ACC|REQ|TKT|TK|LC)-/i.test(String(value || ""))) return false;
@@ -291,8 +283,7 @@
 
       /* ===================== DOB / Birthdate (label-driven) ===================== */
       dob: {
-        // allow "出生日期（中文）" etc.
-        pattern: /((?:出生日期|出生日期（中文）|出生年月|生日|DOB|Date\s*of\s*Birth)\s*[:：=]\s*)(\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日)/giu,
+        pattern: /((?:出生日期|出生年月|生日|DOB|Date\s*of\s*Birth)\s*[:：=]\s*)(\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日)/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -320,16 +311,14 @@
 
       /* ===================== Driver License (label-driven) ===================== */
       driver_license: {
-        // allow CN plates like "京A-482771-2026" by permitting a leading Han char
-        pattern:
-          /((?:驾驶证号|驾驶证号码|Driver[’']?s\s*License(?:\s*No\.?|Number)?)\s*[:：=]\s*)([\u4E00-\u9FFFA-Za-z0-9][\u4E00-\u9FFFA-Za-z0-9\-\/]{3,32})/giu,
+        pattern: /((?:驾驶证号|驾驶证号码|Driver[’']?s\s*License(?:\s*No\.?|Number)?)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       /* ===================== ACCOUNT (label-driven) ===================== */
       account: {
-        pattern: /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|对公账户|對公賬戶|IBAN|Account\s*Number)\s*[:：=]?\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{6,40}\d)/giu,
+        pattern: /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|信用卡|信用卡号|信用卡號|card\s*number|credit\s*card|对公账户|對公賬戶|IBAN|Account\s*Number)\s*[:：=]?\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{6,40}\d)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -388,8 +377,7 @@
       /* ===================== REF (label-driven) ===================== */
       ref_label: {
         // 说明：不做“只遮尾号”的新模式（不改架构）；保持 label-driven 全值占位，避免 phone 误杀。
-        pattern:
-          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|Case\s*ID|Ticket\s*No\.?|Application\s*ID|Order\s*ID|Invoice\s*No\.?|Reference|Customer\s*ID)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,80})/giu,
+        pattern: /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,80})/giu,
         tag: "REF",
         mode: "prefix"
       },
