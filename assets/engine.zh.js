@@ -85,7 +85,7 @@
 
       // refs / handles (label-driven)
       "handle_label",
-      // ✅ FIX: stable tail-mask for multi-segment IDs (no lookbehind; keep prefix)
+      // ✅ FIX: stable tail-mask for multi-segment IDs (keep prefix; mask last numeric segment)
       "cust_id",
       "ref_numeric_tail_label",
       "ref_label_tail2",
@@ -175,7 +175,7 @@
       if (/(编号|单号|订单|发票|合同|申请|工单|票据|客户|账号|账户|卡号|对公|税号)/i.test(lbl)) return false;
 
       // value itself looks like typical ID prefix
-      if (/\b(?:CUST|CASE|ORD|INV|APP|REF|ACC|REQ|TKT|TK|LC)-/i.test(String(value || ""))) return false;
+      if (/\b(?:CUST|CASE|ORD|INV|APP|REF|ACC|REQ|TKT|TK|LC|CLM|LEGAL)-/i.test(String(value || ""))) return false;
 
       return true;
     },
@@ -297,7 +297,7 @@
 
       /* ===================== DOB / Birthdate (label-driven) ===================== */
       dob: {
-        // ✅ FIX: allow "出生日期（中文）" label
+        // ✅ allow "出生日期（中文）" label
         pattern: /((?:出生日期(?:（中文）)?|出生年月|生日|DOB|Date\s*of\s*Birth)\s*[:：=]\s*)(\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日)/giu,
         tag: "SECRET",
         mode: "prefix"
@@ -352,28 +352,28 @@
       /* ===================== REF NUMERIC TAIL (label-driven; numeric prefix) ===================== */
       ref_numeric_tail_label: {
         // Ticket No.: 20260224-778421 -> Ticket No.: 20260224-【编号】
-        // ✅ FIX: capture the whole prefix including the numeric head + delimiter
-        pattern: /((?:Ticket\s*No\.?|工单号|票据号|编号)\s*[:：=]\s*)(?![^\n\r]*【编号】)(\d{4,}[-_.])(\d{4,})/giu,
+        // ✅ CRITICAL: MUST be 2 capture groups for prefix-mode engines
+        pattern: /((?:Ticket\s*No\.?|工单号|票据号|编号)\s*[:：=]\s*)(?![^\n\r]*【编号】)(\d{4,}[-_.]\d{4,})/giu,
         tag: "REF",
         mode: "prefix"
       },
 
       /* ===================== REF LABEL TAIL (label-driven; alpha prefix) ===================== */
       ref_label_tail2: {
-        // FIX: no lookbehind; keep full prefix; mask only last numeric segment (>=4)
+        // ✅ CRITICAL: MUST be 2 capture groups for prefix-mode engines
         // Case ID: CASE-2026-00078421 -> Case ID: CASE-2026-【编号】
         // Application ID: APP-2026-02-778421 -> Application ID: APP-2026-02-【编号】
         // Reference: REF-AB-2026-00078421 -> Reference: REF-AB-2026-【编号】
         // Contract/Legal: LC-AB-2026-00078421 / LEGAL-REF-2026-00001234 / CLM-XY-2026-0007712 -> ...-【编号】
         pattern:
-          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|Case\s*ID|Order\s*ID|Invoice\s*No\.?|Application\s*ID|Reference)\s*[:：=]\s*)(?![^\n\r]*【编号】)(?:(?:(?:[A-Za-z]{2,10}[A-Za-z0-9]*)(?:-[A-Za-z0-9]{1,12}){0,8})-)(\d{4,})/giu,
+          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?|Application\s*ID|Reference)\s*[:：=]\s*)(?![^\n\r]*【编号】)([A-Za-z]{2,10}[A-Za-z0-9]*(?:-[A-Za-z0-9]{1,12}){0,8}-\d{4,})/giu,
         tag: "REF",
         mode: "prefix"
       },
 
       /* ===================== ACCOUNT (label-driven) ===================== */
       account: {
-        // ✅ FIX: do NOT let \s cross newline (avoid "IBAN: ... \n 开户银行:" being merged)
+        // ✅ do NOT let \s cross newline (avoid "IBAN: ... \n 开户银行:" being merged)
         pattern:
           /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|信用卡|信用卡号|信用卡號|card\s*number|credit\s*card|对公账户|對公賬戶|IBAN|Account\s*Number)\s*[:：=]?\s*)([A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
         tag: "ACCOUNT",
@@ -389,9 +389,8 @@
 
       /* ===================== BANK ROUTING / CLEARING / BRANCH (label-driven) ===================== */
       bank_routing_ids: {
-        // ✅ FIX: do NOT let \s cross newline
-        pattern:
-          /((?:联行号|清算号|分行号|支行号|行号|路由号|routing\s*number|aba|bsb|transit\s*number|clearing\s*(?:number|no\.?)|branch\s*code)\s*[:：=]\s*)([0-9][0-9 \t-]{2,24}[0-9])/giu,
+        // ✅ do NOT let \s cross newline
+        pattern: /((?:联行号|清算号|分行号|支行号|行号|路由号|routing\s*number|aba|bsb|transit\s*number|clearing\s*(?:number|no\.?)|branch\s*code)\s*[:：=]\s*)([0-9][0-9 \t-]{2,24}[0-9])/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -439,7 +438,7 @@
       /* ===================== REF (label-driven) ===================== */
       ref_label: {
         // important: exclude '-' to avoid fighting with multi-segment tail rules
-        // ✅ FIX: prevent partial-grab when the next char is '-' (e.g. "CASE-2026-..." / "20260224-...")
+        // ✅ prevent partial-grab when the next char is '-' (e.g. "CASE-2026-..." / "20260224-...")
         pattern:
           /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9_.]{3,80})(?!-)/giu,
         tag: "REF",
@@ -448,7 +447,7 @@
 
       /* ===================== ADDRESS (CN partial) ===================== */
       address_cn: {
-        // ✅ FIX: require delimiter (avoid matching headings like "地址信息（用于...）")
+        // ✅ require delimiter (avoid matching headings like "地址信息（用于...）")
         pattern: /((?:地址|住址|办公地址|通信地址|收货地址|居住地址|单位地址|联系地址)\s*[:：=]\s*)([^\n\r]{2,120})/giu,
         tag: "ADDRESS",
         mode: "address_cn_partial"
@@ -456,9 +455,11 @@
 
       /* ===================== MONEY (ZH require currency indicator) ===================== */
       money: {
-        // ✅ add EUR formats + USD/$ formats (keep original RMB/¥/元 support intact)
+        // ✅ fix: ensure "人民币 8800 元" is captured as ONE match (incl. 元)
+        // - Use explicit spaces incl. U+3000 to avoid edge whitespace issues.
+        // - Keep EUR / USD formats.
         pattern:
-          /(?:((?:人民币|CNY|RMB)\s*)(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?)(?:\s*元)?)|(?:([¥￥])\s*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?))|(?:(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?)\s*元)|(?:\b(?:USD)\b\s*\$?\s*\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)|(?:\$\s*\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)|(?:\d{1,3}(?:\.\d{3})*(?:,\d{2})?\s*€)|(?:€\s*\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/giu,
+          /(?:((?:人民币|CNY|RMB)[ \t\u3000]*)(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?)(?:[ \t\u3000]*元)?)|(?:([¥￥])[ \t\u3000]*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?))|(?:(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?)[ \t\u3000]*元)|(?:\b(?:USD)\b[ \t\u3000]*\$?[ \t\u3000]*\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)|(?:\$\s*\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)|(?:\d{1,3}(?:\.\d{3})*(?:,\d{2})?[ \t\u3000]*€)|(?:€[ \t\u3000]*\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/giu,
         tag: "MONEY"
       },
 
@@ -553,7 +554,7 @@
 
       /* ===================== REF (format-like) ===================== */
       ref: {
-        // ✅ FIX: avoid partial match inside multi-segment IDs like CASE-2026-00078421
+        // ✅ avoid partial match inside multi-segment IDs like CASE-2026-00078421
         pattern: /\b[A-Z]{2,6}-?\d{5,14}\b(?!-\d)/g,
         tag: "REF"
       },
