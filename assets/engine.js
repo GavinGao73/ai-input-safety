@@ -594,37 +594,162 @@ function labelForKey(k) {
   return k;
 }
 
+/**
+ * Scheme A (grouped saturation):
+ * - score is computed from 5 risk groups with diminishing returns: 1 - exp(-k * hits)
+ * - group weights sum to 1.0, final score in [0..100]
+ * - keeps "top" list based on legacy weights for UI explanation (no UI changes)
+ */
 function computeRiskReport(hitsByKey, meta) {
   const pol = getPolicy();
   const R = pol && pol.risk ? pol.risk : {};
+
+  // legacy (UI top list)
   const W = R && R.weights ? R.weights : {};
-  const T = R && R.thresholds ? R.thresholds : { mid: 35, high: 70 };
-  const B = R && R.bonus ? R.bonus : { base: 10, len1500: 6, len4000: 8, fromPdf: 6 };
+
+  // thresholds/bonus
+  const T = R && R.thresholds ? R.thresholds : { mid: 40, high: 70 };
+  const B = R && R.bonus ? R.bonus : { base: 0, len1500: 2, len4000: 3, fromPdf: 2 };
 
   const cap = Number(R.capPerKey || 12);
   const clampMin = Number(R.clampMin ?? 0);
   const clampMax = Number(R.clampMax ?? 100);
 
-  let score = 0;
+  const groups = (R && R.groups && typeof R.groups === "object") ? R.groups : null;
+  const gw = (R && R.groupWeights && typeof R.groupWeights === "object") ? R.groupWeights : null;
+  const gk = (R && R.groupK && typeof R.groupK === "object") ? R.groupK : null;
 
-  for (const [k, c] of Object.entries(hitsByKey || {})) {
-    if (!c) continue;
-    const w = Number(W[k] || 0);
-    const capped = Math.min(Number(c || 0), cap);
-    score += w * capped;
+  // Safe defaults (only used if policy missing)
+  const DEFAULT_GROUPS = {
+    critical: [
+      "secret",
+      "api_key_token",
+      "bearer_token",
+      "card_security",
+      "security_answer",
+      "otp",
+      "pin",
+      "2fa"
+    ],
+    financial: [
+      "account",
+      "bank",
+      "bank_routing_ids",
+      "card_expiry"
+    ],
+    identity: [
+      "dob",
+      "place_of_birth",
+      "passport",
+      "driver_license",
+      "ssn",
+      "ein",
+      "national_id",
+      "tax_id",
+      "insurance_id",
+      "intl_itin",
+      "intl_nino",
+      "intl_nhs",
+      "intl_sin",
+      "intl_tfn",
+      "intl_abn"
+    ],
+    contact: [
+      "phone",
+      "email",
+      "url",
+      "address_cn",
+      "address_cn_partial",
+      "address_de_street",
+      "address_en_inline_street",
+      "address_en_extra_block",
+      "address_en_extra",
+      "handle_label",
+      "handle",
+      "person_name",
+      "company"
+    ],
+    tracking: [
+      "ip_label",
+      "ip_address",
+      "mac_label",
+      "mac_address",
+      "imei",
+      "device_fingerprint",
+      "uuid",
+      "wallet_id",
+      "tx_hash",
+      "crypto_wallet"
+    ]
+  };
+
+  const DEFAULT_GW = {
+    critical: 0.32,
+    financial: 0.28,
+    identity: 0.18,
+    contact: 0.12,
+    tracking: 0.10
+  };
+
+  const DEFAULT_GK = {
+    critical: 0.35,
+    financial: 0.30,
+    identity: 0.22,
+    contact: 0.18,
+    tracking: 0.20
+  };
+
+  const G = groups || DEFAULT_GROUPS;
+  const GW = gw || DEFAULT_GW;
+  const GK = gk || DEFAULT_GK;
+
+  function getCappedHit(k) {
+    const c = Number((hitsByKey && hitsByKey[k]) || 0);
+    if (!c) return 0;
+    return Math.min(c, cap);
   }
 
-  score += Number(B.base || 0);
-  if (meta.inputLen >= 1500) score += Number(B.len1500 || 0);
-  if (meta.inputLen >= 4000) score += Number(B.len4000 || 0);
-  if (meta.fromPdf) score += Number(B.fromPdf || 0);
+  function satScore(hits, k) {
+    const hh = Math.max(0, Number(hits || 0));
+    const kk = Math.max(0, Number(k || 0));
+    if (hh <= 0 || kk <= 0) return 0;
+    // 1 - exp(-k*hits)  in [0..1)
+    return 1 - Math.exp(-kk * hh);
+  }
 
-  score = clamp(Math.round(score), clampMin, clampMax);
+  // compute group hits
+  const groupHits = {};
+  for (const gname of Object.keys(G || {})) {
+    const arr = Array.isArray(G[gname]) ? G[gname] : [];
+    let sum = 0;
+    for (const k of arr) sum += getCappedHit(k);
+    groupHits[gname] = sum;
+  }
+
+  // base score from groups (0..100)
+  let base = 0;
+  for (const gname of Object.keys(GW || {})) {
+    const w = Number(GW[gname] || 0);
+    if (!w) continue;
+    const hits = Number(groupHits[gname] || 0);
+    const k = Number(GK[gname] || 0);
+    base += w * satScore(hits, k);
+  }
+  let score = Math.round(base * 100);
+
+  // small bonuses (kept, but reduced in policy to avoid constant 100)
+  score += Number(B.base || 0);
+  if (meta && meta.inputLen >= 1500) score += Number(B.len1500 || 0);
+  if (meta && meta.inputLen >= 4000) score += Number(B.len4000 || 0);
+  if (meta && meta.fromPdf) score += Number(B.fromPdf || 0);
+
+  score = clamp(score, clampMin, clampMax);
 
   let level = "low";
   if (score >= Number(T.high || 70)) level = "high";
-  else if (score >= Number(T.mid || 35)) level = "mid";
+  else if (score >= Number(T.mid || 40)) level = "mid";
 
+  // keep existing "top" computation (legacy weights for explanation)
   const pairs = Object.entries(hitsByKey || {})
     .filter(([, c]) => c > 0)
     .map(([k, c]) => {
