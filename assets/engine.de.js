@@ -345,58 +345,40 @@
 
       /* ===================== ADDRESS (inline, street + house no only; no PLZ/City) ===================== */
       address_de_inline_street: {
-        // Block-style address line (no label):
-        // - Musterstraße 12
-        // - Domkloster 4
-        // - Unter den Linden 77a
-        // Conservative:
-        // - line-anchored
-        // - requires house number
-        // - avoids warehouse/sku/system lines
-        // - only one numeric range allowed (so 12-07-03 won't match)
         pattern:
           /^(?!.*\b(?:Lagerplatz|Regal|Fach|SKU|Fehlercode|ERR|Testwert|Artikel|Gutschrift|Kontonummer|Bankleitzahl|Versichertennummer)\b)(?:[A-ZÄÖÜ][\p{L}.'\-]{1,40}(?:\s+[A-ZÄÖÜ][\p{L}.'\-]{1,40}){0,4})\s+\d{1,4}(?:\s*[A-Za-z])?(?:-\d{1,4})?$/gmu,
         tag: "ADDRESS"
       },
 
-      /* ===================== ADDRESS (apartment/building details only) ===================== */
       address_de_extra: {
-        // Only mask when it looks like apartment/building details (Gebäude/Etage/OG/Zimmer/Wohnung/etc.)
         pattern:
           /((?:Zusatz)\s*[:：=]\s*)((?=[^\n\r]{2,140}$)(?=.*\b(?:Gebäude|Haus|Block|Aufgang|Etage|Stock|Stockwerk|OG|EG|DG|WHG|Wohnung|Zimmer|Raum|App\.?|Apartment|Tür|Klingel)\b)[^\n\r]{2,140})/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
 
-      /* ===================== ADDRESS (label-driven, street-like only; NO PLZ/City) ===================== */
       address_de_street: {
-        // For single-line labeled address fields that actually contain a street/houseNo (not company line).
-        // NOTE: PLZ/Postleitzahl intentionally excluded (user asked to keep PLZ+City unmasked).
         pattern:
           /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)\s*[:：=]\s*)((?=[^\n\r]{4,140}$)(?=[^\n\r]{0,140}(?:\d{1,4}\s*[A-Za-z]?\b|straße\b|strasse\b|str\.\b|weg\b|platz\b|allee\b|gasse\b|ring\b|ufer\b|damm\b|chaussee\b|promenade\b|markt\b|hof\b|kai\b))[^\n\r]{4,140})/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
 
-      /* ===================== HANDLE ===================== */
       handle: {
         pattern: /@[A-Za-z0-9_]{2,32}\b/g,
         tag: "HANDLE"
       },
 
-      /* ===================== REF ===================== */
       ref: {
         pattern: /\b[A-Z]{2,6}-?\d{4,14}\b/g,
         tag: "REF"
       },
 
-      /* ===================== NUMBER fallback ===================== */
       number: {
         pattern: /\b\d[\d\s\-]{6,30}\d\b/g,
         tag: "NUMBER"
       },
 
-      /* ===================== TITLE ===================== */
       title: {
         pattern: /\b(Herr|Frau|Dr\.?|Prof\.?)\b/g,
         tag: "TITLE"
@@ -433,16 +415,10 @@
     return out;
   }
 
-  // Keys to align with EN “International + High-Risk” patches
   const NEW_KEYS = [
-    // tokens / auth
     "api_key_token",
     "bearer_token",
-
-    // security Q/A
     "security_answer",
-
-    // device / tracking
     "ip_label",
     "ip_address",
     "mac_label",
@@ -450,36 +426,23 @@
     "imei2",
     "device_fingerprint",
     "uuid2",
-
-    // banking routing fields
     "bank_routing_ids",
-
-    // card auth metadata
     "avs_data",
     "three_ds_status",
     "eci",
-
-    // legal/contract refs (tail mask)
     "legal_ref_tail",
-
-    // web3
     "wallet_id",
     "tx_hash",
     "crypto_wallet",
-
-    // insurance (common in EU docs)
     "insurance_id2"
   ];
 
-  // Run these BEFORE generic number fallback
   DE.priority = insertBefore(DE.priority || [], "number", NEW_KEYS);
 
-  // Always-on for high-risk fields (German policy is conservative)
   DE.alwaysOn = DE.alwaysOn || [];
   NEW_KEYS.forEach((k) => uniqPush(DE.alwaysOn, k));
 
   Object.assign(DE.rules, {
-    /* FIX A parity: token/api key (label-driven) */
     api_key_token: {
       pattern:
         /((?:api\s*key|x-api-key|access\s*token|refresh\s*token|token|auth\s*token|client\s*secret|secret\s*key|schlüssel|schluessel)\s*[:：=]\s*)([A-Za-z0-9._\-]{8,300})/giu,
@@ -493,7 +456,6 @@
       mode: "prefix"
     },
 
-    /* Security answer (German + EN label support) */
     security_answer: {
       pattern:
         /((?:Sicherheitsantwort|Antwort|security\s*answer|answer)\s*[:：=]\s*)([^\n\r]{1,160})/giu,
@@ -501,7 +463,6 @@
       mode: "prefix"
     },
 
-    /* IP label + bare */
     ip_label: {
       pattern:
         /((?:IP(?:\s*Adresse|Address)?|IPv4|IPv6)\s*[:：=]\s*)((?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)|(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{1,4})/giu,
@@ -515,7 +476,6 @@
       tag: "SECRET"
     },
 
-    /* MAC label + bare */
     mac_label: {
       pattern: /((?:MAC(?:\s*Adresse|Address)?)\s*[:：=]\s*)(\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b)/giu,
       tag: "SECRET",
@@ -527,14 +487,12 @@
       tag: "SECRET"
     },
 
-    /* IMEI (DE docs often keep “IMEI” label) */
     imei2: {
       pattern: /((?:IMEI)\s*[:：=]\s*)(\d{14,16})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
-    /* Device/session/fingerprint/user-agent */
     device_fingerprint: {
       pattern:
         /((?:Geräte-?ID|Geraete-?ID|Device\s*ID|Session\s*ID|Sitzungs-?ID|Fingerprint|Browser-?Fingerprint|User-?Agent)\s*[:：=]\s*)([^\n\r]{1,220})/giu,
@@ -542,13 +500,11 @@
       mode: "prefix"
     },
 
-    /* UUID / GUID */
     uuid2: {
       pattern: /\b([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\b/giu,
       tag: "SECRET"
     },
 
-    /* Bank routing / clearing / branch / transit / BSB / ABA */
     bank_routing_ids: {
       pattern:
         /((?:Clearing\s*(?:nummer|number|no\.?)|Clearing|Zentralbank-?Nr\.?|Filial-?Code|Filialnummer|Branch\s*Code|Transit\s*Number|BSB|ABA(?:\s*(?:Number|Routing\s*Number))?)\s*[:：=]\s*)([0-9][0-9\s-]{2,24}[0-9])/giu,
@@ -556,7 +512,6 @@
       mode: "prefix"
     },
 
-    /* Card auth / fraud signals */
     avs_data: {
       pattern: /((?:AVS\s*Data)\s*[:：=]\s*)([A-Za-z0-9._\-]{1,40})/giu,
       tag: "SECRET",
@@ -575,7 +530,6 @@
       mode: "prefix"
     },
 
-    /* Legal/contract refs — tail mask (align with EN legal_ref_tail) */
     legal_ref_tail: {
       pattern:
         /((?:(?:Vertragsnummer|Vertrag\s*Nr\.?|Schadensnummer|Schaden\s*Nr\.?|Rechtsfall\s*Ref|Legal\s*Case\s*Ref|Claim\s*Reference|Contract\s*Number)\s*[:：=]\s*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
@@ -583,7 +537,6 @@
       mode: "prefix"
     },
 
-    /* Insurance IDs (EU common) */
     insurance_id2: {
       pattern:
         /((?:Versicherungs(?:nummer|nr\.?)|Police(?:n)?nummer|Policen(?:nr\.?)|Policy\s*(?:ID|No\.?|Number)|Member\s*(?:ID|No\.?|Number))\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,60})/giu,
@@ -591,7 +544,6 @@
       mode: "prefix"
     },
 
-    /* Web3: Wallet ID / Tx hash / Addresses */
     wallet_id: {
       pattern: /((?:Wallet\s*ID)\s*[:：=]\s*)([A-Za-z0-9._\-]{3,80})/giu,
       tag: "SECRET",
