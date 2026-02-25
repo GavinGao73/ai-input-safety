@@ -573,7 +573,38 @@ function getRiskI18n() {
   const pack = getUiPack();
   if (pack && pack.ui && pack.ui.riskI18n) return pack.ui.riskI18n;
 
-  // hard fallback only
+  // ✅ fallback follows UI language (NOT content/rule language)
+  const L = getLangUI();
+
+  if (L === "zh") {
+    return {
+      low: "低",
+      mid: "中",
+      high: "高",
+      top: "主要风险来源",
+      advice: "建议",
+      adviceLow: "可以使用。金钱保护默认开启（M1）。",
+      adviceMid: "请检查主要风险来源；可考虑加强遮罩或添加手工涂抹/术语。",
+      adviceHigh: "不建议直接发送：请移除签名/账户等敏感细节，并加强遮罩。",
+      meta: (m) => `命中 ${m.hits}｜Money M1${m.fromPdf ? "｜文件" : ""}`
+    };
+  }
+
+  if (L === "de") {
+    return {
+      low: "Niedrig",
+      mid: "Mittel",
+      high: "Hoch",
+      top: "Top-Risikoquellen",
+      advice: "Hinweis",
+      adviceLow: "OK. Geldschutz ist standardmäßig aktiv (M1).",
+      adviceMid: "Top-Risiken prüfen; ggf. stärker maskieren oder manuelle Schwärzung/Begriffe ergänzen.",
+      adviceHigh: "Nicht so versenden: Signatur/Konten entfernen und stärker maskieren.",
+      meta: (m) => `Treffer ${m.hits}｜Money M1${m.fromPdf ? "｜Datei" : ""}`
+    };
+  }
+
+  // EN default
   return {
     low: "Low",
     mid: "Medium",
@@ -926,6 +957,17 @@ function applyRules(text) {
       inputLen: out.length
     });
 
+    // ✅ UI: allow manual terms & risk panel while typing (non-empty input)
+    try {
+      const ta2 = $("inputText");
+      const hasInput = !!(ta2 && String(ta2.value || "").trim());
+      if (hasInput) {
+        if (typeof window.expandManualArea === "function") window.expandManualArea();
+        if (typeof window.expandRiskArea === "function") window.expandRiskArea();
+        if (typeof window.syncManualRiskHeights === "function") window.syncManualRiskHeights();
+      }
+    } catch (_) {}
+
     updateInputWatermarkVisibility();
     const ta = $("inputText");
     if (ta) renderInputOverlayForPdf(ta.value || "");
@@ -1081,6 +1123,17 @@ function applyRules(text) {
     fromPdf: lastRunMeta.fromPdf,
     inputLen: lastRunMeta.inputLen
   });
+
+  // ✅ UI: allow manual terms & risk panel while typing (non-empty input)
+  try {
+    const ta2 = $("inputText");
+    const hasInput = !!(ta2 && String(ta2.value || "").trim());
+    if (hasInput) {
+      if (typeof window.expandManualArea === "function") window.expandManualArea();
+      if (typeof window.expandRiskArea === "function") window.expandRiskArea();
+      if (typeof window.syncManualRiskHeights === "function") window.syncManualRiskHeights();
+    }
+  } catch (_) {}
 
   updateInputWatermarkVisibility();
   const ta = $("inputText");
