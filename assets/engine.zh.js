@@ -40,7 +40,7 @@
       if (han / total > 0.05) return "zh";
 
       if (
-        /(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号|开户银行|对公账户|收款账号|身份证|护照|出生日期|出生地|设备ID|会话ID|IP地址|交易哈希|钱包地址)/.test(
+        /(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号|开户银行|对公账户|收款账号|身份证|护照|出生日期|出生地|设备ID|会话ID|IP地址|交易哈希|钱包地址|车牌|号牌)/.test(
           s
         )
       ) {
@@ -62,6 +62,7 @@
       "id_card",
       "passport",
       "driver_license",
+      "license_plate",
 
       // device / tracking
       "ip_label",
@@ -128,6 +129,7 @@
       "id_card",
       "passport",
       "driver_license",
+      "license_plate",
 
       "ip_label",
       "ip_address",
@@ -315,7 +317,18 @@
 
       /* ===================== Driver License (label-driven) ===================== */
       driver_license: {
-        pattern: /((?:驾驶证号|驾驶证号码|Driver[’']?s\s*License(?:\s*No\.?|Number)?)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32})/giu,
+        // CN policy: 驾驶证号按“身份证号”处理（18位，末位可X）。
+        // 同时为了防止字段里出现脏数据（例如带"-"的拼接编号），只要该字段值含数字也整体遮盖。
+        pattern: /((?:驾驶证号|驾驶证号码|Driver[’']?s\s*License(?:\s*No\.?|Number)?)\s*[:：=]\s*)(\d{17}[\dXx]|(?=[^\n\r]*\d)[^\n\r]{4,40})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      /* ===================== LICENSE PLATE (label-driven; CN) ===================== */
+      license_plate: {
+        // CN plate: “京A123456” (汉字 + 字母 + 5~6位字母数字), no "-" / no spaces.
+        // Covers both standard (5) and new-energy style (6) tail lengths.
+        pattern: /((?:车牌号|车牌号码|号牌号码|车牌)\s*[:：=]\s*)([\u4E00-\u9FFF][A-Z][A-Z0-9]{5,6})\b/giu,
         tag: "SECRET",
         mode: "prefix"
       },
