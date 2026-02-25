@@ -40,7 +40,7 @@
       if (han / total > 0.05) return "zh";
 
       if (
-        /(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号|开户银行|对公账户|收款账号|身份证|护照|出生日期|出生地|设备ID|会话ID|IP地址|交易哈希|钱包地址|索赔参考号|法律案件号|Application\s*ID|Reference)/.test(
+        /(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户地址|密码|验证码|登录账号|微信号|开户银行|对公账户|收款账号|身份证|护照|出生日期|出生地|设备ID|会话ID|IP地址|交易哈希|钱包地址)/.test(
           s
         )
       ) {
@@ -84,10 +84,8 @@
       "url",
 
       // refs / handles (label-driven)
-      // ✅ IMPORTANT: tail-mask multi-segment IDs BEFORE label-driven full mask,
-      // so you keep prefix like APP-2026-02- intact.
-      "ref_tail",
       "handle_label",
+      "ref_tail",
       "ref_label",
 
       // money (requires currency indicator)
@@ -153,7 +151,7 @@
       "tx_hash",
       "crypto_wallet",
 
-      // ✅ tail-mask for multi-segment IDs (keeps prefix, hides last numeric chunk)
+      // ✅ tail-mask multi-segment IDs (keeps prefix, hides last numeric chunk)
       "ref_tail"
     ],
 
@@ -164,8 +162,7 @@
 
       const lbl = String(label || "").toLowerCase();
       // labels that are usually IDs, not phones
-      if (/(编号|单号|订单|发票|合同|申请|工单|票据|客户|账号|账户|卡号|对公|税号|reference|application\s*id)/i.test(lbl))
-        return false;
+      if (/(编号|单号|订单|发票|合同|申请|工单|票据|客户|账号|账户|卡号|对公|税号)/i.test(lbl)) return false;
 
       // value itself looks like typical ID prefix
       if (/\b(?:CUST|CASE|ORD|INV|APP|REF|ACC|REQ|TKT|TK|LC)-/i.test(String(value || ""))) return false;
@@ -318,23 +315,17 @@
 
       /* ===================== Driver License (label-driven) ===================== */
       driver_license: {
-        // ✅ allow CN province prefix like 京A-xxxxxx-2026 (starts with Chinese char)
-        pattern: /((?:驾驶证号|驾驶证号码|Driver[’']?s\s*License(?:\s*No\.?|Number)?)\s*[:：=]\s*)([\u4E00-\u9FFFA-Za-z0-9][A-Za-z0-9\-\/]{4,32})/giu,
+        pattern: /((?:驾驶证号|驾驶证号码|Driver[’']?s\s*License(?:\s*No\.?|Number)?)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       /* ===================== REF TAIL (multi-segment IDs) ===================== */
       ref_tail: {
-        // Strategy: keep prefix segments, mask ONLY the last numeric segment (>=4 digits)
-        // Examples:
-        // APP-2026-02-778421     -> APP-2026-02-【编号】
-        // REF-AB-2026-00078421   -> REF-AB-2026-【编号】
-        // CLM-XY-2026-0007712    -> CLM-XY-2026-【编号】
-        // LEGAL-REF-2026-00001234-> LEGAL-REF-2026-【编号】
-        //
-        // NOTE: requires lookbehind support (modern Chrome/Edge OK).
-        pattern: /(?<=\b[A-Z][A-Z0-9]{1,10}(?:-[A-Z0-9]{1,10})*-)\d{4,}\b/g,
+        // keep prefix segments, mask ONLY the last numeric segment (>=4 digits)
+        // APP-2026-02-778421 -> APP-2026-02-【编号】
+        // REF-AB-2026-00078421 -> REF-AB-2026-【编号】
+        pattern: /(?<=\b[A-Z][A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})*-)\d{4,}\b/g,
         tag: "REF"
       },
 
@@ -396,8 +387,8 @@
 
       /* ===================== REF (label-driven) ===================== */
       ref_label: {
-        // ✅ add: Application ID / Reference / 索赔参考号 / 法律案件号
-        pattern: /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|Case\s*ID|Ticket\s*No\.?|Application\s*ID|Order\s*ID|Invoice\s*No\.?|Reference)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,80})/giu,
+        // ✅ important: exclude '-' to avoid fighting with ref_tail (multi-segment IDs)
+        pattern: /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9_.]{3,80})/giu,
         tag: "REF",
         mode: "prefix"
       },
