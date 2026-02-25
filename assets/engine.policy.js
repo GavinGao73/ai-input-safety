@@ -48,6 +48,7 @@
 
     // ✅ risk scoring policy (non-language)
     risk: {
+      // legacy weights kept for UI "Top risk sources" ranking (no UI change)
       weights: {
         bank: 28,
         account: 26,
@@ -68,21 +69,100 @@
         manual_term: 10
       },
 
-      // thresholds
+      // Scheme A config: grouped saturation scoring
+      groups: {
+        critical: [
+          "secret",
+          "api_key_token",
+          "bearer_token",
+          "card_security",
+          "security_answer"
+        ],
+        financial: [
+          "account",
+          "bank",
+          "bank_routing_ids",
+          "card_expiry"
+        ],
+        identity: [
+          "dob",
+          "place_of_birth",
+          "passport",
+          "driver_license",
+          "ssn",
+          "ein",
+          "national_id",
+          "tax_id",
+          "insurance_id",
+          "intl_itin",
+          "intl_nino",
+          "intl_nhs",
+          "intl_sin",
+          "intl_tfn",
+          "intl_abn"
+        ],
+        contact: [
+          "phone",
+          "email",
+          "url",
+          "address_cn",
+          "address_cn_partial",
+          "address_de_street",
+          "address_en_inline_street",
+          "address_en_extra_block",
+          "address_en_extra",
+          "handle_label",
+          "handle",
+          "person_name",
+          "company"
+        ],
+        tracking: [
+          "ip_label",
+          "ip_address",
+          "mac_label",
+          "mac_address",
+          "imei",
+          "device_fingerprint",
+          "uuid",
+          "wallet_id",
+          "tx_hash",
+          "crypto_wallet"
+        ]
+      },
+
+      // group weights MUST sum to 1.0
+      groupWeights: {
+        critical: 0.32,
+        financial: 0.28,
+        identity: 0.18,
+        contact: 0.12,
+        tracking: 0.10
+      },
+
+      // saturation speed per group (higher => saturates faster)
+      groupK: {
+        critical: 0.35,
+        financial: 0.30,
+        identity: 0.22,
+        contact: 0.18,
+        tracking: 0.20
+      },
+
+      // thresholds (tuned for Scheme A distribution)
       thresholds: {
-        mid: 35,
+        mid: 40,
         high: 70
       },
 
-      // score bonuses
+      // score bonuses (kept, but reduced so high-intensity docs don't constant-hit 100)
       bonus: {
-        base: 10,
-        len1500: 6,
-        len4000: 8,
-        fromPdf: 6
+        base: 0,
+        len1500: 2,
+        len4000: 3,
+        fromPdf: 2
       },
 
-      // cap hits per key to avoid runaway score
+      // cap hits per key to avoid runaway within a group
       capPerKey: 12,
 
       clampMin: 0,
