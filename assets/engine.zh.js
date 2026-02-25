@@ -50,7 +50,6 @@
     },
 
     // ✅ language-specific execution order (tuned independently)
-    // 说明：尽量对齐 EN/DE 的“高风险先行”，但不硬上不符合中文常见形态的字段。
     priority: [
       // secrets/auth first
       "secret",
@@ -86,6 +85,7 @@
 
       // refs / handles (label-driven)
       "handle_label",
+      "ref_label_tail", // ✅ NEW: label-driven multi-segment tail mask (incl. pure numeric prefixes)
       "ref_tail",
       "ref_label",
 
@@ -114,8 +114,7 @@
       "number"
     ],
 
-    // ✅ language-specific always-on (beyond core base)
-    // 说明：zh 默认更偏“保守合规”：证件/设备/路由/安全类字段建议 always-on。
+    // ✅ language-specific always-on
     alwaysOn: [
       "handle_label",
       "ref_label",
@@ -154,7 +153,10 @@
       "crypto_wallet",
 
       // ✅ tail-mask multi-segment IDs (keeps prefix, hides last numeric chunk)
-      "ref_tail"
+      "ref_tail",
+
+      // ✅ NEW: label-driven tail mask for multi-segment IDs (Ticket No. / Case ID / etc.)
+      "ref_label_tail"
     ],
 
     // ✅ phone FP guard (zh): prevent long numeric IDs/refs being treated as phone
@@ -163,10 +165,8 @@
       if (digits.length >= 16) return false;
 
       const lbl = String(label || "").toLowerCase();
-      // labels that are usually IDs, not phones
       if (/(编号|单号|订单|发票|合同|申请|工单|票据|客户|账号|账户|卡号|对公|税号)/i.test(lbl)) return false;
 
-      // value itself looks like typical ID prefix
       if (/\b(?:CUST|CASE|ORD|INV|APP|REF|ACC|REQ|TKT|TK|LC)-/i.test(String(value || ""))) return false;
 
       return true;
@@ -193,14 +193,12 @@
       return `${label}${S1}${v}${S2}`;
     },
 
-    // ✅ company formatting strategy (zh-only): keep partial industry tail + legal suffix
-    // Signature aligned with core call-site: ({ raw, name, legal, punct, coreStr, placeholder })
+    // ✅ company formatting strategy (zh-only)
     formatCompany: function ({ raw, name, legal, punct, coreStr, placeholder }) {
       const rawName = String(name || "");
       const rawLegal = String(legal || "");
       const rawPunct = String(punct || "");
 
-      // if no legal, just mask whole company token
       if (!rawLegal) return `${placeholder("COMPANY")}${rawPunct}`;
 
       const INDUSTRY = [
@@ -248,14 +246,11 @@
       return `${placeholder("COMPANY")}${keep}${rawLegal}${rawPunct}`;
     },
 
-    // ✅ company highlight for pdf overlay (zh-only)
-    // Signature aligned with core call-site: ({ match, name, legal, punct, S1, S2 })
     highlightCompany: function ({ match, name, legal, punct, S1, S2 }) {
       const rawName = String(name || "");
       const rawLegal = String(legal || "");
       const rawPunct = String(punct || "");
       if (rawLegal) return `${S1}${rawName}${S2}${rawLegal}${rawPunct}`;
-      // fallback: highlight whole token if no legal captured
       const m = String(match || rawName || "");
       return `${S1}${m}${S2}${rawPunct}`;
     },
@@ -327,17 +322,25 @@
       /* ===================== LICENSE PLATE (label-driven; CN) ===================== */
       license_plate: {
         // CN plate: “京A123456” (汉字 + 字母 + 5~6位字母数字), no "-" / no spaces.
-        // Covers both standard (5) and new-energy style (6) tail lengths.
         pattern: /((?:车牌号|车牌号码|号牌号码|车牌)\s*[:：=]\s*)([\u4E00-\u9FFF][A-Z][A-Z0-9]{5,6})\b/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
-      /* ===================== REF TAIL (multi-segment IDs) ===================== */
+      /* ===================== REF LABEL TAIL (multi-segment IDs; label-driven) ===================== */
+      ref_label_tail: {
+        // keep prefix segments, mask ONLY the last numeric segment (>=4 digits), even when prefix is numeric.
+        // Ticket No.: 20260224-778421 -> Ticket No.: 20260224-【编号】
+        // Case ID: CASE-2026-00078421 -> Case ID: CASE-2026-【编号】
+        pattern:
+          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|合同号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?|Application\s*ID|Reference)\s*[:：=]\s*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+){0,10}[-_.]))(\d{4,})/giu,
+        tag: "REF",
+        mode: "prefix"
+      },
+
+      /* ===================== REF TAIL (multi-segment IDs; generic) ===================== */
       ref_tail: {
         // keep prefix segments, mask ONLY the last numeric segment (>=4 digits)
-        // APP-2026-02-778421 -> APP-2026-02-【编号】
-        // REF-AB-2026-00078421 -> REF-AB-2026-【编号】
         pattern: /(?<=\b[A-Z][A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})*-)\d{4,}\b/g,
         tag: "REF"
       },
@@ -400,7 +403,7 @@
 
       /* ===================== REF (label-driven) ===================== */
       ref_label: {
-        // ✅ important: exclude '-' to avoid fighting with ref_tail (multi-segment IDs)
+        // exclude '-' to avoid fighting with multi-segment tail rules
         pattern: /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9_.]{3,80})/giu,
         tag: "REF",
         mode: "prefix"
