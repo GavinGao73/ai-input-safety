@@ -404,3 +404,211 @@
     }
   };
 })();
+
+// =========================
+// DE High-Risk ADD-ONLY Patch (align with EN patches; German-friendly labels)
+// - SAFE: append priority/alwaysOn; add rules only
+// - DOES NOT modify existing DE rules (address locks preserved)
+// =========================
+(function () {
+  "use strict";
+
+  const PACKS = (window.__ENGINE_LANG_PACKS__ = window.__ENGINE_LANG_PACKS__ || {});
+  const DE = PACKS.de;
+  if (!DE) return;
+
+  function uniqPush(arr, key) {
+    if (!arr.includes(key)) arr.push(key);
+  }
+
+  function insertBefore(arr, beforeKey, keys) {
+    const out = Array.isArray(arr) ? arr.slice() : [];
+    const idx = out.indexOf(beforeKey);
+    const insertAt = idx >= 0 ? idx : out.length;
+    const toInsert = [];
+    (keys || []).forEach((k) => {
+      if (!out.includes(k) && !toInsert.includes(k)) toInsert.push(k);
+    });
+    out.splice(insertAt, 0, ...toInsert);
+    return out;
+  }
+
+  // Keys to align with EN “International + High-Risk” patches
+  const NEW_KEYS = [
+    // tokens / auth
+    "api_key_token",
+    "bearer_token",
+
+    // security Q/A
+    "security_answer",
+
+    // device / tracking
+    "ip_label",
+    "ip_address",
+    "mac_label",
+    "mac_address",
+    "imei2",
+    "device_fingerprint",
+    "uuid2",
+
+    // banking routing fields
+    "bank_routing_ids",
+
+    // card auth metadata
+    "avs_data",
+    "three_ds_status",
+    "eci",
+
+    // legal/contract refs (tail mask)
+    "legal_ref_tail",
+
+    // web3
+    "wallet_id",
+    "tx_hash",
+    "crypto_wallet",
+
+    // insurance (common in EU docs)
+    "insurance_id2"
+  ];
+
+  // Run these BEFORE generic number fallback
+  DE.priority = insertBefore(DE.priority || [], "number", NEW_KEYS);
+
+  // Always-on for high-risk fields (German policy is conservative)
+  DE.alwaysOn = DE.alwaysOn || [];
+  NEW_KEYS.forEach((k) => uniqPush(DE.alwaysOn, k));
+
+  Object.assign(DE.rules, {
+    /* FIX A parity: token/api key (label-driven) */
+    api_key_token: {
+      pattern:
+        /((?:api\s*key|x-api-key|access\s*token|refresh\s*token|token|auth\s*token|client\s*secret|secret\s*key|schlüssel|schluessel)\s*[:：=]\s*)([A-Za-z0-9._\-]{8,300})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    bearer_token: {
+      pattern: /(\bauthorization\s*[:：=]\s*bearer\s+)([A-Za-z0-9._\-]{8,400})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* Security answer (German + EN label support) */
+    security_answer: {
+      pattern:
+        /((?:Sicherheitsantwort|Antwort|security\s*answer|answer)\s*[:：=]\s*)([^\n\r]{1,160})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* IP label + bare */
+    ip_label: {
+      pattern:
+        /((?:IP(?:\s*Adresse|Address)?|IPv4|IPv6)\s*[:：=]\s*)((?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)|(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{1,4})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    ip_address: {
+      pattern:
+        /\b((?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)|(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{1,4})\b/giu,
+      tag: "SECRET"
+    },
+
+    /* MAC label + bare */
+    mac_label: {
+      pattern: /((?:MAC(?:\s*Adresse|Address)?)\s*[:：=]\s*)(\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b)/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    mac_address: {
+      pattern: /\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b/giu,
+      tag: "SECRET"
+    },
+
+    /* IMEI (DE docs often keep “IMEI” label) */
+    imei2: {
+      pattern: /((?:IMEI)\s*[:：=]\s*)(\d{14,16})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* Device/session/fingerprint/user-agent */
+    device_fingerprint: {
+      pattern:
+        /((?:Geräte-?ID|Geraete-?ID|Device\s*ID|Session\s*ID|Sitzungs-?ID|Fingerprint|Browser-?Fingerprint|User-?Agent)\s*[:：=]\s*)([^\n\r]{1,220})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* UUID / GUID */
+    uuid2: {
+      pattern: /\b([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\b/giu,
+      tag: "SECRET"
+    },
+
+    /* Bank routing / clearing / branch / transit / BSB / ABA */
+    bank_routing_ids: {
+      pattern:
+        /((?:Clearing\s*(?:nummer|number|no\.?)|Clearing|Zentralbank-?Nr\.?|Filial-?Code|Filialnummer|Branch\s*Code|Transit\s*Number|BSB|ABA(?:\s*(?:Number|Routing\s*Number))?)\s*[:：=]\s*)([0-9][0-9\s-]{2,24}[0-9])/giu,
+      tag: "ACCOUNT",
+      mode: "prefix"
+    },
+
+    /* Card auth / fraud signals */
+    avs_data: {
+      pattern: /((?:AVS\s*Data)\s*[:：=]\s*)([A-Za-z0-9._\-]{1,40})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    three_ds_status: {
+      pattern: /((?:3-?D\s*Secure|3DS)(?:\s*Status)?\s*[:：=]\s*)([A-Za-z0-9._\-]{1,40})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    eci: {
+      pattern: /((?:ECI)\s*[:：=]\s*)(\d{2})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* Legal/contract refs — tail mask (align with EN legal_ref_tail) */
+    legal_ref_tail: {
+      pattern:
+        /((?:(?:Vertragsnummer|Vertrag\s*Nr\.?|Schadensnummer|Schaden\s*Nr\.?|Rechtsfall\s*Ref|Legal\s*Case\s*Ref|Claim\s*Reference|Contract\s*Number)\s*[:：=]\s*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
+      tag: "REF",
+      mode: "prefix"
+    },
+
+    /* Insurance IDs (EU common) */
+    insurance_id2: {
+      pattern:
+        /((?:Versicherungs(?:nummer|nr\.?)|Police(?:n)?nummer|Policen(?:nr\.?)|Policy\s*(?:ID|No\.?|Number)|Member\s*(?:ID|No\.?|Number))\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,60})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* Web3: Wallet ID / Tx hash / Addresses */
+    wallet_id: {
+      pattern: /((?:Wallet\s*ID)\s*[:：=]\s*)([A-Za-z0-9._\-]{3,80})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    tx_hash: {
+      pattern: /((?:Transaction\s*Hash|TX\s*Hash|Txn\s*Hash)\s*[:：=]\s*)(0x[0-9a-f]{16,128})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    crypto_wallet: {
+      pattern:
+        /((?:BTC|ETH)\s*[:：=]\s*)((?:bc1)[0-9a-z]{25,90}|[13][A-HJ-NP-Za-km-z1-9]{25,34}|0x[a-f0-9]{40})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    }
+  });
+})();
