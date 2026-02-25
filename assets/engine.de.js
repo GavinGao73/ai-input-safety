@@ -13,6 +13,7 @@
 // USER ADJUST (latest):
 // - Name lines: DO NOT output [Anrede]. Keep Herr/Frau/Dr/Prof titles, only mask the name part -> [Name].
 // - Geburtsort: low priority; can mask, but leaving it is acceptable.
+// - Zusatz: only mask "Gebäude..., OG..., Zimmer..." part; keep ", Klingel „Müller“…"
 // =========================
 
 (function () {
@@ -133,11 +134,12 @@
       "id_card",
       "passport",
       "driver_license",
-      "birthdate",
+      "birthdate"
 
       // birthplace is low priority (user). DO NOT force it.
       // (Removed in fix patch if present)
 
+      ,
       "account",
       "bank",
       "blz",
@@ -579,14 +581,15 @@
 })();
 
 // =========================
-// DE Fix Patch (UPDATED per user)
+// DE Fix Patch (UPDATED per user; + Zusatz partial masking)
 // - Fix BLZ with parentheses: "Bankleitzahl (BLZ): ..."
 // - Add card expiry + CVC/CVV
 // - Fix Name masking: KEEP titles (Herr/Frau/Dr/Prof) in output; DO NOT emit [Anrede]; only mask name => [Name]
 // - Geburtsort: low priority; do NOT force masking (remove from alwaysOn)
-// - Address: street-only masking while keeping tail (PLZ/City/Country) using mode "prefix_keep_tail"
-//   and disable legacy "address_de_street" execution to prevent tail loss.
+// - Address: street-only masking while keeping tail (PLZ/City/Country) WITHOUT requiring new engine modes
+// - Zusatz: mask only "Gebäude..., OG..., Zimmer..." and keep ", Klingel …"
 // - IMPORTANT: disable "title" key execution to prevent Herr/Frau/Dr/Prof -> [Anrede]
+// - IMPORTANT: disable full-line "address_de_extra" masking to avoid swallowing Klingel-tail after partial masking
 // =========================
 (function () {
   "use strict";
@@ -618,7 +621,8 @@
     "blz_paren",
     "card_expiry_de",
     "card_security_de",
-    "address_de_street_partial"
+    "address_de_street_partial",
+    "address_de_extra_partial" // Zusatz: Gebäude/OG/Zimmer only (keep Klingel tail)
   ];
 
   // Insert BEFORE existing keys where relevant
@@ -626,12 +630,14 @@
   DE.priority = insertBefore(DE.priority || [], "birthplace", ["birthplace_optional_secret"]);
   DE.priority = insertBefore(DE.priority || [], "blz", ["blz_paren"]);
   DE.priority = insertBefore(DE.priority || [], "address_de_street", ["address_de_street_partial"]);
+  DE.priority = insertBefore(DE.priority || [], "address_de_extra", ["address_de_extra_partial"]);
   DE.priority = insertBefore(DE.priority || [], "number", ["card_expiry_de", "card_security_de"]);
 
   // Always-on:
   // - keep person-name fix always on
   // - keep BLZ/expiry/CVC always on
   // - keep address partial always on
+  // - keep Zusatz partial always on (per user)
   // - DO NOT force Geburtsort (user said low priority)
   DE.alwaysOn = Array.isArray(DE.alwaysOn) ? DE.alwaysOn : [];
   uniqPush(DE.alwaysOn, "person_name_keep_title");
@@ -639,20 +645,12 @@
   uniqPush(DE.alwaysOn, "card_expiry_de");
   uniqPush(DE.alwaysOn, "card_security_de");
   uniqPush(DE.alwaysOn, "address_de_street_partial");
+  uniqPush(DE.alwaysOn, "address_de_extra_partial");
 
-  // Remove birthplace from alwaysOn (soften: mask only if enabled by user or other strategy)
+  // Remove birthplace from alwaysOn (soften)
   DE.alwaysOn = DE.alwaysOn.filter(
     (k) => k !== "birthplace" && k !== "birthplace_secret" && k !== "birthplace_optional_secret"
   );
-
-  // IMPORTANT: disable legacy full-line address masking key execution to prevent losing tail
-  // (rule definition remains for backward compatibility, but it will not run)
-  if (Array.isArray(DE.priority)) {
-    DE.priority = DE.priority.filter((k) => k !== "address_de_street");
-  }
-  if (Array.isArray(DE.alwaysOn)) {
-    DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "address_de_street");
-  }
 
   // IMPORTANT: disable title masking execution (prevents Herr/Frau/Dr/Prof -> [Anrede])
   if (Array.isArray(DE.priority)) {
@@ -662,11 +660,21 @@
     DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "title");
   }
 
+  // IMPORTANT: disable full-line Zusatz masking to avoid swallowing Klingel-tail after partial masking
+  if (Array.isArray(DE.priority)) {
+    DE.priority = DE.priority.filter((k) => k !== "address_de_extra");
+  }
+  if (Array.isArray(DE.alwaysOn)) {
+    DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "address_de_extra");
+  }
+
   Object.assign(DE.rules, {
     /* 1) Name lines: keep title, only mask the name part.
-       Example:
-       "Name: Herr Max Müller" -> "Name: Herr [Name]"
-       "Ansprechpartner: Dr. Julia Wagner" -> "Ansprechpartner: Dr. [Name]"
+       Expected:
+       Name: Herr [Name]
+       Empfänger: Frau [Name]
+       Ansprechpartner: Dr. [Name]
+       And never emits [Anrede].
     */
     person_name_keep_title: {
       pattern:
@@ -705,16 +713,29 @@
     },
 
     /* 6) Address partial masking (street only, keep PLZ/City/Country)
-       Requires engine.js support: mode "prefix_keep_tail"
+       Achieved WITHOUT new engine modes: we only match up to the comma via lookahead.
        Example:
        "Adresse: Musterstraße 12, 50667 Köln, Deutschland"
        -> "Adresse: [Adresse], 50667 Köln, Deutschland"
     */
     address_de_street_partial: {
       pattern:
-        /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)\s*[:：=]\s*)([^,\n\r]{4,120}?)(\s*,[^\n\r]{0,160})/giu,
+        /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)\s*[:：=]\s*)([^,\n\r]{4,120}?)(?=\s*,)/giu,
       tag: "ADDRESS",
-      mode: "prefix_keep_tail"
+      mode: "prefix"
+    },
+
+    /* 7) Zusatz partial masking:
+       Only mask "Gebäude..., OG..., Zimmer..." and keep the rest, e.g. ", Klingel „Müller“…"
+       Example:
+       "Zusatz: Gebäude B, 3. OG, Zimmer 12, Klingel „Müller“"
+       -> "Zusatz: [Adresse], Klingel „Müller“"
+    */
+    address_de_extra_partial: {
+      pattern:
+        /((?:Zusatz)\s*[:：=]\s*)((?=[^\n\r]{2,260})(?=.*\b(?:Gebäude|Haus|Block|Aufgang|Etage|Stock|Stockwerk|OG|EG|DG|WHG|Wohnung|Zimmer|Raum|App\.?|Apartment)\b)[^\n\r]*?)(?=,\s*(?:Klingel|Tür|Tel\.?|Telefon)\b)/giu,
+      tag: "ADDRESS",
+      mode: "prefix"
     }
   });
 })();
