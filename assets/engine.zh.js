@@ -99,8 +99,9 @@
       "phone",
 
       // person/org
-      "person_name",
+      // ✅ FIX: company before person_name (开户名等公司字段不应被人名抢走)
       "company",
+      "person_name",
 
       // address (CN partial)
       "address_cn",
@@ -120,6 +121,12 @@
     // ✅ language-specific always-on
     alwaysOn: [
       "handle_label",
+
+      // ✅ FIX: tail-mask first (avoid ref_label partial-grab in multi-pass engines)
+      "cust_id",
+      "ref_numeric_tail_label",
+      "ref_label_tail2",
+
       "ref_label",
       "address_cn",
 
@@ -149,16 +156,13 @@
 
       "money",
 
+      // ✅ FIX: org before person
+      "company",
       "person_name",
 
       "wallet_id",
       "tx_hash",
-      "crypto_wallet",
-
-      // ✅ FIX: stable tail-mask for multi-segment IDs (no lookbehind; keep prefix)
-      "cust_id",
-      "ref_numeric_tail_label",
-      "ref_label_tail2"
+      "crypto_wallet"
     ],
 
     // ✅ phone FP guard (zh): prevent long numeric IDs/refs being treated as phone
@@ -293,7 +297,8 @@
 
       /* ===================== DOB / Birthdate (label-driven) ===================== */
       dob: {
-        pattern: /((?:出生日期|出生年月|生日|DOB|Date\s*of\s*Birth)\s*[:：=]\s*)(\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日)/giu,
+        // ✅ FIX: allow "出生日期（中文）" label
+        pattern: /((?:出生日期(?:（中文）)?|出生年月|生日|DOB|Date\s*of\s*Birth)\s*[:：=]\s*)(\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日)/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -339,7 +344,7 @@
       /* ===================== CUSTOMER ID (CUST-...) ===================== */
       cust_id: {
         // Customer ID: CUST-004918273645 -> Customer ID: CUST-【编号】
-        pattern: /((?:Customer\s*ID|客户号|客户ID)\s*[:：=]\s*CUST-)(\d{6,})/giu,
+        pattern: /((?:Customer\s*ID|客户号|客户ID)\s*[:：=]\s*CUST-)(?![^\n\r]*【编号】)(\d{6,})/giu,
         tag: "REF",
         mode: "prefix"
       },
@@ -347,7 +352,8 @@
       /* ===================== REF NUMERIC TAIL (label-driven; numeric prefix) ===================== */
       ref_numeric_tail_label: {
         // Ticket No.: 20260224-778421 -> Ticket No.: 20260224-【编号】
-        pattern: /((?:Ticket\s*No\.?|工单号|票据号|编号)\s*[:：=]\s*\d{4,}[-_.])(\d{4,})/giu,
+        // ✅ FIX: capture the whole prefix including the numeric head + delimiter
+        pattern: /((?:Ticket\s*No\.?|工单号|票据号|编号)\s*[:：=]\s*)(?![^\n\r]*【编号】)(\d{4,}[-_.])(\d{4,})/giu,
         tag: "REF",
         mode: "prefix"
       },
@@ -358,15 +364,18 @@
         // Case ID: CASE-2026-00078421 -> Case ID: CASE-2026-【编号】
         // Application ID: APP-2026-02-778421 -> Application ID: APP-2026-02-【编号】
         // Reference: REF-AB-2026-00078421 -> Reference: REF-AB-2026-【编号】
+        // Contract/Legal: LC-AB-2026-00078421 / LEGAL-REF-2026-00001234 / CLM-XY-2026-0007712 -> ...-【编号】
         pattern:
-          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|Case\s*ID|Order\s*ID|Invoice\s*No\.?|Application\s*ID|Reference)\s*[:：=]\s*)(?![^\n\r]*【编号】)(?:(?:[A-Za-z]{2,10}[A-Za-z0-9]*)(?:-[A-Za-z0-9]{1,12}){0,8}-)(\d{4,})/giu,
+          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|Case\s*ID|Order\s*ID|Invoice\s*No\.?|Application\s*ID|Reference)\s*[:：=]\s*)(?![^\n\r]*【编号】)(?:(?:(?:[A-Za-z]{2,10}[A-Za-z0-9]*)(?:-[A-Za-z0-9]{1,12}){0,8})-)(\d{4,})/giu,
         tag: "REF",
         mode: "prefix"
       },
 
       /* ===================== ACCOUNT (label-driven) ===================== */
       account: {
-        pattern: /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|信用卡|信用卡号|信用卡號|card\s*number|credit\s*card|对公账户|對公賬戶|IBAN|Account\s*Number)\s*[:：=]?\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{6,40}\d)/giu,
+        // ✅ FIX: do NOT let \s cross newline (avoid "IBAN: ... \n 开户银行:" being merged)
+        pattern:
+          /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|信用卡|信用卡号|信用卡號|card\s*number|credit\s*card|对公账户|對公賬戶|IBAN|Account\s*Number)\s*[:：=]?\s*)([A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -380,7 +389,9 @@
 
       /* ===================== BANK ROUTING / CLEARING / BRANCH (label-driven) ===================== */
       bank_routing_ids: {
-        pattern: /((?:联行号|清算号|分行号|支行号|行号|路由号|routing\s*number|aba|bsb|transit\s*number|clearing\s*(?:number|no\.?)|branch\s*code)\s*[:：=]\s*)([0-9][0-9\s-]{2,24}[0-9])/giu,
+        // ✅ FIX: do NOT let \s cross newline
+        pattern:
+          /((?:联行号|清算号|分行号|支行号|行号|路由号|routing\s*number|aba|bsb|transit\s*number|clearing\s*(?:number|no\.?)|branch\s*code)\s*[:：=]\s*)([0-9][0-9 \t-]{2,24}[0-9])/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -402,7 +413,8 @@
       /* ===================== PHONE (label-driven + explicit intl prefix) ===================== */
       phone: {
         // ✅ minimal FP cut: remove "联系人/kontakt" from label list (it caused accidental non-phone spans)
-        pattern: /((?:联系方式|联系电话|电话|手機|手机|tel|telefon|phone|mobile|handy)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(\b(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
+        pattern:
+          /((?:联系方式|联系电话|电话|手機|手机|tel|telefon|phone|mobile|handy)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(\b(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
         tag: "PHONE",
         mode: "phone"
       },
@@ -427,14 +439,17 @@
       /* ===================== REF (label-driven) ===================== */
       ref_label: {
         // important: exclude '-' to avoid fighting with multi-segment tail rules
-        pattern: /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9_.]{3,80})/giu,
+        // ✅ FIX: prevent partial-grab when the next char is '-' (e.g. "CASE-2026-..." / "20260224-...")
+        pattern:
+          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9_.]{3,80})(?!-)/giu,
         tag: "REF",
         mode: "prefix"
       },
 
       /* ===================== ADDRESS (CN partial) ===================== */
       address_cn: {
-        pattern: /((?:地址|住址|办公地址|通信地址|收货地址|居住地址|单位地址|联系地址)\s*[:：=]?\s*)([^\n\r]{2,120})/giu,
+        // ✅ FIX: require delimiter (avoid matching headings like "地址信息（用于...）")
+        pattern: /((?:地址|住址|办公地址|通信地址|收货地址|居住地址|单位地址|联系地址)\s*[:：=]\s*)([^\n\r]{2,120})/giu,
         tag: "ADDRESS",
         mode: "address_cn_partial"
       },
@@ -538,7 +553,8 @@
 
       /* ===================== REF (format-like) ===================== */
       ref: {
-        pattern: /\b[A-Z]{2,6}-?\d{5,14}\b/g,
+        // ✅ FIX: avoid partial match inside multi-segment IDs like CASE-2026-00078421
+        pattern: /\b[A-Z]{2,6}-?\d{5,14}\b(?!-\d)/g,
         tag: "REF"
       },
 
