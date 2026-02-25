@@ -9,6 +9,10 @@
 // - Address: do NOT mask PLZ+City / Country.
 //   Only mask street + house number; if apartment details exist, include building/floor/room (e.g., Gebäude/OG/Zimmer).
 // - Everything else stays as-is.
+//
+// USER ADJUST (latest):
+// - Name lines: DO NOT output [Anrede]. Keep Herr/Frau/Dr/Prof titles, only mask the name part -> [Name].
+// - Geburtsort: low priority; can mask, but leaving it is acceptable.
 // =========================
 
 (function () {
@@ -28,7 +32,7 @@
       ADDRESS: "[Adresse]",
       HANDLE: "[Handle]",
       REF: "[Referenz]",
-      TITLE: "[Anrede]",
+      TITLE: "[Anrede]", // NOTE: kept for generic use; name-lines must not emit [Anrede]
       NUMBER: "[Zahl]",
       MONEY: "[Betrag]",
       COMPANY: "[Firma]",
@@ -43,11 +47,11 @@
       // ✅ 不再因为一个 ü/ä/ö/ß 就直接判定德语
       // 只有出现“明显德语关键词”才判定为 de
       if (
-      /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Zusatz|Geburtsdatum|Geburtsort|USt-IdNr)\b/i.test(
-      s
+        /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Zusatz|Geburtsdatum|Geburtsort|USt-IdNr)\b/i.test(
+          s
+        )
       )
-    )
-      return "de";
+        return "de";
 
       // ✅ 兜底：如果德语字符很多（比如整段德语），也判 de（避免误判）
       const umlauts = (s.match(/[äöüÄÖÜß]/g) || []).length;
@@ -129,6 +133,9 @@
       "passport",
       "driver_license",
       "birthdate",
+
+      // birthplace is conservative in original; user says low priority (can mask, can keep).
+      // Keep it ON for now, but we will provide an optional downgrade patch below.
       "birthplace",
 
       "account",
@@ -265,6 +272,7 @@
       },
 
       birthplace: {
+        // NOTE (kept as-is in base pack). User says low priority; optional patch below can disable/relax it.
         pattern: /((?:Geburtsort)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
         tag: "ADDRESS",
         mode: "prefix"
@@ -330,6 +338,7 @@
 
       /* ===================== PERSON NAME (STRICT label-driven) ===================== */
       person_name: {
+        // NOTE: superseded by person_name_line patch (line-anchored) when present.
         pattern:
           /((?:Name|Kontakt|Ansprechpartner|Empfänger)\s*[:：=]\s*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)\s+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
         tag: "NAME",
@@ -358,6 +367,7 @@
       },
 
       address_de_street: {
+        // NOTE: Full-line masking. Partial masking (street only, keep tail) needs engine support; provided as stub in fix patch.
         pattern:
           /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)\s*[:：=]\s*)((?=[^\n\r]{4,140}$)(?=[^\n\r]{0,140}(?:\d{1,4}\s*[A-Za-z]?\b|straße\b|strasse\b|str\.\b|weg\b|platz\b|allee\b|gasse\b|ring\b|ufer\b|damm\b|chaussee\b|promenade\b|markt\b|hof\b|kai\b))[^\n\r]{4,140})/giu,
         tag: "ADDRESS",
@@ -566,11 +576,11 @@
 })();
 
 // =========================
-// DE Fix Patch (ADD-ONLY) — v2.0.1
+// DE Fix Patch (ADD-ONLY) — v2.0.2 (UPDATED per user)
 // - Fix BLZ with parentheses: "Bankleitzahl (BLZ): ..."
 // - Add card expiry + CVC/CVV
-// - Birthplace should be SECRET (placeholder [Geheim]) not ADDRESS
-// - Stabilize person_name: line-anchored (EN v6.2 parity)
+// - Fix Name masking: KEEP titles (Herr/Frau/Dr/Prof) in output; DO NOT emit [Anrede]; only mask name => [Name]
+// - Geburtsort: low priority; we will NOT force masking (remove from alwaysOn) but keep a rule as optional.
 // - Address partial masking requires engine support; rule stub included
 // =========================
 (function () {
@@ -598,8 +608,8 @@
 
   // New keys (run earlier than the old ones they supersede)
   const NEW_KEYS = [
-    "person_name_line",
-    "birthplace_secret",
+    "person_name_keep_title",
+    "birthplace_optional_secret",
     "blz_paren",
     "card_expiry_de",
     "card_security_de"
@@ -607,26 +617,41 @@
   ];
 
   // Insert BEFORE existing keys where relevant
-  DE.priority = insertBefore(DE.priority || [], "person_name", ["person_name_line"]);
-  DE.priority = insertBefore(DE.priority || [], "birthplace", ["birthplace_secret"]);
+  DE.priority = insertBefore(DE.priority || [], "person_name", ["person_name_keep_title"]);
+  DE.priority = insertBefore(DE.priority || [], "birthplace", ["birthplace_optional_secret"]);
   DE.priority = insertBefore(DE.priority || [], "blz", ["blz_paren"]);
   DE.priority = insertBefore(DE.priority || [], "number", ["card_expiry_de", "card_security_de"]);
 
-  // Always-on (conservative German policy)
+  // Always-on:
+  // - keep person-name fix always on
+  // - keep BLZ/expiry/CVC always on
+  // - DO NOT force Geburtsort (user said low priority)
   DE.alwaysOn = DE.alwaysOn || [];
-  NEW_KEYS.forEach((k) => uniqPush(DE.alwaysOn, k));
+  uniqPush(DE.alwaysOn, "person_name_keep_title");
+  uniqPush(DE.alwaysOn, "blz_paren");
+  uniqPush(DE.alwaysOn, "card_expiry_de");
+  uniqPush(DE.alwaysOn, "card_security_de");
+
+  // Remove birthplace from alwaysOn (soften: mask if matched in normal pass, but not forced)
+  if (Array.isArray(DE.alwaysOn)) {
+    DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "birthplace" && k !== "birthplace_secret" && k !== "birthplace_optional_secret");
+  }
 
   Object.assign(DE.rules, {
-    /* 1) person_name — line-anchored, avoids cross-line weirdness */
-    person_name_line: {
+    /* 1) Name lines: keep title, only mask the name part.
+       Example:
+       "Name: Herr Max Müller" -> "Name: Herr [Name]"
+       "Ansprechpartner: Dr. Julia Wagner" -> "Ansprechpartner: Dr. [Name]"
+    */
+    person_name_keep_title: {
       pattern:
         /^((?:Name|Kontakt|Ansprechpartner|Empfänger)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?\s+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
       tag: "NAME",
       mode: "prefix"
     },
 
-    /* 2) Geburtsort should behave like EN place_of_birth => SECRET */
-    birthplace_secret: {
+    /* 2) Geburtsort: optional masking (NOT always-on) */
+    birthplace_optional_secret: {
       pattern: /((?:Geburtsort)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
       tag: "SECRET",
       mode: "prefix"
@@ -666,4 +691,3 @@
     */
   });
 })();
-
