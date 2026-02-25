@@ -1,10 +1,11 @@
 // =========================
 // assets/engine.en.js
-// UPGRADE v6.3 (perfect close)
-// - FIX A: Authorization handled ONLY by bearer_token (api_key_token no longer captures "authorization")
-// - FIX B: address_en_extra_block requires a digit (prevents trap-line false positives)
-// - FIX C: person_name no longer requires full-line end (keeps inline comments safe; still no newline eating)
-// Everything else unchanged from v6.2
+// UPGRADE v6.3.1 (perfect close, keep v6.2 person_name stability)
+//
+// - Keep v6.3 FIX A / FIX B
+// - Revert FIX C style: person_name is LINE-ANCHORED (no cross-line / no field chaining)
+//   but allows optional trailing inline comment (same line only).
+// - Everything else unchanged from v6.3
 // =========================
 
 (function () {
@@ -351,10 +352,10 @@
         mode: "phone"
       },
 
-      /* FIX C: no full-line end requirement; still does NOT cross lines */
+      /* v6.2-stable: line-anchored, no cross-line; allow optional trailing inline comment */
       person_name: {
         pattern:
-          /((?:name|customer\s*name|account\s*holder|recipient|name\s*on\s*card)[ \t]*[:：=][ \t]*(?:(?:mr|mrs|ms|miss|dr|prof)\.?\s+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})/giu,
+          /^((?:name|customer\s*name|account\s*holder|recipient|name\s*on\s*card)[ \t]*[:：=][ \t]*(?:(?:mr|mrs|ms|miss|dr|prof)\.?\s+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
