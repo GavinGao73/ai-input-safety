@@ -504,3 +504,134 @@
   });
 
 })();
+
+
+// =========================
+// High-Risk ADD-ONLY Patch (2–7)
+// - SAFE: no deletions; only inserts keys before "number" + adds new rules
+// - Covers:
+//   ② bank routing fields (Branch Code / Clearing / Transit / BSB / ABA)
+//   ③ card auth metadata (AVS / 3DS / ECI)  [ZIP stays unmasked]
+//   ④ security answers (Answer: ...)
+//   ⑤ legal/contract refs (LC-... tail>=4 etc.)
+//   ⑥ device/session/fingerprint/user-agent
+//   ⑦ crypto wallet + wallet id + tx hash
+// =========================
+(function () {
+  "use strict";
+
+  const PACKS = (window.__ENGINE_LANG_PACKS__ = window.__ENGINE_LANG_PACKS__ || {});
+  const EN = PACKS.en;
+  if (!EN) return;
+
+  function uniqPush(arr, key) {
+    if (!arr.includes(key)) arr.push(key);
+  }
+
+  function insertBefore(arr, beforeKey, keys) {
+    const out = Array.isArray(arr) ? arr.slice() : [];
+    const idx = out.indexOf(beforeKey);
+    const insertAt = idx >= 0 ? idx : out.length;
+    const toInsert = [];
+    (keys || []).forEach((k) => {
+      if (!out.includes(k) && !toInsert.includes(k)) toInsert.push(k);
+    });
+    out.splice(insertAt, 0, ...toInsert);
+    return out;
+  }
+
+  const NEW_KEYS = [
+    "bank_routing_ids",
+    "avs_data",
+    "three_ds_status",
+    "eci",
+    "security_answer",
+    "legal_ref_tail",
+    "device_fingerprint",
+    "wallet_id",
+    "tx_hash",
+    "crypto_wallet"
+  ];
+
+  // Ensure these run BEFORE generic number fallback
+  EN.priority = insertBefore(EN.priority || [], "number", NEW_KEYS);
+
+  // Always-on for high-risk fields (ZIP remains unmasked; we do NOT add a ZIP rule)
+  EN.alwaysOn = EN.alwaysOn || [];
+  NEW_KEYS.forEach((k) => uniqPush(EN.alwaysOn, k));
+
+  Object.assign(EN.rules, {
+
+    /* ② Bank routing / clearing / branch / transit / BSB / ABA */
+    bank_routing_ids: {
+      pattern:
+        /((?:bank\s*name|branch\s*code|clearing\s*(?:number|no\.?)|transit\s*number|bsb|aba\s*(?:number|routing\s*number)?|aba)\s*[:：=]\s*)([0-9][0-9\s-]{2,24}[0-9])/giu,
+      tag: "ACCOUNT",
+      mode: "prefix"
+    },
+
+    /* ③ Card auth / fraud signals (ZIP stays unmasked by design) */
+    avs_data: {
+      pattern: /((?:avs\s*data)\s*[:：=]\s*)([A-Za-z0-9._\-]{1,40})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    three_ds_status: {
+      pattern: /((?:3-?d\s*secure|3ds)\s*(?:status)?\s*[:：=]\s*)([A-Za-z0-9._\-]{1,40})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    eci: {
+      pattern: /((?:eci)\s*[:：=]\s*)(\d{2})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* ④ Security Q/A — mask Answer value (systems often leak this) */
+    security_answer: {
+      pattern: /((?:answer|security\s*answer)\s*[:：=]\s*)([^\n\r]{1,160})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* ⑤ Legal/contract refs — tail mask like ref_label_tail but for additional labels */
+    legal_ref_tail: {
+      pattern:
+        /((?:(?:contract\s*number|claim\s*reference|legal\s*case\s*ref)\s*[:：=]\s*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
+      tag: "REF",
+      mode: "prefix"
+    },
+
+    /* ⑥ Device/session/fingerprint/user-agent (risk/fraud logs) */
+    device_fingerprint: {
+      pattern:
+        /((?:device\s*id|session\s*id|fingerprint|user\s*agent)\s*[:：=]\s*)([^\n\r]{1,220})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* ⑦ Web3: Wallet ID / Transaction Hash / Wallet addresses */
+    wallet_id: {
+      pattern: /((?:wallet\s*id)\s*[:：=]\s*)([A-Za-z0-9._\-]{3,80})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    tx_hash: {
+      pattern: /((?:transaction\s*hash|tx\s*hash|txn\s*hash)\s*[:：=]\s*)(0x[0-9a-f]{16,128})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    crypto_wallet: {
+      pattern:
+        /((?:btc|eth)\s*[:：=]\s*)(?:((?:bc1)[0-9a-z]{25,90}|[13][A-HJ-NP-Za-km-z1-9]{25,34})|(0x[a-f0-9]{40}))/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    }
+
+  });
+
+})();
