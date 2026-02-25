@@ -85,21 +85,21 @@
 
       // refs / handles (label-driven)
       "handle_label",
-      // ✅ FIX: stable tail-mask for multi-segment IDs (keep prefix; mask last numeric segment)
-      "cust_id",
-      "ref_numeric_tail_label",
-      "ref_label_tail2",
-      // keep existing label-driven full-value ref masking for non-hyphenated tokens
-      "ref_label",
 
-      // money (requires currency indicator)
+      // ✅ Customer ID: keep "CUST-" prefix, mask digits only
+      "cust_id",
+
+      // ✅ FULL ref mask (single placeholder, no tail logic)
+      "ref_label_full",
+
+      // money
       "money",
 
       // phone AFTER ids
       "phone",
 
       // person/org
-      // ✅ FIX: company before person_name (开户名等公司字段不应被人名抢走)
+      // ✅ company before person_name (开户名等公司字段不应被人名抢走)
       "company",
       "person_name",
 
@@ -122,12 +122,10 @@
     alwaysOn: [
       "handle_label",
 
-      // ✅ FIX: tail-mask first (avoid ref_label partial-grab in multi-pass engines)
+      // refs / ids
       "cust_id",
-      "ref_numeric_tail_label",
-      "ref_label_tail2",
+      "ref_label_full",
 
-      "ref_label",
       "address_cn",
 
       "secret",
@@ -156,7 +154,7 @@
 
       "money",
 
-      // ✅ FIX: org before person
+      // ✅ org before person
       "company",
       "person_name",
 
@@ -348,31 +346,21 @@
         mode: "prefix"
       },
 
-      /* ===================== REF NUMERIC TAIL (label-driven; numeric prefix) ===================== */
-      ref_numeric_tail_label: {
-        // Ticket No.: 20260224-778421 -> Ticket No.: 20260224-【编号】
-        // ✅ MUST be (prefix)(tail) so engine masks only tail.
-        pattern: /((?:Ticket\s*No\.?|工单号|票据号|编号)\s*[:：=]\s*)(?![^\n\r]*【编号】)(\d{4,})([-_.])(\d{4,})/giu,
-        tag: "REF",
-        mode: "prefix"
-      },
-
-      /* ===================== REF LABEL TAIL (label-driven; alpha prefix) ===================== */
-      ref_label_tail2: {
-        // ✅ MUST be (prefix)(tail) so engine masks only tail.
-        // Case ID: CASE-2026-00078421 -> Case ID: CASE-2026-【编号】
-        // Application ID: APP-2026-02-778421 -> Application ID: APP-2026-02-【编号】
-        // Reference: REF-AB-2026-00078421 -> Reference: REF-AB-2026-【编号】
-        // Contract/Legal: LC-AB-2026-00078421 / LEGAL-REF-2026-00001234 / CLM-XY-2026-0007712 -> ...-【编号】
+      /* ===================== REF FULL MASK (label-driven; single placeholder) ===================== */
+      ref_label_full: {
+        // ✅ FULL replacement, single 【编号】 only, no tail logic.
+        // Covers:
+        // Case ID / Ticket No. / Application ID / Order ID / Invoice No. / Reference
+        // 合同号 / 索赔参考号 / 法律案件号 / 申请编号 / 参考编号 / 工单号 / 票据号 / 客户号 / 编号 ...
         pattern:
-          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?|Application\s*ID|Reference)\s*[:：=]\s*)(?![^\n\r]*【编号】)(?:(?:[A-Za-z]{2,12}[A-Za-z0-9]*)(?:-[A-Za-z0-9]{1,12}){1,10}-)(\d{4,})/giu,
+          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|Case\s*ID|Ticket\s*No\.?|Application\s*ID|Order\s*ID|Invoice\s*No\.?|Reference)\s*[:：=]\s*)(?![^\n\r]*【编号】)([A-Za-z0-9][A-Za-z0-9._\-]{3,120})/giu,
         tag: "REF",
         mode: "prefix"
       },
 
       /* ===================== ACCOUNT (label-driven) ===================== */
       account: {
-        pattern: /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|信用卡|信用卡号|信用卡號|card\s*number|credit\s*card|对公账户|對公賬戶|IBAN|Account\s*Number)\s*[:：=]?\s*)([A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
+        pattern: /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|信用卡|信用卡号|信用卡號|card\s*number|credit\s*card|对公账户|對公賬戶|IBAN|Account\s*Number)\s*[:：=]?\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{6,40}\d)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -386,7 +374,7 @@
 
       /* ===================== BANK ROUTING / CLEARING / BRANCH (label-driven) ===================== */
       bank_routing_ids: {
-        pattern: /((?:联行号|清算号|分行号|支行号|行号|路由号|routing\s*number|aba|bsb|transit\s*number|clearing\s*(?:number|no\.?)|branch\s*code)\s*[:：=]\s*)([0-9][0-9 \t-]{2,24}[0-9])/giu,
+        pattern: /((?:联行号|清算号|分行号|支行号|行号|路由号|routing\s*number|aba|bsb|transit\s*number|clearing\s*(?:number|no\.?)|branch\s*code)\s*[:：=]\s*)([0-9][0-9\s-]{2,24}[0-9])/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -430,14 +418,6 @@
         mode: "prefix"
       },
 
-      /* ===================== REF (label-driven) ===================== */
-      ref_label: {
-        // important: exclude '-' to avoid fighting with multi-segment tail rules
-        pattern: /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9_.]{3,80})(?!-)/giu,
-        tag: "REF",
-        mode: "prefix"
-      },
-
       /* ===================== ADDRESS (CN partial) ===================== */
       address_cn: {
         // ✅ require delimiter (avoid matching headings like "地址信息（用于...）")
@@ -448,9 +428,9 @@
 
       /* ===================== MONEY (ZH require currency indicator) ===================== */
       money: {
-        // ✅ FIX: remove CAPTURE GROUPS to avoid double replacement (e.g. "人民币 8800 元" -> 【金额】【金额】)
+        // ✅ FIX: all non-capturing to prevent split/double replacement
         pattern:
-          /(?:\b(?:人民币|CNY|RMB)\b[ \t\u3000]*\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?[ \t\u3000]*(?:元)?|[¥￥][ \t\u3000]*\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?|\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?[ \t\u3000]*元|\bUSD\b[ \t\u3000]*\$?[ \t\u3000]*\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\$[ \t\u3000]*\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|€[ \t\u3000]*\d{1,3}(?:\.\d{3})*(?:,\d{2})?|\d{1,3}(?:\.\d{3})*(?:,\d{2})?[ \t\u3000]*€)/giu,
+          /(?:\b(?:人民币|CNY|RMB)\b\s*\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?\s*(?:元)?|[¥￥]\s*\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?|\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?\s*元|\bUSD\b\s*\$?\s*\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\$\s*\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|€\s*\d{1,3}(?:\.\d{3})*(?:,\d{2})?|\d{1,3}(?:\.\d{3})*(?:,\d{2})?\s*€)/giu,
         tag: "MONEY"
       },
 
@@ -545,8 +525,8 @@
 
       /* ===================== REF (format-like) ===================== */
       ref: {
-        // ✅ avoid partial match inside multi-segment IDs like CASE-2026-00078421
-        pattern: /\b[A-Z]{2,6}-?\d{5,14}\b(?!-\d)/g,
+        // keep conservative to avoid partial hits inside multi-segment IDs (handled by ref_label_full)
+        pattern: /\b[A-Z]{2,6}-?\d{5,14}\b(?![-_.][A-Za-z0-9])/g,
         tag: "REF"
       },
 
