@@ -85,8 +85,11 @@
 
       // refs / handles (label-driven)
       "handle_label",
-      "ref_label_tail", // ✅ NEW: label-driven multi-segment tail mask (incl. pure numeric prefixes)
-      "ref_tail",
+      // ✅ FIX: stable tail-mask for multi-segment IDs (no lookbehind; keep prefix)
+      "cust_id",
+      "ref_numeric_tail_label",
+      "ref_label_tail2",
+      // keep existing label-driven full-value ref masking for non-hyphenated tokens
       "ref_label",
 
       // money (requires currency indicator)
@@ -152,11 +155,10 @@
       "tx_hash",
       "crypto_wallet",
 
-      // ✅ tail-mask multi-segment IDs (keeps prefix, hides last numeric chunk)
-      "ref_tail",
-
-      // ✅ NEW: label-driven tail mask for multi-segment IDs (Ticket No. / Case ID / etc.)
-      "ref_label_tail"
+      // ✅ FIX: stable tail-mask for multi-segment IDs (no lookbehind; keep prefix)
+      "cust_id",
+      "ref_numeric_tail_label",
+      "ref_label_tail2"
     ],
 
     // ✅ phone FP guard (zh): prevent long numeric IDs/refs being treated as phone
@@ -165,8 +167,10 @@
       if (digits.length >= 16) return false;
 
       const lbl = String(label || "").toLowerCase();
+      // labels that are usually IDs, not phones
       if (/(编号|单号|订单|发票|合同|申请|工单|票据|客户|账号|账户|卡号|对公|税号)/i.test(lbl)) return false;
 
+      // value itself looks like typical ID prefix
       if (/\b(?:CUST|CASE|ORD|INV|APP|REF|ACC|REQ|TKT|TK|LC)-/i.test(String(value || ""))) return false;
 
       return true;
@@ -193,12 +197,14 @@
       return `${label}${S1}${v}${S2}`;
     },
 
-    // ✅ company formatting strategy (zh-only)
+    // ✅ company formatting strategy (zh-only): keep partial industry tail + legal suffix
+    // Signature aligned with core call-site: ({ raw, name, legal, punct, coreStr, placeholder })
     formatCompany: function ({ raw, name, legal, punct, coreStr, placeholder }) {
       const rawName = String(name || "");
       const rawLegal = String(legal || "");
       const rawPunct = String(punct || "");
 
+      // if no legal, just mask whole company token
       if (!rawLegal) return `${placeholder("COMPANY")}${rawPunct}`;
 
       const INDUSTRY = [
@@ -246,11 +252,14 @@
       return `${placeholder("COMPANY")}${keep}${rawLegal}${rawPunct}`;
     },
 
+    // ✅ company highlight for pdf overlay (zh-only)
+    // Signature aligned with core call-site: ({ match, name, legal, punct, S1, S2 })
     highlightCompany: function ({ match, name, legal, punct, S1, S2 }) {
       const rawName = String(name || "");
       const rawLegal = String(legal || "");
       const rawPunct = String(punct || "");
       if (rawLegal) return `${S1}${rawName}${S2}${rawLegal}${rawPunct}`;
+      // fallback: highlight whole token if no legal captured
       const m = String(match || rawName || "");
       return `${S1}${m}${S2}${rawPunct}`;
     },
@@ -322,29 +331,37 @@
       /* ===================== LICENSE PLATE (label-driven; CN) ===================== */
       license_plate: {
         // CN plate: “京A123456” (汉字 + 字母 + 5~6位字母数字), no "-" / no spaces.
-        pattern: /((?:车牌号|车牌号码|号牌号码|车牌)\s*[:：=]\s*)([\u4E00-\u9FFF][A-Z][A-Z0-9]{5,6})\b/giu,
+        pattern: /((?:车牌号|车牌号码|号牌号码|车牌|号牌)\s*[:：=]\s*)([\u4E00-\u9FFF][A-Z][A-Z0-9]{5,6})\b/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
-      /* ===================== REF LABEL TAIL (multi-segment IDs; label-driven) ===================== */
-      ref_label_tail: {
-        // keep prefix segments, mask ONLY the last numeric segment (>=4 digits), even when prefix is numeric.
-        // Ticket No.: 20260224-778421 -> Ticket No.: 20260224-【编号】
-        // Case ID: CASE-2026-00078421 -> Case ID: CASE-2026-【编号】
-        // ✅ FIX (idempotent): if this line already contains 【编号】, skip to prevent repeated drift
-        pattern:
-          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|合同号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?|Application\s*ID|Reference)\s*[:：=]\s*)(?![^\n\r]*【编号】)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+){0,10}[-_.])(\d{4,})/giu,
+      /* ===================== CUSTOMER ID (CUST-...) ===================== */
+      cust_id: {
+        // Customer ID: CUST-004918273645 -> Customer ID: CUST-【编号】
+        pattern: /((?:Customer\s*ID|客户号|客户ID)\s*[:：=]\s*CUST-)(\d{6,})/giu,
         tag: "REF",
         mode: "prefix"
       },
 
-      /* ===================== REF TAIL (multi-segment IDs; generic) ===================== */
-      ref_tail: {
-        // keep prefix segments, mask ONLY the last numeric segment (>=4 digits)
-        // ✅ FIX (idempotent): if this line already contains 【编号】, skip to prevent repeated drift
-        pattern: /^(?![^\n\r]*【编号】).*?(?<=\b[A-Z][A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})*-)\d{4,}\b/gmu,
-        tag: "REF"
+      /* ===================== REF NUMERIC TAIL (label-driven; numeric prefix) ===================== */
+      ref_numeric_tail_label: {
+        // Ticket No.: 20260224-778421 -> Ticket No.: 20260224-【编号】
+        pattern: /((?:Ticket\s*No\.?|工单号|票据号|编号)\s*[:：=]\s*\d{4,}[-_.])(\d{4,})/giu,
+        tag: "REF",
+        mode: "prefix"
+      },
+
+      /* ===================== REF LABEL TAIL (label-driven; alpha prefix) ===================== */
+      ref_label_tail2: {
+        // FIX: no lookbehind; keep full prefix; mask only last numeric segment (>=4)
+        // Case ID: CASE-2026-00078421 -> Case ID: CASE-2026-【编号】
+        // Application ID: APP-2026-02-778421 -> Application ID: APP-2026-02-【编号】
+        // Reference: REF-AB-2026-00078421 -> Reference: REF-AB-2026-【编号】
+        pattern:
+          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|Case\s*ID|Order\s*ID|Invoice\s*No\.?|Application\s*ID|Reference)\s*[:：=]\s*)(?![^\n\r]*【编号】)(?:(?:[A-Za-z]{2,10}[A-Za-z0-9]*)(?:-[A-Za-z0-9]{1,12}){0,8}-)(\d{4,})/giu,
+        tag: "REF",
+        mode: "prefix"
       },
 
       /* ===================== ACCOUNT (label-driven) ===================== */
@@ -384,6 +401,7 @@
 
       /* ===================== PHONE (label-driven + explicit intl prefix) ===================== */
       phone: {
+        // ✅ minimal FP cut: remove "联系人/kontakt" from label list (it caused accidental non-phone spans)
         pattern: /((?:联系方式|联系电话|电话|手機|手机|tel|telefon|phone|mobile|handy)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(\b(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
         tag: "PHONE",
         mode: "phone"
@@ -391,7 +409,10 @@
 
       /* ===================== PERSON NAME (label-driven; CN-realistic) ===================== */
       person_name: {
-        pattern: /((?:姓名|收件人|联系人|开户名|Name|Recipient)\s*[:：=]\s*)((?:(?:Mr\.?|Mrs\.?|Ms\.?|Dr\.?|Prof\.?)\s*)?[\u4E00-\u9FFF]{2,6}|(?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})/gmu,
+        // FIX: "开户名" 只有在该行不像公司名时才按人名处理
+        // - 如果该行包含公司法定后缀（有限公司/公司/集团/有限责任公司/股份有限公司等），则跳过 person_name，让 company 接管
+        pattern:
+          /((?:姓名|收件人|联系人|Name|Recipient|开户名)\s*[:：=]\s*)(?![^\n\r]*(?:集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司))((?:(?:Mr\.?|Mrs\.?|Ms\.?|Dr\.?|Prof\.?)\s*)?[\u4E00-\u9FFF]{2,6}|(?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})/gmu,
         tag: "NAME",
         mode: "prefix"
       },
@@ -405,9 +426,8 @@
 
       /* ===================== REF (label-driven) ===================== */
       ref_label: {
-        // exclude '-' to avoid fighting with multi-segment tail rules
-        // ✅ FIX: require at least ONE letter in the value, so pure-numeric prefixes like "20260224" won't be redacted to 【编号】
-        pattern: /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?)\s*[:：=]\s*)(?=[A-Za-z0-9_.]{3,80}\b)(?=[A-Za-z0-9_.]*[A-Za-z])[A-Za-z0-9][A-Za-z0-9_.]{3,80}/giu,
+        // important: exclude '-' to avoid fighting with multi-segment tail rules
+        pattern: /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|Case\s*ID|Ticket\s*No\.?|Order\s*ID|Invoice\s*No\.?)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9_.]{3,80})/giu,
         tag: "REF",
         mode: "prefix"
       },
@@ -421,6 +441,7 @@
 
       /* ===================== MONEY (ZH require currency indicator) ===================== */
       money: {
+        // ✅ add EUR formats + USD/$ formats (keep original RMB/¥/元 support intact)
         pattern:
           /(?:((?:人民币|CNY|RMB)\s*)(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?)(?:\s*元)?)|(?:([¥￥])\s*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?))|(?:(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?)\s*元)|(?:\b(?:USD)\b\s*\$?\s*\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)|(?:\$\s*\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)|(?:\d{1,3}(?:\.\d{3})*(?:,\d{2})?\s*€)|(?:€\s*\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/giu,
         tag: "MONEY"
