@@ -626,8 +626,7 @@
     },
 
     crypto_wallet: {
-      pattern:
-        /((?:btc|eth)\s*[:：=]\s*)(?:((?:bc1)[0-9a-z]{25,90}|[13][A-HJ-NP-Za-km-z1-9]{25,34})|(0x[a-f0-9]{40}))/giu,
+      pattern:/((?:btc|eth)\s*[:：=]\s*)((?:bc1)[0-9a-z]{25,90}|[13][A-HJ-NP-Za-km-z1-9]{25,34}|0x[a-f0-9]{40})/giu,
       tag: "SECRET",
       mode: "prefix"
     }
