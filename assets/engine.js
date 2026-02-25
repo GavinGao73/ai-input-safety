@@ -17,6 +17,7 @@
 // ✅ PATCHES (this file):
 // - P1: Prefix-mode replacement preserves trailing whitespace/newlines (prevents line-merge when a pack regex accidentally eats \n)
 // - P2: Placeholder protection ONLY shields engine-generated placeholders (avoid protecting arbitrary [..] such as Markdown links)
+// - P3: NEW mode "prefix_keep_tail": keep tail unmasked (needed for DE street-only masking while keeping PLZ/City/Country)
 // =========================
 
 console.log("[engine.js] loaded v20260223-engine-a5-policy-split");
@@ -489,6 +490,17 @@ function markHitsInOriginal(text) {
         const label = p1 || "";
         const val = p2 || "";
         return `${label}${S1}${val}${S2}`;
+      });
+      continue;
+    }
+
+    // ✅ P3: prefix_keep_tail (highlight ONLY the masked segment, keep tail as normal)
+    if (r.mode === "prefix_keep_tail") {
+      s = s.replace(r.pattern, (m, p1, p2, p3) => {
+        const label = p1 || "";
+        const toMask = p2 || "";
+        const tail = p3 || "";
+        return `${label}${S1}${toMask}${S2}${tail}`;
       });
       continue;
     }
@@ -1027,6 +1039,15 @@ function applyRules(text) {
         const suffix = consumed > 0 && consumed <= match.length ? match.slice(consumed) : "";
         addHit(key);
         return `${label}${placeholder(r.tag)}${suffix}`;
+      }
+
+      // ✅ P3: prefix_keep_tail (mask only the middle part, keep tail untouched)
+      if (r.mode === "prefix_keep_tail") {
+        const label = String(args[1] || "");
+        const toMask = String(args[2] || "");
+        const tail = String(args[3] || "");
+        addHit(key);
+        return `${label}${placeholder(r.tag)}${tail}`;
       }
 
       if (r.mode === "address_cn_partial") {
