@@ -32,7 +32,7 @@
       ADDRESS: "[Adresse]",
       HANDLE: "[Handle]",
       REF: "[Referenz]",
-      TITLE: "[Anrede]", // NOTE: kept for generic use; name-lines must not emit [Anrede]
+      TITLE: "[Anrede]", // NOTE: kept for generic use; but title auto-masking is disabled in fix patch (to keep Herr/Frau/Dr/Prof)
       NUMBER: "[Zahl]",
       MONEY: "[Betrag]",
       COMPANY: "[Firma]",
@@ -391,6 +391,8 @@
       },
 
       title: {
+        // NOTE: title masking is disabled by fix patch (removing "title" from priority/alwaysOn).
+        // Kept for backward compatibility (definition only).
         pattern: /\b(Herr|Frau|Dr\.?|Prof\.?)\b/g,
         tag: "TITLE"
       }
@@ -584,6 +586,7 @@
 // - Geburtsort: low priority; do NOT force masking (remove from alwaysOn)
 // - Address: street-only masking while keeping tail (PLZ/City/Country) using mode "prefix_keep_tail"
 //   and disable legacy "address_de_street" execution to prevent tail loss.
+// - IMPORTANT: disable "title" key execution to prevent Herr/Frau/Dr/Prof -> [Anrede]
 // =========================
 (function () {
   "use strict";
@@ -649,6 +652,14 @@
   }
   if (Array.isArray(DE.alwaysOn)) {
     DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "address_de_street");
+  }
+
+  // IMPORTANT: disable title masking execution (prevents Herr/Frau/Dr/Prof -> [Anrede])
+  if (Array.isArray(DE.priority)) {
+    DE.priority = DE.priority.filter((k) => k !== "title");
+  }
+  if (Array.isArray(DE.alwaysOn)) {
+    DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "title");
   }
 
   Object.assign(DE.rules, {
