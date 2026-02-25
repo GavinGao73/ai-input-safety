@@ -564,3 +564,106 @@
     }
   });
 })();
+
+// =========================
+// DE Fix Patch (ADD-ONLY) — v2.0.1
+// - Fix BLZ with parentheses: "Bankleitzahl (BLZ): ..."
+// - Add card expiry + CVC/CVV
+// - Birthplace should be SECRET (placeholder [Geheim]) not ADDRESS
+// - Stabilize person_name: line-anchored (EN v6.2 parity)
+// - Address partial masking requires engine support; rule stub included
+// =========================
+(function () {
+  "use strict";
+
+  const PACKS = (window.__ENGINE_LANG_PACKS__ = window.__ENGINE_LANG_PACKS__ || {});
+  const DE = PACKS.de;
+  if (!DE) return;
+
+  function uniqPush(arr, key) {
+    if (!arr.includes(key)) arr.push(key);
+  }
+
+  function insertBefore(arr, beforeKey, keys) {
+    const out = Array.isArray(arr) ? arr.slice() : [];
+    const idx = out.indexOf(beforeKey);
+    const insertAt = idx >= 0 ? idx : out.length;
+    const toInsert = [];
+    (keys || []).forEach((k) => {
+      if (!out.includes(k) && !toInsert.includes(k)) toInsert.push(k);
+    });
+    out.splice(insertAt, 0, ...toInsert);
+    return out;
+  }
+
+  // New keys (run earlier than the old ones they supersede)
+  const NEW_KEYS = [
+    "person_name_line",
+    "birthplace_secret",
+    "blz_paren",
+    "card_expiry_de",
+    "card_security_de"
+    // "address_de_street_partial" // only if engine supports preserving tail
+  ];
+
+  // Insert BEFORE existing keys where relevant
+  DE.priority = insertBefore(DE.priority || [], "person_name", ["person_name_line"]);
+  DE.priority = insertBefore(DE.priority || [], "birthplace", ["birthplace_secret"]);
+  DE.priority = insertBefore(DE.priority || [], "blz", ["blz_paren"]);
+  DE.priority = insertBefore(DE.priority || [], "number", ["card_expiry_de", "card_security_de"]);
+
+  // Always-on (conservative German policy)
+  DE.alwaysOn = DE.alwaysOn || [];
+  NEW_KEYS.forEach((k) => uniqPush(DE.alwaysOn, k));
+
+  Object.assign(DE.rules, {
+    /* 1) person_name — line-anchored, avoids cross-line weirdness */
+    person_name_line: {
+      pattern:
+        /^((?:Name|Kontakt|Ansprechpartner|Empfänger)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?\s+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+      tag: "NAME",
+      mode: "prefix"
+    },
+
+    /* 2) Geburtsort should behave like EN place_of_birth => SECRET */
+    birthplace_secret: {
+      pattern: /((?:Geburtsort)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* 3) BLZ with parentheses */
+    blz_paren: {
+      pattern: /((?:Bankleitzahl)\s*(?:\(\s*BLZ\s*\))?\s*[:：=]\s*)(\d{5,12})/giu,
+      tag: "ACCOUNT",
+      mode: "prefix"
+    },
+
+    /* 4) Card expiry (DE + EN labels) */
+    card_expiry_de: {
+      pattern:
+        /((?:Gültig\s*bis|Gueltig\s*bis|Ablaufdatum|Expiry|Expiration|Exp(?:iry|iration)?(?:\s*Date)?|Valid\s*Thru|Valid\s*Through)\s*[:：=]\s*)(\d{2}\s*\/\s*\d{2,4}|\d{2}\s*-\s*\d{2,4}|\d{4}\s*-\s*\d{2})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    /* 5) CVC/CVV */
+    card_security_de: {
+      pattern: /((?:CVC|CVV|CVC2|CAV2)\s*[:：=]\s*)(\d{3,4})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    }
+
+    /*
+    // 6) Address partial masking (street only, keep PLZ/City/Country)
+    // NOTE: This needs engine support (a mode that can keep the tail part).
+    address_de_street_partial: {
+      pattern:
+        /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)\s*[:：=]\s*)([^,\n\r]{4,80})([^\n\r]*)/giu,
+      tag: "ADDRESS",
+      mode: "prefix_keep_tail" // <- only works if engine implements it
+    }
+    */
+  });
+})();
+
