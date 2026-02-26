@@ -29,9 +29,10 @@ console.log("[engine.js] loaded v20260223-engine-a5-policy-split");
    DETECTION_ITEMS write-trace (BOOT EARLY)
    - capture who sets window.DETECTION_ITEMS
    - re-init enabled after each set
+   - ✅ FIX: even if initEnabled is not ready yet, schedule a deferred init
    ========================= */
-(function traceDetectionItemsBoot(){
-  try{
+(function traceDetectionItemsBoot() {
+  try {
     if (window.__TRACE_DETECTION_ITEMS_BOOT__) return;
     window.__TRACE_DETECTION_ITEMS_BOOT__ = true;
 
@@ -40,34 +41,46 @@ console.log("[engine.js] loaded v20260223-engine-a5-policy-split");
     Object.defineProperty(window, "DETECTION_ITEMS", {
       configurable: true,
       enumerable: true,
-      get(){ return _v; },
-      set(v){
+      get() {
+        return _v;
+      },
+      set(v) {
         _v = v;
 
         // store for later inspection (even if console is noisy)
-        try{
+        try {
           window.__DETECTION_ITEMS_LAST_SET__ = {
             when: Date.now(),
             iso: new Date().toISOString(),
             valueShape: v && typeof v === "object" ? Object.keys(v) : null,
-            // grab a stack snapshot
             stack: (new Error("DETECTION_ITEMS set")).stack || ""
           };
-        }catch(_){}
+        } catch (_) {}
 
         // visible trace (optional but useful)
-        try{
+        try {
           console.warn("[DETECTION_ITEMS SET]", "time=", new Date().toISOString());
           console.trace("[DETECTION_ITEMS SET TRACE]");
-        }catch(_){}
+        } catch (_) {}
 
-        // keep enabled in sync
-        try{
-          if (typeof window.initEnabled === "function") window.initEnabled();
-        }catch(_){}
+        // keep enabled in sync (defer to survive load order)
+        try {
+          setTimeout(() => {
+            try {
+              if (typeof initEnabled === "function") initEnabled();
+              else if (typeof window.initEnabled === "function") window.initEnabled();
+            } catch (_) {}
+          }, 0);
+        } catch (_) {}
       }
     });
-  }catch(_){}
+
+    // ✅ in case DETECTION_ITEMS already existed before hook:
+    // trigger setter once to record + init (no-op if undefined)
+    try {
+      window.DETECTION_ITEMS = _v;
+    } catch (_) {}
+  } catch (_) {}
 })();
 
 /* =========================
@@ -183,7 +196,7 @@ function detectRuleEngine(text) {
 
   const PACKS = getPacks();
 
-  // prefer pack detectors; order: zh -> de -> en (stable preference)
+  // prefer pack detectors; order: zh -> en -> de (stable preference)
   try {
     if (PACKS.zh && typeof PACKS.zh.detect === "function") {
       const r = normLang(PACKS.zh.detect(s));
@@ -788,11 +801,9 @@ function computeRiskReport(hitsByKey, meta) {
     const hh = Math.max(0, Number(hits || 0));
     const kk = Math.max(0, Number(k || 0));
     if (hh <= 0 || kk <= 0) return 0;
-    // 1 - exp(-k*hits)  in [0..1)
     return 1 - Math.exp(-kk * hh);
   }
 
-  // compute group hits
   const groupHits = {};
   for (const gname of Object.keys(G || {})) {
     const arr = Array.isArray(G[gname]) ? G[gname] : [];
@@ -801,7 +812,6 @@ function computeRiskReport(hitsByKey, meta) {
     groupHits[gname] = sum;
   }
 
-  // base score from groups (0..100)
   let base = 0;
   for (const gname of Object.keys(GW || {})) {
     const w = Number(GW[gname] || 0);
@@ -812,7 +822,6 @@ function computeRiskReport(hitsByKey, meta) {
   }
   let score = Math.round(base * 100);
 
-  // small bonuses
   score += Number(B.base || 0);
   if (meta && meta.inputLen >= 1500) score += Number(B.len1500 || 0);
   if (meta && meta.inputLen >= 4000) score += Number(B.len4000 || 0);
@@ -824,7 +833,6 @@ function computeRiskReport(hitsByKey, meta) {
   if (score >= Number(T.high || 70)) level = "high";
   else if (score >= Number(T.mid || 40)) level = "mid";
 
-  // keep existing "top" computation (legacy weights for explanation)
   const pairs = Object.entries(hitsByKey || {})
     .filter(([, c]) => c > 0)
     .map(([k, c]) => {
@@ -1371,71 +1379,4 @@ try {
     } catch (_) {}
   } catch (_) {
   }
-})();
-
-/* =========================
-   Z) Late init for DETECTION_ITEMS (fix enabledCount=0 / overwritten config)
-   - If engine loads before DETECTION_ITEMS, initEnabled will run once it appears.
-   - If some later file overwrites window.DETECTION_ITEMS, re-init enabled automatically.
-   ========================= */
-(function ensureDetectionItemsInit() {
-  try {
-    // avoid double-hook
-    if (window.__DETECTION_ITEMS_INIT_PATCHED__) return;
-    window.__DETECTION_ITEMS_INIT_PATCHED__ = true;
-
-    let done = false;
-
-    function safeInit() {
-      if (done) return;
-      try {
-        if (window.DETECTION_ITEMS && typeof window.initEnabled === "function") {
-          window.initEnabled();
-          done = true;
-        }
-      } catch (_) {}
-    }
-
-    // 1) try immediately
-    safeInit();
-
-    // 2) retry a few times (covers async script load order)
-    let tries = 0;
-    const timer = setInterval(() => {
-      tries++;
-      safeInit();
-      if (done || tries >= 80) clearInterval(timer); // ~4s max
-    }, 50);
-
-    // 3) hook overwrites of window.DETECTION_ITEMS (best-effort)
-    try {
-      if (!window.__DETECTION_ITEMS_HOOKED__) {
-        window.__DETECTION_ITEMS_HOOKED__ = true;
-
-        let _v = window.DETECTION_ITEMS;
-
-        Object.defineProperty(window, "DETECTION_ITEMS", {
-          configurable: true,
-          enumerable: true,
-          get() {
-            return _v;
-          },
-          set(v) {
-            _v = v;
-            try {
-              if (typeof window.initEnabled === "function") window.initEnabled();
-            } catch (_) {}
-            try {
-              window.dispatchEvent(new Event("detectionitems:changed"));
-            } catch (_) {}
-          }
-        });
-
-        // trigger setter once with current value (if any)
-        try {
-          window.DETECTION_ITEMS = _v;
-        } catch (_) {}
-      }
-    } catch (_) {}
-  } catch (_) {}
 })();
