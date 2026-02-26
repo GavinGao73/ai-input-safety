@@ -30,6 +30,7 @@ console.log("[engine.js] loaded v20260223-engine-a5-policy-split");
    - capture who sets window.DETECTION_ITEMS
    - re-init enabled after each set
    - ✅ FIX: even if initEnabled is not ready yet, schedule a deferred init
+   - ✅ FIX: DO NOT self-assign window.DETECTION_ITEMS (prevents "last set" being polluted by engine.js)
    ========================= */
 (function traceDetectionItemsBoot() {
   try {
@@ -75,10 +76,18 @@ console.log("[engine.js] loaded v20260223-engine-a5-policy-split");
       }
     });
 
-    // ✅ in case DETECTION_ITEMS already existed before hook:
-    // trigger setter once to record + init (no-op if undefined)
+    // ✅ If DETECTION_ITEMS already existed before hook:
+    // DO NOT write it back (would pollute "last set" stack with engine.js).
+    // Instead: do a best-effort deferred init only.
     try {
-      window.DETECTION_ITEMS = _v;
+      if (_v && typeof _v === "object") {
+        setTimeout(() => {
+          try {
+            if (typeof initEnabled === "function") initEnabled();
+            else if (typeof window.initEnabled === "function") window.initEnabled();
+          } catch (_) {}
+        }, 0);
+      }
     } catch (_) {}
   } catch (_) {}
 })();
@@ -682,8 +691,8 @@ function getRiskI18n() {
       top: "Top-Risikoquellen",
       advice: "Hinweis",
       adviceLow: "OK. Geldschutz ist standardmäßig aktiv (M1).",
-      adviceMid: "Top-Risiken prüfen; ggf. stärker maskieren oder manuelle Schwärzung/Begriffe ergänzen.",
-      adviceHigh: "Nicht so versenden: Signatur/Konten entfernen und stärker maskieren.",
+      adviceMid: "Top-Risiken prüfen; ggf. stärker maskieren oder manuelle Schwärzung/Begriffe ergänzen。",
+      adviceHigh: "Nicht so versenden: Signatur/Konten entfernen und stärker maskieren。",
       meta: (m) => `Treffer ${m.hits}｜Money M1${m.fromPdf ? "｜Datei" : ""}`
     };
   }
@@ -730,9 +739,9 @@ function computeRiskReport(hitsByKey, meta) {
   const clampMin = Number(R.clampMin ?? 0);
   const clampMax = Number(R.clampMax ?? 100);
 
-  const groups = (R && R.groups && typeof R.groups === "object") ? R.groups : null;
-  const gw = (R && R.groupWeights && typeof R.groupWeights === "object") ? R.groupWeights : null;
-  const gk = (R && R.groupK && typeof R.groupK === "object") ? R.groupK : null;
+  const groups = R && R.groups && typeof R.groups === "object" ? R.groups : null;
+  const gw = R && R.groupWeights && typeof R.groupWeights === "object" ? R.groupWeights : null;
+  const gk = R && R.groupK && typeof R.groupK === "object" ? R.groupK : null;
 
   // Safe defaults (only used if policy missing)
   // ✅ PATCH: remove non-existent "address_cn_partial" key; the key is "address_cn" (mode may be address_cn_partial)
@@ -1377,6 +1386,5 @@ try {
     try {
       window.dispatchEvent(new CustomEvent("boot:checked", { detail: window.__BOOT_OK }));
     } catch (_) {}
-  } catch (_) {
-  }
+  } catch (_) {}
 })();
