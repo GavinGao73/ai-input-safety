@@ -151,13 +151,7 @@ function bind() {
 const btnClear = $("btnClear");
 if (btnClear) {
   btnClear.onclick = () => {
-    // ✅ 0) FIRST: re-init enabled (must not be blocked by later UI errors)
-    try {
-      if (typeof window.initEnabled === "function") window.initEnabled();
-      else if (typeof initEnabled === "function") initEnabled();
-    } catch (_) {}
-
-    // ✅ 1) everything else: do not allow any single error to abort the rest
+    // ✅ 1) everything: do not allow any single error to abort the rest
     try { if ($("inputText")) $("inputText").value = ""; } catch (_) {}
     try { renderOutput(""); } catch (_) {}
 
@@ -222,7 +216,7 @@ if (btnClear) {
     try { window.__RasterExportLast = null; } catch (_) {}
     try { if (typeof renderExportStatusCombined === "function") renderExportStatusCombined(); } catch (_) {}
 
-    // ✅ FINAL: initEnabled again as a last safety net
+    // ✅ FINAL: after everything cleared, re-init enabled to defaults
     try {
       if (typeof window.initEnabled === "function") window.initEnabled();
       else if (typeof initEnabled === "function") initEnabled();
