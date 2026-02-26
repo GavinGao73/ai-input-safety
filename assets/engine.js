@@ -1327,3 +1327,70 @@ try {
   } catch (_) {
   }
 })();
+
+/* =========================
+   Z) Late init for DETECTION_ITEMS (fix enabledCount=0 / overwritten config)
+   - If engine loads before DETECTION_ITEMS, initEnabled will run once it appears.
+   - If some later file overwrites window.DETECTION_ITEMS, re-init enabled automatically.
+   ========================= */
+(function ensureDetectionItemsInit() {
+  try {
+    // avoid double-hook
+    if (window.__DETECTION_ITEMS_INIT_PATCHED__) return;
+    window.__DETECTION_ITEMS_INIT_PATCHED__ = true;
+
+    let done = false;
+
+    function safeInit() {
+      if (done) return;
+      try {
+        if (window.DETECTION_ITEMS && typeof window.initEnabled === "function") {
+          window.initEnabled();
+          done = true;
+        }
+      } catch (_) {}
+    }
+
+    // 1) try immediately
+    safeInit();
+
+    // 2) retry a few times (covers async script load order)
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries++;
+      safeInit();
+      if (done || tries >= 80) clearInterval(timer); // ~4s max
+    }, 50);
+
+    // 3) hook overwrites of window.DETECTION_ITEMS (best-effort)
+    try {
+      if (!window.__DETECTION_ITEMS_HOOKED__) {
+        window.__DETECTION_ITEMS_HOOKED__ = true;
+
+        let _v = window.DETECTION_ITEMS;
+
+        Object.defineProperty(window, "DETECTION_ITEMS", {
+          configurable: true,
+          enumerable: true,
+          get() {
+            return _v;
+          },
+          set(v) {
+            _v = v;
+            try {
+              if (typeof window.initEnabled === "function") window.initEnabled();
+            } catch (_) {}
+            try {
+              window.dispatchEvent(new Event("detectionitems:changed"));
+            } catch (_) {}
+          }
+        });
+
+        // trigger setter once with current value (if any)
+        try {
+          window.DETECTION_ITEMS = _v;
+        } catch (_) {}
+      }
+    } catch (_) {}
+  } catch (_) {}
+})();
