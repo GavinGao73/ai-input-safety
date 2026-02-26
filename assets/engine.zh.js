@@ -89,8 +89,12 @@
       // ✅ Customer ID: keep "CUST-" prefix, mask digits only
       "cust_id",
 
-      // ✅ FULL ref mask (single placeholder, no tail logic)
-      "ref_label_full",
+      // ✅ ID policy: keep prefix/body, mask ONLY the last numeric segment (tail digits)
+      // (replaces previous FULL ref mask behavior)
+      "ref_label_tail",
+
+      // legacy full rule definition kept but NOT executed
+      // "ref_label_full",
 
       // money
       "money",
@@ -124,7 +128,7 @@
 
       // refs / ids
       "cust_id",
-      "ref_label_full",
+      "ref_label_tail",
 
       "address_cn",
 
@@ -346,6 +350,19 @@
         mode: "prefix"
       },
 
+      /* ===================== REF TAIL MASK (label-driven; keep prefix/body, mask last digits only) ===================== */
+      ref_label_tail: {
+        // ✅ Tail-only replacement: keep prefix/body, mask ONLY the last numeric tail (>=4 digits)
+        // Covers:
+        // Case ID / Ticket No. / Application ID / Order ID / Invoice No. / Reference
+        // 合同号 / 索赔参考号 / 法律案件号 / 申请编号 / 参考编号 / 工单号 / 票据号 / 客户号 / 编号 ...
+        // Example: CASE-2026-00078421 -> CASE-2026-【编号】
+        pattern:
+          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|Case\s*ID|Ticket\s*No\.?|Application\s*ID|Order\s*ID|Invoice\s*No\.?|Reference)\s*[:：=]\s*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,10}[-_.]))(\d{4,})/giu,
+        tag: "REF",
+        mode: "prefix"
+      },
+
       /* ===================== REF FULL MASK (label-driven; single placeholder) ===================== */
       ref_label_full: {
         // ✅ FULL replacement, single 【编号】 only, no tail logic.
@@ -525,7 +542,7 @@
 
       /* ===================== REF (format-like) ===================== */
       ref: {
-        // keep conservative to avoid partial hits inside multi-segment IDs (handled by ref_label_full)
+        // keep conservative to avoid partial hits inside multi-segment IDs (handled by ref_label_tail)
         pattern: /\b[A-Z]{2,6}-?\d{5,14}\b(?![-_.][A-Za-z0-9])/g,
         tag: "REF"
       },
