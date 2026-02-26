@@ -148,76 +148,84 @@ function bind() {
     window.__export_snapshot.manualTerms = manualTerms.slice(0);
   }
 
-  const btnClear = $("btnClear");
-  if (btnClear) {
-    btnClear.onclick = () => {
-      if ($("inputText")) $("inputText").value = "";
-      renderOutput("");
+const btnClear = $("btnClear");
+if (btnClear) {
+  btnClear.onclick = () => {
+    if ($("inputText")) $("inputText").value = "";
+    renderOutput("");
 
-      window.__safe_hits = 0;
-      window.__safe_breakdown = {};
-      window.__safe_score = 0;
-      window.__safe_level = "low";
-      window.__safe_report = null;
+    window.__safe_hits = 0;
+    window.__safe_breakdown = {};
+    window.__safe_score = 0;
+    window.__safe_level = "low";
+    window.__safe_report = null;
 
-      lastRunMeta.fromPdf = false;
+    lastRunMeta.fromPdf = false;
 
-      collapseManualArea();
-      collapseRiskArea();
-      clearProgress();
-      clearBodyHeights();
+    collapseManualArea();
+    collapseRiskArea();
+    clearProgress();
+    clearBodyHeights();
 
-      const rb = $("riskBox");
-      if (rb) rb.innerHTML = "";
+    const rb = $("riskBox");
+    if (rb) rb.innerHTML = "";
 
-      if ($("pdfName")) $("pdfName").textContent = "";
+    if ($("pdfName")) $("pdfName").textContent = "";
 
-      const wrap = $("inputWrap");
-      if (wrap) {
-        wrap.classList.remove("pdf-overlay-on");
-        wrap.classList.remove("has-content");
+    const wrap = $("inputWrap");
+    if (wrap) {
+      wrap.classList.remove("pdf-overlay-on");
+      wrap.classList.remove("has-content");
+    }
+    if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
+
+    manualTerms = [];
+    const termInput2 = $("manualTerms") || $("nameList");
+    if (termInput2) {
+      termInput2.value = "";
+      termInput2.disabled = false;
+    }
+
+    lastUploadedFile = null;
+    lastFileKind = "";
+    lastProbe = null;
+    lastPdfOriginalText = "";
+    setStage3Ui("none");
+    setManualPanesForMode("none");
+
+    __manualRedactSession = null;
+    __manualRedactResult = null;
+    try { window.__manual_redact_last = null; } catch (_) {}
+
+    window.__export_snapshot = null;
+    // ✅ optional: also clear per-lang snapshots to avoid stale enabledKeys/lang leaks
+    try { window.__export_snapshot_byLang = null; } catch (_) {}
+
+    // ✅ RULE C: Clear resets to "first-enter" start:
+    // contentLangMode="auto", contentLang=""
+    try {
+      if (typeof resetContentLang === "function") resetContentLang();
+      else {
+        window.contentLangMode = "auto";
+        window.contentLang = "";
       }
-      if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
+    } catch (_) {}
 
-      manualTerms = [];
-      const termInput2 = $("manualTerms") || $("nameList");
-      if (termInput2) {
-        termInput2.value = "";
-        termInput2.disabled = false;
-      }
+    // ✅ KEY FIX: after Clear, re-init enabled so it won't be 0 until first upload/applyRules
+    try {
+      if (typeof window.initEnabled === "function") window.initEnabled();
+      else if (typeof initEnabled === "function") initEnabled();
+    } catch (_) {}
 
-      lastUploadedFile = null;
-      lastFileKind = "";
-      lastProbe = null;
-      lastPdfOriginalText = "";
-      setStage3Ui("none");
-      setManualPanesForMode("none");
+    // also clear export status UI (but keep boot line)
+    try {
+      window.__RasterExportLast = null;
+      renderExportStatusCombined();
+    } catch (_) {}
 
-      __manualRedactSession = null;
-      __manualRedactResult = null;
-      try { window.__manual_redact_last = null; } catch (_) {}
-
-      window.__export_snapshot = null;
-
-      // ✅ RULE C: Clear resets to "first-enter" start:
-      // contentLangMode="auto", contentLang=""
-      try {
-        if (typeof resetContentLang === "function") resetContentLang();
-        else {
-          window.contentLangMode = "auto";
-          window.contentLang = "";
-        }
-      } catch (_) {}
-
-      // also clear export status UI (but keep boot line)
-      try {
-        window.__RasterExportLast = null;
-        renderExportStatusCombined();
-      } catch (_) {}
-
-      window.dispatchEvent(new Event("safe:updated"));
-    };
-  }
+    window.dispatchEvent(new Event("safe:updated"));
+  };
+}
 
   const btnCopy = $("btnCopy");
   if (btnCopy) {
