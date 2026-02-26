@@ -630,6 +630,7 @@
 // - IMPORTANT: disable "title" key execution to prevent Herr/Frau/Dr/Prof -> [Anrede]
 // - IMPORTANT: disable full-line "address_de_extra" masking to avoid swallowing Klingel-tail after partial masking
 // - IMPORTANT: disable legacy full-line "address_de_street" execution to prevent losing PLZ/City/Country tail  ✅ FIX (ONLY CHANGE)
+// - IMPORTANT: disable legacy "ref" execution to enforce ID tail-only policy across unlabeled IDs ✅ FIX (ONLY CHANGE)
 // =========================
 (function () {
   "use strict";
@@ -715,6 +716,14 @@
   }
   if (Array.isArray(DE.alwaysOn)) {
     DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "address_de_street");
+  }
+
+  // IMPORTANT: disable legacy "ref" masking execution to enforce tail-only ID policy
+  if (Array.isArray(DE.priority)) {
+    DE.priority = DE.priority.filter((k) => k !== "ref");
+  }
+  if (Array.isArray(DE.alwaysOn)) {
+    DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "ref");
   }
 
   Object.assign(DE.rules, {
