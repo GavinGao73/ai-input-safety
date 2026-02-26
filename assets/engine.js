@@ -18,6 +18,7 @@
 // - P1: Prefix-mode replacement preserves trailing whitespace/newlines (prevents line-merge when a pack regex accidentally eats \n)
 // - P2: Placeholder protection ONLY shields engine-generated placeholders (avoid protecting arbitrary [..] such as Markdown links)
 // - P3: NEW mode "prefix_keep_tail": keep tail unmasked (needed for DE street-only masking while keeping PLZ/City/Country)
+// - P4: Export enabledKeys MUST include ALWAYS_ON (safer & consistent with execution)
 // =========================
 
 console.log("[engine.js] loaded v20260223-engine-a5-policy-split");
@@ -278,9 +279,22 @@ function escapeHTML(s) {
 }
 
 // ================= ENABLED KEYS FOR EXPORT =================
+// ✅ PATCH P4: export enabledKeys MUST include ALWAYS_ON (policy + pack)
+// - enabled = UI-selected defaults/toggles
+// - ALWAYS_ON = enforced coverage regardless of UI
 function effectiveEnabledKeys() {
   const MUST_INCLUDE = ["company"]; // keep as-is (your build choice)
+
   const base = new Set(Array.from(enabled || []));
+
+  // include always-on keys (policy + pack)
+  try {
+    const ALWAYS_ON = getAlwaysOnSet();
+    if (ALWAYS_ON && typeof ALWAYS_ON.forEach === "function") {
+      ALWAYS_ON.forEach((k) => base.add(k));
+    }
+  } catch (_) {}
+
   for (const k of MUST_INCLUDE) base.add(k);
   return Array.from(base);
 }
@@ -665,22 +679,8 @@ function computeRiskReport(hitsByKey, meta) {
   // Safe defaults (only used if policy missing)
   // ✅ PATCH: remove non-existent "address_cn_partial" key; the key is "address_cn" (mode may be address_cn_partial)
   const DEFAULT_GROUPS = {
-    critical: [
-      "secret",
-      "api_key_token",
-      "bearer_token",
-      "card_security",
-      "security_answer",
-      "otp",
-      "pin",
-      "2fa"
-    ],
-    financial: [
-      "account",
-      "bank",
-      "bank_routing_ids",
-      "card_expiry"
-    ],
+    critical: ["secret", "api_key_token", "bearer_token", "card_security", "security_answer", "otp", "pin", "2fa"],
+    financial: ["account", "bank", "bank_routing_ids", "card_expiry"],
     identity: [
       "dob",
       "place_of_birth",
@@ -726,21 +726,8 @@ function computeRiskReport(hitsByKey, meta) {
     ]
   };
 
-  const DEFAULT_GW = {
-    critical: 0.32,
-    financial: 0.28,
-    identity: 0.18,
-    contact: 0.12,
-    tracking: 0.10
-  };
-
-  const DEFAULT_GK = {
-    critical: 0.35,
-    financial: 0.30,
-    identity: 0.22,
-    contact: 0.18,
-    tracking: 0.20
-  };
+  const DEFAULT_GW = { critical: 0.32, financial: 0.28, identity: 0.18, contact: 0.12, tracking: 0.1 };
+  const DEFAULT_GK = { critical: 0.35, financial: 0.3, identity: 0.22, contact: 0.18, tracking: 0.2 };
 
   const G = groups || DEFAULT_GROUPS;
   const GW = gw || DEFAULT_GW;
@@ -780,7 +767,7 @@ function computeRiskReport(hitsByKey, meta) {
   }
   let score = Math.round(base * 100);
 
-  // small bonuses (kept, but reduced in policy to avoid constant 100)
+  // small bonuses
   score += Number(B.base || 0);
   if (meta && meta.inputLen >= 1500) score += Number(B.len1500 || 0);
   if (meta && meta.inputLen >= 4000) score += Number(B.len4000 || 0);
@@ -875,7 +862,7 @@ function applyRules(text) {
     const map = [];
     let t = String(s || "");
 
-    // (A) Protect 【...】 blocks (these are explicitly placeholder-style in your UI)
+    // (A) Protect 【...】 blocks
     t = t.replace(/【[^【】\n\r]{1,120}】/g, (m) => {
       const id = map.length;
       map.push(m);
@@ -883,8 +870,6 @@ function applyRules(text) {
     });
 
     // (B) Protect ONLY known placeholder tokens in square brackets
-    //     This prevents accidental shielding of Markdown like: [email](mailto:...) or [text](url)
-    //     while still preventing re-masking of already produced placeholders.
     const PH = [
       // DE
       "Telefon",
@@ -939,6 +924,7 @@ function applyRules(text) {
   const rules = getRulesSafe();
   const pack = getContentPack();
 
+  // ✅ PATCH P4 in action: enabledKeysArr now includes ALWAYS_ON too
   const enabledKeysArr = effectiveEnabledKeys();
   const enabledSet = new Set(enabledKeysArr);
 
@@ -969,7 +955,6 @@ function applyRules(text) {
       inputLen: out.length
     });
 
-    // ✅ UI: allow manual terms & risk panel while typing (non-empty input)
     try {
       const ta2 = $("inputText");
       const hasInput = !!(ta2 && String(ta2.value || "").trim());
@@ -1010,7 +995,7 @@ function applyRules(text) {
   // manual first
   out = applyManualTermsMask(out, () => addHit("manual_term"));
 
-  // protect existing placeholders (ONLY known tokens)
+  // protect existing placeholders
   const p0 = protectPlaceholders(out);
   out = p0.t;
 
@@ -1032,7 +1017,6 @@ function applyRules(text) {
       const match = String(args[0] || "");
 
       if (r.mode === "prefix") {
-        // P1: preserve suffix (incl. newline/whitespace) that the regex might have consumed.
         const label = String(args[1] || "");
         const val = String(args[2] || "");
         const consumed = (label + val).length;
@@ -1041,7 +1025,6 @@ function applyRules(text) {
         return `${label}${placeholder(r.tag)}${suffix}`;
       }
 
-      // ✅ P3: prefix_keep_tail (mask only the middle part, keep tail untouched)
       if (r.mode === "prefix_keep_tail") {
         const label = String(args[1] || "");
         const toMask = String(args[2] || "");
@@ -1145,7 +1128,6 @@ function applyRules(text) {
     inputLen: lastRunMeta.inputLen
   });
 
-  // ✅ UI: allow manual terms & risk panel while typing (non-empty input)
   try {
     const ta2 = $("inputText");
     const hasInput = !!(ta2 && String(ta2.value || "").trim());
@@ -1343,7 +1325,6 @@ try {
       window.dispatchEvent(new CustomEvent("boot:checked", { detail: window.__BOOT_OK }));
     } catch (_) {}
   } catch (_) {
-    // even in failure: keep a minimal marker
     try {
       window.__BOOT_OK = { ok: false, when: Date.now(), error: "bootSelfCheck_failed" };
     } catch (_) {}
