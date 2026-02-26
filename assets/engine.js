@@ -189,13 +189,13 @@ function detectRuleEngine(text) {
       const r = normLang(PACKS.zh.detect(s));
       if (r === "zh") return "zh";
     }
-    if (PACKS.de && typeof PACKS.de.detect === "function") {
-      const r = normLang(PACKS.de.detect(s));
-      if (r === "de") return "de";
-    }
     if (PACKS.en && typeof PACKS.en.detect === "function") {
       const r = normLang(PACKS.en.detect(s));
       if (r === "en") return "en";
+    }
+    if (PACKS.de && typeof PACKS.de.detect === "function") {
+      const r = normLang(PACKS.de.detect(s));
+      if (r === "de") return "de";
     }
   } catch (_) {}
 
