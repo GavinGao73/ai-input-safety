@@ -1,5 +1,5 @@
 // =========================
-// assets/engine.js (FULL)
+// assets/engine.js (FULL)  ✅ PATCHED
 // ROUTER + STABLE CORE (no lang rules/priority/alwaysOn/formatters inside)
 // - UI language: window.currentLang (UI only)
 // - Content strategy language: window.ruleEngine (+ window.ruleEngineMode)
@@ -663,6 +663,7 @@ function computeRiskReport(hitsByKey, meta) {
   const gk = (R && R.groupK && typeof R.groupK === "object") ? R.groupK : null;
 
   // Safe defaults (only used if policy missing)
+  // ✅ PATCH: remove non-existent "address_cn_partial" key; the key is "address_cn" (mode may be address_cn_partial)
   const DEFAULT_GROUPS = {
     critical: [
       "secret",
@@ -702,7 +703,6 @@ function computeRiskReport(hitsByKey, meta) {
       "email",
       "url",
       "address_cn",
-      "address_cn_partial",
       "address_de_street",
       "address_en_inline_street",
       "address_en_extra_block",
