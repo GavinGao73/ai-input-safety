@@ -1,5 +1,5 @@
 // =========================
-// assets/engine.policy.js (FULL)
+// assets/engine.policy.js (FULL) ✅ PATCHED
 // Strategy layer (NON-language, change here frequently)
 // - baseAlwaysOn (global coverage defaults)
 // - defaultPriority (fallback when packs missing)
@@ -19,6 +19,7 @@
 
     // ✅ fallback execution order if pack missing (product default)
     // If you prefer "no fallback" (fail closed), set this to []
+    // ✅ PATCH: ref_label -> ref_label_tail (new key). Keep others as-is.
     defaultPriority: [
       "secret",
       "account",
@@ -26,7 +27,7 @@
       "email",
       "url",
       "handle_label",
-      "ref_label",
+      "ref_label_tail",
       "money",
       "phone",
       "company",
@@ -49,6 +50,7 @@
     // ✅ risk scoring policy (non-language)
     risk: {
       // legacy weights kept for UI "Top risk sources" ranking (no UI change)
+      // ✅ PATCH: ref_label -> ref_label_tail
       weights: {
         bank: 28,
         account: 26,
@@ -59,7 +61,7 @@
         address_de_street: 18,
         address_cn: 18,
         handle_label: 10,
-        ref_label: 6,
+        ref_label_tail: 6,
         handle: 10,
         ref: 6,
         title: 4,
@@ -70,6 +72,7 @@
       },
 
       // Scheme A config: grouped saturation scoring
+      // ✅ PATCH: remove non-existent "address_cn_partial" key; use "address_cn"
       groups: {
         critical: [
           "secret",
@@ -106,7 +109,6 @@
           "email",
           "url",
           "address_cn",
-          "address_cn_partial",
           "address_de_street",
           "address_en_inline_street",
           "address_en_extra_block",
