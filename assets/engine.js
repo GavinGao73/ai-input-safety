@@ -1325,8 +1325,5 @@ try {
       window.dispatchEvent(new CustomEvent("boot:checked", { detail: window.__BOOT_OK }));
     } catch (_) {}
   } catch (_) {
-    try {
-      window.__BOOT_OK = { ok: false, when: Date.now(), error: "bootSelfCheck_failed" };
-    } catch (_) {}
   }
 })();
