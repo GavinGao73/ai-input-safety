@@ -151,58 +151,65 @@ function bind() {
 const btnClear = $("btnClear");
 if (btnClear) {
   btnClear.onclick = () => {
-    if ($("inputText")) $("inputText").value = "";
-    renderOutput("");
+    // ✅ 0) FIRST: re-init enabled (must not be blocked by later UI errors)
+    try {
+      if (typeof window.initEnabled === "function") window.initEnabled();
+      else if (typeof initEnabled === "function") initEnabled();
+    } catch (_) {}
 
-    window.__safe_hits = 0;
-    window.__safe_breakdown = {};
-    window.__safe_score = 0;
-    window.__safe_level = "low";
-    window.__safe_report = null;
+    // ✅ 1) everything else: do not allow any single error to abort the rest
+    try { if ($("inputText")) $("inputText").value = ""; } catch (_) {}
+    try { renderOutput(""); } catch (_) {}
 
-    lastRunMeta.fromPdf = false;
+    try { window.__safe_hits = 0; } catch (_) {}
+    try { window.__safe_breakdown = {}; } catch (_) {}
+    try { window.__safe_score = 0; } catch (_) {}
+    try { window.__safe_level = "low"; } catch (_) {}
+    try { window.__safe_report = null; } catch (_) {}
 
-    collapseManualArea();
-    collapseRiskArea();
-    clearProgress();
-    clearBodyHeights();
+    try { lastRunMeta.fromPdf = false; } catch (_) {}
 
-    const rb = $("riskBox");
-    if (rb) rb.innerHTML = "";
+    try { if (typeof collapseManualArea === "function") collapseManualArea(); } catch (_) {}
+    try { if (typeof collapseRiskArea === "function") collapseRiskArea(); } catch (_) {}
+    try { if (typeof clearProgress === "function") clearProgress(); } catch (_) {}
+    try { if (typeof clearBodyHeights === "function") clearBodyHeights(); } catch (_) {}
 
-    if ($("pdfName")) $("pdfName").textContent = "";
+    try { const rb = $("riskBox"); if (rb) rb.innerHTML = ""; } catch (_) {}
+    try { if ($("pdfName")) $("pdfName").textContent = ""; } catch (_) {}
 
-    const wrap = $("inputWrap");
-    if (wrap) {
-      wrap.classList.remove("pdf-overlay-on");
-      wrap.classList.remove("has-content");
-    }
-    if ($("inputOverlay")) $("inputOverlay").innerHTML = "";
+    try {
+      const wrap = $("inputWrap");
+      if (wrap) {
+        wrap.classList.remove("pdf-overlay-on");
+        wrap.classList.remove("has-content");
+      }
+    } catch (_) {}
+    try { const ov = $("inputOverlay"); if (ov) ov.innerHTML = ""; } catch (_) {}
 
-    manualTerms = [];
-    const termInput2 = $("manualTerms") || $("nameList");
-    if (termInput2) {
-      termInput2.value = "";
-      termInput2.disabled = false;
-    }
+    try {
+      manualTerms = [];
+      const termInput2 = $("manualTerms") || $("nameList");
+      if (termInput2) {
+        termInput2.value = "";
+        termInput2.disabled = false;
+      }
+    } catch (_) {}
 
-    lastUploadedFile = null;
-    lastFileKind = "";
-    lastProbe = null;
-    lastPdfOriginalText = "";
-    setStage3Ui("none");
-    setManualPanesForMode("none");
+    try { lastUploadedFile = null; } catch (_) {}
+    try { lastFileKind = ""; } catch (_) {}
+    try { lastProbe = null; } catch (_) {}
+    try { lastPdfOriginalText = ""; } catch (_) {}
+    try { if (typeof setStage3Ui === "function") setStage3Ui("none"); } catch (_) {}
+    try { if (typeof setManualPanesForMode === "function") setManualPanesForMode("none"); } catch (_) {}
 
-    __manualRedactSession = null;
-    __manualRedactResult = null;
+    try { __manualRedactSession = null; } catch (_) {}
+    try { __manualRedactResult = null; } catch (_) {}
     try { window.__manual_redact_last = null; } catch (_) {}
 
-    window.__export_snapshot = null;
-    // ✅ optional: also clear per-lang snapshots to avoid stale enabledKeys/lang leaks
+    try { window.__export_snapshot = null; } catch (_) {}
     try { window.__export_snapshot_byLang = null; } catch (_) {}
 
-    // ✅ RULE C: Clear resets to "first-enter" start:
-    // contentLangMode="auto", contentLang=""
+    // ✅ RULE C: reset ruleEngine/contentLang
     try {
       if (typeof resetContentLang === "function") resetContentLang();
       else {
@@ -211,19 +218,17 @@ if (btnClear) {
       }
     } catch (_) {}
 
-    // ✅ KEY FIX: after Clear, re-init enabled so it won't be 0 until first upload/applyRules
+    // ✅ optional: clear export status (keep boot line)
+    try { window.__RasterExportLast = null; } catch (_) {}
+    try { if (typeof renderExportStatusCombined === "function") renderExportStatusCombined(); } catch (_) {}
+
+    // ✅ FINAL: initEnabled again as a last safety net
     try {
       if (typeof window.initEnabled === "function") window.initEnabled();
       else if (typeof initEnabled === "function") initEnabled();
     } catch (_) {}
 
-    // also clear export status UI (but keep boot line)
-    try {
-      window.__RasterExportLast = null;
-      renderExportStatusCombined();
-    } catch (_) {}
-
-    window.dispatchEvent(new Event("safe:updated"));
+    try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
   };
 }
 
