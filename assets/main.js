@@ -148,83 +148,89 @@ function bind() {
     window.__export_snapshot.manualTerms = manualTerms.slice(0);
   }
 
-const btnClear = $("btnClear");
-if (btnClear) {
-  btnClear.onclick = () => {
-    // ✅ 1) everything: do not allow any single error to abort the rest
-    try { if ($("inputText")) $("inputText").value = ""; } catch (_) {}
-    try { renderOutput(""); } catch (_) {}
+  const btnClear = $("btnClear");
+  if (btnClear) {
+    btnClear.onclick = () => {
+      // ✅ 0) FIRST: re-init enabled (must not be blocked by later UI errors)
+      try {
+        if (typeof window.initEnabled === "function") window.initEnabled();
+        else if (typeof initEnabled === "function") initEnabled();
+      } catch (_) {}
 
-    try { window.__safe_hits = 0; } catch (_) {}
-    try { window.__safe_breakdown = {}; } catch (_) {}
-    try { window.__safe_score = 0; } catch (_) {}
-    try { window.__safe_level = "low"; } catch (_) {}
-    try { window.__safe_report = null; } catch (_) {}
+      // ✅ 1) everything else: do not allow any single error to abort the rest
+      try { if ($("inputText")) $("inputText").value = ""; } catch (_) {}
+      try { renderOutput(""); } catch (_) {}
 
-    try { lastRunMeta.fromPdf = false; } catch (_) {}
+      try { window.__safe_hits = 0; } catch (_) {}
+      try { window.__safe_breakdown = {}; } catch (_) {}
+      try { window.__safe_score = 0; } catch (_) {}
+      try { window.__safe_level = "low"; } catch (_) {}
+      try { window.__safe_report = null; } catch (_) {}
 
-    try { if (typeof collapseManualArea === "function") collapseManualArea(); } catch (_) {}
-    try { if (typeof collapseRiskArea === "function") collapseRiskArea(); } catch (_) {}
-    try { if (typeof clearProgress === "function") clearProgress(); } catch (_) {}
-    try { if (typeof clearBodyHeights === "function") clearBodyHeights(); } catch (_) {}
+      try { lastRunMeta.fromPdf = false; } catch (_) {}
 
-    try { const rb = $("riskBox"); if (rb) rb.innerHTML = ""; } catch (_) {}
-    try { if ($("pdfName")) $("pdfName").textContent = ""; } catch (_) {}
+      try { if (typeof collapseManualArea === "function") collapseManualArea(); } catch (_) {}
+      try { if (typeof collapseRiskArea === "function") collapseRiskArea(); } catch (_) {}
+      try { if (typeof clearProgress === "function") clearProgress(); } catch (_) {}
+      try { if (typeof clearBodyHeights === "function") clearBodyHeights(); } catch (_) {}
 
-    try {
-      const wrap = $("inputWrap");
-      if (wrap) {
-        wrap.classList.remove("pdf-overlay-on");
-        wrap.classList.remove("has-content");
-      }
-    } catch (_) {}
-    try { const ov = $("inputOverlay"); if (ov) ov.innerHTML = ""; } catch (_) {}
+      try { const rb = $("riskBox"); if (rb) rb.innerHTML = ""; } catch (_) {}
+      try { if ($("pdfName")) $("pdfName").textContent = ""; } catch (_) {}
 
-    try {
-      manualTerms = [];
-      const termInput2 = $("manualTerms") || $("nameList");
-      if (termInput2) {
-        termInput2.value = "";
-        termInput2.disabled = false;
-      }
-    } catch (_) {}
+      try {
+        const wrap = $("inputWrap");
+        if (wrap) {
+          wrap.classList.remove("pdf-overlay-on");
+          wrap.classList.remove("has-content");
+        }
+      } catch (_) {}
+      try { const ov = $("inputOverlay"); if (ov) ov.innerHTML = ""; } catch (_) {}
 
-    try { lastUploadedFile = null; } catch (_) {}
-    try { lastFileKind = ""; } catch (_) {}
-    try { lastProbe = null; } catch (_) {}
-    try { lastPdfOriginalText = ""; } catch (_) {}
-    try { if (typeof setStage3Ui === "function") setStage3Ui("none"); } catch (_) {}
-    try { if (typeof setManualPanesForMode === "function") setManualPanesForMode("none"); } catch (_) {}
+      try {
+        manualTerms = [];
+        const termInput2 = $("manualTerms") || $("nameList");
+        if (termInput2) {
+          termInput2.value = "";
+          termInput2.disabled = false;
+        }
+      } catch (_) {}
 
-    try { __manualRedactSession = null; } catch (_) {}
-    try { __manualRedactResult = null; } catch (_) {}
-    try { window.__manual_redact_last = null; } catch (_) {}
+      try { lastUploadedFile = null; } catch (_) {}
+      try { lastFileKind = ""; } catch (_) {}
+      try { lastProbe = null; } catch (_) {}
+      try { lastPdfOriginalText = ""; } catch (_) {}
+      try { if (typeof setStage3Ui === "function") setStage3Ui("none"); } catch (_) {}
+      try { if (typeof setManualPanesForMode === "function") setManualPanesForMode("none"); } catch (_) {}
 
-    try { window.__export_snapshot = null; } catch (_) {}
-    try { window.__export_snapshot_byLang = null; } catch (_) {}
+      try { __manualRedactSession = null; } catch (_) {}
+      try { __manualRedactResult = null; } catch (_) {}
+      try { window.__manual_redact_last = null; } catch (_) {}
 
-    // ✅ RULE C: reset ruleEngine/contentLang
-    try {
-      if (typeof resetContentLang === "function") resetContentLang();
-      else {
-        window.contentLangMode = "auto";
-        window.contentLang = "";
-      }
-    } catch (_) {}
+      try { window.__export_snapshot = null; } catch (_) {}
+      try { window.__export_snapshot_byLang = null; } catch (_) {}
 
-    // ✅ optional: clear export status (keep boot line)
-    try { window.__RasterExportLast = null; } catch (_) {}
-    try { if (typeof renderExportStatusCombined === "function") renderExportStatusCombined(); } catch (_) {}
+      // ✅ RULE C: reset ruleEngine/contentLang
+      try {
+        if (typeof resetContentLang === "function") resetContentLang();
+        else {
+          window.contentLangMode = "auto";
+          window.contentLang = "";
+        }
+      } catch (_) {}
 
-    // ✅ FINAL: after everything cleared, re-init enabled to defaults
-    try {
-      if (typeof window.initEnabled === "function") window.initEnabled();
-      else if (typeof initEnabled === "function") initEnabled();
-    } catch (_) {}
+      // ✅ optional: clear export status (keep boot line)
+      try { window.__RasterExportLast = null; } catch (_) {}
+      try { if (typeof renderExportStatusCombined === "function") renderExportStatusCombined(); } catch (_) {}
 
-    try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
-  };
-}
+      // ✅ FINAL: initEnabled again as a last safety net
+      try {
+        if (typeof window.initEnabled === "function") window.initEnabled();
+        else if (typeof initEnabled === "function") initEnabled();
+      } catch (_) {}
+
+      try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
+    };
+  }
 
   const btnCopy = $("btnCopy");
   if (btnCopy) {
@@ -475,117 +481,4 @@ if (btnClear) {
   } catch (e) {
     console.error("[boot] failed:", e);
   }
-})();
-
-// =========================
-// Shadow debug (no DevTools)
-// Toggle: press "D" (shift optional)
-// - outlines fixed/sticky layers
-// - can hide common gradient overlays
-// - dumps topmost element at screen bottom center
-// =========================
-(function shadowDebugBoot(){
-  try{
-    let on = false;
-
-    function markAll(){
-      const els = Array.from(document.querySelectorAll("*"));
-      for(const el of els){
-        const cs = getComputedStyle(el);
-        const pos = cs.position;
-
-        // mark only suspicious layers
-        if(pos === "fixed" || pos === "sticky"){
-          el.dataset.__dbg_shadow = "1";
-          el.style.outline = "2px solid rgba(255,0,0,.7)";
-          el.style.outlineOffset = "-2px";
-        }
-      }
-    }
-
-    function unmarkAll(){
-      const els = Array.from(document.querySelectorAll("[data-__dbg_shadow]"));
-      for(const el of els){
-        delete el.dataset.__dbg_shadow;
-        el.style.outline = "";
-        el.style.outlineOffset = "";
-      }
-    }
-
-    // hide common overlay patterns (gradient masks, pseudo overlays simulated by elements)
-    function hideOverlaysYes(){
-      const els = Array.from(document.querySelectorAll("*"));
-      for(const el of els){
-        const cs = getComputedStyle(el);
-
-        const bg = cs.backgroundImage || "";
-        const hasGrad = bg.includes("gradient");
-        const hasMask = (cs.maskImage && cs.maskImage !== "none") || (cs.webkitMaskImage && cs.webkitMaskImage !== "none");
-        const hasShadow = cs.boxShadow && cs.boxShadow !== "none";
-        const opaque = parseFloat(cs.opacity || "1") < 1;
-
-        // only target likely overlay layers
-        if(hasGrad || hasMask || (hasShadow && (cs.position==="fixed"||cs.position==="sticky")) || opaque){
-          el.dataset.__dbg_overlay = "1";
-          el.style.backgroundImage = "none";
-          el.style.webkitMaskImage = "none";
-          el.style.maskImage = "none";
-          el.style.boxShadow = "none";
-        }
-      }
-    }
-
-    function hideOverlaysNo(){
-      const els = Array.from(document.querySelectorAll("[data-__dbg_overlay]"));
-      for(const el of els){
-        delete el.dataset.__dbg_overlay;
-        el.style.backgroundImage = "";
-        el.style.webkitMaskImage = "";
-        el.style.maskImage = "";
-        el.style.boxShadow = "";
-      }
-    }
-
-    function probeBottomTop(){
-      // bottom-center point
-      const x = Math.floor(window.innerWidth / 2);
-      const y = Math.floor(window.innerHeight - 8);
-      const el = document.elementFromPoint(x, y);
-      const name = el ? (el.tagName.toLowerCase() + (el.id ? ("#" + el.id) : "") + (el.className ? ("." + String(el.className).trim().replace(/\s+/g,".")) : "")) : "(none)";
-
-      // show in your existing progress area if possible
-      const host = document.getElementById("exportStatus") || document.getElementById("riskBox");
-      if(host){
-        const prev = host.textContent || "";
-        host.textContent = `ShadowDebug: bottom-top = ${name}\n` + prev;
-      }else{
-        alert("ShadowDebug: bottom-top = " + name);
-      }
-    }
-
-    function apply(){
-      if(on){
-        markAll();
-        hideOverlaysYes();
-        probeBottomTop();
-      }else{
-        unmarkAll();
-        hideOverlaysNo();
-      }
-    }
-
-    window.addEventListener("keydown", (e)=>{
-      // press D to toggle
-      if(String(e.key||"").toLowerCase() !== "d") return;
-      on = !on;
-      apply();
-    });
-
-    // expose manual trigger
-    window.__shadowDebug = {
-      on(){ on=true; apply(); },
-      off(){ on=false; apply(); },
-      probe: probeBottomTop
-    };
-  }catch(_){}
 })();
