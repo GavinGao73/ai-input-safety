@@ -91,6 +91,7 @@
       "ref_generic_tail",
 
       // money
+      "money_label",
       "money",
 
       // phone AFTER ids
@@ -134,6 +135,7 @@
       "mac_address",
       "imei",
 
+      "money_label",
       "money",
       "account",
       "bank",
@@ -197,9 +199,19 @@
         tag: "URL"
       },
 
+      // ✅ NEW (minimal): label-driven money to catch "Amount: 2950.15" / "Total=-106.82"
+      // - only triggers with strong money labels
+      // - does NOT treat all decimals as money
+      money_label: {
+        pattern:
+          /((?:amount|total|subtotal|grand\s*total|price|fee|fees|charge|charges|balance|paid|payment|refund|due|net|gross|tax|vat)\s*[:：=]\s*)([-+−]?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2}))/giu,
+        tag: "MONEY",
+        mode: "prefix"
+      },
+
       money: {
         pattern:
-          /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b\s*\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?\s*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥]\s*\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?)/giu,
+          /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b\s*[-+−]?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?|\b[-+−]?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?\s*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥]\s*[-+−]?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?)/giu,
         tag: "MONEY"
       },
 
@@ -353,9 +365,10 @@
       },
 
       /* v6.2-stable: line-anchored, no cross-line; allow optional trailing inline comment */
+      // ✅ Minimal extension: allow From/To/Attn labels (still requires ":/=" and capitalized-name structure)
       person_name: {
         pattern:
-          /^((?:name|customer\s*name|account\s*holder|recipient|name\s*on\s*card)[ \t]*[:：=][ \t]*(?:(?:mr|mrs|ms|miss|dr|prof)\.?\s+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+          /^((?:name|customer\s*name|account\s*holder|recipient|name\s*on\s*card|from|to|attn\.?|attention)[ \t]*[:：=][ \t]*(?:(?:mr|mrs|ms|miss|dr|prof)\.?\s+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
@@ -374,9 +387,10 @@
       },
 
       /* FIX B: require a digit somewhere on the line */
+      /* ✅ Refine: only redact the "suite/apt/unit/floor/room + id" fragment, not the whole line */
       address_en_extra_block: {
         pattern:
-          /(?=[^\n\r]*\d)\b(?:suite|ste\.?|apt|apartment|unit|floor|fl\.?|room|rm\.?)\b[^\n\r]{0,80}\b(?:suite|ste\.?|apt|apartment|unit|floor|fl\.?|room|rm\.?)\b[^\n\r]{0,80}\b/giu,
+          /\b(?:suite|ste\.?|apt|apartment|unit|floor|fl\.?|room|rm\.?)\b(?:\s*(?:#|no\.?|number)?\s*[:：-]?\s*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu,
         tag: "ADDRESS"
       },
 
