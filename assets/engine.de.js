@@ -14,6 +14,10 @@
 // - Name lines: DO NOT output [Anrede]. Keep Herr/Frau/Dr/Prof titles, only mask the name part -> [Name].
 // - Geburtsort: low priority; can mask, but leaving it is acceptable.
 // - Zusatz: only mask "Gebäude..., OG..., Zimmer..." part; keep ", Klingel „Müller“…"
+//
+// ID POLICY (latest):
+// - ID: overall mask KEEP, but ONLY mask the LAST numeric segment (tail digits).
+//   Example: CASE-2026-00078421 -> CASE-2026-[Referenz]
 // =========================
 
 (function () {
@@ -67,8 +71,14 @@
       "login",
 
       // identity / case / reference system (very German)
-      "aktenzeichen",
-      "id_label",
+      // ✅ ID tail-only policy (mask only last numeric segment)
+      "aktenzeichen_tail",
+      "id_label_tail",
+      "ref_generic_tail_de",
+
+      // keep legacy full rules defined but NOT executed (see note above)
+      // "aktenzeichen",
+      // "id_label",
 
       // tax / government / personal documents
       "tax_id",
@@ -116,6 +126,7 @@
 
       // generic
       "handle",
+      // NOTE: legacy "ref" masked whole token; disabled by tail-only policy via priority ordering
       "ref",
       "title",
       "number"
@@ -125,8 +136,10 @@
       "secret",
       "login",
 
-      "aktenzeichen",
-      "id_label",
+      // ✅ ID tail-only policy (mask only last numeric segment)
+      "aktenzeichen_tail",
+      "id_label_tail",
+      "ref_generic_tail_de",
 
       "tax_id",
       "vat_id",
@@ -210,6 +223,16 @@
       },
 
       /* ===================== CASE FILE / BUSINESS REF ===================== */
+      // ✅ NEW: tail-only masking for Aktenzeichen/Geschäftszeichen
+      // Example: Aktenzeichen: CASE-2026-00078421 -> Aktenzeichen: CASE-2026-[Referenz]
+      aktenzeichen_tail: {
+        pattern:
+          /((?:Aktenzeichen|Geschäftszeichen)\s*[:：=]\s*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.\/][A-Za-z0-9\[\]]+){0,10}[-_.\/]))(\d{4,})/giu,
+        tag: "REF",
+        mode: "prefix"
+      },
+
+      // legacy full mask (definition kept, but prefer tail rule via priority/alwaysOn)
       aktenzeichen: {
         pattern: /((?:Aktenzeichen|Geschäftszeichen)\s*[:：=]\s*)([A-Za-z0-9\-\/\.]{6,80})/giu,
         tag: "REF",
@@ -217,9 +240,24 @@
       },
 
       /* ===================== ID / REF LABELS (always-on) ===================== */
+      // ✅ NEW: tail-only masking for German label IDs
+      id_label_tail: {
+        pattern:
+          /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)\s*[:：=]\s*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.\/:][A-Za-z0-9\[\]]+){0,10}[-_.\/:]))(\d{4,})/giu,
+        tag: "REF",
+        mode: "prefix"
+      },
+
       id_label: {
         pattern:
           /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_\/:.]{3,80})/giu,
+        tag: "REF",
+        mode: "prefix"
+      },
+
+      // ✅ NEW: generic tail IDs (covers CASE-2026-00078421 style even without label)
+      ref_generic_tail_de: {
+        pattern: /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-))(\d{5,})\b/gu,
         tag: "REF",
         mode: "prefix"
       },
@@ -579,6 +617,7 @@
     }
   });
 })();
+
 
 // =========================
 // DE Fix Patch (UPDATED per user; + Zusatz partial masking)
