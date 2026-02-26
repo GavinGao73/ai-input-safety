@@ -26,6 +26,51 @@ console.log("[engine.js] loaded v20260223-engine-a5-policy-split");
 "use strict";
 
 /* =========================
+   DETECTION_ITEMS write-trace (BOOT EARLY)
+   - capture who sets window.DETECTION_ITEMS
+   - re-init enabled after each set
+   ========================= */
+(function traceDetectionItemsBoot(){
+  try{
+    if (window.__TRACE_DETECTION_ITEMS_BOOT__) return;
+    window.__TRACE_DETECTION_ITEMS_BOOT__ = true;
+
+    let _v = window.DETECTION_ITEMS;
+
+    Object.defineProperty(window, "DETECTION_ITEMS", {
+      configurable: true,
+      enumerable: true,
+      get(){ return _v; },
+      set(v){
+        _v = v;
+
+        // store for later inspection (even if console is noisy)
+        try{
+          window.__DETECTION_ITEMS_LAST_SET__ = {
+            when: Date.now(),
+            iso: new Date().toISOString(),
+            valueShape: v && typeof v === "object" ? Object.keys(v) : null,
+            // grab a stack snapshot
+            stack: (new Error("DETECTION_ITEMS set")).stack || ""
+          };
+        }catch(_){}
+
+        // visible trace (optional but useful)
+        try{
+          console.warn("[DETECTION_ITEMS SET]", "time=", new Date().toISOString());
+          console.trace("[DETECTION_ITEMS SET TRACE]");
+        }catch(_){}
+
+        // keep enabled in sync
+        try{
+          if (typeof window.initEnabled === "function") window.initEnabled();
+        }catch(_){}
+      }
+    });
+  }catch(_){}
+})();
+
+/* =========================
    0) Policy access (NON-language)
    ========================= */
 
