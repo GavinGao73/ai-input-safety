@@ -37,7 +37,7 @@
       ADDRESS: "[Adresse]",
       HANDLE: "[Handle]",
       REF: "[Referenz]",
-      TITLE: "[Anrede]", // NOTE: kept for generic use; but title auto-masking is disabled in fix patch (to keep Herr/Frau/Dr/Prof)
+      TITLE: "[Anrede]", // NOTE: kept for generic use; title masking is disabled (see Fix Patch)
       NUMBER: "[Zahl]",
       MONEY: "[Betrag]",
       COMPANY: "[Firma]",
@@ -90,7 +90,7 @@
 
       // personal attributes
       "birthdate",
-      "birthplace", // low priority; not forced always-on (see patch)
+      "birthplace", // low priority; not forced always-on (see Fix Patch)
 
       // financial / banking
       "account",
@@ -109,6 +109,7 @@
       "phone",
 
       // person names (STRICT label-driven)
+      "person_name_keep_title",
       "person_name",
 
       // organization BEFORE address (prevents company line being treated as address context)
@@ -117,18 +118,18 @@
       // ✅ address lines WITHOUT labels (street+houseNo only)
       "address_de_inline_street",
 
-      // ✅ label-driven extras (apartment/building/floor/room)
-      "address_de_extra",
+      // ✅ label-driven extras (apartment/building/floor/room) — PARTIAL ONLY
+      "address_de_extra_partial",
 
-      // ✅ label-driven address (street/strasse only; NO PLZ/City masking)
-      // NOTE: will be replaced by partial rule in fix patch
-      "address_de_street",
+      // ✅ label-driven address — PARTIAL ONLY (street+houseNo; keeps tail PLZ/City/Country)
+      "address_de_street_partial",
 
       // generic
       "handle",
-      // NOTE: legacy "ref" masked whole token; disabled by tail-only policy via priority ordering
-      "ref",
-      "title",
+
+      // NOTE:
+      // - legacy "ref" masked whole token; disabled by tail-only policy (do not run)
+      // - "title" masking disabled to keep Herr/Frau/Dr/Prof
       "number"
     ],
 
@@ -147,12 +148,10 @@
       "id_card",
       "passport",
       "driver_license",
-      "birthdate"
+      "birthdate",
 
       // birthplace is low priority (user). DO NOT force it.
-      // (Removed in fix patch if present)
 
-      ,
       "account",
       "bank",
       "blz",
@@ -163,13 +162,15 @@
       "money",
       "phone",
 
+      // ✅ Name masking with titles preserved (Herr/Frau/Dr/Prof kept; only name -> [Name])
+      "person_name_keep_title",
       "person_name",
 
       // keep company + street/apartment address always-on (conservative German policy)
       "company",
       "address_de_inline_street",
-      "address_de_extra",
-      "address_de_street"
+      "address_de_extra_partial",
+      "address_de_street_partial"
     ],
 
     // phone FP guard (de): prevent ref/order/invoice/customer IDs being masked as phone
@@ -312,7 +313,7 @@
       },
 
       birthplace: {
-        // Updated: if it masks, use SECRET placeholder (low priority; not forced always-on).
+        // low priority; not forced always-on
         pattern: /((?:Geburtsort)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
         tag: "SECRET",
         mode: "prefix"
@@ -377,8 +378,20 @@
       },
 
       /* ===================== PERSON NAME (STRICT label-driven) ===================== */
+      person_name_keep_title: {
+        // Expected:
+        // Name: Herr [Name]
+        // Empfänger: Frau [Name]
+        // Ansprechpartner: Dr. [Name]
+        // And never emits [Anrede].
+        pattern:
+          /^((?:Name|Kontakt|Ansprechpartner|Empfänger)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?\s+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+        tag: "NAME",
+        mode: "prefix"
+      },
+
       person_name: {
-        // NOTE: superseded by person_name_keep_title patch (line-anchored) when present.
+        // legacy (kept)
         pattern:
           /((?:Name|Kontakt|Ansprechpartner|Empfänger)\s*[:：=]\s*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)\s+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
         tag: "NAME",
@@ -399,6 +412,29 @@
         tag: "ADDRESS"
       },
 
+      address_de_street_partial: {
+        // Street-only masking; keep tail (PLZ/City/Country)
+        // Example:
+        // "Adresse: Musterstraße 12, 50667 Köln, Deutschland"
+        // -> "Adresse: [Adresse], 50667 Köln, Deutschland"
+        pattern:
+          /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)\s*[:：=]\s*)([^,\n\r]{4,120}?)(?=\s*,)/giu,
+        tag: "ADDRESS",
+        mode: "prefix"
+      },
+
+      address_de_extra_partial: {
+        // Zusatz: mask only building/floor/room part; keep ", Klingel …" tail
+        // Example:
+        // "Zusatz: Gebäude B, 3. OG, Zimmer 12, Klingel „Müller“"
+        // -> "Zusatz: [Adresse], Klingel „Müller“"
+        pattern:
+          /((?:Zusatz)\s*[:：=]\s*)((?=[^\n\r]{2,260})(?=.*\b(?:Gebäude|Haus|Block|Aufgang|Etage|Stock|Stockwerk|OG|EG|DG|WHG|Wohnung|Zimmer|Raum|App\.?|Apartment)\b)[^\n\r]*?)(?=,\s*(?:Klingel|Tür|Tel\.?|Telefon)\b)/giu,
+        tag: "ADDRESS",
+        mode: "prefix"
+      },
+
+      // legacy definitions kept (NOT executed by priority/alwaysOn)
       address_de_extra: {
         pattern:
           /((?:Zusatz)\s*[:：=]\s*)((?=[^\n\r]{2,140}$)(?=.*\b(?:Gebäude|Haus|Block|Aufgang|Etage|Stock|Stockwerk|OG|EG|DG|WHG|Wohnung|Zimmer|Raum|App\.?|Apartment|Tür|Klingel)\b)[^\n\r]{2,140})/giu,
@@ -407,19 +443,19 @@
       },
 
       address_de_street: {
-        // Legacy full-line masking (may include PLZ/City) => disabled by fix patch routing.
-        // Kept as definition only for backward compatibility.
         pattern:
           /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)\s*[:：=]\s*)((?=[^\n\r]{4,140}$)(?=[^\n\r]{0,140}(?:\d{1,4}\s*[A-Za-z]?\b|straße\b|strasse\b|str\.\b|weg\b|platz\b|allee\b|gasse\b|ring\b|ufer\b|damm\b|chaussee\b|promenade\b|markt\b|hof\b|kai\b))[^\n\r]{4,140})/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
 
+      /* ===================== GENERIC ===================== */
       handle: {
         pattern: /@[A-Za-z0-9_]{2,32}\b/g,
         tag: "HANDLE"
       },
 
+      // legacy ref rule definition kept (NOT executed; tail-only enforced by priority)
       ref: {
         pattern: /\b[A-Z]{2,6}-?\d{4,14}\b/g,
         tag: "REF"
@@ -430,9 +466,8 @@
         tag: "NUMBER"
       },
 
+      // legacy title rule definition kept (NOT executed)
       title: {
-        // NOTE: title masking is disabled by fix patch (removing "title" from priority/alwaysOn).
-        // Kept for backward compatibility (definition only).
         pattern: /\b(Herr|Frau|Dr\.?|Prof\.?)\b/g,
         tag: "TITLE"
       }
@@ -618,7 +653,6 @@
   });
 })();
 
-
 // =========================
 // DE Fix Patch (UPDATED per user; + Zusatz partial masking)
 // - Fix BLZ with parentheses: "Bankleitzahl (BLZ): ..."
@@ -627,10 +661,6 @@
 // - Geburtsort: low priority; do NOT force masking (remove from alwaysOn)
 // - Address: street-only masking while keeping tail (PLZ/City/Country) WITHOUT requiring new engine modes
 // - Zusatz: mask only "Gebäude..., OG..., Zimmer..." and keep ", Klingel …"
-// - IMPORTANT: disable "title" key execution to prevent Herr/Frau/Dr/Prof -> [Anrede]
-// - IMPORTANT: disable full-line "address_de_extra" masking to avoid swallowing Klingel-tail after partial masking
-// - IMPORTANT: disable legacy full-line "address_de_street" execution to prevent losing PLZ/City/Country tail  ✅ FIX (ONLY CHANGE)
-// - IMPORTANT: disable legacy "ref" execution to enforce ID tail-only policy across unlabeled IDs ✅ FIX (ONLY CHANGE)
 // =========================
 (function () {
   "use strict";
@@ -655,107 +685,46 @@
     return out;
   }
 
-  // New keys (run earlier than the old ones they supersede)
+  // New keys (run earlier than older ones they supersede)
   const NEW_KEYS = [
-    "person_name_keep_title",
     "birthplace_optional_secret",
     "blz_paren",
     "card_expiry_de",
-    "card_security_de",
-    "address_de_street_partial",
-    "address_de_extra_partial" // Zusatz: Gebäude/OG/Zimmer only (keep Klingel tail)
+    "card_security_de"
   ];
 
-  // Insert BEFORE existing keys where relevant
-  DE.priority = insertBefore(DE.priority || [], "person_name", ["person_name_keep_title"]);
+  // Insert BEFORE existing keys where relevant (conservative)
   DE.priority = insertBefore(DE.priority || [], "birthplace", ["birthplace_optional_secret"]);
   DE.priority = insertBefore(DE.priority || [], "blz", ["blz_paren"]);
-  DE.priority = insertBefore(DE.priority || [], "address_de_street", ["address_de_street_partial"]);
-  DE.priority = insertBefore(DE.priority || [], "address_de_extra", ["address_de_extra_partial"]);
   DE.priority = insertBefore(DE.priority || [], "number", ["card_expiry_de", "card_security_de"]);
 
   // Always-on:
-  // - keep person-name fix always on
   // - keep BLZ/expiry/CVC always on
-  // - keep address partial always on
-  // - keep Zusatz partial always on (per user)
   // - DO NOT force Geburtsort (user said low priority)
   DE.alwaysOn = Array.isArray(DE.alwaysOn) ? DE.alwaysOn : [];
-  uniqPush(DE.alwaysOn, "person_name_keep_title");
   uniqPush(DE.alwaysOn, "blz_paren");
   uniqPush(DE.alwaysOn, "card_expiry_de");
   uniqPush(DE.alwaysOn, "card_security_de");
-  uniqPush(DE.alwaysOn, "address_de_street_partial");
-  uniqPush(DE.alwaysOn, "address_de_extra_partial");
 
-  // Remove birthplace from alwaysOn (soften)
-  DE.alwaysOn = DE.alwaysOn.filter(
-    (k) => k !== "birthplace" && k !== "birthplace_secret" && k !== "birthplace_optional_secret"
-  );
-
-  // IMPORTANT: disable title masking execution (prevents Herr/Frau/Dr/Prof -> [Anrede])
-  if (Array.isArray(DE.priority)) {
-    DE.priority = DE.priority.filter((k) => k !== "title");
-  }
-  if (Array.isArray(DE.alwaysOn)) {
-    DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "title");
-  }
-
-  // IMPORTANT: disable full-line Zusatz masking to avoid swallowing Klingel-tail after partial masking
-  if (Array.isArray(DE.priority)) {
-    DE.priority = DE.priority.filter((k) => k !== "address_de_extra");
-  }
-  if (Array.isArray(DE.alwaysOn)) {
-    DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "address_de_extra");
-  }
-
-  // IMPORTANT: disable legacy full-line street masking to prevent losing PLZ/City/Country tail
-  // (rule definition remains for backward compatibility, but it will not run)
-  if (Array.isArray(DE.priority)) {
-    DE.priority = DE.priority.filter((k) => k !== "address_de_street");
-  }
-  if (Array.isArray(DE.alwaysOn)) {
-    DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "address_de_street");
-  }
-
-  // IMPORTANT: disable legacy "ref" masking execution to enforce tail-only ID policy
-  if (Array.isArray(DE.priority)) {
-    DE.priority = DE.priority.filter((k) => k !== "ref");
-  }
-  if (Array.isArray(DE.alwaysOn)) {
-    DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "ref");
-  }
+  // Remove birthplace from alwaysOn (soften). Keep birthplace_optional_secret NOT always-on.
+  DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "birthplace" && k !== "birthplace_secret");
 
   Object.assign(DE.rules, {
-    /* 1) Name lines: keep title, only mask the name part.
-       Expected:
-       Name: Herr [Name]
-       Empfänger: Frau [Name]
-       Ansprechpartner: Dr. [Name]
-       And never emits [Anrede].
-    */
-    person_name_keep_title: {
-      pattern:
-        /^((?:Name|Kontakt|Ansprechpartner|Empfänger)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?\s+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
-      tag: "NAME",
-      mode: "prefix"
-    },
-
-    /* 2) Geburtsort: optional masking (NOT always-on) */
+    /* 1) Geburtsort: optional masking (NOT always-on) */
     birthplace_optional_secret: {
       pattern: /((?:Geburtsort)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
-    /* 3) BLZ with parentheses */
+    /* 2) BLZ with parentheses */
     blz_paren: {
       pattern: /((?:Bankleitzahl)\s*(?:\(\s*BLZ\s*\))?\s*[:：=]\s*)(\d{5,12})/giu,
       tag: "ACCOUNT",
       mode: "prefix"
     },
 
-    /* 4) Card expiry (DE + EN labels) */
+    /* 3) Card expiry (DE + EN labels) */
     card_expiry_de: {
       pattern:
         /((?:Gültig\s*bis|Gueltig\s*bis|Ablaufdatum|Expiry|Expiration|Exp(?:iry|iration)?(?:\s*Date)?|Valid\s*Thru|Valid\s*Through)\s*[:：=]\s*)(\d{2}\s*\/\s*\d{2,4}|\d{2}\s*-\s*\d{2,4}|\d{4}\s*-\s*\d{2})/giu,
@@ -763,36 +732,10 @@
       mode: "prefix"
     },
 
-    /* 5) CVC/CVV */
+    /* 4) CVC/CVV */
     card_security_de: {
       pattern: /((?:CVC|CVV|CVC2|CAV2)\s*[:：=]\s*)(\d{3,4})/giu,
       tag: "SECRET",
-      mode: "prefix"
-    },
-
-    /* 6) Address partial masking (street only, keep PLZ/City/Country)
-       Achieved WITHOUT new engine modes: we only match up to the comma via lookahead.
-       Example:
-       "Adresse: Musterstraße 12, 50667 Köln, Deutschland"
-       -> "Adresse: [Adresse], 50667 Köln, Deutschland"
-    */
-    address_de_street_partial: {
-      pattern:
-        /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)\s*[:：=]\s*)([^,\n\r]{4,120}?)(?=\s*,)/giu,
-      tag: "ADDRESS",
-      mode: "prefix"
-    },
-
-    /* 7) Zusatz partial masking:
-       Only mask "Gebäude..., OG..., Zimmer..." and keep the rest, e.g. ", Klingel „Müller“…"
-       Example:
-       "Zusatz: Gebäude B, 3. OG, Zimmer 12, Klingel „Müller“"
-       -> "Zusatz: [Adresse], Klingel „Müller“"
-    */
-    address_de_extra_partial: {
-      pattern:
-        /((?:Zusatz)\s*[:：=]\s*)((?=[^\n\r]{2,260})(?=.*\b(?:Gebäude|Haus|Block|Aufgang|Etage|Stock|Stockwerk|OG|EG|DG|WHG|Wohnung|Zimmer|Raum|App\.?|Apartment)\b)[^\n\r]*?)(?=,\s*(?:Klingel|Tür|Tel\.?|Telefon)\b)/giu,
-      tag: "ADDRESS",
       mode: "prefix"
     }
   });
