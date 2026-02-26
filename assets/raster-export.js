@@ -49,8 +49,20 @@
         phone: 50,
         account: 80,
         bank: 120,
+
+        // legacy keys kept for compat
         address_de_street: 140,
         address_de_postal: 140,
+
+        // ✅ address keys (whitelist expansion)
+        address_de_street_partial: 140,
+        address_de_extra_partial: 140,
+        address_de_inline_street: 140,
+        address_en_inline_street: 140,
+        address_en_extra_block: 140,
+        address_en_extra: 140,
+        address_cn: 140,
+
         handle: 80,
         ref: 80,
         title: 80,
@@ -114,8 +126,20 @@
         phone: 60,
         account: 90,
         bank: 140,
+
+        // legacy keys kept for compat
         address_de_street: 160,
         address_de_postal: 160,
+
+        // ✅ address keys (whitelist expansion)
+        address_de_street_partial: 160,
+        address_de_extra_partial: 160,
+        address_de_inline_street: 160,
+        address_en_inline_street: 160,
+        address_en_extra_block: 160,
+        address_en_extra: 160,
+        address_cn: 160,
+
         handle: 90,
         ref: 90,
         title: 90,
@@ -156,8 +180,20 @@
         phone: 60,
         account: 90,
         bank: 140,
+
+        // legacy keys kept for compat
         address_de_street: 160,
         address_de_postal: 160,
+
+        // ✅ address keys (whitelist expansion)
+        address_de_street_partial: 160,
+        address_de_extra_partial: 160,
+        address_de_inline_street: 160,
+        address_en_inline_street: 160,
+        address_en_extra_block: 160,
+        address_en_extra: 160,
+        address_cn: 160,
+
         handle: 90,
         ref: 90,
         title: 90,
@@ -746,8 +782,13 @@
     function keyGroupForBBox(key) {
       const isLongValueKey =
         key === "account" || key === "phone" || key === "email" || key === "bank";
+
+      // ✅ whitelist: address keys across packs
       const isAddressKey =
-        key === "address_de_street" || key === "address_de_postal";
+        key === "address_de_street" || key === "address_de_postal" ||
+        key === "address_de_street_partial" || key === "address_de_extra_partial" || key === "address_de_inline_street" ||
+        key === "address_en_inline_street" || key === "address_en_extra_block" || key === "address_en_extra" ||
+        key === "address_cn";
 
       if (key === "money") return "money";
       if (key === "manual_term") return "manual_term";
@@ -856,7 +897,12 @@
         const mm = re ? sub.match(re) : null;
         if (mm && mm[0]) ls += mm[0].length;
 
-      } else if (key === "address_de_street" || key === "address_de_postal") {
+      } else if (
+        key === "address_de_street" || key === "address_de_postal" ||
+        key === "address_de_street_partial" || key === "address_de_extra_partial" || key === "address_de_inline_street" ||
+        key === "address_en_inline_street" || key === "address_en_extra_block" || key === "address_en_extra" ||
+        key === "address_cn"
+      ) {
         const re = makeLabelPrefixRe(labels.address);
         const mm = re ? sub.match(re) : null;
         if (mm && mm[0]) ls += mm[0].length;
