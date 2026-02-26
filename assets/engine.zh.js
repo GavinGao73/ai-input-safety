@@ -97,6 +97,7 @@
       // "ref_label_full",
 
       // money
+      "money_label",
       "money",
 
       // phone AFTER ids
@@ -156,6 +157,7 @@
       "card_expiry",
       "card_security",
 
+      "money_label",
       "money",
 
       // ✅ org before person
@@ -443,11 +445,23 @@
         mode: "address_cn_partial"
       },
 
+      /* ===================== MONEY LABEL (ZH/EN strong labels; no currency sign required) ===================== */
+      money_label: {
+        // ✅ label-driven money to catch "Amount: 2950.15" / "Total=-106.82" etc.
+        // - requires strong money labels
+        // - requires decimal part (prevents "any integer" being treated as money)
+        pattern:
+          /((?:金额|合计|总计|小计|应付|实付|已付|支付金额|付款金额|收款金额|退款金额|余额|费用|手续费|服务费|税额|税费|增值税|VAT|Amount|Total|Subtotal|Balance|Paid|Payment|Refund|Due|Net|Gross)\s*[:：=]\s*)([-+−]?\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2}))/giu,
+        tag: "MONEY",
+        mode: "prefix"
+      },
+
       /* ===================== MONEY (ZH require currency indicator) ===================== */
       money: {
         // ✅ FIX: all non-capturing to prevent split/double replacement
+        // ✅ Add optional sign (do NOT expand to "any decimal is money")
         pattern:
-          /(?:\b(?:人民币|CNY|RMB)\b\s*\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?\s*(?:元)?|[¥￥]\s*\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?|\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?\s*元|\bUSD\b\s*\$?\s*\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\$\s*\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|€\s*\d{1,3}(?:\.\d{3})*(?:,\d{2})?|\d{1,3}(?:\.\d{3})*(?:,\d{2})?\s*€)/giu,
+          /(?:\b(?:人民币|CNY|RMB)\b\s*[-+−]?\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?\s*(?:元)?|[¥￥]\s*[-+−]?\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?|\b[-+−]?\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?\s*元|\bUSD\b\s*\$?\s*[-+−]?\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\$\s*[-+−]?\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|€\s*[-+−]?\d{1,3}(?:\.\d{3})*(?:,\d{2})?|\b[-+−]?\d{1,3}(?:\.\d{3})*(?:,\d{2})?\s*€)/giu,
         tag: "MONEY"
       },
 
