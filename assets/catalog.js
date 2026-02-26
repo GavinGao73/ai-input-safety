@@ -1,5 +1,5 @@
 const DETECTION_ITEMS = {
-  // L1 = 高风险/强隐私：默认开启（基本不建议让用户关）
+  // L1 = 高风险/强隐私：默认开启（开箱安全）
   l1: [
     // comms
     { key: "email", defaultOn: true },
@@ -17,58 +17,55 @@ const DETECTION_ITEMS = {
     { key: "card_expiry", defaultOn: true },
     { key: "card_security", defaultOn: true },
 
-    // identity
+    // identity（这里你可以选择默认开或默认关；我给“偏安全”的默认开）
     { key: "dob", defaultOn: true },
-    { key: "place_of_birth", defaultOn: true },
+    { key: "place_of_birth", defaultOn: false },   // ↓更容易误伤/不常见，建议默认关
     { key: "id_card", defaultOn: true },
     { key: "passport", defaultOn: true },
     { key: "driver_license", defaultOn: true },
-    { key: "license_plate", defaultOn: true },
+    { key: "license_plate", defaultOn: false },    // ↓噪声较大（车牌格式多样），建议默认关
 
-    // tracking/device
-    { key: "ip_label", defaultOn: true },
-    { key: "ip_address", defaultOn: true },
-    { key: "mac_label", defaultOn: true },
-    { key: "mac_address", defaultOn: true },
-    { key: "imei", defaultOn: true },
-    { key: "device_fingerprint", defaultOn: true },
-    { key: "uuid", defaultOn: true },
+    // tracking/device（强噪声：默认关，用户需要时再开）
+    { key: "ip_label", defaultOn: false },
+    { key: "ip_address", defaultOn: false },
+    { key: "mac_label", defaultOn: false },
+    { key: "mac_address", defaultOn: false },
+    { key: "imei", defaultOn: false },
+    { key: "device_fingerprint", defaultOn: false },
+    { key: "uuid", defaultOn: false },
 
-    // addresses (keep the ones you already use + future-proof for EN)
+    // addresses（默认开）
     { key: "address_cn", defaultOn: true },
     { key: "address_de_street", defaultOn: true },
     { key: "address_en_inline_street", defaultOn: true },
-    { key: "address_en_extra_block", defaultOn: true },
-    { key: "address_en_extra", defaultOn: true },
+    { key: "address_en_extra_block", defaultOn: false }, // ↓通常更“长块”，误伤成本高，建议默认关
+    { key: "address_en_extra", defaultOn: false },
 
-    // org/person (你现在 company 强制 included，但 UI 也应可见)
+    // org/person
     { key: "company", defaultOn: true },
     { key: "person_name", defaultOn: true },
 
-    // crypto / chain
-    { key: "wallet_id", defaultOn: true },
-    { key: "tx_hash", defaultOn: true },
-    { key: "crypto_wallet", defaultOn: true }
+    // crypto / chain（默认关：只对特定用户有用，且误伤/误判成本高）
+    { key: "wallet_id", defaultOn: false },
+    { key: "tx_hash", defaultOn: false },
+    { key: "crypto_wallet", defaultOn: false }
   ],
 
   // L2 = 中风险/可识别：默认开启，但允许用户关
   l2: [
-    // handles / user ids
     { key: "handle_label", defaultOn: true },
     { key: "handle", defaultOn: true },
 
-    // refs / ids
     { key: "cust_id", defaultOn: true },
     { key: "ref_label_tail", defaultOn: true },
     { key: "ref", defaultOn: true },
 
-    // titles
     { key: "title", defaultOn: true }
   ],
 
-  // L3 = 低风险/泛化：默认关闭（需要时用户再开）
+  // L3 = 低风险/泛化：默认关闭
   l3: [
-    // Money protection is controlled by UI (M1/M2), but keep as a key for consistency
+    // Money protection is controlled by M1/M2, keep key for consistency
     { key: "money", defaultOn: false },
 
     // generic
