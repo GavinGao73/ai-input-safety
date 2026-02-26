@@ -3,6 +3,14 @@
 // Content-strategy pack: zh (NOT UI language)
 // - placeholders + detect + rules (FULL, no common)
 // - pack policy hooks: priority / alwaysOn / phoneGuard / company formatting / address partial formatting
+//
+// LOCKED (whitelist-aligned for zh):
+// - ID policy: keep prefix/body, mask ONLY the last numeric segment via ref_label_tail / cust_id.
+// - Disable legacy generic ref masking ("ref") to avoid breaking tail-only policy.
+// - Disable title masking ("title") to keep 先生/女士/教授 等称谓原样保留（不输出【称谓】）。
+//
+// NOTE (allowed cleanup):
+// - ref_label_full is legacy and NOT executed; removed to reduce confusion/attack surface.
 // =========================
 
 (function () {
@@ -22,7 +30,7 @@
       ADDRESS: "【地址】",
       HANDLE: "【账号名】",
       REF: "【编号】",
-      TITLE: "【称谓】",
+      TITLE: "【称谓】", // kept for compatibility; execution disabled (see priority list)
       NUMBER: "【数字】",
       MONEY: "【金额】",
       COMPANY: "【公司】",
@@ -90,11 +98,7 @@
       "cust_id",
 
       // ✅ ID policy: keep prefix/body, mask ONLY the last numeric segment (tail digits)
-      // (replaces previous FULL ref mask behavior)
       "ref_label_tail",
-
-      // legacy full rule definition kept but NOT executed
-      // "ref_label_full",
 
       // money
       "money_label",
@@ -116,10 +120,8 @@
       "tx_hash",
       "crypto_wallet",
 
-      // generic
+      // generic (NOTE: "ref" + "title" disabled to preserve whitelist policy)
       "handle",
-      "ref",
-      "title",
       "number"
     ],
 
@@ -365,18 +367,6 @@
         mode: "prefix"
       },
 
-      /* ===================== REF FULL MASK (label-driven; single placeholder) ===================== */
-      ref_label_full: {
-        // ✅ FULL replacement, single 【编号】 only, no tail logic.
-        // Covers:
-        // Case ID / Ticket No. / Application ID / Order ID / Invoice No. / Reference
-        // 合同号 / 索赔参考号 / 法律案件号 / 申请编号 / 参考编号 / 工单号 / 票据号 / 客户号 / 编号 ...
-        pattern:
-          /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|Case\s*ID|Ticket\s*No\.?|Application\s*ID|Order\s*ID|Invoice\s*No\.?|Reference)\s*[:：=]\s*)(?![^\n\r]*【编号】)([A-Za-z0-9][A-Za-z0-9._\-]{3,120})/giu,
-        tag: "REF",
-        mode: "prefix"
-      },
-
       /* ===================== ACCOUNT (label-driven) ===================== */
       account: {
         pattern: /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|信用卡|信用卡号|信用卡號|card\s*number|credit\s*card|对公账户|對公賬戶|IBAN|Account\s*Number)\s*[:：=]?\s*)([A-Z]{2}\d{2}[\d\s-]{10,40}|\d[\d\s-]{6,40}\d)/giu,
@@ -542,11 +532,7 @@
         mode: "prefix"
       },
 
-      /* ===================== TITLE ===================== */
-      title: {
-        pattern: /\b(先生|女士|小姐|太太|老师|同学|经理|主任|总监|博士|教授)\b/gu,
-        tag: "TITLE"
-      },
+      /* ===================== TITLE (DISABLED: definition removed; execution disabled in priority) ===================== */
 
       /* ===================== HANDLE (generic) ===================== */
       handle: {
@@ -554,12 +540,7 @@
         tag: "HANDLE"
       },
 
-      /* ===================== REF (format-like) ===================== */
-      ref: {
-        // keep conservative to avoid partial hits inside multi-segment IDs (handled by ref_label_tail)
-        pattern: /\b[A-Z]{2,6}-?\d{5,14}\b(?![-_.][A-Za-z0-9])/g,
-        tag: "REF"
-      },
+      /* ===================== REF (DISABLED: legacy generic ref masking removed to preserve tail-only policy) ===================== */
 
       /* ===================== NUMBER fallback ===================== */
       number: {
