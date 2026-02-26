@@ -648,3 +648,59 @@
   });
 
 })();
+
+
+// =========================
+// EN Compat Patch (Whitelist alignment)
+// - Add OPTIONAL support for keys:
+//     address_de_street / address_de_postal
+// - Purpose: if UI/exporter uses these keys across languages, EN will still have rules.
+// - SAFE: add rules + insert into priority only (NOT alwaysOn)
+// =========================
+(function () {
+  "use strict";
+
+  const PACKS = (window.__ENGINE_LANG_PACKS__ = window.__ENGINE_LANG_PACKS__ || {});
+  const EN = PACKS.en;
+  if (!EN) return;
+
+  function insertBefore(arr, beforeKey, keys) {
+    const out = Array.isArray(arr) ? arr.slice() : [];
+    const idx = out.indexOf(beforeKey);
+    const insertAt = idx >= 0 ? idx : out.length;
+    const toInsert = [];
+    (keys || []).forEach((k) => {
+      if (!out.includes(k) && !toInsert.includes(k)) toInsert.push(k);
+    });
+    out.splice(insertAt, 0, ...toInsert);
+    return out;
+  }
+
+  const KEYS = ["address_de_street", "address_de_postal"];
+
+  // Put them right before EN address rules (so they don’t get swallowed by generic)
+  EN.priority = insertBefore(EN.priority || [], "address_en_inline_street", KEYS);
+
+  EN.rules = EN.rules || {};
+  Object.assign(EN.rules, {
+    // Street part only (label-driven), keep the tail after comma
+    // Example:
+    // "Address: 221B Baker Street, London NW1 6XE, UK"
+    // -> "Address: [Address], London NW1 6XE, UK"
+    address_de_street: {
+      pattern:
+        /((?:address|shipping\s*address|billing\s*address|street\s*address|mailing\s*address)\s*[:：=]\s*)([^,\n\r]{4,160}?)(?=\s*,)/giu,
+      tag: "ADDRESS",
+      mode: "prefix"
+    },
+
+    // Postal code only (label-driven). Intentionally DOES NOT mask city/country lines without a postal label.
+    // Supports: US ZIP, CA postal, UK postcode, AU/NZ (4 digits), generic 3–10 alnum/hyphen.
+    address_de_postal: {
+      pattern:
+        /((?:zip(?:\s*code)?|postal\s*code|postcode)\s*[:：=]\s*)(\d{5}(?:-\d{4})?|[A-Z]\d[A-Z]\s?\d[A-Z]\d|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}|\d{4}|[A-Z0-9][A-Z0-9\- ]{2,9}[A-Z0-9])/giu,
+      tag: "ADDRESS",
+      mode: "prefix"
+    }
+  });
+})();
