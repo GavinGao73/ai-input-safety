@@ -131,7 +131,7 @@
 
       // personal attributes
       "birthdate",
-      "birthplace", // low priority; not forced always-on (see Fix Patch)
+      "place_of_birth", // low priority; not forced always-on (see Fix Patch)
 
       // financial / banking
       "account",
@@ -190,6 +190,7 @@
       "passport",
       "driver_license",
       "birthdate",
+      "place_of_birth",
 
       // birthplace is low priority (user). DO NOT force it.
 
@@ -353,9 +354,8 @@
         mode: "prefix"
       },
 
-      birthplace: {
-        // low priority; not forced always-on
-        pattern: /((?:Geburtsort)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
+      place_of_birth: {
+        pattern: /((?:geburtsort)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
