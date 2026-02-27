@@ -47,6 +47,41 @@
       return "";
     },
 
+        // Score-based detect (0..100). Keeps existing detect() for compatibility.
+    detectScore: function (s) {
+      s = String(s || "");
+      const t = s.slice(0, 2600);
+      if (!t.trim()) return { lang: "en", score: 0, confidence: 0, signals: [] };
+
+      let score = 0;
+      const signals = [];
+
+      // strong EN document fields
+      if (/\b(Invoice|Order ID|Application ID|Case ID|Ticket No\.?|Reference|Customer ID)\b/i.test(t)) {
+        score += 34; signals.push("en:ref_fields");
+      }
+      if (/\b(Account Number|Routing Number|Sort Code|IBAN|SWIFT|BIC|CVV|CVC|Expiry|Expiration|Valid Thru)\b/i.test(t)) {
+        score += 26; signals.push("en:bank_card_fields");
+      }
+      if (/\b(Phone|Email|Address|Shipping Address|Billing Address)\b/i.test(t)) {
+        score += 18; signals.push("en:contact_fields");
+      }
+      if (/\b(Username|Login|Handle|Password|OTP|2FA)\b/i.test(t)) {
+        score += 18; signals.push("en:auth_fields");
+      }
+
+      // penalty if a lot of Chinese characters (mixed content)
+      const han = (t.match(/[\u4E00-\u9FFF]/g) || []).length;
+      const total = Math.max(1, t.length);
+      if (han / total > 0.02) { score -= 18; signals.push("mix:han"); }
+
+      if (score < 0) score = 0;
+      if (score > 100) score = 100;
+
+      const confidence = score >= 80 ? 0.9 : score >= 70 ? 0.8 : score >= 55 ? 0.65 : score >= 40 ? 0.5 : 0.3;
+      return { lang: "en", score, confidence, signals };
+    },
+
     priority: [
       // secrets / auth first
       "secret",
