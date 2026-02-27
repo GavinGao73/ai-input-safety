@@ -194,55 +194,9 @@ function setLangContentAuto(text) {
   setRuleEngineAuto(text);
 }
 
-/* =========================
-   1.0) Detection helper (score-based; pack-owned logic)
-   - Engine remains language-agnostic: it only asks packs for scores.
-   ========================= */
-
-function detectByPackScore(pack, langKey, text) {
-  try {
-    if (!pack || typeof pack !== "object") return null;
-
-    // New API: detectScore()
-    if (typeof pack.detectScore === "function") {
-      const r = pack.detectScore(text);
-      if (!r || typeof r !== "object") return null;
-
-      const lang = normLang(r.lang || langKey);
-      const score = Number(r.score);
-      const confidence = Number(r.confidence);
-
-      if (!lang || !Number.isFinite(score)) return null;
-
-      return {
-        lang,
-        score: clamp(score, 0, 100),
-        confidence: Number.isFinite(confidence) ? clamp(confidence, 0, 1) : null,
-        signals: Array.isArray(r.signals) ? r.signals.slice(0, 10) : []
-      };
-    }
-
-    // Old API: detect() -> treat as weak evidence (compat)
-    if (typeof pack.detect === "function") {
-      const r = normLang(pack.detect(text));
-      if (r === langKey) return { lang: langKey, score: 60, confidence: 0.6, signals: ["legacy_detect"] };
-      return { lang: langKey, score: 0, confidence: 0, signals: [] };
-    }
-
-    return null;
-  } catch (_) {
-    return null;
-  }
-}
-
 /**
  * Detect content strategy language:
  * - ask pack detectors only
- * - fallback via policy (no char-heuristics here)
- */
-/**
- * Detect content strategy language:
- * - ask pack detectors only (now score-based)
  * - fallback via policy (no char-heuristics here)
  */
 function detectRuleEngine(text) {
@@ -251,47 +205,29 @@ function detectRuleEngine(text) {
   if (!s.trim()) return "";
 
   const PACKS = getPacks();
+
+  // prefer pack detectors; order: zh -> en -> de (stable preference)
+  try {
+    if (PACKS.zh && typeof PACKS.zh.detect === "function") {
+      const r = normLang(PACKS.zh.detect(s));
+      if (r === "zh") return "zh";
+    }
+    if (PACKS.en && typeof PACKS.en.detect === "function") {
+      const r = normLang(PACKS.en.detect(s));
+      if (r === "en") return "en";
+    }
+    if (PACKS.de && typeof PACKS.de.detect === "function") {
+      const r = normLang(PACKS.de.detect(s));
+      if (r === "de") return "de";
+    }
+  } catch (_) {}
+
+  // fallback policy
   const pol = getPolicy();
-  const det = (pol && pol.detect) || {};
-
-  // policy-driven thresholds (engine remains language-agnostic)
-  const TH_LOCK = Number(det.lockScore ?? 72); // must be strong enough to lock
-  const GAP = Number(det.minGap ?? 14);        // winner must beat runner-up
-  const ALLOW_MIXED = det.allowMixed !== false; // default true
-  const MIXED_LANG = String(det.mixedLang || ""); // "" recommended = do not set ruleEngine
-
-  const cand = [];
-  const z = detectByPackScore(PACKS.zh, "zh", s);
-  const e = detectByPackScore(PACKS.en, "en", s);
-  const d = detectByPackScore(PACKS.de, "de", s);
-  if (z) cand.push(z);
-  if (e) cand.push(e);
-  if (d) cand.push(d);
-
-  // If packs provide no usable detection, fallback policy
-  if (!cand.length) {
-    const fb = String(pol.detectFallback || "en").toLowerCase();
-    if (fb === "ui") return getLangUI();
-    if (fb === "zh" || fb === "de" || fb === "en") return fb;
-    return "en";
-  }
-
-  cand.sort((a, b) => (b.score - a.score) || ((b.confidence || 0) - (a.confidence || 0)));
-
-  const best = cand[0];
-  const second = cand[1] || { score: 0, confidence: 0 };
-
-  const strongEnough = best.score >= TH_LOCK;
-  const gapEnough = best.score - second.score >= GAP;
-
-  // ✅ lock only when strong + distinct
-  if (strongEnough && gapEnough) return best.lang;
-
-  // ✅ mixed fallback: keep engine neutral (no lock)
-  if (ALLOW_MIXED) return normLang(MIXED_LANG) || "";
-
-  // if mixed disabled, pick best anyway
-  return best.lang;
+  const fb = String(pol.detectFallback || "en").toLowerCase();
+  if (fb === "ui") return getLangUI();
+  if (fb === "zh" || fb === "de" || fb === "en") return fb;
+  return "en";
 }
 
 /* =========================
