@@ -57,39 +57,6 @@
       return "";
     },
 
-        // Score-based detect (0..100). Keeps existing detect() for compatibility.
-    detectScore: function (s) {
-      s = String(s || "");
-      const t = s.slice(0, 2600);
-      if (!t.trim()) return { lang: "zh", score: 0, confidence: 0, signals: [] };
-
-      let score = 0;
-      const signals = [];
-
-      // Han ratio is strong evidence for ZH content strategy
-      const han = (t.match(/[\u4E00-\u9FFF]/g) || []).length;
-      const total = Math.max(1, t.length);
-      const ratio = han / total;
-
-      if (ratio >= 0.08) { score += 55; signals.push("zh:han_high"); }
-      else if (ratio >= 0.05) { score += 42; signals.push("zh:han_mid"); }
-      else if (ratio >= 0.02) { score += 18; signals.push("zh:han_low"); }
-
-      // strong CN-style fields
-      if (/(申请编号|参考编号|办公地址|通信地址|联系人|手机号|银行卡号|开户银行|对公账户|收款账号|身份证|护照|出生日期|出生地|设备ID|会话ID|IP地址|交易哈希|钱包地址|车牌|号牌)/.test(t)) {
-        score += 36; signals.push("zh:fields");
-      }
-      if (/(有限公司|有限责任公司|股份有限公司|集团)/.test(t)) {
-        score += 14; signals.push("zh:company_legal");
-      }
-
-      if (score < 0) score = 0;
-      if (score > 100) score = 100;
-
-      const confidence = score >= 80 ? 0.9 : score >= 70 ? 0.8 : score >= 55 ? 0.65 : score >= 40 ? 0.5 : 0.3;
-      return { lang: "zh", score, confidence, signals };
-    },
-
     // ✅ language-specific execution order (tuned independently)
     priority: [
       // secrets/auth first
