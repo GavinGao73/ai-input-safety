@@ -5,6 +5,7 @@
 // - defaultPriority (fallback when packs missing)
 // - phoneGuardDefault (avoid treating long IDs as phone)
 // - risk scoring policy (weights/thresholds/bonuses)
+// - detect: score-based language selection thresholds
 // =========================
 
 (function () {
@@ -169,6 +170,23 @@
 
       clampMin: 0,
       clampMax: 100
+    },
+
+    // ✅ detection thresholds for score-based pack detectors
+    // engine.detectRuleEngine() 读取这里：pol.detect
+    detect: {
+      // 锁定语言的最低得分：只有 >=72 才允许锁 pack
+      lockScore: 72,
+
+      // 第一名与第二名的最小分差：差距不足视为“混合/不稳定”
+      minGap: 14,
+
+      // 允许“混合模式”：为 true 时，在分数不够稳时允许返回 ""（不锁 ruleEngine）
+      allowMixed: true,
+
+      // 混合模式下如果你想强行指定一个语言，就填 "en"/"de"/"zh"
+      // 推荐先保持 ""：mixed 场景下让 detectRuleEngine 返回 ""，保持引擎中立
+      mixedLang: ""
     },
 
     // ✅ language detection fallback behavior
