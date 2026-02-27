@@ -387,13 +387,13 @@
       /* ✅ Refine: only redact the "suite/apt/unit/floor/room + id" fragment, not the whole line */
       address_en_extra_block: {
         pattern:
-          /\b(?:suite|ste\.?|apt|apartment|unit|floor|fl\.?|room|rm\.?)\b(?:\s*(?:#|no\.?|number)?\s*[:：-]?\s*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu,
+          /\b(?:suite|ste\.?|apt|apartment|unit|floor|fl\.?|room|rm\.?|flat|level)\b(?:\s*(?:#|no\.?|number)?\s*[:：-]?\s*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu
         tag: "ADDRESS"
       },
 
       address_en_extra: {
         pattern:
-          /\b(?:apt|apartment|unit|suite|ste\.?|floor|fl\.?|room|rm\.?|building|bldg\.?|dept|department)\b(?:\s+#?\s*|#\s*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu,
+          /\b(?:apt|apartment|unit|suite|ste\.?|floor|fl\.?|room|rm\.?|flat|level|building|bldg\.?|dept|department)\b(?:\s+#?\s*|#\s*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu
         tag: "ADDRESS"
       },
 
@@ -609,12 +609,10 @@
 
     /* ⑤ Legal/contract refs — tail mask like ref_label_tail but for additional labels */
     legal_ref_tail: {
-      pattern:
-        /((?:(?:contract\s*number|claim\s*reference|legal\s*case\s*ref)\s*[:：=]\s*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
+      pattern:/((?:(?:contract\s*number|claim\s*reference|legal\s*case\s*ref)\s*[:：=]\s*)(?!ERR-)(?!SKU:)((?:[A-Za-z]{1,8}|[A-Za-z]{1,4}\d{0,4})(?:[-_.](?:[A-Za-z0-9]{1,12})){0,8}[-_.]))(\d{4,})\b/giu,
       tag: "REF",
       mode: "prefix"
     },
-
     /* ⑥ Device/session/fingerprint/user-agent (risk/fraud logs) */
     device_fingerprint: {
       pattern:
