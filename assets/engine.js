@@ -21,7 +21,8 @@
 // - P4: Export enabledKeys MUST include ALWAYS_ON (safer & consistent with execution)
 // =========================
 
-console.log("[engine.js] loaded v20260223-engine-a5-policy-split");
+// ✅ FIX: version string aligned with deployed query param (?v=20260224a1)
+console.log("[engine.js] loaded v20260224a1-engine-a5-policy-split");
 
 "use strict";
 
@@ -691,8 +692,9 @@ function getRiskI18n() {
       top: "Top-Risikoquellen",
       advice: "Hinweis",
       adviceLow: "OK. Geldschutz ist standardmäßig aktiv (M1).",
-      adviceMid: "Top-Risiken prüfen; ggf. stärker maskieren oder manuelle Schwärzung/Begriffe ergänzen。",
-      adviceHigh: "Nicht so versenden: Signatur/Konten entfernen und stärker maskieren。",
+      // ✅ FIX: replace Chinese punctuation with German/Latin period
+      adviceMid: "Top-Risiken prüfen; ggf. stärker maskieren oder manuelle Schwärzung/Begriffe ergänzen.",
+      adviceHigh: "Nicht so versenden: Signatur/Konten entfernen und stärker maskieren.",
       meta: (m) => `Treffer ${m.hits}｜Money M1${m.fromPdf ? "｜Datei" : ""}`
     };
   }
@@ -1380,7 +1382,8 @@ try {
       langUI: typeof window.getLangUI === "function" ? window.getLangUI() : window.currentLang || "",
       langContent: typeof window.getLangContent === "function" ? window.getLangContent() : window.ruleEngine || "",
       ruleEngineMode: String(window.ruleEngineMode || ""),
-      engineVersion: "v20260223-engine-a5-policy-split"
+      // ✅ FIX: align with deployed version tag
+      engineVersion: "v20260224a1-engine-a5-policy-split"
     };
 
     try {
