@@ -65,47 +65,6 @@
       return "";
     },
 
-        // Score-based detect (0..100). Keeps existing detect() for compatibility.
-    detectScore: function (s) {
-      s = String(s || "");
-      const t = s.slice(0, 2600);
-      if (!t.trim()) return { lang: "de", score: 0, confidence: 0, signals: [] };
-
-      let score = 0;
-      const signals = [];
-
-      // strong German field labels / business doc lexicon
-      if (/\b(Aktenzeichen|Geschäftszeichen|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Bestellnummer|Antragsnummer|Vorgangs-?ID|Referenz)\b/i.test(t)) {
-        score += 38; signals.push("de:ref_labels");
-      }
-      if (/\b(Straße|Strasse|Rechnungsadresse|Lieferadresse|Anschrift|PLZ|Zusatz|Geburtsdatum|Geburtsort|Kontonummer|Bankleitzahl|USt-IdNr)\b/i.test(t)) {
-        score += 34; signals.push("de:addr_fin_tax");
-      }
-      if (/\b(Herr|Frau|Ansprechpartner|Empfänger)\b/i.test(t)) {
-        score += 16; signals.push("de:salutation_fields");
-      }
-      if (/\b(GmbH|AG|UG|KG|GbR|e\.K\.)\b/i.test(t)) {
-        score += 18; signals.push("de:legal_suffix");
-      }
-
-      // umlaut density is weak evidence (avoid false locks)
-      const umlauts = (t.match(/[äöüÄÖÜß]/g) || []).length;
-      if (umlauts >= 3) { score += 10; signals.push("de:umlauts3"); }
-      else if (umlauts >= 1) { score += 4; signals.push("de:umlauts1"); }
-
-      // penalty if a lot of Chinese characters (mixed content)
-      const han = (t.match(/[\u4E00-\u9FFF]/g) || []).length;
-      const total = Math.max(1, t.length);
-      if (han / total > 0.02) { score -= 18; signals.push("mix:han"); }
-
-      // clamp
-      if (score < 0) score = 0;
-      if (score > 100) score = 100;
-
-      const confidence = score >= 80 ? 0.9 : score >= 70 ? 0.8 : score >= 55 ? 0.65 : score >= 40 ? 0.5 : 0.3;
-      return { lang: "de", score, confidence, signals };
-    },
-
     priority: [
       // secrets / auth first
       "secret",
@@ -131,7 +90,7 @@
 
       // personal attributes
       "birthdate",
-      "place_of_birth", // low priority; not forced always-on (see Fix Patch)
+      "birthplace", // low priority; not forced always-on (see Fix Patch)
 
       // financial / banking
       "account",
@@ -190,7 +149,6 @@
       "passport",
       "driver_license",
       "birthdate",
-      "place_of_birth",
 
       // birthplace is low priority (user). DO NOT force it.
 
@@ -354,8 +312,9 @@
         mode: "prefix"
       },
 
-      place_of_birth: {
-        pattern: /((?:geburtsort)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
+      birthplace: {
+        // low priority; not forced always-on
+        pattern: /((?:Geburtsort)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -781,3 +740,4 @@
     }
   });
 })();
+
