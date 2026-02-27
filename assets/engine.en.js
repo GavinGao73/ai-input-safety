@@ -204,7 +204,7 @@
       // - does NOT treat all decimals as money
       money_label: {
         pattern:
-          /((?:amount|total|subtotal|grand\s*total|price|fee|fees|charge|charges|balance|paid|payment|refund|due|net|gross|tax|vat)\s*[:：=]\s*)([-+−]?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2}))/giu,
+          /((?:amount|total|subtotal|grand\s*total|price|fee|fees|charge|charges|balance|paid|payment|refund|due|net|gross|tax|vat)\s*[:：=]\s*)([-+−]?(?:\d{1,3}(?:[,\s]\d{3})*|\d+)\.\d{2})(?!\d)/giu,
         tag: "MONEY",
         mode: "prefix"
       },
