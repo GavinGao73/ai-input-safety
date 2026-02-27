@@ -40,11 +40,7 @@
       const han = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
       if (han / Math.max(1, s.length) > 0.03) return "";
 
-      if (
-        /\b(Invoice|Order ID|Account Number|Username|Address|Phone|Email|Customer|Payment|Bank|Passport|SSN)\b/i.test(
-          s
-        )
-      )
+      if (/\b(Invoice|Order ID|Account Number|Username|Address|Phone|Email|Customer|Payment|Bank|Passport|SSN)\b/i.test(s))
         return "en";
 
       if (/[A-Za-z]/.test(s)) return "en";
@@ -62,35 +58,27 @@
 
       // strong EN document fields
       if (/\b(Invoice|Order ID|Application ID|Case ID|Ticket No\.?|Reference|Customer ID)\b/i.test(t)) {
-        score += 34;
-        signals.push("en:ref_fields");
+        score += 34; signals.push("en:ref_fields");
       }
       if (/\b(Account Number|Routing Number|Sort Code|IBAN|SWIFT|BIC|CVV|CVC|Expiry|Expiration|Valid Thru)\b/i.test(t)) {
-        score += 26;
-        signals.push("en:bank_card_fields");
+        score += 26; signals.push("en:bank_card_fields");
       }
       if (/\b(Phone|Email|Address|Shipping Address|Billing Address)\b/i.test(t)) {
-        score += 18;
-        signals.push("en:contact_fields");
+        score += 18; signals.push("en:contact_fields");
       }
       if (/\b(Username|Login|Handle|Password|OTP|2FA)\b/i.test(t)) {
-        score += 18;
-        signals.push("en:auth_fields");
+        score += 18; signals.push("en:auth_fields");
       }
 
       // penalty if a lot of Chinese characters (mixed content)
       const han = (t.match(/[\u4E00-\u9FFF]/g) || []).length;
       const total = Math.max(1, t.length);
-      if (han / total > 0.02) {
-        score -= 18;
-        signals.push("mix:han");
-      }
+      if (han / total > 0.02) { score -= 18; signals.push("mix:han"); }
 
       if (score < 0) score = 0;
       if (score > 100) score = 100;
 
-      const confidence =
-        score >= 80 ? 0.9 : score >= 70 ? 0.8 : score >= 55 ? 0.65 : score >= 40 ? 0.5 : 0.3;
+      const confidence = score >= 80 ? 0.9 : score >= 70 ? 0.8 : score >= 55 ? 0.65 : score >= 40 ? 0.5 : 0.3;
       return { lang: "en", score, confidence, signals };
     },
 
@@ -235,9 +223,7 @@
 
       // label 像典型编号字段（Case ID / Ticket No / Order ID ...）
       if (
-        /\b(?:case|ticket|order|invoice|reference|ref|customer|application|request|account|portal|contract|claim|legal)\b/.test(
-          lbl
-        ) &&
+        /\b(?:case|ticket|order|invoice|reference|ref|customer|application|request|account|portal|contract|claim|legal)\b/.test(lbl) &&
         /\b(?:id|no|number|#)\b/.test(lbl)
       ) {
         return false;
@@ -486,7 +472,7 @@
       /* ===================== PHONE (label-driven + explicit intl prefix) ===================== */
       phone: {
         pattern:
-          /((?:phone|mobile|contact|tel|whatsapp|telegram|signal|fax)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(?<![A-Za-z0-9_-])(\b(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
+          /((?:phone|mobile|contact|tel|whatsapp|telegram|signal|fax)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(?<![A-Za-z0-9_-])(\b(?:[+＋]\s*\d{1,3}|0{2}\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
         tag: "PHONE",
         mode: "phone"
       },
@@ -545,7 +531,7 @@
         // Case ID / Ticket No. / Application ID / Order ID / Invoice No. / Reference /
         // Request ID / Account ID / Customer ID / Portal Ref / ...
         pattern:
-          /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|portal\s*ref)\s*(?:id|no\.?|number)?|account\s*id)\s*(?:[:：=]|-)\s*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,10}[-_.]))(\d{4,})/giu,
+          /(((?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|portal\s*ref)\s*(?:id|no\.?|number)?|account\s*id)\s*(?:[:：=]|-)\s*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,10}[-_.]))(\d{4,})/giu,
         tag: "REF",
         mode: "prefix"
       },
