@@ -1,12 +1,11 @@
 // =========================
 // assets/engine.en.js
-// UPGRADE v6.3.1 (EN core, no intl_*, light high-risk)
-// - Keep v6.2 person_name stability (line-anchored, no cross-line)
-// - Fix money false positives via money_label + currency-only money
-// - Strengthen phoneGuard for CUST-/CASE-/ORD-... IDs
-// - Add small set of high-risk fields: bank_routing_ids / security_answer /
-//   device_fingerprint / uuid / wallet_id / tx_hash / crypto_wallet
-// - No intl_* (ITIN/NINO/SIN/TFN/ABN/NHS) and no address_de_* patch
+// UPGRADE v6.3.1 (close with zh-pack philosophy, keep v6.2 person_name stability)
+//
+// - 移除额外 patch（International / High-Risk / EN Compat），合并进主 pack 或暂时关闭
+// - ID 策略改为「标签驱动 + 尾段遮盖」，增加 Account ID / Request ID / Portal Ref 支持
+// - 强化 phoneGuard：避免业务 ID / 引用号被误当作电话
+// - 地址策略：只遮街道+门牌+楼层/房间，城市和国家保留
 // =========================
 
 (function () {
@@ -80,9 +79,9 @@
       }
 
       // penalty if a lot of Chinese characters (mixed content)
-      const han2 = (t.match(/[\u4E00-\u9FFF]/g) || []).length;
+      const han = (t.match(/[\u4E00-\u9FFF]/g) || []).length;
       const total = Math.max(1, t.length);
-      if (han2 / total > 0.02) {
+      if (han / total > 0.02) {
         score -= 18;
         signals.push("mix:han");
       }
@@ -95,18 +94,17 @@
       return { lang: "en", score, confidence, signals };
     },
 
+    // Language-specific execution order
     priority: [
-      // secrets / auth first
+      // 1) secrets / auth
       "secret",
       "api_key_token",
       "bearer_token",
-      "handle_label",
+      "security_answer",
 
-      // personal attributes
+      // 2) identity
       "dob",
       "place_of_birth",
-
-      // identity
       "passport",
       "driver_license",
       "ssn",
@@ -114,10 +112,76 @@
       "national_id",
       "tax_id",
 
-      // insurance
-      "insurance_id",
+      // 3) device / network
+      "ip_label",
+      "ip_address",
+      "mac_label",
+      "mac_address",
+      "imei",
+      "device_fingerprint",
+      "uuid",
 
-      // device / network identifiers
+      // 4) financial
+      "account",
+      "bank",
+      "bank_routing_ids",
+      "card_expiry",
+      "card_security",
+
+      // 5) comms
+      "email",
+      "url",
+
+      // 6) refs / IDs / handles
+      "handle_label",
+      "cust_id",
+      "ref_label_tail",
+
+      // 7) money
+      "money_label",
+      "money",
+
+      // 8) phone AFTER ids
+      "phone",
+
+      // 9) org / person (org first)
+      "company",
+      "person_name",
+
+      // 10) address
+      "address_en_inline_street",
+      "address_en_extra_block",
+      "address_en_extra",
+
+      // 11) crypto / chain
+      "wallet_id",
+      "tx_hash",
+      "crypto_wallet",
+
+      // 12) generic
+      "handle",
+      "number"
+    ],
+
+    // Language-specific always-on set
+    alwaysOn: [
+      // secrets / auth
+      "secret",
+      "api_key_token",
+      "bearer_token",
+      "security_answer",
+
+      // identity
+      "dob",
+      "place_of_birth",
+      "passport",
+      "driver_license",
+      "ssn",
+      "ein",
+      "national_id",
+      "tax_id",
+
+      // device / network
       "ip_label",
       "ip_address",
       "mac_label",
@@ -133,101 +197,45 @@
       "card_expiry",
       "card_security",
 
-      // comms
-      "email",
-      "url",
-
-      // refs / IDs
-      "ref_label_tail",
-      "ref_generic_tail",
-
       // money
       "money_label",
       "money",
 
-      // phone AFTER ids
-      "phone",
-
-      // person / org
-      "person_name",
+      // org / person
       "company",
+      "person_name",
 
       // address
       "address_en_inline_street",
       "address_en_extra_block",
       "address_en_extra",
 
-      // crypto / chain
+      // refs
+      "cust_id",
+      "ref_label_tail",
+
+      // crypto
       "wallet_id",
       "tx_hash",
       "crypto_wallet",
 
-      // generic
-      "handle",
-      "number"
+      // handles
+      "handle_label"
     ],
 
-    alwaysOn: [
-      "handle_label",
-      "secret",
-      "api_key_token",
-      "bearer_token",
-
-      "dob",
-      "place_of_birth",
-
-      "passport",
-      "driver_license",
-      "ssn",
-      "ein",
-      "national_id",
-      "tax_id",
-
-      "insurance_id",
-
-      "ip_label",
-      "ip_address",
-      "mac_label",
-      "mac_address",
-      "imei",
-      "device_fingerprint",
-      "uuid",
-
-      "money_label",
-      "money",
-      "account",
-      "bank",
-      "bank_routing_ids",
-      "card_expiry",
-      "card_security",
-
-      "person_name",
-
-      "address_en_inline_street",
-      "address_en_extra_block",
-      "address_en_extra",
-
-      "ref_label_tail",
-      "ref_generic_tail",
-
-      "wallet_id",
-      "tx_hash",
-      "crypto_wallet"
-    ],
-
-    // upgraded guard: protect business IDs from being mis-tagged as phone
+    // Phone FP guard: prevent IDs / refs being treated as phone
     phoneGuard: function ({ label, value, match }) {
       const lbl = String(label || "").toLowerCase();
       const val = String(value || "");
       const raw = String(match || value || "");
       const digits = val.replace(/\D+/g, "");
 
-      // ① protect long numeric strings: very likely IDs / accounts, not phones
+      // 长数字串：更可能是 ID / 账号，而不是手机号
       if (digits.length >= 16) return false;
 
-      // ② label clearly indicates an ID / reference field (Case ID / Ticket No / Order ID / ...)
+      // label 像典型编号字段（Case ID / Ticket No / Order ID ...）
       if (
-        /\b(?:case|ticket|order|invoice|reference|ref|customer|application|request|account)\b/.test(
+        /\b(?:case|ticket|order|invoice|reference|ref|customer|application|request|account|portal|contract|claim|legal)\b/.test(
           lbl
         ) &&
         /\b(?:id|no|number|#)\b/.test(lbl)
@@ -235,13 +243,13 @@
         return false;
       }
 
-      // ③ raw match contains typical ID prefixes with long numeric tails
-      //    Covers: CUST- / CASE- / ORD- / INV- / APP- / REF- / ACC- / MEM- / INS- / REQ- / PR- / LC- / CLM- / CNT-
+      // 原始片段里带典型业务 ID 前缀
+      // CUST- / CASE- / ORD- / INV- / APP- / REF- / ACC- / MEM- / INS- / REQ- / PR- / LC- / CLM- / CNT-
       if (/\b(?:CUST|CASE|ORD|INV|APP|REF|ACC|MEM|INS|REQ|PR|LC|CLM|CNT)-/i.test(raw)) {
         return false;
       }
 
-      // ④ generic pattern: UPPER prefix + multiple dash segments + 4+ digit tail => business ID, not phone
+      // 通用业务 ID 模式：大写前缀 + 多段 -/._ + 4+ 尾数
       if (/\b[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{4,}\b/i.test(raw)) {
         return false;
       }
@@ -266,17 +274,19 @@
     },
 
     rules: {
+      /* ===================== EMAIL ===================== */
       email: {
         pattern: /\b[A-Z0-9._%+-]+\s*@\s*[A-Z0-9.-]+\s*\.\s*[A-Z]{2,}\b/gi,
         tag: "EMAIL"
       },
 
+      /* ===================== URL ===================== */
       url: {
         pattern: /\b(?:https?:\/\/|www\.)[^\s<>"'\n\r）)\]】]+/giu,
         tag: "URL"
       },
 
-      // ✅ label-driven money: strong labels + decimal part
+      /* ===================== MONEY (label-driven) ===================== */
       money_label: {
         pattern:
           /((?:amount|total|subtotal|grand\s*total|price|fee|fees|charge|charges|balance|paid|payment|refund|due|net|gross|tax|vat)\s*[:：=]\s*)([-+−]?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2}))/giu,
@@ -284,13 +294,14 @@
         mode: "prefix"
       },
 
-      // ✅ explicit-currency money only (no bare decimals / integers)
+      /* ===================== MONEY (with explicit currency) ===================== */
       money: {
         pattern:
           /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b\s*[-+−]?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?|\b[-+−]?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?\s*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥]\s*[-+−]?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?)/giu,
         tag: "MONEY"
       },
 
+      /* ===================== SECRET (password / OTP / codes) ===================== */
       secret: {
         pattern:
           /((?:password|passcode|pin|otp|2fa|verification\s*code|security\s*code|one[-\s]?time\s*code|recovery\s*code|backup\s*code)\s*[:：=]\s*)([^\n\r]{1,160})/giu,
@@ -298,15 +309,9 @@
         mode: "prefix"
       },
 
-      // ✅ Security Q/A — mask Answer value
-      security_answer: {
-        pattern: /((?:answer|security\s*answer)\s*[:：=]\s*)([^\n\r]{1,160})/giu,
-        tag: "SECRET",
-        mode: "prefix"
-      },
-
-      /* FIX A: removed "authorization" here; bearer_token owns it */
+      /* ===================== API keys / tokens ===================== */
       api_key_token: {
+        // FIX A: "authorization" removed here; bearer_token owns it
         pattern:
           /((?:api\s*key|x-api-key|access\s*token|refresh\s*token|token|auth\s*token|client\s*secret|secret\s*key)\s*[:：=]\s*)([A-Za-z0-9._\-]{8,300})/giu,
         tag: "SECRET",
@@ -319,30 +324,42 @@
         mode: "prefix"
       },
 
+      /* ===================== USERNAME / HANDLE (label-driven) ===================== */
       handle_label: {
         pattern: /((?:username|user\s*id|login\s*id|login|handle)\s*(?:[:：=]|-)\s*)([A-Za-z0-9_@.\-]{3,80})/giu,
         tag: "HANDLE",
         mode: "prefix"
       },
 
+      /* ===================== SECURITY ANSWER (label-driven) ===================== */
+      security_answer: {
+        pattern: /((?:answer|security\s*answer)\s*[:：=]\s*)([^\n\r]{1,160})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      /* ===================== DOB / Date of birth ===================== */
       dob: {
         pattern: /((?:date\s*of\s*birth|dob)\s*[:：=]\s*\d{4}[-\/\.])(\d{2}[-\/\.]\d{2})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
+      /* ===================== Place of birth ===================== */
       place_of_birth: {
         pattern: /((?:place\s*of\s*birth|pob|birthplace)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
+      /* ===================== Passport ===================== */
       passport: {
         pattern: /((?:passport(?:\s*(?:no\.?|number))?)\s*[:：=]\s*)([A-Z0-9][A-Z0-9\-]{4,22})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
+      /* ===================== Driver license ===================== */
       driver_license: {
         pattern:
           /((?:driver[’']?s\s*license(?:\s*(?:no\.?|number))?|driving\s*licen[cs]e(?:\s*(?:no\.?|number))?)\s*[:：=]\s*)([A-Z0-9][A-Z0-9\-]{4,28})/giu,
@@ -350,12 +367,14 @@
         mode: "prefix"
       },
 
+      /* ===================== US SSN ===================== */
       ssn: {
         pattern: /((?:ssn|social\s*security\s*number)\s*[:：=]\s*)(\d{3}-\d{2}-\d{4}|\d{9})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
+      /* ===================== Business / tax IDs (EIN / TIN / National ID) ===================== */
       ein: {
         pattern: /((?:ein|employer\s*identification\s*number)\s*[:：=]\s*)(\d{2}-\d{7})/giu,
         tag: "SECRET",
@@ -376,13 +395,7 @@
         mode: "prefix"
       },
 
-      insurance_id: {
-        pattern:
-          /((?:insurance\s*(?:id|no\.?|number)|policy\s*(?:id|no\.?|number)|claim\s*(?:id|no\.?|number)|member\s*(?:id|no\.?|number)|membership\s*(?:id|no\.?|number))\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,60})/giu,
-        tag: "SECRET",
-        mode: "prefix"
-      },
-
+      /* ===================== IP (label-driven) ===================== */
       ip_label: {
         pattern:
           /((?:ip\s*address|ipv4|ipv6)\s*[:：=]\s*)((?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)|(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{1,4})/giu,
@@ -390,30 +403,34 @@
         mode: "prefix"
       },
 
+      /* ===================== IP (bare) ===================== */
       ip_address: {
         pattern:
           /\b((?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)|(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{1,4})\b/giu,
         tag: "SECRET"
       },
 
+      /* ===================== MAC (label-driven) ===================== */
       mac_label: {
         pattern: /((?:mac\s*(?:address)?)\s*[:：=]\s*)(\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b)/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
+      /* ===================== MAC (bare) ===================== */
       mac_address: {
         pattern: /\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b/giu,
         tag: "SECRET"
       },
 
+      /* ===================== IMEI ===================== */
       imei: {
         pattern: /((?:imei)\s*[:：=]\s*)(\d{14,16})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
-      // Device / session / fingerprint / user-agent
+      /* ===================== Device / session / fingerprint / user-agent ===================== */
       device_fingerprint: {
         pattern:
           /((?:device\s*id|session\s*id|fingerprint|user\s*agent)\s*[:：=]\s*)([^\n\r]{1,220})/giu,
@@ -421,12 +438,13 @@
         mode: "prefix"
       },
 
-      // UUID / GUID
+      /* ===================== UUID / GUID (bare) ===================== */
       uuid: {
         pattern: /\b([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\b/giu,
         tag: "SECRET"
       },
 
+      /* ===================== ACCOUNT / CARD / IBAN (label-driven) ===================== */
       account: {
         pattern:
           /((?:account(?:\s*number)?|routing\s*number|sort\s*code|iban|credit\s*card|debit\s*card|card\s*number|name\s*on\s*card)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
@@ -434,14 +452,7 @@
         mode: "prefix"
       },
 
-      // Bank routing / clearing / branch / transit / BSB / ABA
-      bank_routing_ids: {
-        pattern:
-          /((?:bank\s*name|branch\s*code|clearing\s*(?:number|no\.?)|transit\s*number|bsb|aba\s*(?:number|routing\s*number)?|aba)\s*[:：=]\s*)([0-9][0-9\s-]{2,24}[0-9])/giu,
-        tag: "ACCOUNT",
-        mode: "prefix"
-      },
-
+      /* ===================== Bank SWIFT / BIC ===================== */
       bank: {
         pattern:
           /((?:swift|swift\s*code|bic)\b\s*[:：=]?\s*)([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
@@ -449,6 +460,15 @@
         mode: "prefix"
       },
 
+      /* ===================== Bank routing / clearing / branch (label-driven) ===================== */
+      bank_routing_ids: {
+        pattern:
+          /((?:bank\s*name|branch\s*code|clearing\s*(?:number|no\.?)|transit\s*number|bsb|aba\s*(?:number|routing\s*number)?|aba)\s*[:：=]\s*)([0-9][0-9\s-]{2,24}[0-9])/giu,
+        tag: "ACCOUNT",
+        mode: "prefix"
+      },
+
+      /* ===================== Card expiry ===================== */
       card_expiry: {
         pattern:
           /((?:exp(?:iry|iration)?(?:\s*date)?|valid\s*thru|valid\s*through)\s*[:：=]\s*)(\d{2}\s*\/\s*\d{2,4}|\d{2}\s*-\s*\d{2,4}|\d{4}\s*-\s*\d{2})/giu,
@@ -456,12 +476,14 @@
         mode: "prefix"
       },
 
+      /* ===================== Card security code ===================== */
       card_security: {
         pattern: /((?:cvv|cvc)\s*[:：=]\s*)(\d{3,4})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
+      /* ===================== PHONE (label-driven + explicit intl prefix) ===================== */
       phone: {
         pattern:
           /((?:phone|mobile|contact|tel|whatsapp|telegram|signal|fax)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(?<![A-Za-z0-9_-])(\b(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
@@ -469,15 +491,17 @@
         mode: "phone"
       },
 
-      /* v6.2-stable: line-anchored, no cross-line; allow optional trailing inline comment */
-      // Minimal extension: allow From/To/Attn labels
+      /* ===================== PERSON NAME (line-anchored; keep title) ===================== */
       person_name: {
+        // v6.2-stable: line-anchored, no cross-line; allow optional trailing inline comment
+        // Minimal extension: allow From/To/Attn labels (still requires ":/=" and capitalized-name structure)
         pattern:
           /^((?:name|customer\s*name|account\s*holder|recipient|name\s*on\s*card|from|to|attn\.?|attention)[ \t]*[:：=][ \t]*(?:(?:mr|mrs|ms|miss|dr|prof)\.?\s+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
 
+      /* ===================== COMPANY (legal suffix kept) ===================== */
       company: {
         pattern:
           /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)\s+(?<legal>LLC|L\.?L\.?C\.?|Ltd\.?|Limited|Inc\.?|Incorporated|Corp\.?|Corporation|PLC|LLP|Co\.?|Company)\b/giu,
@@ -485,14 +509,16 @@
         mode: "company"
       },
 
+      /* ===================== ADDRESS (inline street line, e.g. "1600 Amphitheatre Parkway") ===================== */
       address_en_inline_street: {
         pattern:
           /\b\d{1,5}[A-Za-z]?(?:-\d{1,5})?\s+(?:[A-Za-z0-9.'’\-]+\s+){0,6}(?:street|st\.?|avenue|ave\.?|road|rd\.?|boulevard|blvd\.?|lane|ln\.?|drive|dr\.?|way|parkway|pkwy\.?|court|ct\.?|place|pl\.?|square|sq\.?|highway|hwy\.?|terrace|ter\.?|crescent|cres\.?|close|cl\.?|gardens?|gdns?\.?|mews|row|alley|aly\.?)\b/giu,
         tag: "ADDRESS"
       },
 
-      // Refine: only redact the "suite/apt/unit/floor/room + id" fragment, not the whole line
+      /* ===================== ADDRESS EXTRA (suite / apt / unit / floor / room) ===================== */
       address_en_extra_block: {
+        // 只遮 "suite/apt/unit/floor/room + id" 片段
         pattern:
           /\b(?:suite|ste\.?|apt|apartment|unit|floor|fl\.?|room|rm\.?)\b(?:\s*(?:#|no\.?|number)?\s*[:：-]?\s*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu,
         tag: "ADDRESS"
@@ -504,21 +530,33 @@
         tag: "ADDRESS"
       },
 
+      /* ===================== CUSTOMER ID (CUST-...) ===================== */
+      cust_id: {
+        // Customer ID: CUST-004918273645 -> Customer ID: CUST-[Ref]
+        pattern: /((?:customer\s*id)\s*[:：=]\s*CUST-)(?![^\n\r]*\[Ref\])(\d{6,})/giu,
+        tag: "REF",
+        mode: "prefix"
+      },
+
+      /* ===================== REF TAIL MASK (label-driven; tail-only policy) ===================== */
       ref_label_tail: {
+        // Tail-only replacement: keep prefix/body, mask ONLY the last numeric tail (>=4 digits)
+        // Covers:
+        // Case ID / Ticket No. / Application ID / Order ID / Invoice No. / Reference /
+        // Request ID / Account ID / Customer ID / Portal Ref / ...
         pattern:
-          /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account|portal)\s*(?:id|no\.?|number)?\s*(?:[:：=]|-)\s*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
+          /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|portal\s*ref)\s*(?:id|no\.?|number)?|account\s*id)\s*(?:[:：=]|-)\s*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,10}[-_.]))(\d{4,})/giu,
         tag: "REF",
         mode: "prefix"
       },
 
-      ref_generic_tail: {
-        pattern:
-          /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-))(\d{5,})\b/gu,
-        tag: "REF",
-        mode: "prefix"
+      /* ===================== HANDLE (generic @username) ===================== */
+      handle: {
+        pattern: /@[A-Za-z0-9_]{2,32}\b/g,
+        tag: "HANDLE"
       },
 
-      // Web3: Wallet ID / Transaction Hash / wallet addresses
+      /* ===================== WEB3: Wallet ID / Tx Hash / Wallet addresses ===================== */
       wallet_id: {
         pattern: /((?:wallet\s*id)\s*[:：=]\s*)([A-Za-z0-9._\-]{3,80})/giu,
         tag: "SECRET",
@@ -538,11 +576,7 @@
         mode: "prefix"
       },
 
-      handle: {
-        pattern: /@[A-Za-z0-9_]{2,32}\b/g,
-        tag: "HANDLE"
-      },
-
+      /* ===================== NUMBER fallback ===================== */
       number: {
         pattern: /\b\d[\d\s-]{6,28}\d\b/g,
         tag: "NUMBER"
