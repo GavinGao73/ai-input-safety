@@ -40,7 +40,11 @@
       const han = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
       if (han / Math.max(1, s.length) > 0.03) return "";
 
-      if (/\b(Invoice|Order ID|Account Number|Username|Address|Phone|Email|Customer|Payment|Bank|Passport|SSN)\b/i.test(s))
+      if (
+        /\b(Invoice|Order ID|Account Number|Username|Address|Phone|Email|Customer|Payment|Bank|Passport|SSN)\b/i.test(
+          s
+        )
+      )
         return "en";
 
       if (/[A-Za-z]/.test(s)) return "en";
@@ -236,8 +240,10 @@
         mode: "prefix"
       },
 
+      // ✅ do NOT capture emails as HANDLE (so Login ID email stays [Email])
       handle_label: {
-        pattern:/((?:username|user\s*id|login\s*id|login|handle)\s*(?:[:：=]|-)\s*)(?![A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b)([A-Za-z0-9_@.\-]{3,80})/giu,
+        pattern:
+          /((?:username|user\s*id|login\s*id|login|handle)\s*(?:[:：=]|-)\s*)(?![A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b)([A-Za-z0-9_@.\-]{3,80})/giu,
         tag: "HANDLE",
         mode: "prefix"
       },
@@ -261,7 +267,8 @@
       },
 
       driver_license: {
-        pattern:/((?:driver[’']?s\s*license(?:\s*(?:no\.?|number))?|driving\s*licen[cs]e(?:\s*(?:no\.?|number))?)\s*[:：=]\s*)([A-Z0-9][A-Z0-9\-]{4,28})/giu,
+        pattern:
+          /((?:driver[’']?s\s*license(?:\s*(?:no\.?|number))?|driving\s*licen[cs]e(?:\s*(?:no\.?|number))?)\s*[:：=]\s*)([A-Z0-9][A-Z0-9\-]{4,28})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -286,13 +293,15 @@
       },
 
       tax_id: {
-        pattern:/((?:tax\s*id|tax\s*identification\s*(?:no\.?|number)|tin)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-]{4,32})/giu,
+        pattern:
+          /((?:tax\s*id|tax\s*identification\s*(?:no\.?|number)|tin)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-]{4,32})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       insurance_id: {
-        pattern:/((?:insurance\s*(?:id|no\.?|number)|policy\s*(?:id|no\.?|number)|claim\s*(?:id|no\.?|number)|member\s*(?:id|no\.?|number)|membership\s*(?:id|no\.?|number))\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,60})/giu,
+        pattern:
+          /((?:insurance\s*(?:id|no\.?|number)|policy\s*(?:id|no\.?|number)|claim\s*(?:id|no\.?|number)|member\s*(?:id|no\.?|number)|membership\s*(?:id|no\.?|number))\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,60})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -387,13 +396,13 @@
       /* ✅ Refine: only redact the "suite/apt/unit/floor/room + id" fragment, not the whole line */
       address_en_extra_block: {
         pattern:
-          /\b(?:suite|ste\.?|apt|apartment|unit|floor|fl\.?|room|rm\.?|flat|level)\b(?:\s*(?:#|no\.?|number)?\s*[:：-]?\s*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu
+          /\b(?:suite|ste\.?|apt|apartment|unit|floor|fl\.?|room|rm\.?|flat|level)\b(?:\s*(?:#|no\.?|number)?\s*[:：-]?\s*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu,
         tag: "ADDRESS"
       },
 
       address_en_extra: {
         pattern:
-          /\b(?:apt|apartment|unit|suite|ste\.?|floor|fl\.?|room|rm\.?|flat|level|building|bldg\.?|dept|department)\b(?:\s+#?\s*|#\s*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu
+          /\b(?:apt|apartment|unit|suite|ste\.?|floor|fl\.?|room|rm\.?|flat|level|building|bldg\.?|dept|department)\b(?:\s+#?\s*|#\s*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu,
         tag: "ADDRESS"
       },
 
@@ -405,8 +414,7 @@
       },
 
       ref_generic_tail: {
-        pattern:
-          /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-))(\d{5,})\b/gu,
+        pattern: /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-))(\d{5,})\b/gu,
         tag: "REF",
         mode: "prefix"
       },
@@ -424,7 +432,6 @@
   };
 })();
 
-
 // =========================
 // International ADD-ONLY Patch (UK/US/CA/AU common fields)
 // - SAFE: append priority/alwaysOn; add rules only
@@ -438,32 +445,13 @@
   if (!EN) return;
 
   // append-only
-  const addPrio = [
-    "intl_itin",
-    "intl_nino",
-    "intl_nhs",
-    "intl_sin",
-    "intl_tfn",
-    "intl_abn",
-    "uuid"
-  ];
-
+  const addPrio = ["intl_itin", "intl_nino", "intl_nhs", "intl_sin", "intl_tfn", "intl_abn", "uuid"];
   EN.priority = (EN.priority || []).concat(addPrio);
 
-  const addAlways = [
-    "intl_itin",
-    "intl_nino",
-    "intl_nhs",
-    "intl_sin",
-    "intl_tfn",
-    "intl_abn",
-    "uuid"
-  ];
-
+  const addAlways = ["intl_itin", "intl_nino", "intl_nhs", "intl_sin", "intl_tfn", "intl_abn", "uuid"];
   EN.alwaysOn = (EN.alwaysOn || []).concat(addAlways);
 
   Object.assign(EN.rules, {
-
     /* 🇺🇸 US ITIN (often formatted like SSN but starts with 9xx; keep simple and label-driven) */
     intl_itin: {
       pattern: /((?:us\s*)?itin\s*[:：=]\s*)(9\d{2}[-\s]?\d{2}[-\s]?\d{4})/giu,
@@ -471,9 +459,10 @@
       mode: "prefix"
     },
 
-    /* 🇬🇧 UK – National Insurance Number (NINO) */
+    /* 🇬🇧 UK – National Insurance Number (NINO)
+       NOTE: relaxed prefix to allow test/trap values like "QQ" */
     intl_nino: {
-      pattern: /((?:uk\s*)?nino\s*[:：=]\s*)([A-CEGHJ-PR-TW-Z]{2}\s?\d{2}\s?\d{2}\s?\d{2}\s?[A-D])/giu,
+      pattern: /((?:uk\s*)?nino\s*[:：=]\s*)([A-Z]{2}\s?\d{2}\s?\d{2}\s?\d{2}\s?[A-D])/giu,
       tag: "SECRET",
       mode: "prefix"
     },
@@ -511,22 +500,12 @@
       pattern: /\b([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\b/giu,
       tag: "SECRET"
     }
-
   });
-
 })();
-
 
 // =========================
 // High-Risk ADD-ONLY Patch (2–7)
 // - SAFE: no deletions; only inserts keys before "number" + adds new rules
-// - Covers:
-//   ② bank routing fields (Branch Code / Clearing / Transit / BSB / ABA)
-//   ③ card auth metadata (AVS / 3DS / ECI)  [ZIP stays unmasked]
-//   ④ security answers (Answer: ...)
-//   ⑤ legal/contract refs (LC-... tail>=4 etc.)
-//   ⑥ device/session/fingerprint/user-agent
-//   ⑦ crypto wallet + wallet id + tx hash
 // =========================
 (function () {
   "use strict";
@@ -564,16 +543,12 @@
     "crypto_wallet"
   ];
 
-  // Ensure these run BEFORE generic number fallback
   EN.priority = insertBefore(EN.priority || [], "number", NEW_KEYS);
 
-  // Always-on for high-risk fields (ZIP remains unmasked; we do NOT add a ZIP rule)
   EN.alwaysOn = EN.alwaysOn || [];
   NEW_KEYS.forEach((k) => uniqPush(EN.alwaysOn, k));
 
   Object.assign(EN.rules, {
-
-    /* ② Bank routing / clearing / branch / transit / BSB / ABA */
     bank_routing_ids: {
       pattern:
         /((?:bank\s*name|branch\s*code|clearing\s*(?:number|no\.?)|transit\s*number|bsb|aba\s*(?:number|routing\s*number)?|aba)\s*[:：=]\s*)([0-9][0-9\s-]{2,24}[0-9])/giu,
@@ -581,7 +556,6 @@
       mode: "prefix"
     },
 
-    /* ③ Card auth / fraud signals (ZIP stays unmasked by design) */
     avs_data: {
       pattern: /((?:avs\s*data)\s*[:：=]\s*)([A-Za-z0-9._\-]{1,40})/giu,
       tag: "SECRET",
@@ -600,28 +574,26 @@
       mode: "prefix"
     },
 
-    /* ④ Security Q/A — mask Answer value (systems often leak this) */
     security_answer: {
       pattern: /((?:answer|security\s*answer)\s*[:：=]\s*)([^\n\r]{1,160})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
-    /* ⑤ Legal/contract refs — tail mask like ref_label_tail but for additional labels */
+    // ✅ Fix: avoid double [Ref] by preserving full prefix and masking only final numeric tail
     legal_ref_tail: {
-      pattern:/((?:(?:contract\s*number|claim\s*reference|legal\s*case\s*ref)\s*[:：=]\s*)(?!ERR-)(?!SKU:)((?:[A-Za-z]{1,8}|[A-Za-z]{1,4}\d{0,4})(?:[-_.](?:[A-Za-z0-9]{1,12})){0,8}[-_.]))(\d{4,})\b/giu,
+      pattern:
+        /((?:(?:contract\s*number|claim\s*reference|legal\s*case\s*ref)\s*[:：=]\s*)(?!ERR-)(?!SKU:)((?:[A-Za-z]{1,8}|[A-Za-z]{1,4}\d{0,4})(?:[-_.](?:[A-Za-z0-9]{1,12})){0,8}[-_.]))(\d{4,})\b/giu,
       tag: "REF",
       mode: "prefix"
     },
-    /* ⑥ Device/session/fingerprint/user-agent (risk/fraud logs) */
+
     device_fingerprint: {
-      pattern:
-        /((?:device\s*id|session\s*id|fingerprint|user\s*agent)\s*[:：=]\s*)([^\n\r]{1,220})/giu,
+      pattern: /((?:device\s*id|session\s*id|fingerprint|user\s*agent)\s*[:：=]\s*)([^\n\r]{1,220})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
-    /* ⑦ Web3: Wallet ID / Transaction Hash / Wallet addresses */
     wallet_id: {
       pattern: /((?:wallet\s*id)\s*[:：=]\s*)([A-Za-z0-9._\-]{3,80})/giu,
       tag: "SECRET",
@@ -635,21 +607,15 @@
     },
 
     crypto_wallet: {
-      pattern:/((?:btc|eth)\s*[:：=]\s*)((?:bc1)[0-9a-z]{25,90}|[13][A-HJ-NP-Za-km-z1-9]{25,34}|0x[a-f0-9]{40})/giu,
+      pattern: /((?:btc|eth)\s*[:：=]\s*)((?:bc1)[0-9a-z]{25,90}|[13][A-HJ-NP-Za-km-z1-9]{25,34}|0x[a-f0-9]{40})/giu,
       tag: "SECRET",
       mode: "prefix"
     }
-
   });
-
 })();
-
 
 // =========================
 // EN Compat Patch (Whitelist alignment)
-// - Add OPTIONAL support for keys:
-//     address_de_street / address_de_postal
-// - Purpose: if UI/exporter uses these keys across languages, EN will still have rules.
 // - SAFE: add rules + insert into priority only (NOT alwaysOn)
 // =========================
 (function () {
@@ -672,16 +638,10 @@
   }
 
   const KEYS = ["address_de_street", "address_de_postal"];
-
-  // Put them right before EN address rules (so they don’t get swallowed by generic)
   EN.priority = insertBefore(EN.priority || [], "address_en_inline_street", KEYS);
 
   EN.rules = EN.rules || {};
   Object.assign(EN.rules, {
-    // Street part only (label-driven), keep the tail after comma
-    // Example:
-    // "Address: 221B Baker Street, London NW1 6XE, UK"
-    // -> "Address: [Address], London NW1 6XE, UK"
     address_de_street: {
       pattern:
         /((?:address|shipping\s*address|billing\s*address|street\s*address|mailing\s*address)\s*[:：=]\s*)([^,\n\r]{4,160}?)(?=\s*,)/giu,
@@ -689,8 +649,6 @@
       mode: "prefix"
     },
 
-    // Postal code only (label-driven). Intentionally DOES NOT mask city/country lines without a postal label.
-    // Supports: US ZIP, CA postal, UK postcode, AU/NZ (4 digits), generic 3–10 alnum/hyphen.
     address_de_postal: {
       pattern:
         /((?:zip(?:\s*code)?|postal\s*code|postcode)\s*[:：=]\s*)(\d{5}(?:-\d{4})?|[A-Z]\d[A-Z]\s?\d[A-Z]\d|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}|\d{4}|[A-Z0-9][A-Z0-9\- ]{2,9}[A-Z0-9])/giu,
