@@ -187,22 +187,33 @@
       "ref_generic_tail"
     ],
 
-    phoneGuard: function ({ label, value }) {
+        phoneGuard: function ({ label, value, match }) {
       const lbl = String(label || "").toLowerCase();
       const val = String(value || "");
+      const raw = String(match || value || "");
       const digits = val.replace(/\D+/g, "");
 
+      // ① 保护长数字串：大概率是 ID / 账号，而不是手机号
       if (digits.length >= 16) return false;
 
+      // ② label 本身是典型“编号字段”（Case ID / Ticket No / Order ID ...）
       if (
         /\b(?:case|ticket|order|invoice|reference|ref|customer|application|request|account)\b/.test(lbl) &&
         /\b(?:id|no|number|#)\b/.test(lbl)
-      )
+      ) {
         return false;
+      }
 
-      if (/\b(?:CUST|CASE|ORD|INV|APP|REF|ACC|MEM|INS|REQ|PR)-/i.test(val)) return false;
+      // ③ 原始命中片段里带有典型前缀 + 长尾号，视为业务 ID，不视为 phone
+      //    覆盖：CUST- / CASE- / ORD- / INV- / APP- / REF- / ACC- / MEM- / INS- / REQ- / PR- / LC- / CLM- / CNT-
+      if (/\b(?:CUST|CASE|ORD|INV|APP|REF|ACC|MEM|INS|REQ|PR|LC|CLM|CNT)-/i.test(raw)) {
+        return false;
+      }
 
-      if (/\b[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{4,}\b/i.test(val)) return false;
+      // ④ 通用模式：大写前缀块 + 多段 -/._ + 尾部 4+ 位数字，也按“业务 ID”处理
+      if (/\b[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{4,}\b/i.test(raw)) {
+        return false;
+      }
 
       return true;
     },
