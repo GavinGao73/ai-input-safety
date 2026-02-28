@@ -589,7 +589,8 @@
     },
 
     device_fingerprint: {
-      pattern: /((?:device\s*id|session\s*id|fingerprint|user\s*agent)\s*[:：=]\s*)([^\n\r]{1,220})/giu,
+      pattern:
+        /((?:device\s*id|session\s*id|fingerprint|user\s*agent)\s*[:：=]\s*)([^\n\r:]{1,200})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
