@@ -22,9 +22,14 @@
 // =========================
 
 // ✅ FIX: version string aligned with deployed query param (?v=20260224a1)
-console.log("[engine.js] loaded v20260228a1-engine-a5-policy-split");
 
 "use strict";
+
+// ✅ single source of truth
+const ENGINE_VERSION = "v20260228a1-engine-a5-policy-split";
+
+// ✅ FIX: version string aligned with deployed query param (?v=20260228a1)
+console.log("[engine.js] loaded " + ENGINE_VERSION);
 
 /* =========================
    DETECTION_ITEMS write-trace (BOOT EARLY)
@@ -1394,7 +1399,7 @@ try {
       langContent: typeof window.getLangContent === "function" ? window.getLangContent() : window.ruleEngine || "",
       ruleEngineMode: String(window.ruleEngineMode || ""),
       // ✅ FIX: align with deployed version tag
-      engineVersion: "v20260224a1-engine-a5-policy-split"
+      engineVersion: ENGINE_VERSION
     };
 
     try {
