@@ -365,20 +365,171 @@ pack → policy → engine
 
 ---
 
-### Rationale（不可变更理由）
+D17 Language Detection & Routing Strategy（LOCKED）
 
-Filter 的核心不是“匹配能力最大化”，  
-而是 **稳定、安全、可预测的规则系统**。
+状态：Accepted / Locked（架构扩展约束）
 
-语言规则的集中化会导致：
+Context
 
-• 修改不可控  
-• 非目标语种误伤  
-• 行为漂移  
-• 安全语义失效  
+随着多语种规则包（EN / DE / ZH 及未来扩展语言）的增加，
+内容语言判定若依赖以下机制将产生结构性风险：
 
-因此该边界属于 **系统级不变量（system invariant）**。
+• 固定检测顺序（order bias）
+• 单语言关键词短路判定
+• engine 内嵌语言判断逻辑
+• 检测不确定时静默 fallback
 
----
+这会导致：
 
-**违反该规则视为架构破坏，而非普通代码修改。**
+• 语言误判
+• 规则包错误路由
+• 跨语言误伤（cross-pack regression）
+• 扩展新语言时复杂度指数增长
+
+语言检测属于“路由层问题”，
+不是规则层问题。
+
+必须将语言识别机制与规则引擎解耦。
+
+Decision
+
+Filter 引入外部离线语言检测库：
+
+franc（MIT License, JS-based n-gram detector）
+
+用途：
+
+仅用于内容语言识别（routing），
+不参与规则执行。
+
+Scope Boundary
+
+语言检测库：
+
+✔ 仅用于判断文本所属自然语言
+✔ 不参与 PII 识别
+✔ 不参与规则匹配
+✔ 不参与命中逻辑
+✔ 不参与优先级系统
+
+它是路由器（router），不是规则处理器。
+
+Detection Flow（LOCKED）
+Input Text
+↓
+franc(text)
+↓
+Return top ISO language + confidence score
+↓
+If confidence ≥ THRESHOLD AND (top - second) ≥ MARGIN:
+    ruleEngine = detected language
+    mode = lock
+Else:
+    Trigger modal for manual selection
+Confidence Policy（HARD RULE）
+
+必须满足两个条件才允许自动锁定：
+
+置信度 ≥ 预设阈值（例如 0.75）
+
+第一名与第二名差值 ≥ margin（例如 0.10）
+
+否则：
+
+• 不自动切换
+• 弹窗提示用户选择语言
+
+禁止：
+
+• 静默 fallback
+• 自动在低置信度情况下锁定
+
+UI Policy
+
+为避免 UI 膨胀：
+
+• 不设置常驻语言切换按钮
+• 内容默认跟随 UI 语言
+• 自动检测后显示当前内容语言状态
+• 若不确定 → 弹窗选择
+• 提供“Change content language”入口（非按钮堆叠）
+
+Routing Isolation Rule（HARD BOUNDARY）
+
+engine.js 仍不得包含语言特征逻辑。
+
+语言检测属于独立模块（language-router）。
+
+职责分离：
+
+language-router.js
+• 调用 franc
+• 输出 { lang, confidence }
+• 决策是否锁定
+
+engine.js
+• 仅执行规则调度
+• 不关心语言识别算法
+
+语言包（engine.en.js / engine.de.js）
+• 不参与语言识别
+• 不包含 detect 顺序控制
+
+Legal & License
+
+franc 使用 MIT License：
+
+• 允许商业使用
+• 允许闭源
+• 无版权费用
+• 需保留 LICENSE 文件
+
+不引入服务器通信。
+检测完全在浏览器内完成。
+
+不影响无存储原则（D3）。
+
+Security Model Compatibility
+
+该决策：
+
+✔ 不引入数据存储
+✔ 不引入网络调用
+✔ 不改变 Raster Secure 模型
+✔ 不影响 Rule Engine 隔离原则（D16）
+
+语言识别仅影响规则包选择，
+不影响输出安全模型。
+
+Long-Term Scalability
+
+新增语言时：
+
+添加新的语言 pack
+
+在 language-router 中映射 ISO code
+
+无需修改 engine.js
+
+检测层与规则层完全解耦。
+
+Rationale（不可变更理由）
+
+语言检测若与规则引擎耦合：
+
+• 会破坏 D16 边界
+• 会导致跨语言污染
+• 会导致顺序依赖
+• 会引发不可预测行为
+
+Filter 的核心目标是：
+
+可预测、安全、可扩展。
+
+因此语言识别必须：
+
+✔ 独立
+✔ 可替换
+✔ 不侵入规则层
+
+违反本决策视为架构破坏。
