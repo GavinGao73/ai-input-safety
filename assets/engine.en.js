@@ -531,13 +531,13 @@
   }
 
   const NEW_KEYS = [
+    "device_fingerprint",
     "bank_routing_ids",
     "avs_data",
     "three_ds_status",
     "eci",
     "security_answer",
     "legal_ref_tail",
-    "device_fingerprint",
     "wallet_id",
     "tx_hash",
     "crypto_wallet"
