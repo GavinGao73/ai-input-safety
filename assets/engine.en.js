@@ -543,6 +543,12 @@
     "crypto_wallet"
   ];
 
+  // ✅ STABILITY PATCH (small, no new keys):
+  // Ensure device_fingerprint runs early enough (before financial/account-ish rules),
+  // without touching other existing order.
+  EN.priority = insertBefore(EN.priority || [], "account", ["device_fingerprint"]);
+
+  // keep original insertion (dedup-safe)
   EN.priority = insertBefore(EN.priority || [], "number", NEW_KEYS);
 
   EN.alwaysOn = EN.alwaysOn || [];
@@ -589,9 +595,10 @@
       mode: "prefix"
     },
 
+    // ✅ STABILITY PATCH: allow ":" / "：" / "=" for real-world logs, keep strict line-bound value length
     device_fingerprint: {
       pattern:
-        /((?:device\s*id|session\s*id|fingerprint|user\s*agent)\s*[:：]\s*)([^\n\r]{1,200})/giu,
+        /((?:device\s*id|session\s*id|fingerprint|user\s*agent)\s*[:：=]\s*)([^\n\r]{1,200})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
@@ -615,7 +622,7 @@
     }
   });
 
-  // 🔒 强制确保 device 类规则始终为 prefix（防止被覆盖导致整行替换）
+  // 🔒 Ensure device_fingerprint keeps prefix semantics (no accidental overwrite)
   ["device_fingerprint"].forEach((k) => {
     const r = EN.rules[k];
     if (r && r.pattern) {
