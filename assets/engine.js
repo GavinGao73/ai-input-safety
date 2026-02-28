@@ -408,6 +408,14 @@ function renderOutput(outPlain) {
   host.innerHTML = html;
 }
 
+// ================= copy source (stable) =================
+function getCopyText() {
+  return window.__lastOutputPlain ?? document.getElementById("outputText")?.innerText ?? "";
+}
+try {
+  if (typeof window.getCopyText !== "function") window.getCopyText = getCopyText;
+} catch (_) {}
+
 // ================= input watermark hide =================
 function updateInputWatermarkVisibility() {
   const ta = $("inputText");
@@ -1002,6 +1010,7 @@ function applyRules(text) {
   // If packs not loaded, only manual terms
   if (!rules) {
     out = applyManualTermsMask(out, () => addHit("manual_term"));
+    window.__lastOutputPlain = out; // ✅ ensure stable plain exists even if renderOutput not reached
     renderOutput(out);
 
     const report = computeRiskReport(hitsByKey, {
@@ -1184,6 +1193,7 @@ function applyRules(text) {
     langContent: getLangContent()
   };
 
+  window.__lastOutputPlain = out; // ✅ ensure stable plain exists before renderOutput
   renderOutput(out);
   renderRiskBox(report, {
     hits,
