@@ -583,7 +583,7 @@
     // ✅ Fix: avoid double [Ref] by preserving full prefix and masking only final numeric tail
     legal_ref_tail: {
       pattern:
-        /((?:(?:contract\s*number|claim\s*reference|legal\s*case\s*ref)\s*[:：=]\s*)(?!ERR-)(?!SKU:)((?:[A-Za-z]{1,8}|[A-Za-z]{1,4}\d{0,4})(?:[-_.](?:[A-Za-z0-9]{1,12})){0,8}[-_.]))(\d{4,})\b/giu,
+        /((?:(?:contract\s*number|claim\s*reference|legal\s*case\s*ref)\s*[:：=]\s*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})\b/giu,
       tag: "REF",
       mode: "prefix"
     },
