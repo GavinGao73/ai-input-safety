@@ -232,12 +232,21 @@ function bind() {
     };
   }
 
-  const btnCopy = $("btnCopy");
+    const btnCopy = $("btnCopy");
   if (btnCopy) {
     btnCopy.onclick = async () => {
       const t = window.I18N && window.I18N[currentLang];
       try {
-        await navigator.clipboard.writeText(lastOutputPlain || "");
+        // ✅ COPY SOURCE FIX:
+        // - prefer engine-provided stable getter
+        // - fallback to __lastOutputPlain (set by renderOutput)
+        // - last fallback: DOM innerText
+        const txt =
+          (typeof window.getCopyText === "function" ? window.getCopyText() : "") ||
+          (window.__lastOutputPlain ?? document.getElementById("outputText")?.innerText ?? "");
+
+        await navigator.clipboard.writeText(txt);
+
         if (t) {
           const old = btnCopy.textContent;
           btnCopy.textContent = t.btnCopied || old;
