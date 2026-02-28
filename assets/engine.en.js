@@ -548,6 +548,8 @@
   EN.alwaysOn = EN.alwaysOn || [];
   NEW_KEYS.forEach((k) => uniqPush(EN.alwaysOn, k));
 
+  EN.rules = EN.rules || {};
+
   Object.assign(EN.rules, {
     bank_routing_ids: {
       pattern:
@@ -580,7 +582,6 @@
       mode: "prefix"
     },
 
-    // ✅ Fix: avoid double [Ref] by preserving full prefix and masking only final numeric tail
     legal_ref_tail: {
       pattern:
         /((?:(?:contract\s*number|claim\s*reference|legal\s*case\s*ref)\s*[:：=]\s*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})\b/giu,
@@ -613,6 +614,16 @@
       mode: "prefix"
     }
   });
+
+  // 🔒 强制确保 device 类规则始终为 prefix（防止被覆盖导致整行替换）
+  ["device_fingerprint"].forEach((k) => {
+    const r = EN.rules[k];
+    if (r && r.pattern) {
+      r.mode = "prefix";
+      r.tag = "SECRET";
+    }
+  });
+
 })();
 
 // =========================
