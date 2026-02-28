@@ -6,6 +6,11 @@
 // - Revert FIX C style: person_name is LINE-ANCHORED (no cross-line / no field chaining)
 //   but allows optional trailing inline comment (same line only).
 // - Everything else unchanged from v6.3
+//
+// ✅ CONSERVATIVE PATCH (NO engine changes; pack regex only):
+// - For ALL label/prefix rules: replace \s* around separators with [ \t]*
+// - For label internals like "user\s*id": use [ \t]*
+// - For numeric value classes: replace \s with [ \t] where appropriate to avoid newline swallowing
 // =========================
 
 (function () {
@@ -208,7 +213,7 @@
       // - does NOT treat all decimals as money
       money_label: {
         pattern:
-          /((?:amount|total|subtotal|grand\s*total|price|fee|fees|charge|charges|balance|paid|payment|refund|due|net|gross|tax|vat)\s*[:：=]\s*)([-+−]?(?:\d{1,3}(?:[,\s]\d{3})*|\d+)\.\d{2})(?!\d)/giu,
+          /((?:amount|total|subtotal|grand[ \t]*total|price|fee|fees|charge|charges|balance|paid|payment|refund|due|net|gross|tax|vat)[ \t]*[:：=][ \t]*)([-+−]?(?:\d{1,3}(?:[, \t]\d{3})*|\d+)\.\d{2})(?!\d)/giu,
         tag: "MONEY",
         mode: "prefix"
       },
@@ -221,7 +226,7 @@
 
       secret: {
         pattern:
-          /((?:password|passcode|pin|otp|2fa|verification\s*code|security\s*code|one[-\s]?time\s*code|recovery\s*code|backup\s*code)\s*[:：=]\s*)([^\n\r]{1,160})/giu,
+          /((?:password|passcode|pin|otp|2fa|verification[ \t]*code|security[ \t]*code|one[- \t]?time[ \t]*code|recovery[ \t]*code|backup[ \t]*code)[ \t]*[:：=][ \t]*)([^\n\r]{1,160})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -229,13 +234,13 @@
       /* FIX A: removed "authorization" here; bearer_token owns it */
       api_key_token: {
         pattern:
-          /((?:api\s*key|x-api-key|access\s*token|refresh\s*token|token|auth\s*token|client\s*secret|secret\s*key)\s*[:：=]\s*)([A-Za-z0-9._\-]{8,300})/giu,
+          /((?:api[ \t]*key|x-api-key|access[ \t]*token|refresh[ \t]*token|token|auth[ \t]*token|client[ \t]*secret|secret[ \t]*key)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{8,300})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       bearer_token: {
-        pattern: /(\bauthorization\s*[:：=]\s*bearer\s+)([A-Za-z0-9._\-]{8,400})/giu,
+        pattern: /(\bauthorization[ \t]*[:：=][ \t]*bearer[ \t]+)([A-Za-z0-9._\-]{8,400})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -243,72 +248,72 @@
       // ✅ do NOT capture emails as HANDLE (so Login ID email stays [Email])
       handle_label: {
         pattern:
-          /((?:username|user\s*id|login\s*id|login|handle)\s*(?:[:：=]|-)\s*)(?![A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b)([A-Za-z0-9_@.\-]{3,80})/giu,
+          /((?:username|user[ \t]*id|login[ \t]*id|login|handle)[ \t]*(?:[:：=]|-)[ \t]*)(?![A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b)([A-Za-z0-9_@.\-]{3,80})/giu,
         tag: "HANDLE",
         mode: "prefix"
       },
 
       dob: {
-        pattern: /((?:date\s*of\s*birth|dob)\s*[:：=]\s*\d{4}[-\/\.])(\d{2}[-\/\.]\d{2})/giu,
+        pattern: /((?:date[ \t]*of[ \t]*birth|dob)[ \t]*[:：=][ \t]*\d{4}[-\/\.])(\d{2}[-\/\.]\d{2})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       place_of_birth: {
-        pattern: /((?:place\s*of\s*birth|pob|birthplace)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
+        pattern: /((?:place[ \t]*of[ \t]*birth|pob|birthplace)[ \t]*[:：=][ \t]*)([^\n\r]{2,80})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       passport: {
-        pattern: /((?:passport(?:\s*(?:no\.?|number))?)\s*[:：=]\s*)([A-Z0-9][A-Z0-9\-]{4,22})/giu,
+        pattern: /((?:passport(?:[ \t]*(?:no\.?|number))?)[ \t]*[:：=][ \t]*)([A-Z0-9][A-Z0-9\-]{4,22})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       driver_license: {
         pattern:
-          /((?:driver[’']?s\s*license(?:\s*(?:no\.?|number))?|driving\s*licen[cs]e(?:\s*(?:no\.?|number))?)\s*[:：=]\s*)([A-Z0-9][A-Z0-9\-]{4,28})/giu,
+          /((?:driver[’']?s[ \t]*license(?:[ \t]*(?:no\.?|number))?|driving[ \t]*licen[cs]e(?:[ \t]*(?:no\.?|number))?)[ \t]*[:：=][ \t]*)([A-Z0-9][A-Z0-9\-]{4,28})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       ssn: {
-        pattern: /((?:ssn|social\s*security\s*number)\s*[:：=]\s*)(\d{3}-\d{2}-\d{4}|\d{9})/giu,
+        pattern: /((?:ssn|social[ \t]*security[ \t]*number)[ \t]*[:：=][ \t]*)(\d{3}-\d{2}-\d{4}|\d{9})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       ein: {
-        pattern: /((?:ein|employer\s*identification\s*number)\s*[:：=]\s*)(\d{2}-\d{7})/giu,
+        pattern: /((?:ein|employer[ \t]*identification[ \t]*number)[ \t]*[:：=][ \t]*)(\d{2}-\d{7})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       national_id: {
         pattern:
-          /((?:national\s*id(?:\s*(?:no\.?|number))?|id\s*number)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,40})/giu,
+          /((?:national[ \t]*id(?:[ \t]*(?:no\.?|number))?|id[ \t]*number)[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,40})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       tax_id: {
         pattern:
-          /((?:tax\s*id|tax\s*identification\s*(?:no\.?|number)|tin)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-]{4,32})/giu,
+          /((?:tax[ \t]*id|tax[ \t]*identification[ \t]*(?:no\.?|number)|tin)[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-]{4,32})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       insurance_id: {
         pattern:
-          /((?:insurance\s*(?:id|no\.?|number)|policy\s*(?:id|no\.?|number)|claim\s*(?:id|no\.?|number)|member\s*(?:id|no\.?|number)|membership\s*(?:id|no\.?|number))\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,60})/giu,
+          /((?:insurance[ \t]*(?:id|no\.?|number)|policy[ \t]*(?:id|no\.?|number)|claim[ \t]*(?:id|no\.?|number)|member[ \t]*(?:id|no\.?|number)|membership[ \t]*(?:id|no\.?|number))[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,60})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       ip_label: {
         pattern:
-          /((?:ip\s*address|ipv4|ipv6)\s*[:：=]\s*)((?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)|(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{1,4})/giu,
+          /((?:ip[ \t]*address|ipv4|ipv6)[ \t]*[:：=][ \t]*)((?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)|(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{1,4})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -320,7 +325,7 @@
       },
 
       mac_label: {
-        pattern: /((?:mac\s*(?:address)?)\s*[:：=]\s*)(\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b)/giu,
+        pattern: /((?:mac[ \t]*(?:address)?)[ \t]*[:：=][ \t]*)(\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b)/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -331,41 +336,41 @@
       },
 
       imei: {
-        pattern: /((?:imei)\s*[:：=]\s*)(\d{14,16})/giu,
+        pattern: /((?:imei)[ \t]*[:：=][ \t]*)(\d{14,16})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       account: {
         pattern:
-          /((?:account(?:\s*number)?|routing\s*number|sort\s*code|iban|credit\s*card|debit\s*card|card\s*number|name\s*on\s*card)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
+          /((?:account(?:[ \t]*number)?|routing[ \t]*number|sort[ \t]*code|iban|credit[ \t]*card|debit[ \t]*card|card[ \t]*number|name[ \t]*on[ \t]*card)[ \t]*[:：=][ \t]*)([^\n\r]{2,80})/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
 
       bank: {
         pattern:
-          /((?:swift|swift\s*code|bic)\b\s*[:：=]?\s*)([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
+          /((?:swift|swift[ \t]*code|bic)\b[ \t]*[:：=]?[ \t]*)([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
 
       card_expiry: {
         pattern:
-          /((?:exp(?:iry|iration)?(?:\s*date)?|valid\s*thru|valid\s*through)\s*[:：=]\s*)(\d{2}\s*\/\s*\d{2,4}|\d{2}\s*-\s*\d{2,4}|\d{4}\s*-\s*\d{2})/giu,
+          /((?:exp(?:iry|iration)?(?:[ \t]*date)?|valid[ \t]*thru|valid[ \t]*through)[ \t]*[:：=][ \t]*)(\d{2}[ \t]*\/[ \t]*\d{2,4}|\d{2}[ \t]*-[ \t]*\d{2,4}|\d{4}[ \t]*-[ \t]*\d{2})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       card_security: {
-        pattern: /((?:cvv|cvc)\s*[:：=]\s*)(\d{3,4})/giu,
+        pattern: /((?:cvv|cvc)[ \t]*[:：=][ \t]*)(\d{3,4})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       phone: {
         pattern:
-          /((?:phone|mobile|contact|tel|whatsapp|telegram|signal|fax)\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(?<![A-Za-z0-9_-])(\b(?:[+＋]\s*\d{1,3}|00\s*\d{1,3})[\d\s().-]{6,}\d\b)/giu,
+          /((?:phone|mobile|contact|tel|whatsapp|telegram|signal|fax)[ \t]*[:：=]?[ \t]*)([+＋]?[ \t]*\d[\d \t().-]{5,}\d)\b|(?<![A-Za-z0-9_-])(\b(?:[+＋][ \t]*\d{1,3}|00[ \t]*\d{1,3})[\d \t().-]{6,}\d\b)/giu,
         tag: "PHONE",
         mode: "phone"
       },
@@ -374,7 +379,7 @@
       // ✅ Minimal extension: allow From/To/Attn labels (still requires ":/=" and capitalized-name structure)
       person_name: {
         pattern:
-          /^((?:name|customer\s*name|account\s*holder|recipient|name\s*on\s*card|from|to|attn\.?|attention)[ \t]*[:：=][ \t]*(?:(?:mr|mrs|ms|miss|dr|prof)\.?\s+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+          /^((?:name|customer[ \t]*name|account[ \t]*holder|recipient|name[ \t]*on[ \t]*card|from|to|attn\.?|attention)[ \t]*[:：=][ \t]*(?:(?:mr|mrs|ms|miss|dr|prof)\.?\s+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
@@ -396,19 +401,19 @@
       /* ✅ Refine: only redact the "suite/apt/unit/floor/room + id" fragment, not the whole line */
       address_en_extra_block: {
         pattern:
-          /\b(?:suite|ste\.?|apt|apartment|unit|floor|fl\.?|room|rm\.?|flat|level)\b(?:\s*(?:#|no\.?|number)?\s*[:：-]?\s*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu,
+          /\b(?:suite|ste\.?|apt|apartment|unit|floor|fl\.?|room|rm\.?|flat|level)\b(?:[ \t]*(?:#|no\.?|number)?[ \t]*[:：-]?[ \t]*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu,
         tag: "ADDRESS"
       },
 
       address_en_extra: {
         pattern:
-          /\b(?:apt|apartment|unit|suite|ste\.?|floor|fl\.?|room|rm\.?|flat|level|building|bldg\.?|dept|department)\b(?:\s+#?\s*|#\s*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu,
+          /\b(?:apt|apartment|unit|suite|ste\.?|floor|fl\.?|room|rm\.?|flat|level|building|bldg\.?|dept|department)\b(?:[ \t]+#?[ \t]*|#[ \t]*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu,
         tag: "ADDRESS"
       },
 
       ref_label_tail: {
         pattern:
-          /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)\s*(?:id|no\.?|number)?\s*(?:[:：=]|-)\s*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
+          /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*(?:[:：=]|-)[ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
         tag: "REF",
         mode: "prefix"
       },
@@ -425,7 +430,7 @@
       },
 
       number: {
-        pattern: /\b\d[\d\s-]{6,28}\d\b/g,
+        pattern: /\b\d[\d \t-]{6,28}\d\b/g,
         tag: "NUMBER"
       }
     }
@@ -454,7 +459,7 @@
   Object.assign(EN.rules, {
     /* 🇺🇸 US ITIN (often formatted like SSN but starts with 9xx; keep simple and label-driven) */
     intl_itin: {
-      pattern: /((?:us\s*)?itin\s*[:：=]\s*)(9\d{2}[-\s]?\d{2}[-\s]?\d{4})/giu,
+      pattern: /((?:us[ \t]*)?itin[ \t]*[:：=][ \t]*)(9\d{2}[- \t]?\d{2}[- \t]?\d{4})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
@@ -462,35 +467,35 @@
     /* 🇬🇧 UK – National Insurance Number (NINO)
        NOTE: relaxed prefix to allow test/trap values like "QQ" */
     intl_nino: {
-      pattern: /((?:uk\s*)?nino\s*[:：=]\s*)([A-Z]{2}\s?\d{2}\s?\d{2}\s?\d{2}\s?[A-D])/giu,
+      pattern: /((?:uk[ \t]*)?nino[ \t]*[:：=][ \t]*)([A-Z]{2}[ \t]?\d{2}[ \t]?\d{2}[ \t]?\d{2}[ \t]?[A-D])/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     /* 🇬🇧 UK – NHS Number (label-driven) */
     intl_nhs: {
-      pattern: /((?:uk\s*)?nhs\s*number\s*[:：=]\s*)(\d{3}\s?\d{3}\s?\d{4})/giu,
+      pattern: /((?:uk[ \t]*)?nhs[ \t]*number[ \t]*[:：=][ \t]*)(\d{3}[ \t]?\d{3}[ \t]?\d{4})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     /* 🇨🇦 CA – SIN (label-driven) */
     intl_sin: {
-      pattern: /((?:ca\s*)?sin\s*[:：=]\s*)(\d{3}\s?\d{3}\s?\d{3})/giu,
+      pattern: /((?:ca[ \t]*)?sin[ \t]*[:：=][ \t]*)(\d{3}[ \t]?\d{3}[ \t]?\d{3})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     /* 🇦🇺 AU – TFN (label-driven) */
     intl_tfn: {
-      pattern: /((?:au\s*)?tfn\s*[:：=]\s*)(\d{3}\s?\d{3}\s?\d{3})/giu,
+      pattern: /((?:au[ \t]*)?tfn[ \t]*[:：=][ \t]*)(\d{3}[ \t]?\d{3}[ \t]?\d{3})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     /* 🇦🇺 AU – ABN (label-driven) */
     intl_abn: {
-      pattern: /((?:au\s*)?abn\s*[:：=]\s*)(\d{2}\s?\d{3}\s?\d{3}\s?\d{3})/giu,
+      pattern: /((?:au[ \t]*)?abn[ \t]*[:：=][ \t]*)(\d{2}[ \t]?\d{3}[ \t]?\d{3}[ \t]?\d{3})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
@@ -559,64 +564,63 @@
   Object.assign(EN.rules, {
     bank_routing_ids: {
       pattern:
-        /((?:bank\s*name|branch\s*code|clearing\s*(?:number|no\.?)|transit\s*number|bsb|aba\s*(?:number|routing\s*number)?|aba)\s*[:：=]\s*)([0-9][0-9\s-]{2,24}[0-9])/giu,
+        /((?:bank[ \t]*name|branch[ \t]*code|clearing[ \t]*(?:number|no\.?)|transit[ \t]*number|bsb|aba[ \t]*(?:number|routing[ \t]*number)?|aba)[ \t]*[:：=][ \t]*)([0-9][0-9 \t-]{2,24}[0-9])/giu,
       tag: "ACCOUNT",
       mode: "prefix"
     },
 
     avs_data: {
-      pattern: /((?:avs\s*data)\s*[:：=]\s*)([A-Za-z0-9._\-]{1,40})/giu,
+      pattern: /((?:avs[ \t]*data)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{1,40})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     three_ds_status: {
-      pattern: /((?:3-?d\s*secure|3ds)\s*(?:status)?\s*[:：=]\s*)([A-Za-z0-9._\-]{1,40})/giu,
+      pattern: /((?:3-?d[ \t]*secure|3ds)[ \t]*(?:status)?[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{1,40})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     eci: {
-      pattern: /((?:eci)\s*[:：=]\s*)(\d{2})/giu,
+      pattern: /((?:eci)[ \t]*[:：=][ \t]*)(\d{2})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     security_answer: {
-      pattern: /((?:answer|security\s*answer)\s*[:：=]\s*)([^\n\r]{1,160})/giu,
+      pattern: /((?:answer|security[ \t]*answer)[ \t]*[:：=][ \t]*)([^\n\r]{1,160})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     legal_ref_tail: {
       pattern:
-        /((?:(?:contract\s*number|claim\s*reference|legal\s*case\s*ref)\s*[:：=]\s*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})\b/giu,
+        /((?:(?:contract[ \t]*number|claim[ \t]*reference|legal[ \t]*case[ \t]*ref)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})\b/giu,
       tag: "REF",
       mode: "prefix"
     },
 
     // ✅ STABILITY PATCH: allow ":" / "：" / "=" for real-world logs, keep strict line-bound value length
     device_fingerprint: {
-      pattern:
-        /((?:device\s*id|session\s*id|fingerprint|user\s*agent)\s*[:：=]\s*)([^\n\r]{1,200})/giu,
+      pattern: /((?:device[ \t]*id|session[ \t]*id|fingerprint|user[ \t]*agent)[ \t]*[:：=][ \t]*)([^\n\r]{1,200})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     wallet_id: {
-      pattern: /((?:wallet\s*id)\s*[:：=]\s*)([A-Za-z0-9._\-]{3,80})/giu,
+      pattern: /((?:wallet[ \t]*id)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{3,80})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     tx_hash: {
-      pattern: /((?:transaction\s*hash|tx\s*hash|txn\s*hash)\s*[:：=]\s*)(0x[0-9a-f]{16,128})/giu,
+      pattern: /((?:transaction[ \t]*hash|tx[ \t]*hash|txn[ \t]*hash)[ \t]*[:：=][ \t]*)(0x[0-9a-f]{16,128})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     crypto_wallet: {
-      pattern: /((?:btc|eth)\s*[:：=]\s*)((?:bc1)[0-9a-z]{25,90}|[13][A-HJ-NP-Za-km-z1-9]{25,34}|0x[a-f0-9]{40})/giu,
+      pattern: /((?:btc|eth)[ \t]*[:：=][ \t]*)((?:bc1)[0-9a-z]{25,90}|[13][A-HJ-NP-Za-km-z1-9]{25,34}|0x[a-f0-9]{40})/giu,
       tag: "SECRET",
       mode: "prefix"
     }
@@ -630,7 +634,6 @@
       r.tag = "SECRET";
     }
   });
-
 })();
 
 // =========================
@@ -663,14 +666,14 @@
   Object.assign(EN.rules, {
     address_de_street: {
       pattern:
-        /((?:address|shipping\s*address|billing\s*address|street\s*address|mailing\s*address)\s*[:：=]\s*)([^,\n\r]{4,160}?)(?=\s*,)/giu,
+        /((?:address|shipping[ \t]*address|billing[ \t]*address|street[ \t]*address|mailing[ \t]*address)[ \t]*[:：=][ \t]*)([^,\n\r]{4,160}?)(?=[ \t]*,)/giu,
       tag: "ADDRESS",
       mode: "prefix"
     },
 
     address_de_postal: {
       pattern:
-        /((?:zip(?:\s*code)?|postal\s*code|postcode)\s*[:：=]\s*)(\d{5}(?:-\d{4})?|[A-Z]\d[A-Z]\s?\d[A-Z]\d|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}|\d{4}|[A-Z0-9][A-Z0-9\- ]{2,9}[A-Z0-9])/giu,
+        /((?:zip(?:[ \t]*code)?|postal[ \t]*code|postcode)[ \t]*[:：=][ \t]*)(\d{5}(?:-\d{4})?|[A-Z]\d[A-Z][ \t]?\d[A-Z]\d|[A-Z]{1,2}\d[A-Z\d]?[ \t]?\d[A-Z]{2}|\d{4}|[A-Z0-9][A-Z0-9\- ]{2,9}[A-Z0-9])/giu,
       tag: "ADDRESS",
       mode: "prefix"
     }
