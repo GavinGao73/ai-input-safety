@@ -396,6 +396,7 @@ function placeholder(key) {
 // ================= output render =================
 function renderOutput(outPlain) {
   lastOutputPlain = String(outPlain || "");
+  window.__lastOutputPlain = lastOutputPlain; // debug + stable copy source
   const host = $("outputText");
   if (!host) return;
 
