@@ -37,7 +37,7 @@
         font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
       ">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-          <div style="font-size:14px; font-weight:700;">选择内容语言 / Content Language</div>
+          <div id="langModalTitle" style="font-size:14px; font-weight:700;">选择内容语言 / Content Language</div>
           <button id="langModalClose" style="
             border:1px solid rgba(255,255,255,.12);
             background:transparent;
@@ -63,28 +63,34 @@
     `;
 
     document.body.appendChild(root);
+
+    // click outside to close
+    root.addEventListener("click", (e) => {
+      if (e && e.target === root) API.close();
+    });
+
     return root;
   }
 
   function i18n(uiLang) {
     const t = (window.I18N && window.I18N[uiLang]) ? window.I18N[uiLang] : {};
-    // Provide minimal safe fallbacks; do not require you to add I18N keys now
     return {
       title: t.langModalTitle || "选择内容语言 / Content Language",
       hint:
         t.langModalHint ||
-        "系统无法稳定判断输入内容属于哪种语言。请选择一次，之后将锁定（Lock），避免漂移。",
-      picked: t.langModalPicked || "已选择并锁定：",
-      close: t.langModalClose || "关闭",
-      btnManual: t.langModalManual || "手动切换语言"
+        "系统无法稳定判断输入内容属于哪种语言。请选择一次，之后将锁定（Lock），避免漂移。"
     };
+  }
+
+  function labelForLang(l) {
+    return l === "zh" ? "中文 (zh)" : l === "de" ? "Deutsch (de)" : "English (en)";
   }
 
   function buildButtons(container, langs, detected, onPick) {
     container.innerHTML = "";
     langs.forEach((l) => {
       const b = document.createElement("button");
-      b.textContent = (l === "zh" ? "中文" : l === "de" ? "Deutsch" : "English") + ` (${l})`;
+      b.textContent = labelForLang(l);
       b.style.border = "1px solid rgba(255,255,255,.14)";
       b.style.background = (l === detected) ? "rgba(120,255,240,.12)" : "transparent";
       b.style.color = "#e8eef7";
@@ -100,35 +106,49 @@
     const uiLang = (opts && opts.uiLang) || "en";
     const detected = (opts && opts.detected) || "";
     const reason = (opts && opts.reason) || "";
+    const confidence = (opts && typeof opts.confidence === "number") ? opts.confidence : null;
+    const candidates = Array.isArray(opts && opts.candidates) ? opts.candidates.slice(0, 6) : [];
     const onPick = (opts && opts.onPick) || function () {};
+    const onClose = (opts && opts.onClose) || function () {};
 
     const root = ensureRoot();
     const t = i18n(uiLang);
 
+    const title = root.querySelector("#langModalTitle");
     const meta = root.querySelector("#langModalMeta");
     const hint = root.querySelector("#langModalHint");
     const btns = root.querySelector("#langModalBtns");
     const close = root.querySelector("#langModalClose");
 
-    hint.textContent = t.hint;
-    meta.textContent = `detected=${detected || "(none)"}  reason=${reason || "(n/a)"}`;
+    if (title) title.textContent = t.title;
+    if (hint) hint.textContent = t.hint;
 
     const packs = window.__ENGINE_LANG_PACKS__ || {};
-    const langs = ["zh", "de", "en"].filter((k) => !!packs[k]);
-    // fallback if packs not ready
-    const finalLangs = langs.length ? langs : ["zh", "de", "en"];
+    let langs = ["zh", "de", "en"].filter((k) => !!packs[k]);
+    if (!langs.length) langs = ["zh", "de", "en"];
+
+    // If detector provides candidates, prefer them (but keep within supported langs)
+    const cand = candidates.filter((x) => langs.includes(x));
+    const finalLangs = cand.length ? Array.from(new Set(cand.concat(langs))) : langs;
+
+    const metaParts = [];
+    metaParts.push(`detected=${detected || "(none)"}`);
+    if (confidence != null) metaParts.push(`confidence=${confidence.toFixed(2)}`);
+    metaParts.push(`reason=${reason || "(n/a)"}`);
+    if (meta) meta.textContent = metaParts.join("  ");
+
+    function doClose() {
+      try { root.style.display = "none"; } catch (_) {}
+      try { onClose(); } catch (_) {}
+      try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
+    }
 
     buildButtons(btns, finalLangs, detected, function (lang) {
-      try { root.style.display = "none"; } catch (_) {}
+      doClose();
       try { onPick(lang); } catch (_) {}
-      try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
     });
 
-    if (close) {
-      close.onclick = () => {
-        try { root.style.display = "none"; } catch (_) {}
-      };
-    }
+    if (close) close.onclick = doClose;
 
     root.style.display = "flex";
   };
@@ -136,6 +156,9 @@
   API.close = function close() {
     const root = document.getElementById("langModalRoot");
     if (root) root.style.display = "none";
+    try {
+      if (typeof window.__LANG_MODAL_OPENING__ !== "undefined") window.__LANG_MODAL_OPENING__ = false;
+    } catch (_) {}
   };
 
 })();
