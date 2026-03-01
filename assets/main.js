@@ -6,6 +6,7 @@
 // ✅ Content language: window.contentLang / window.contentLangMode 只由 engine.js 状态机控制
 // ✅ auto 仅在 contentLang=="" 时检测一次，检测后立即 lock
 // ✅ Clear 必须 resetContentLang(): mode=auto, contentLang=""
+//
 // ✅ Export Mode A uses langContent (rule language) rather than UI lang
 //
 // + v20260228 LANG-DETECT INTEGRATION (conservative)
@@ -86,6 +87,9 @@ function stopExportStatusMirror() {
    ========================= */
 function ensureLangBeforeApply(text) {
   try {
+    // ✅ If modal is already opening/open, do NOT run applyRules again (avoid double-modal + drift)
+    if (window.__LANG_MODAL_OPENING__) return false;
+
     if (window.__LangDetect && typeof window.__LangDetect.ensureContentLang === "function") {
       const r = window.__LangDetect.ensureContentLang(text, currentLang);
       // if modal opened -> stop this run
@@ -100,18 +104,27 @@ window.openLangPicker = function () {
   try {
     const ta = document.getElementById("inputText");
     const v = ta ? String(ta.value || "") : "";
-    // force "ask" flow: open modal even if detectable
+
     if (window.__LangModal && typeof window.__LangModal.open === "function") {
+      try { window.__LANG_MODAL_OPENING__ = true; } catch (_) {}
+
       window.__LangModal.open({
         uiLang: (String(currentLang || "en")).toLowerCase(),
         detected: (window.getLangContent && window.getLangContent()) || window.ruleEngine || "",
+        confidence: null,
+        candidates: ["zh", "de", "en"],
         reason: "manual_open",
         onPick: function (lang) {
+          try { window.__LANG_MODAL_OPENING__ = false; } catch (_) {}
+
           window.ruleEngine = lang;
           window.ruleEngineMode = "lock";
           window.contentLang = lang;
           window.contentLangMode = "lock";
           if (v.trim() && typeof window.applyRules === "function") window.applyRules(v);
+        },
+        onClose: function () {
+          try { window.__LANG_MODAL_OPENING__ = false; } catch (_) {}
         }
       });
     }
