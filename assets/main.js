@@ -7,6 +7,11 @@
 // ✅ auto 仅在 contentLang=="" 时检测一次，检测后立即 lock
 // ✅ Clear 必须 resetContentLang(): mode=auto, contentLang=""
 // ✅ Export Mode A uses langContent (rule language) rather than UI lang
+//
+// + v20260228 LANG-DETECT INTEGRATION (conservative)
+// ✅ before applyRules(): ensureContentLang(text, currentLang)
+// ✅ uncertain -> modal choose once -> lock
+// ✅ does NOT add permanent UI buttons (expose window.openLangPicker)
 // =========================
 
 /* =========================
@@ -75,6 +80,44 @@ function stopExportStatusMirror() {
   }
 }
 
+/* =========================
+   LANG DETECT GUARD (NEW)
+   - call before applyRules() to avoid wrong-language pack usage
+   ========================= */
+function ensureLangBeforeApply(text) {
+  try {
+    if (window.__LangDetect && typeof window.__LangDetect.ensureContentLang === "function") {
+      const r = window.__LangDetect.ensureContentLang(text, currentLang);
+      // if modal opened -> stop this run
+      if (r && r.ok === false) return false;
+    }
+  } catch (_) {}
+  return true;
+}
+
+// Optional manual picker entry (no UI clutter by default)
+window.openLangPicker = function () {
+  try {
+    const ta = document.getElementById("inputText");
+    const v = ta ? String(ta.value || "") : "";
+    // force "ask" flow: open modal even if detectable
+    if (window.__LangModal && typeof window.__LangModal.open === "function") {
+      window.__LangModal.open({
+        uiLang: (String(currentLang || "en")).toLowerCase(),
+        detected: (window.getLangContent && window.getLangContent()) || window.ruleEngine || "",
+        reason: "manual_open",
+        onPick: function (lang) {
+          window.ruleEngine = lang;
+          window.ruleEngineMode = "lock";
+          window.contentLang = lang;
+          window.contentLangMode = "lock";
+          if (v.trim() && typeof window.applyRules === "function") window.applyRules(v);
+        }
+      });
+    }
+  } catch (_) {}
+};
+
 // ================= bind =================
 function bind() {
   document.querySelectorAll(".lang button").forEach(b => {
@@ -95,8 +138,11 @@ function bind() {
       // ✅ IMPORTANT: UI switch MUST NOT overwrite contentLang/mode
       // contentLang must be decided by content detection (engine.js)
 
-      if (inTxt) applyRules(inTxt);
-      else window.dispatchEvent(new Event("safe:updated"));
+      if (inTxt) {
+        // ✅ NEW: ensure correct content language BEFORE applying rules
+        if (!ensureLangBeforeApply(inTxt)) return;
+        applyRules(inTxt);
+      } else window.dispatchEvent(new Event("safe:updated"));
 
       if (ta) renderInputOverlayForPdf(ta.value || "");
 
@@ -136,8 +182,11 @@ function bind() {
       window.__export_snapshot.manualTerms = manualTerms.slice(0);
 
       const inTxt = (($("inputText") && $("inputText").value) || "").trim();
-      if (inTxt) applyRules(inTxt);
-      else window.dispatchEvent(new Event("safe:updated"));
+      if (inTxt) {
+        // ✅ NEW
+        if (!ensureLangBeforeApply(inTxt)) return;
+        applyRules(inTxt);
+      } else window.dispatchEvent(new Event("safe:updated"));
 
       renderInputOverlayForPdf(($("inputText") && $("inputText").value) || "");
       requestAnimationFrame(syncManualRiskHeights);
@@ -232,21 +281,12 @@ function bind() {
     };
   }
 
-    const btnCopy = $("btnCopy");
+  const btnCopy = $("btnCopy");
   if (btnCopy) {
     btnCopy.onclick = async () => {
       const t = window.I18N && window.I18N[currentLang];
       try {
-        // ✅ COPY SOURCE FIX:
-        // - prefer engine-provided stable getter
-        // - fallback to __lastOutputPlain (set by renderOutput)
-        // - last fallback: DOM innerText
-        const txt =
-          (typeof window.getCopyText === "function" ? window.getCopyText() : "") ||
-          (window.__lastOutputPlain ?? document.getElementById("outputText")?.innerText ?? "");
-
-        await navigator.clipboard.writeText(txt);
-
+        await navigator.clipboard.writeText(lastOutputPlain || "");
         if (t) {
           const old = btnCopy.textContent;
           btnCopy.textContent = t.btnCopied || old;
@@ -269,8 +309,11 @@ function bind() {
       const v = String(ta.value || "");
       clearTimeout(autoTimer);
       autoTimer = setTimeout(() => {
-        if (v.trim()) applyRules(v);
-        else {
+        if (v.trim()) {
+          // ✅ NEW
+          if (!ensureLangBeforeApply(v)) return;
+          applyRules(v);
+        } else {
           renderOutput("");
           const rb = $("riskBox");
           if (rb) rb.innerHTML = "";
