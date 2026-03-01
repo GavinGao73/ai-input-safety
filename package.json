@@ -1,0 +1,15 @@
+{
+  "name": "ai-input-safety",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:franc": "node scripts/build-franc.mjs"
+  },
+  "dependencies": {
+    "franc": "^6.2.0",
+    "franc-all": "^6.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}
