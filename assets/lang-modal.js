@@ -7,6 +7,7 @@
   "use strict";
 
   const API = (window.__LangModal = window.__LangModal || {});
+  API.__state = API.__state || { onClose: null, isOpen: false };
 
   function ensureRoot() {
     let root = document.getElementById("langModalRoot");
@@ -64,9 +65,17 @@
 
     document.body.appendChild(root);
 
-    // click outside to close
+    // click outside to close (统一走 API.close，确保触发 onClose & 复位)
     root.addEventListener("click", (e) => {
       if (e && e.target === root) API.close();
+    });
+
+    // ESC to close
+    window.addEventListener("keydown", (e) => {
+      if (e && (e.key === "Escape" || e.key === "Esc")) {
+        const r = document.getElementById("langModalRoot");
+        if (r && r.style.display === "flex") API.close();
+      }
     });
 
     return root;
@@ -102,7 +111,37 @@
     });
   }
 
+  function resetOpeningFlag() {
+    try { window.__LANG_MODAL_OPENING__ = false; } catch (_) {}
+  }
+
+  // ✅ unified close path: always calls stored onClose + resets flag + dispatches safe:updated
+  API.close = function close() {
+    const root = document.getElementById("langModalRoot");
+    if (root) root.style.display = "none";
+
+    API.__state.isOpen = false;
+
+    // reset "opening" guard (important)
+    resetOpeningFlag();
+
+    // call stored onClose if any
+    try {
+      const fn = API.__state.onClose;
+      API.__state.onClose = null;
+      if (typeof fn === "function") fn();
+    } catch (_) {}
+
+    try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
+  };
+
   API.open = function open(opts) {
+    // if already open, close first to avoid stacked state
+    try {
+      const r0 = document.getElementById("langModalRoot");
+      if (r0 && r0.style.display === "flex") API.close();
+    } catch (_) {}
+
     const uiLang = (opts && opts.uiLang) || "en";
     const detected = (opts && opts.detected) || "";
     const reason = (opts && opts.reason) || "";
@@ -111,6 +150,9 @@
     const onPick = (opts && opts.onPick) || function () {};
     const onClose = (opts && opts.onClose) || function () {};
 
+    // store onClose so ANY close path can trigger it
+    API.__state.onClose = onClose;
+
     const root = ensureRoot();
     const t = i18n(uiLang);
 
@@ -118,7 +160,7 @@
     const meta = root.querySelector("#langModalMeta");
     const hint = root.querySelector("#langModalHint");
     const btns = root.querySelector("#langModalBtns");
-    const close = root.querySelector("#langModalClose");
+    const closeBtn = root.querySelector("#langModalClose");
 
     if (title) title.textContent = t.title;
     if (hint) hint.textContent = t.hint;
@@ -137,28 +179,23 @@
     metaParts.push(`reason=${reason || "(n/a)"}`);
     if (meta) meta.textContent = metaParts.join("  ");
 
-    function doClose() {
-      try { root.style.display = "none"; } catch (_) {}
-      try { onClose(); } catch (_) {}
-      try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
+    function doPick(lang) {
+      // pick -> close (will reset flag + dispatch + onClose)
+      API.close();
+      try { onPick(lang); } catch (_) {}
     }
 
-    buildButtons(btns, finalLangs, detected, function (lang) {
-      doClose();
-      try { onPick(lang); } catch (_) {}
-    });
+    buildButtons(btns, finalLangs, detected, doPick);
 
-    if (close) close.onclick = doClose;
+    if (closeBtn) closeBtn.onclick = API.close;
+
+    // mark open
+    API.__state.isOpen = true;
+
+    // align with guard flag if caller uses it
+    try { window.__LANG_MODAL_OPENING__ = true; } catch (_) {}
 
     root.style.display = "flex";
-  };
-
-  API.close = function close() {
-    const root = document.getElementById("langModalRoot");
-    if (root) root.style.display = "none";
-    try {
-      if (typeof window.__LANG_MODAL_OPENING__ !== "undefined") window.__LANG_MODAL_OPENING__ = false;
-    } catch (_) {}
   };
 
 })();
