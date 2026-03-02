@@ -90,16 +90,33 @@
     return { lang: "", confidence: 0, needsConfirm: true, candidates: [], reason: "no_strong_signal", source: "heuristic" };
   }
 
+  // ---- Franc provider (IMPORTANT) ----
+  // You bundled with: --global-name=FrLang
+  // So use window.FrLang.franc / window.FrLang.francAll first.
+  function getFrancProvider() {
+    const G = window;
+    const hasFrLang = !!(G.FrLang && typeof G.FrLang === "object");
+    const p =
+      (hasFrLang && typeof G.FrLang.franc === "function" ? G.FrLang : null) ||
+      (typeof G.franc === "function" ? G : null);
+
+    // Compatibility alias: if bundle is FrLang, expose window.franc/francAll too.
+    try {
+      if (hasFrLang && !G.franc && typeof G.FrLang.franc === "function") G.franc = G.FrLang.franc;
+      if (hasFrLang && !G.francAll && typeof G.FrLang.francAll === "function") G.francAll = G.FrLang.francAll;
+    } catch (_) {}
+
+    return p;
+  }
+
   // franc-all gives ISO 639-3 code, e.g. "eng", "deu", "cmn"
   function detectByFranc(text) {
     try {
       const s = safeStr(text).trim();
       if (!s) return { lang: "", confidence: 0, needsConfirm: true, candidates: [], reason: "empty", source: "franc" };
 
-      // ✅ Bundle export: window.FrLang.{franc, francAll}
-      const F = window.FrLang || {};
-
-      if (typeof F.franc !== "function") {
+      const P = getFrancProvider();
+      if (!P || typeof P.franc !== "function") {
         return { lang: "", confidence: 0, needsConfirm: true, candidates: [], reason: "franc_missing", source: "franc" };
       }
 
@@ -113,8 +130,8 @@
       let confidence = 0.78;
 
       // If francAll exists, use top-2 as candidates, and compute a conservative confidence by gap
-      if (typeof F.francAll === "function") {
-        const all = F.francAll(s);
+      if (typeof P.francAll === "function") {
+        const all = P.francAll(s);
         if (Array.isArray(all) && all.length) {
           const top = all[0];
           const second = all[1];
@@ -136,7 +153,7 @@
       }
 
       if (!topIso3) {
-        topIso3 = safeStr(F.franc(s));
+        topIso3 = safeStr(P.franc(s));
         confidence = 0.78;
       }
 
@@ -220,7 +237,7 @@
 
     // 2) franc
     const f = detectByFranc(trimmed);
-    if (f.lang) return f;
+    if (f.lang || (f.candidates && f.candidates.length)) return f;
 
     // 3) pack.detect
     const p = detectByPackDetect(trimmed);
@@ -257,43 +274,51 @@
         return { ok: false, lang: "", asked: true };
       }
 
-      if (window.__LangModal && typeof window.__LangModal.open === "function") {
-        try {
-          window.__LANG_MODAL_OPENING__ = true;
-          window.__LangModal.open({
-            uiLang: normalizePackLang(uiLang) || "en",
-            detected: res.lang || "",
-            confidence: typeof res.confidence === "number" ? res.confidence : null,
-            candidates: Array.isArray(res.candidates) ? res.candidates.slice(0, 6) : [],
-            reason: res.reason || "",
-            onPick: function (lang) {
-              const L = normalizePackLang(lang);
-              if (!L) return;
+      // If modal missing, fall back to auto-lock best guess (avoid "no decision forever")
+      if (!(window.__LangModal && typeof window.__LangModal.open === "function")) {
+        const guess = normalizePackLang(res.lang) || normalizePackLang(uiLang) || "en";
+        window.ruleEngine = guess;
+        window.ruleEngineMode = "lock";
+        window.contentLang = guess;
+        window.contentLangMode = "lock";
+        return { ok: true, lang: guess, asked: false };
+      }
 
-              window.ruleEngine = L;
-              window.ruleEngineMode = "lock";
+      try {
+        window.__LANG_MODAL_OPENING__ = true;
+        window.__LangModal.open({
+          uiLang: normalizePackLang(uiLang) || "en",
+          detected: res.lang || "",
+          confidence: typeof res.confidence === "number" ? res.confidence : null,
+          candidates: Array.isArray(res.candidates) ? res.candidates.slice(0, 6) : [],
+          reason: res.reason || "",
+          onPick: function (lang) {
+            const L = normalizePackLang(lang);
+            if (!L) return;
 
-              // Mirror old naming (compat)
-              window.contentLang = L;
-              window.contentLangMode = "lock";
+            window.ruleEngine = L;
+            window.ruleEngineMode = "lock";
 
-              // clear flag
-              window.__LANG_MODAL_OPENING__ = false;
+            // Mirror old naming (compat)
+            window.contentLang = L;
+            window.contentLangMode = "lock";
 
-              // rerun immediately
-              try {
-                const ta = document.getElementById("inputText");
-                const v = ta ? String(ta.value || "") : s;
-                if (typeof window.applyRules === "function") window.applyRules(v);
-              } catch (_) {}
-            },
-            onClose: function () {
-              window.__LANG_MODAL_OPENING__ = false;
-            }
-          });
-        } catch (_) {
-          window.__LANG_MODAL_OPENING__ = false;
-        }
+            // clear flag
+            window.__LANG_MODAL_OPENING__ = false;
+
+            // rerun immediately
+            try {
+              const ta = document.getElementById("inputText");
+              const v = ta ? String(ta.value || "") : s;
+              if (typeof window.applyRules === "function") window.applyRules(v);
+            } catch (_) {}
+          },
+          onClose: function () {
+            window.__LANG_MODAL_OPENING__ = false;
+          }
+        });
+      } catch (_) {
+        window.__LANG_MODAL_OPENING__ = false;
       }
 
       return { ok: false, lang: "", asked: true };
@@ -310,7 +335,10 @@
 
     // If res.lang exists but not confident, still ask (best safety)
     if (res && res.lang) {
-      return API.ensureContentLang(s, uiLang); // will open modal due to needsConfirm
+      // force confirm flow
+      res.needsConfirm = true;
+      // open modal
+      return API.ensureContentLang(s, uiLang);
     }
 
     return { ok: true, lang: "", asked: false };
