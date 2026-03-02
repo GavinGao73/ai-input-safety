@@ -96,7 +96,10 @@
       const s = safeStr(text).trim();
       if (!s) return { lang: "", confidence: 0, needsConfirm: true, candidates: [], reason: "empty", source: "franc" };
 
-      if (typeof window.franc !== "function") {
+      // ✅ Bundle export: window.FrLang.{franc, francAll}
+      const F = window.FrLang || {};
+
+      if (typeof F.franc !== "function") {
         return { lang: "", confidence: 0, needsConfirm: true, candidates: [], reason: "franc_missing", source: "franc" };
       }
 
@@ -110,8 +113,8 @@
       let confidence = 0.78;
 
       // If francAll exists, use top-2 as candidates, and compute a conservative confidence by gap
-      if (typeof window.francAll === "function") {
-        const all = window.francAll(s);
+      if (typeof F.francAll === "function") {
+        const all = F.francAll(s);
         if (Array.isArray(all) && all.length) {
           const top = all[0];
           const second = all[1];
@@ -133,7 +136,7 @@
       }
 
       if (!topIso3) {
-        topIso3 = safeStr(window.franc(s));
+        topIso3 = safeStr(F.franc(s));
         confidence = 0.78;
       }
 
