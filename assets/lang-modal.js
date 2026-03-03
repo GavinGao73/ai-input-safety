@@ -115,8 +115,9 @@
     try { window.__LANG_MODAL_OPENING__ = false; } catch (_) {}
   }
 
-  // ✅ unified close path: always calls stored onClose + resets flag + dispatches safe:updated
-  API.close = function close() {
+  // internal close core:
+  // - skipOnClose=true means "user picked a language" path (do not call onClose callback)
+  function closeCore(skipOnClose) {
     const root = document.getElementById("langModalRoot");
     if (root) root.style.display = "none";
 
@@ -125,14 +126,24 @@
     // reset "opening" guard (important)
     resetOpeningFlag();
 
-    // call stored onClose if any
-    try {
-      const fn = API.__state.onClose;
-      API.__state.onClose = null;
-      if (typeof fn === "function") fn();
-    } catch (_) {}
+    if (!skipOnClose) {
+      // call stored onClose if any (cancel/close path)
+      try {
+        const fn = API.__state.onClose;
+        API.__state.onClose = null;
+        if (typeof fn === "function") fn();
+      } catch (_) {}
+    } else {
+      // pick path: just clear stored onClose to avoid stale callback
+      try { API.__state.onClose = null; } catch (_) {}
+    }
 
     try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
+  }
+
+  // ✅ unified close path (cancel/close): always calls stored onClose + resets flag + dispatches safe:updated
+  API.close = function close() {
+    closeCore(false);
   };
 
   API.open = function open(opts) {
@@ -180,8 +191,8 @@
     if (meta) meta.textContent = metaParts.join("  ");
 
     function doPick(lang) {
-      // pick -> close (will reset flag + dispatch + onClose)
-      API.close();
+      // ✅ pick path: close WITHOUT firing onClose (onClose is for cancel/close only)
+      closeCore(true);
       try { onPick(lang); } catch (_) {}
     }
 
