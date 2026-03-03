@@ -45,22 +45,25 @@
       NAME: "[Name]"
     },
 
+    // ✅ DETECT (CONSERVATIVE)
+    // IMPORTANT: do NOT claim "de" just because of umlauts/Latin letters.
+    // Let lang-detect.js decide ambiguity (and possibly open modal).
     detect: function (s) {
       s = String(s || "");
       if (!s.trim()) return "";
 
-      // ✅ 不再因为一个 ü/ä/ö/ß 就直接判定德语
-      // 只有出现“明显德语关键词”才判定为 de
+      // only strong German keywords => de
       if (
         /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Zusatz|Geburtsdatum|Geburtsort|USt-IdNr)\b/i.test(
           s
         )
-      )
+      ) {
         return "de";
+      }
 
-      // ✅ 兜底：如果德语字符很多（比如整段德语），也判 de（避免误判）
-      const umlauts = (s.match(/[äöüÄÖÜß]/g) || []).length;
-      if (umlauts >= 3) return "de";
+      // ❌ removed umlaut-count fallback to avoid over-claim:
+      // const umlauts = (s.match(/[äöüÄÖÜß]/g) || []).length;
+      // if (umlauts >= 3) return "de";
 
       return "";
     },
@@ -191,7 +194,7 @@
         return false;
 
       // value itself looks like an ID prefix (defensive)
-      if (/\b(?:knd|re|ord|ab|ref|v|vg|js)\s*[-/:]\s*/i.test(val)) return false;
+      if (/\b(?:knd|re|ord|ab|ref|v|vg|js)[ \t]*[-/:][ \t]*/i.test(val)) return false;
 
       return true;
     },
@@ -210,7 +213,7 @@
     rules: {
       /* ===================== AUTH / LOGIN (label-driven) ===================== */
       login: {
-        pattern: /((?:Benutzername|User(?:name)?|Login-?ID|User-?ID|Account-?ID)\s*[:：=]\s*)([^\n\r]{1,80})/giu,
+        pattern: /((?:Benutzername|User(?:name)?|Login-?ID|User-?ID|Account-?ID)[ \t]*[:：=][ \t]*)([^\n\r]{1,80})/giu,
         tag: "HANDLE",
         mode: "prefix"
       },
@@ -218,7 +221,7 @@
       /* ===================== SECRET (label-driven) ===================== */
       secret: {
         pattern:
-          /((?:Passwort|Kennwort|PIN|TAN|OTP|2FA|Sicherheitscode|verification\s*code|one[-\s]?time\s*code)\s*[:：=]\s*)([^\n\r]{1,120})/giu,
+          /((?:Passwort|Kennwort|PIN|TAN|OTP|2FA|Sicherheitscode|verification[ \t]*code|one[- \t]?time[ \t]*code)[ \t]*[:：=][ \t]*)([^\n\r]{1,120})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -228,14 +231,14 @@
       // Example: Aktenzeichen: CASE-2026-00078421 -> Aktenzeichen: CASE-2026-[Referenz]
       aktenzeichen_tail: {
         pattern:
-          /((?:Aktenzeichen|Geschäftszeichen)\s*[:：=]\s*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.\/][A-Za-z0-9\[\]]+){0,10}[-_.\/]))(\d{4,})/giu,
+          /((?:Aktenzeichen|Geschäftszeichen)[ \t]*[:：=][ \t]*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.\/][A-Za-z0-9\[\]]+){0,10}[-_.\/]))(\d{4,})/giu,
         tag: "REF",
         mode: "prefix"
       },
 
       // legacy full mask (definition kept, but prefer tail rule via priority/alwaysOn)
       aktenzeichen: {
-        pattern: /((?:Aktenzeichen|Geschäftszeichen)\s*[:：=]\s*)([A-Za-z0-9\-\/\.]{6,80})/giu,
+        pattern: /((?:Aktenzeichen|Geschäftszeichen)[ \t]*[:：=][ \t]*)([A-Za-z0-9\-\/\.]{6,80})/giu,
         tag: "REF",
         mode: "prefix"
       },
@@ -244,14 +247,14 @@
       // ✅ NEW: tail-only masking for German label IDs
       id_label_tail: {
         pattern:
-          /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)\s*[:：=]\s*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.\/:][A-Za-z0-9\[\]]+){0,10}[-_.\/:]))(\d{4,})/giu,
+          /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)[ \t]*[:：=][ \t]*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.\/:][A-Za-z0-9\[\]]+){0,10}[-_.\/:]))(\d{4,})/giu,
         tag: "REF",
         mode: "prefix"
       },
 
       id_label: {
         pattern:
-          /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_\/:.]{3,80})/giu,
+          /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-_\/:.]{3,80})/giu,
         tag: "REF",
         mode: "prefix"
       },
@@ -265,13 +268,13 @@
 
       /* ===================== TAX (DE) ===================== */
       tax_id: {
-        pattern: /((?:Steuer-?ID|Steueridentifikationsnummer)\s*[:：=]\s*)(\d[\d \t]{8,20}\d)/giu,
+        pattern: /((?:Steuer-?ID|Steueridentifikationsnummer)[ \t]*[:：=][ \t]*)(\d[\d \t]{8,20}\d)/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       vat_id: {
-        pattern: /((?:USt-?IdNr\.?|Umsatzsteuer-?ID)\s*[:：=]\s*)(DE\s?\d{8,12})/giu,
+        pattern: /((?:USt-?IdNr\.?|Umsatzsteuer-?ID)[ \t]*[:：=][ \t]*)(DE[ \t]?\d{8,12})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -279,20 +282,20 @@
       /* ===================== SOCIAL SECURITY (DE heuristic) ===================== */
       svnr: {
         pattern:
-          /((?:Sozialversicherungsnummer|SV-Nummer|Rentenversicherungsnummer)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9 \t\-]{5,40})/giu,
+          /((?:Sozialversicherungsnummer|SV-Nummer|Rentenversicherungsnummer)[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9 \t\-]{5,40})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       /* ===================== DOC IDs (DE) ===================== */
       id_card: {
-        pattern: /((?:Personalausweis(?:nummer|[-\s]?Nr\.?))\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-]{4,24})/giu,
+        pattern: /((?:Personalausweis(?:nummer|[- \t]?Nr\.?))[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-]{4,24})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       passport: {
-        pattern: /((?:Reisepass(?:nummer|[-\s]?Nr\.?))\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-]{4,24})/giu,
+        pattern: /((?:Reisepass(?:nummer|[- \t]?Nr\.?))[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-]{4,24})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -300,21 +303,21 @@
       driver_license: {
         // ✅ accepts hyphenated formats, e.g. "D-482771-2026"
         pattern:
-          /((?:Führerschein(?:nummer|[-\s]?Nr\.?)|Führerscheinnummer)\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32})/giu,
+          /((?:Führerschein(?:nummer|[- \t]?Nr\.?)|Führerscheinnummer)[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       /* ===================== PERSONAL ATTRIBUTES ===================== */
       birthdate: {
-        pattern: /((?:Geburtsdatum|Geb\.?\s*Datum)\s*[:：=]\s*)(\d{1,2}\.\d{1,2}\.\d{2,4}|\d{4}-\d{2}-\d{2})/giu,
+        pattern: /((?:Geburtsdatum|Geb\.?[ \t]*Datum)[ \t]*[:：=][ \t]*)(\d{1,2}\.\d{1,2}\.\d{2,4}|\d{4}-\d{2}-\d{2})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       birthplace: {
         // low priority; not forced always-on
-        pattern: /((?:Geburtsort)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
+        pattern: /((?:Geburtsort)[ \t]*[:：=][ \t]*)([^\n\r]{2,80})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -323,21 +326,21 @@
       account: {
         // IBAN / Kontonummer / Account Number
         pattern:
-          /((?:IBAN|Kontonummer|Account(?:\s*Number)?)\s*[:：=]\s*)([A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
+          /((?:IBAN|Kontonummer|Account(?:[ \t]*Number)?)[ \t]*[:：=][ \t]*)([A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
 
       bank: {
         // BIC / SWIFT
-        pattern: /((?:BIC|SWIFT|SWIFT\s*Code)\s*[:：=]?\s*)([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
+        pattern: /((?:BIC|SWIFT|SWIFT[ \t]*Code)[ \t]*[:：=]?[ \t]*)([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
 
       blz: {
         // Bankleitzahl / BLZ
-        pattern: /((?:Bankleitzahl|BLZ)\s*[:：=]\s*)(\d{5,12})/giu,
+        pattern: /((?:Bankleitzahl|BLZ)[ \t]*[:：=][ \t]*)(\d{5,12})/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -345,7 +348,7 @@
       creditcard: {
         // label-driven card number (avoid swallowing random IDs)
         pattern:
-          /((?:Kreditkarte|Kartennummer|Card(?:\s*Number)?|Visa|Mastercard|Amex)\s*[:：=]\s*)(\d(?:[ -]?\d){12,22}\d)/giu,
+          /((?:Kreditkarte|Kartennummer|Card(?:[ \t]*Number)?|Visa|Mastercard|Amex)[ \t]*[:：=][ \t]*)(\d(?:[ -]?\d){12,22}\d)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -353,13 +356,13 @@
       /* ===================== MONEY (strict currency required) ===================== */
       money: {
         pattern:
-          /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b\s*(?:[€$£¥￥]\s*)?\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?\s*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥]\s*\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?\s*[€$£¥￥])/giu,
+          /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*(?:[€$£¥￥][ \t]*)?\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥][ \t]*\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?[ \t]*[€$£¥￥])/giu,
         tag: "MONEY"
       },
 
       /* ===================== COMMUNICATION ===================== */
       email: {
-        pattern: /\b[A-Z0-9._%+-]+\s*@\s*[A-Z0-9.-]+\s*\.\s*[A-Z]{2,}\b/gi,
+        pattern: /\b[A-Z0-9._%+-]+[ \t]*@[ \t]*[A-Z0-9.-]+[ \t]*\.[ \t]*[A-Z]{2,}\b/gi,
         tag: "EMAIL"
       },
 
@@ -372,7 +375,7 @@
       phone: {
         // allow Telefon (Durchwahl): ...
         pattern:
-          /((?:tel|telefon|handy|kontakt|phone|mobile|mobil|whatsapp|telegram|signal|fax)(?:\s*\([^)]+\))?\s*[:：=]?\s*)([+＋]?\s*\d[\d\s().-]{5,}\d)\b|(?<![A-Za-z0-9_-])((?:[+＋]\s*\d{1,3}|00\s*[1-9]\d{0,2})[\d\s().-]{6,}\d)\b/giu,
+          /((?:tel|telefon|handy|kontakt|phone|mobile|mobil|whatsapp|telegram|signal|fax)(?:[ \t]*\([^)]+\))?[ \t]*[:：=]?[ \t]*)([+＋]?[ \t]*\d[\d \t().-]{5,}\d)\b|(?<![A-Za-z0-9_-])((?:[+＋][ \t]*\d{1,3}|00[ \t]*[1-9]\d{0,2})[\d \t().-]{6,}\d)\b/giu,
         tag: "PHONE",
         mode: "phone"
       },
@@ -385,22 +388,22 @@
         // Ansprechpartner: Dr. [Name]
         // And never emits [Anrede].
         pattern:
-          /^((?:Name|Kontakt|Ansprechpartner|Empfänger)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?\s+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+          /^((?:Name|Kontakt|Ansprechpartner|Empfänger)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
 
       person_name: {
-        // legacy (kept)
+        // legacy (kept) — but prevent newline swallowing
         pattern:
-          /((?:Name|Kontakt|Ansprechpartner|Empfänger)\s*[:：=]\s*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)\s+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
+          /((?:Name|Kontakt|Ansprechpartner|Empfänger)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
         tag: "NAME",
         mode: "prefix"
       },
 
       /* ===================== COMPANY ===================== */
       company: {
-        pattern: /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)\s+(?<legal>GmbH|AG|UG|KG|GbR|e\.K\.)\b/gu,
+        pattern: /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)[ \t]+(?<legal>GmbH|AG|UG|KG|GbR|e\.K\.)\b/gu,
         tag: "COMPANY",
         mode: "company"
       },
@@ -408,28 +411,22 @@
       /* ===================== ADDRESS (inline, street + house no only; no PLZ/City) ===================== */
       address_de_inline_street: {
         pattern:
-          /^(?!.*\b(?:Lagerplatz|Regal|Fach|SKU|Fehlercode|ERR|Testwert|Artikel|Gutschrift|Kontonummer|Bankleitzahl|Versichertennummer)\b)(?:[A-ZÄÖÜ][\p{L}.'\-]{1,40}(?:\s+[A-ZÄÖÜ][\p{L}.'\-]{1,40}){0,4})\s+\d{1,4}(?:\s*[A-Za-z])?(?:-\d{1,4})?$/gmu,
+          /^(?!.*\b(?:Lagerplatz|Regal|Fach|SKU|Fehlercode|ERR|Testwert|Artikel|Gutschrift|Kontonummer|Bankleitzahl|Versichertennummer)\b)(?:[A-ZÄÖÜ][\p{L}.'\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][\p{L}.'\-]{1,40}){0,4})[ \t]+\d{1,4}(?:[ \t]*[A-Za-z])?(?:-\d{1,4})?$/gmu,
         tag: "ADDRESS"
       },
 
       address_de_street_partial: {
         // Street-only masking; keep tail (PLZ/City/Country)
-        // Example:
-        // "Adresse: Musterstraße 12, 50667 Köln, Deutschland"
-        // -> "Adresse: [Adresse], 50667 Köln, Deutschland"
         pattern:
-          /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)\s*[:：=]\s*)([^,\n\r]{4,120}?)(?=\s*,)/giu,
+          /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)[ \t]*[:：=][ \t]*)([^,\n\r]{4,120}?)(?=[ \t]*,)/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
 
       address_de_extra_partial: {
         // Zusatz: mask only building/floor/room part; keep ", Klingel …" tail
-        // Example:
-        // "Zusatz: Gebäude B, 3. OG, Zimmer 12, Klingel „Müller“"
-        // -> "Zusatz: [Adresse], Klingel „Müller“"
         pattern:
-          /((?:Zusatz)\s*[:：=]\s*)((?=[^\n\r]{2,260})(?=.*\b(?:Gebäude|Haus|Block|Aufgang|Etage|Stock|Stockwerk|OG|EG|DG|WHG|Wohnung|Zimmer|Raum|App\.?|Apartment)\b)[^\n\r]*?)(?=,\s*(?:Klingel|Tür|Tel\.?|Telefon)\b)/giu,
+          /((?:Zusatz)[ \t]*[:：=][ \t]*)((?=[^\n\r]{2,260})(?=.*\b(?:Gebäude|Haus|Block|Aufgang|Etage|Stock|Stockwerk|OG|EG|DG|WHG|Wohnung|Zimmer|Raum|App\.?|Apartment)\b)[^\n\r]*?)(?=,[ \t]*(?:Klingel|Tür|Tel\.?|Telefon)\b)/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
@@ -437,14 +434,14 @@
       // legacy definitions kept (NOT executed by priority/alwaysOn)
       address_de_extra: {
         pattern:
-          /((?:Zusatz)\s*[:：=]\s*)((?=[^\n\r]{2,140}$)(?=.*\b(?:Gebäude|Haus|Block|Aufgang|Etage|Stock|Stockwerk|OG|EG|DG|WHG|Wohnung|Zimmer|Raum|App\.?|Apartment|Tür|Klingel)\b)[^\n\r]{2,140})/giu,
+          /((?:Zusatz)[ \t]*[:：=][ \t]*)((?=[^\n\r]{2,140}$)(?=.*\b(?:Gebäude|Haus|Block|Aufgang|Etage|Stock|Stockwerk|OG|EG|DG|WHG|Wohnung|Zimmer|Raum|App\.?|Apartment|Tür|Klingel)\b)[^\n\r]{2,140})/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
 
       address_de_street: {
         pattern:
-          /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)\s*[:：=]\s*)((?=[^\n\r]{4,140}$)(?=[^\n\r]{0,140}(?:\d{1,4}\s*[A-Za-z]?\b|straße\b|strasse\b|str\.\b|weg\b|platz\b|allee\b|gasse\b|ring\b|ufer\b|damm\b|chaussee\b|promenade\b|markt\b|hof\b|kai\b))[^\n\r]{4,140})/giu,
+          /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)[ \t]*[:：=][ \t]*)((?=[^\n\r]{4,140}$)(?=[^\n\r]{0,140}(?:\d{1,4}[ \t]*[A-Za-z]?\b|straße\b|strasse\b|str\.\b|weg\b|platz\b|allee\b|gasse\b|ring\b|ufer\b|damm\b|chaussee\b|promenade\b|markt\b|hof\b|kai\b))[^\n\r]{4,140})/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
@@ -462,7 +459,7 @@
       },
 
       number: {
-        pattern: /\b\d[\d\s\-]{6,30}\d\b/g,
+        pattern: /\b\d[\d \t\-]{6,30}\d\b/g,
         tag: "NUMBER"
       },
 
@@ -533,27 +530,27 @@
   Object.assign(DE.rules, {
     api_key_token: {
       pattern:
-        /((?:api\s*key|x-api-key|access\s*token|refresh\s*token|token|auth\s*token|client\s*secret|secret\s*key|schlüssel|schluessel)\s*[:：=]\s*)([A-Za-z0-9._\-]{8,300})/giu,
+        /((?:api[ \t]*key|x-api-key|access[ \t]*token|refresh[ \t]*token|token|auth[ \t]*token|client[ \t]*secret|secret[ \t]*key|schlüssel|schluessel)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{8,300})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     bearer_token: {
-      pattern: /(\bauthorization\s*[:：=]\s*bearer\s+)([A-Za-z0-9._\-]{8,400})/giu,
+      pattern: /(\bauthorization[ \t]*[:：=][ \t]*bearer[ \t]+)([A-Za-z0-9._\-]{8,400})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     security_answer: {
       pattern:
-        /((?:Sicherheitsantwort|Antwort|security\s*answer|answer)\s*[:：=]\s*)([^\n\r]{1,160})/giu,
+        /((?:Sicherheitsantwort|Antwort|security[ \t]*answer|answer)[ \t]*[:：=][ \t]*)([^\n\r]{1,160})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     ip_label: {
       pattern:
-        /((?:IP(?:\s*Adresse|Address)?|IPv4|IPv6)\s*[:：=]\s*)((?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)|(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{1,4})/giu,
+        /((?:IP(?:[ \t]*Adresse|Address)?|IPv4|IPv6)[ \t]*[:：=][ \t]*)((?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)|(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{1,4})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
@@ -565,7 +562,7 @@
     },
 
     mac_label: {
-      pattern: /((?:MAC(?:\s*Adresse|Address)?)\s*[:：=]\s*)(\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b)/giu,
+      pattern: /((?:MAC(?:[ \t]*Adresse|Address)?)[ \t]*[:：=][ \t]*)(\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b)/giu,
       tag: "SECRET",
       mode: "prefix"
     },
@@ -576,14 +573,14 @@
     },
 
     imei2: {
-      pattern: /((?:IMEI)\s*[:：=]\s*)(\d{14,16})/giu,
+      pattern: /((?:IMEI)[ \t]*[:：=][ \t]*)(\d{14,16})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     device_fingerprint: {
       pattern:
-        /((?:Geräte-?ID|Geraete-?ID|Device\s*ID|Session\s*ID|Sitzungs-?ID|Fingerprint|Browser-?Fingerprint|User-?Agent)\s*[:：=]\s*)([^\n\r]{1,220})/giu,
+        /((?:Geräte-?ID|Geraete-?ID|Device[ \t]*ID|Session[ \t]*ID|Sitzungs-?ID|Fingerprint|Browser-?Fingerprint|User-?Agent)[ \t]*[:：=][ \t]*)([^\n\r]{1,220})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
@@ -595,58 +592,58 @@
 
     bank_routing_ids: {
       pattern:
-        /((?:Clearing\s*(?:nummer|number|no\.?)|Clearing|Zentralbank-?Nr\.?|Filial-?Code|Filialnummer|Branch\s*Code|Transit\s*Number|BSB|ABA(?:\s*(?:Number|Routing\s*Number))?)\s*[:：=]\s*)([0-9][0-9\s-]{2,24}[0-9])/giu,
+        /((?:Clearing[ \t]*(?:nummer|number|no\.?)|Clearing|Zentralbank-?Nr\.?|Filial-?Code|Filialnummer|Branch[ \t]*Code|Transit[ \t]*Number|BSB|ABA(?:[ \t]*(?:Number|Routing[ \t]*Number))?)[ \t]*[:：=][ \t]*)([0-9][0-9 \t-]{2,24}[0-9])/giu,
       tag: "ACCOUNT",
       mode: "prefix"
     },
 
     avs_data: {
-      pattern: /((?:AVS\s*Data)\s*[:：=]\s*)([A-Za-z0-9._\-]{1,40})/giu,
+      pattern: /((?:AVS[ \t]*Data)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{1,40})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     three_ds_status: {
-      pattern: /((?:3-?D\s*Secure|3DS)(?:\s*Status)?\s*[:：=]\s*)([A-Za-z0-9._\-]{1,40})/giu,
+      pattern: /((?:3-?D[ \t]*Secure|3DS)(?:[ \t]*Status)?[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{1,40})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     eci: {
-      pattern: /((?:ECI)\s*[:：=]\s*)(\d{2})/giu,
+      pattern: /((?:ECI)[ \t]*[:：=][ \t]*)(\d{2})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     legal_ref_tail: {
       pattern:
-        /((?:(?:Vertragsnummer|Vertrag\s*Nr\.?|Schadensnummer|Schaden\s*Nr\.?|Rechtsfall\s*Ref|Legal\s*Case\s*Ref|Claim\s*Reference|Contract\s*Number)\s*[:：=]\s*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
+        /((?:(?:Vertragsnummer|Vertrag[ \t]*Nr\.?|Schadensnummer|Schaden[ \t]*Nr\.?|Rechtsfall[ \t]*Ref|Legal[ \t]*Case[ \t]*Ref|Claim[ \t]*Reference|Contract[ \t]*Number)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
       tag: "REF",
       mode: "prefix"
     },
 
     insurance_id2: {
       pattern:
-        /((?:Versicherungs(?:nummer|nr\.?)|Police(?:n)?nummer|Policen(?:nr\.?)|Policy\s*(?:ID|No\.?|Number)|Member\s*(?:ID|No\.?|Number))\s*[:：=]\s*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,60})/giu,
+        /((?:Versicherungs(?:nummer|nr\.?)|Police(?:n)?nummer|Policen(?:nr\.?)|Policy[ \t]*(?:ID|No\.?|Number)|Member[ \t]*(?:ID|No\.?|Number))[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,60})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     wallet_id: {
-      pattern: /((?:Wallet\s*ID)\s*[:：=]\s*)([A-Za-z0-9._\-]{3,80})/giu,
+      pattern: /((?:Wallet[ \t]*ID)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{3,80})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     tx_hash: {
-      pattern: /((?:Transaction\s*Hash|TX\s*Hash|Txn\s*Hash)\s*[:：=]\s*)(0x[0-9a-f]{16,128})/giu,
+      pattern: /((?:Transaction[ \t]*Hash|TX[ \t]*Hash|Txn[ \t]*Hash)[ \t]*[:：=][ \t]*)(0x[0-9a-f]{16,128})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     crypto_wallet: {
       pattern:
-        /((?:BTC|ETH)\s*[:：=]\s*)((?:bc1)[0-9a-z]{25,90}|[13][A-HJ-NP-Za-km-z1-9]{25,34}|0x[a-f0-9]{40})/giu,
+        /((?:BTC|ETH)[ \t]*[:：=][ \t]*)((?:bc1)[0-9a-z]{25,90}|[13][A-HJ-NP-Za-km-z1-9]{25,34}|0x[a-f0-9]{40})/giu,
       tag: "SECRET",
       mode: "prefix"
     }
@@ -712,14 +709,14 @@
   Object.assign(DE.rules, {
     /* 1) Geburtsort: optional masking (NOT always-on) */
     birthplace_optional_secret: {
-      pattern: /((?:Geburtsort)\s*[:：=]\s*)([^\n\r]{2,80})/giu,
+      pattern: /((?:Geburtsort)[ \t]*[:：=][ \t]*)([^\n\r]{2,80})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     /* 2) BLZ with parentheses */
     blz_paren: {
-      pattern: /((?:Bankleitzahl)\s*(?:\(\s*BLZ\s*\))?\s*[:：=]\s*)(\d{5,12})/giu,
+      pattern: /((?:Bankleitzahl)[ \t]*(?:\([ \t]*BLZ[ \t]*\))?[ \t]*[:：=][ \t]*)(\d{5,12})/giu,
       tag: "ACCOUNT",
       mode: "prefix"
     },
@@ -727,17 +724,16 @@
     /* 3) Card expiry (DE + EN labels) */
     card_expiry_de: {
       pattern:
-        /((?:Gültig\s*bis|Gueltig\s*bis|Ablaufdatum|Expiry|Expiration|Exp(?:iry|iration)?(?:\s*Date)?|Valid\s*Thru|Valid\s*Through)\s*[:：=]\s*)(\d{2}\s*\/\s*\d{2,4}|\d{2}\s*-\s*\d{2,4}|\d{4}\s*-\s*\d{2})/giu,
+        /((?:Gültig[ \t]*bis|Gueltig[ \t]*bis|Ablaufdatum|Expiry|Expiration|Exp(?:iry|iration)?(?:[ \t]*Date)?|Valid[ \t]*Thru|Valid[ \t]*Through)[ \t]*[:：=][ \t]*)(\d{2}[ \t]*\/[ \t]*\d{2,4}|\d{2}[ \t]*-[ \t]*\d{2,4}|\d{4}[ \t]*-[ \t]*\d{2})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
     /* 4) CVC/CVV */
     card_security_de: {
-      pattern: /((?:CVC|CVV|CVC2|CAV2)\s*[:：=]\s*)(\d{3,4})/giu,
+      pattern: /((?:CVC|CVV|CVC2|CAV2)[ \t]*[:：=][ \t]*)(\d{3,4})/giu,
       tag: "SECRET",
       mode: "prefix"
     }
   });
 })();
-
