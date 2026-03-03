@@ -38,6 +38,9 @@
       NAME: "[Name]"
     },
 
+    // ✅ DETECT (CONSERVATIVE)
+    // IMPORTANT: do NOT claim "en" just because of Latin letters.
+    // Let lang-detect.js decide ambiguity (and possibly open modal).
     detect: function (s) {
       s = String(s || "");
       if (!s.trim()) return "";
@@ -46,13 +49,16 @@
       if (han / Math.max(1, s.length) > 0.03) return "";
 
       if (
-        /\b(Invoice|Order ID|Account Number|Username|Address|Phone|Email|Customer|Payment|Bank|Passport|SSN)\b/i.test(
+        /\b(Invoice|Order[ \t]*ID|Account[ \t]*Number|Username|Address|Phone|Email|Customer|Payment|Bank|Passport|SSN)\b/i.test(
           s
         )
-      )
+      ) {
         return "en";
+      }
 
-      if (/[A-Za-z]/.test(s)) return "en";
+      // ❌ removed overly-broad fallback:
+      // if (/[A-Za-z]/.test(s)) return "en";
+
       return "";
     },
 
@@ -199,7 +205,8 @@
 
     rules: {
       email: {
-        pattern: /\b[A-Z0-9._%+-]+\s*@\s*[A-Z0-9.-]+\s*\.\s*[A-Z]{2,}\b/gi,
+        // ✅ replace \s* with [ \t]* to avoid newline swallowing
+        pattern: /\b[A-Z0-9._%+-]+[ \t]*@[ \t]*[A-Z0-9.-]+[ \t]*\.[ \t]*[A-Z]{2,}\b/gi,
         tag: "EMAIL"
       },
 
@@ -219,8 +226,9 @@
       },
 
       money: {
+        // ✅ replace [.,\s] with [., \t] and \s* with [ \t]*
         pattern:
-          /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b\s*[-+−]?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?|\b[-+−]?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?\s*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥]\s*[-+−]?\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?)/giu,
+          /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*[-+−]?\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?|\b[-+−]?\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥][ \t]*[-+−]?\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?)/giu,
         tag: "MONEY"
       },
 
@@ -385,15 +393,17 @@
       },
 
       company: {
+        // ✅ replace \s+ with [ \t]+ to avoid newline swallowing
         pattern:
-          /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)\s+(?<legal>LLC|L\.?L\.?C\.?|Ltd\.?|Limited|Inc\.?|Incorporated|Corp\.?|Corporation|PLC|LLP|Co\.?|Company)\b/giu,
+          /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)[ \t]+(?<legal>LLC|L\.?L\.?C\.?|Ltd\.?|Limited|Inc\.?|Incorporated|Corp\.?|Corporation|PLC|LLP|Co\.?|Company)\b/giu,
         tag: "COMPANY",
         mode: "company"
       },
 
       address_en_inline_street: {
+        // ✅ replace \s+ with [ \t]+ to avoid newline swallowing
         pattern:
-          /\b\d{1,5}[A-Za-z]?(?:-\d{1,5})?\s+(?:[A-Za-z0-9.'’\-]+\s+){0,6}(?:street|st\.?|avenue|ave\.?|road|rd\.?|boulevard|blvd\.?|lane|ln\.?|drive|dr\.?|way|parkway|pkwy\.?|court|ct\.?|place|pl\.?|square|sq\.?|highway|hwy\.?|terrace|ter\.?|crescent|cres\.?|close|cl\.?|gardens?|gdns?\.?|mews|row|alley|aly\.?)\b/giu,
+          /\b\d{1,5}[A-Za-z]?(?:-\d{1,5})?[ \t]+(?:[A-Za-z0-9.'’\-]+[ \t]+){0,6}(?:street|st\.?|avenue|ave\.?|road|rd\.?|boulevard|blvd\.?|lane|ln\.?|drive|dr\.?|way|parkway|pkwy\.?|court|ct\.?|place|pl\.?|square|sq\.?|highway|hwy\.?|terrace|ter\.?|crescent|cres\.?|close|cl\.?|gardens?|gdns?\.?|mews|row|alley|aly\.?)\b/giu,
         tag: "ADDRESS"
       },
 
