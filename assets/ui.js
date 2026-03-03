@@ -5,24 +5,46 @@
 // ================= Stage 3 UI texts =================
 
 // Stable global DOM helpers (used by main.js bind())
-// $: CSS selector (querySelector)
+// $: CSS selector (querySelector) OR id shorthand ("foo" => "#foo")
 // $$: CSS selector all (array)
 (function () {
+  function normSel(sel) {
+    const s = String(sel || "").trim();
+    if (!s) return s;
+
+    // Already a selector -> keep
+    if (
+      s[0] === "#" ||
+      s[0] === "." ||
+      s[0] === "[" ||
+      s[0] === ":" ||
+      s.includes(" ") ||
+      s.includes(">") ||
+      s.includes("+") ||
+      s.includes("~")
+    ) {
+      return s;
+    }
+
+    // Otherwise treat as id shorthand
+    return "#" + s;
+  }
+
   if (typeof window.$ !== "function") {
     window.$ = function (sel, root) {
       const r = root || document;
-      return r.querySelector(sel);
+      return r.querySelector(normSel(sel));
     };
   }
   if (typeof window.$$ !== "function") {
     window.$$ = function (sel, root) {
       const r = root || document;
-      return Array.from(r.querySelectorAll(sel));
+      return Array.from(r.querySelectorAll(normSel(sel)));
     };
   }
 })();
 
-function stage3Text(key){
+function stage3Text(key) {
   const map = {
     zh: { btnExportPdf: "红删PDF", btnManual: "手工涂抹" },
     de: { btnExportPdf: "PDF", btnManual: "Manuell" },
@@ -32,10 +54,10 @@ function stage3Text(key){
   return m[key] || "";
 }
 
-function setStage3Ui(mode){
+function setStage3Ui(mode) {
   lastStage3Mode = mode || "none";
-  const btnPdf  = $("btnExportRasterPdf");
-  const btnMan  = $("btnManualRedact");
+  const btnPdf = $("btnExportRasterPdf");
+  const btnMan = $("btnManualRedact");
 
   show(btnPdf, lastStage3Mode === "A" || lastStage3Mode === "B");
   show(btnMan, lastStage3Mode === "B");
@@ -50,7 +72,7 @@ function setStage3Ui(mode){
 }
 
 // ================= Manual panes switch (Mode A/B) =================
-function setManualPanesForMode(mode){
+function setManualPanesForMode(mode) {
   const paneA = $("manualTermsPane");
   const paneB = $("manualRedactPane");
   const termInput = $("manualTerms") || $("nameList");
@@ -75,7 +97,7 @@ function setManualPanesForMode(mode){
 }
 
 // ================= Rail note: switch by mode =================
-function setManualRailTextByMode(){
+function setManualRailTextByMode() {
   const t = window.I18N && window.I18N[currentLang];
   const note = $("ui-manual-rail-note");
   const title = $("ui-manual-rail-title");
@@ -92,14 +114,14 @@ function setManualRailTextByMode(){
 }
 
 // ================= Unified control toggles =================
-function setCtlExpanded(btn, body, expanded){
+function setCtlExpanded(btn, body, expanded) {
   if (btn) btn.setAttribute("aria-expanded", expanded ? "true" : "false");
   if (body) {
     body.classList.toggle("open", !!expanded);
     body.style.display = expanded ? "" : "none";
   }
 }
-function toggleCtl(btn, body){
+function toggleCtl(btn, body) {
   const cur = (btn && btn.getAttribute("aria-expanded") === "true");
   setCtlExpanded(btn, body, !cur);
 }
@@ -107,7 +129,7 @@ function toggleCtl(btn, body){
 // ================= Desktop equal-height + minimum expanded height =================
 const DESKTOP_MIN_OPEN_H = 260;
 
-function clearBodyHeights(){
+function clearBodyHeights() {
   const manualBody = $("manualBody");
   const riskBody = $("riskBody");
   if (manualBody) {
@@ -124,7 +146,7 @@ function clearBodyHeights(){
   }
 }
 
-function syncManualRiskHeights(){
+function syncManualRiskHeights() {
   if (isSmallScreen()) { clearBodyHeights(); return; }
 
   const manualBody = $("manualBody");
@@ -150,7 +172,7 @@ function syncManualRiskHeights(){
 }
 
 let __riskResizeObs = null;
-function initRiskResizeObserver(){
+function initRiskResizeObserver() {
   const riskBody = $("riskBody");
   if (!riskBody || !("ResizeObserver" in window)) return;
 
@@ -163,29 +185,29 @@ function initRiskResizeObserver(){
   __riskResizeObs.observe(riskBody);
 }
 
-function expandManualArea(){
+function expandManualArea() {
   const btn = $("btnToggleManual");
   const body = $("manualBody");
   if (btn && body) setCtlExpanded(btn, body, true);
 }
-function expandRiskArea(){
+function expandRiskArea() {
   const btn = $("btnToggleRisk");
   const body = $("riskBody");
   if (btn && body) setCtlExpanded(btn, body, true);
 }
-function collapseManualArea(){
+function collapseManualArea() {
   const btn = $("btnToggleManual");
   const body = $("manualBody");
   if (btn && body) setCtlExpanded(btn, body, false);
 }
-function collapseRiskArea(){
+function collapseRiskArea() {
   const btn = $("btnToggleRisk");
   const body = $("riskBody");
   if (btn && body) setCtlExpanded(btn, body, false);
 }
 
 // ================= Progress area =================
-function setProgressText(lines, isError){
+function setProgressText(lines, isError) {
   const box = $("exportStatus");
   if (!box) return;
 
@@ -194,13 +216,13 @@ function setProgressText(lines, isError){
   box.textContent = s;
 }
 
-function clearProgress(){
+function clearProgress() {
   const a = $("exportStatus");
   if (a) a.textContent = "";
 }
 
 // ================= UI text =================
-function exportTitleFallback(){
+function exportTitleFallback() {
   if (currentLang === "de") return "Fortschritt";
   if (currentLang === "en") return "Progress";
   return "生成进程";
@@ -257,8 +279,8 @@ function setText() {
 // even after app.js is split into multiple files.
 // NOTE: does NOT change any existing logic; only triggers setText/setStage3Ui safely.
 // =========================
-(function uiBootPatch(){
-  function safeApplyTexts(){
+(function uiBootPatch() {
+  function safeApplyTexts() {
     try {
       // i18n not ready -> skip
       if (!(window.I18N && window.I18N[currentLang])) return;
@@ -266,7 +288,6 @@ function setText() {
       // apply all UI texts (includes stage3 buttons)
       if (typeof setText === "function") setText();
       else if (typeof setStage3Ui === "function") setStage3Ui(lastStage3Mode);
-
     } catch (_) {}
   }
 
@@ -275,13 +296,21 @@ function setText() {
     // defer one frame to let other scripts define globals (engine/stage3/main)
     requestAnimationFrame(safeApplyTexts);
   } else {
-    document.addEventListener("DOMContentLoaded", () => {
-      requestAnimationFrame(safeApplyTexts);
-    }, { once: true });
+    document.addEventListener(
+      "DOMContentLoaded",
+      () => {
+        requestAnimationFrame(safeApplyTexts);
+      },
+      { once: true }
+    );
   }
 
   // Also listen for i18n late-load edge case
-  window.addEventListener("load", () => {
-    requestAnimationFrame(safeApplyTexts);
-  }, { once: true });
+  window.addEventListener(
+    "load",
+    () => {
+      requestAnimationFrame(safeApplyTexts);
+    },
+    { once: true }
+  );
 })();
