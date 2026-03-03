@@ -201,9 +201,20 @@
 <script src="./assets/raster-export.js?v=20260224a1" defer></script>
 <script src="./assets/redact-ui.js?v=20260224a1" defer></script>
 
-<script src="assets/vendor/franc-all.min.js"></script>
-<script src="./assets/lang-modal.js?v=20260302a3" defer></script>
-<script src="./assets/lang-detect.js?v=20260302a3" defer></script>
+<!-- ✅ franc bundle must execute before lang-detect (bridge uses FrLang immediately) -->
+<script src="./assets/vendor/franc-all.min.js?v=20260303a1"></script>
+<script>
+  // Bridge: lang-detect expects window.franc / window.francAll
+  // Bundle exports: window.FrLang.franc / window.FrLang.francAll
+  try {
+    if (typeof window.__LANG_MODAL_OPENING__ === "undefined") window.__LANG_MODAL_OPENING__ = false;
+    if (window.FrLang && typeof window.FrLang.franc === "function") window.franc = window.FrLang.franc;
+    if (window.FrLang && typeof window.FrLang.francAll === "function") window.francAll = window.FrLang.francAll;
+  } catch (e) {}
+</script>
+
+<script src="./assets/lang-modal.js?v=20260303a1" defer></script>
+<script src="./assets/lang-detect.js?v=20260303a1" defer></script>
      
 <!-- ✅ content-strategy packs (must load before engine.js) -->
 <script src="./assets/engine.zh.js?v=20260224a1" defer></script>
@@ -219,6 +230,6 @@
 <!-- ✅ UI wiring -->
 <script src="./assets/ui.js?v=20260224a1" defer></script>
 <script src="./assets/stage3.js?v=20260224a1" defer></script>
-<script src="./assets/main.js?v=20260224a1" defer></script>
+<script src="./assets/main.js?v=20260303a1" defer></script>
 </body>
 </html>
