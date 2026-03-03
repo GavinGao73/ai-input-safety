@@ -4,13 +4,14 @@
 // - UI language: window.currentLang (UI only)
 // - Content strategy language: window.ruleEngine (+ window.ruleEngineMode)
 //
-// ✅ GOAL:
-// - auto only runs ONCE when ruleEngine=="" (first real applyRules after boot/Clear)
-// - then lock (no drift)
+// ✅ GOAL (UPDATED):
+// - engine.js 不再做任何“自动语言判断 / 自动锁定”
+// - 语言判断与弹窗完全交给 assets/lang-detect.js + main.js 的 pre-guard（ensureContentLang）
+// - engine.js 只尊重 window.ruleEngine（若已被外部锁定）
 // - Clear resets to (mode=auto, ruleEngine="")
 //
 // ✅ ISOLATION (HARD):
-// - NO zh/en/de rules/priority/alwaysOn/formatters in engine.js
+// - NO zh/en/de rules/priority/alwaysOn/formatters inside engine.js
 // - ALL language-specific logic must live in packs: window.__ENGINE_LANG_PACKS__[lang]
 // - ALL non-language strategy must live in window.__ENGINE_POLICY__
 //
@@ -19,10 +20,10 @@
 // - P2: Placeholder protection ONLY shields engine-generated placeholders (avoid protecting arbitrary [..] such as Markdown links)
 // - P3: NEW mode "prefix_keep_tail": keep tail unmasked (needed for DE street-only masking while keeping PLZ/City/Country)
 // - P4: Export enabledKeys MUST include ALWAYS_ON (safer & consistent with execution)
-// - P5: Optional external language detector hook (franc/lang-detect) + ambiguity modal/event (engine stays language-agnostic)
+// - P5: REMOVE engine-side auto language detection/locking to avoid conflicts with lang-detect.js modal chain
 // =========================
 
-// ✅ FIX: version string aligned with deployed query param (?v=20260224a1)
+// ✅ FIX: version string aligned with deployed query param (?v=20260228a1)
 
 "use strict";
 
@@ -123,7 +124,7 @@ function getLangUI() {
 /**
  * Content strategy language (rules/placeholder), NOT UI language.
  * - if ruleEngine set -> use it
- * - else -> fallback to UI (display only until one-shot detect)
+ * - else -> fallback to UI (display only until external one-shot detect/lock)
  */
 function getLangContent() {
   const v = normLang(window.ruleEngine);
@@ -156,9 +157,9 @@ function resetContentLang() {
 }
 
 /**
- * One-shot auto detect, only when:
- * - mode=auto AND ruleEngine==""
- * After detect: lock.
+ * ✅ P5: engine.js 不再做“自动语言判断/自动锁定”。
+ * - 如果外部（lang-detect.js/main.js）已经设置了 ruleEngine，则这里仅把 mode 变为 lock（稳定）
+ * - 如果 ruleEngine 为空，则保持空（不猜测、不锁定）
  */
 function setRuleEngineAuto(text) {
   try {
@@ -177,139 +178,14 @@ function setRuleEngineAuto(text) {
       return;
     }
 
-    const detected = detectRuleEngine(text);
-    if (!detected) return;
-
-    window.ruleEngine = detected;
-    window.ruleEngineMode = "lock";
-
-    // ✅ compatibility: keep old names in sync
-    try {
-      window.contentLang = detected;
-      window.contentLangMode = "lock";
-    } catch (_) {}
-
-    try {
-      window.dispatchEvent(new CustomEvent("ruleengine:changed", { detail: { lang: detected } }));
-    } catch (_) {}
+    // ✅ P5: do nothing when empty (no auto detection inside engine.js)
+    return;
   } catch (_) {}
 }
 
 // Compatibility wrapper (old name used in applyRules)
 function setLangContentAuto(text) {
   setRuleEngineAuto(text);
-}
-
-/* =========================
-   1.05) External language detector hook (OPTIONAL; language-agnostic)
-   - Uses window.__LangDetect.detectLang(text, uiLang)
-   - Engine itself MUST NOT contain language keywords/regex.
-   - Behavior:
-     - If detector returns a clear lang -> return it (en/de/zh)
-     - If detector says "needsConfirm" -> trigger modal/event, do NOT lock, return ""
-     - If detector missing/fails -> return "" (fallback to pack.detect + policy)
-   ========================= */
-
-function detectRuleEngineExternal(text) {
-  try {
-    const detector = window.__LangDetect && typeof window.__LangDetect.detectLang === "function"
-      ? window.__LangDetect
-      : null;
-
-    if (!detector) return "";
-
-    const s0 = String(text || "");
-    const s = s0.slice(0, 2600);
-    if (!s.trim()) return "";
-
-    const uiLang = getLangUI();
-
-    // Expected return shape (from lang-detect.js):
-    // { lang: "en"|"de"|"zh"|"", needsConfirm?: boolean, confidence?: number, candidates?: string[], reason?: string }
-    const r = detector.detectLang(s, uiLang) || {};
-    const L = normLang(r.lang);
-
-    // Ambiguous: ask user (modal preferred), but do NOT lock
-    if (r && r.needsConfirm) {
-      try {
-        window.__LANG_PENDING__ = {
-          when: Date.now(),
-          uiLang,
-          candidates: Array.isArray(r.candidates) ? r.candidates.slice(0, 6) : [],
-          suggested: L || "",
-          confidence: typeof r.confidence === "number" ? r.confidence : null,
-          reason: typeof r.reason === "string" ? r.reason : ""
-        };
-      } catch (_) {}
-
-      // Prefer direct modal API if present
-      try {
-        if (window.__LangModal && typeof window.__LangModal.open === "function") {
-          window.__LangModal.open({
-            uiLang,
-            candidates: (window.__LANG_PENDING__ && window.__LANG_PENDING__.candidates) || [],
-            suggested: (window.__LANG_PENDING__ && window.__LANG_PENDING__.suggested) || "",
-            confidence: (window.__LANG_PENDING__ && window.__LANG_PENDING__.confidence) || null,
-            reason: (window.__LANG_PENDING__ && window.__LANG_PENDING__.reason) || ""
-          });
-        } else {
-          // Fallback: event for any UI listener
-          window.dispatchEvent(new CustomEvent("lang:needConfirm", { detail: window.__LANG_PENDING__ || {} }));
-        }
-      } catch (_) {}
-
-      return "";
-    }
-
-    // Clear decision
-    if (L === "en" || L === "de" || L === "zh") return L;
-    return "";
-  } catch (_) {
-    return "";
-  }
-}
-
-/**
- * Detect content strategy language:
- * - ask external detector first (optional)
- * - else ask pack detectors only
- * - fallback via policy (no char-heuristics here)
- */
-function detectRuleEngine(text) {
-  const s0 = String(text || "");
-  const s = s0.slice(0, 2600);
-  if (!s.trim()) return "";
-
-  // ✅ P5: external detector (franc/lang-detect) first; if ambiguous it triggers modal/event and returns ""
-  try {
-    const ext = detectRuleEngineExternal(s);
-    if (ext) return ext;
-  } catch (_) {}
-
-  const PACKS = getPacks();
-
-  // prefer pack detectors; order: zh -> en -> de (stable preference)
-  try {
-    if (PACKS.zh && typeof PACKS.zh.detect === "function") {
-      const r = normLang(PACKS.zh.detect(s));
-      if (r === "zh") return "zh";
-    }
-    if (PACKS.en && typeof PACKS.en.detect === "function") {
-      const r = normLang(PACKS.en.detect(s));
-      if (r === "en") return "en";
-    }
-    if (PACKS.de && typeof PACKS.de.detect === "function") {
-      const r = normLang(PACKS.de.detect(s));
-      if (r === "de") return "de";
-    }
-  } catch (_) {}
-
-  // fallback policy
-  const pol = getPolicy();
-  const fb = String(pol.detectFallback || "en").toLowerCase();
-  if (fb === "ui") return getLangUI();
-  if (fb === "zh" || fb === "de" || fb === "en") return fb;
-  return "en";
 }
 
 /* =========================
@@ -1001,7 +877,7 @@ function applyRules(text) {
   let hits = 0;
   const hitsByKey = {};
 
-  // ✅ one-shot auto detect
+  // ✅ P5: engine-side auto detect is now a no-op when ruleEngine empty
   setLangContentAuto(out);
 
   const PRIORITY = getPriority();
@@ -1347,8 +1223,6 @@ try {
   if (typeof window.resetRuleEngine !== "function") window.resetRuleEngine = resetRuleEngine;
   if (typeof window.resetContentLang !== "function") window.resetContentLang = resetContentLang;
 
-  if (typeof window.__detectRuleEngine !== "function") window.__detectRuleEngine = detectRuleEngine;
-
   // Debug pack access
   if (typeof window.getContentPack !== "function") window.getContentPack = getContentPack;
   if (typeof window.getPolicy !== "function") window.getPolicy = getPolicy;
@@ -1365,6 +1239,7 @@ try {
 
 /* =========================
    8) BOOT INIT (RULE A)
+   - ✅ P5: 不做自动识别；只做状态归一化与兼容字段同步
    ========================= */
 (function bootRuleEngineInit() {
   try {
