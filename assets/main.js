@@ -3,9 +3,8 @@
 // v20260223-lang-split-stable-a4
 //
 // ✅ UI language: window.currentLang 只影响 UI 文案
-// ✅ Content language: window.contentLang / window.contentLangMode 只由 engine.js 状态机控制
-// ✅ auto 仅在 contentLang=="" 时检测一次，检测后立即 lock
-// ✅ Clear 必须 resetContentLang(): mode=auto, contentLang=""
+// ✅ Content strategy language: window.ruleEngine / window.ruleEngineMode（由 lang-detect.js 的 ensureContentLang + 用户选择锁定）
+// ✅ Clear 必须 resetContentLang(): mode=auto, ruleEngine=""
 //
 // ✅ Export Mode A uses langContent (rule language) rather than UI lang
 //
@@ -119,8 +118,11 @@ window.openLangPicker = function () {
 
           window.ruleEngine = lang;
           window.ruleEngineMode = "lock";
+
+          // ✅ compatibility
           window.contentLang = lang;
           window.contentLangMode = "lock";
+
           if (v.trim() && typeof window.applyRules === "function") window.applyRules(v);
         },
         onClose: function () {
@@ -148,8 +150,7 @@ function bind() {
       const ta = $("inputText");
       const inTxt = (ta && ta.value) ? String(ta.value).trim() : "";
 
-      // ✅ IMPORTANT: UI switch MUST NOT overwrite contentLang/mode
-      // contentLang must be decided by content detection (engine.js)
+      // ✅ IMPORTANT: UI switch MUST NOT overwrite ruleEngine/mode
 
       if (inTxt) {
         // ✅ NEW: ensure correct content language BEFORE applying rules
@@ -273,8 +274,12 @@ function bind() {
 
       // ✅ RULE C: reset ruleEngine/contentLang
       try {
-        if (typeof resetContentLang === "function") resetContentLang();
-        else {
+        if (typeof resetContentLang === "function") {
+          resetContentLang();
+        } else {
+          // ✅ fallback: keep BOTH new + legacy vars consistent
+          window.ruleEngineMode = "auto";
+          window.ruleEngine = "";
           window.contentLangMode = "auto";
           window.contentLang = "";
         }
@@ -541,8 +546,7 @@ function bind() {
     if (typeof updateInputWatermarkVisibility === "function") updateInputWatermarkVisibility();
     if (typeof initRiskResizeObserver === "function") initRiskResizeObserver();
 
-    // ✅ IMPORTANT: do NOT force contentLang/contentLangMode here.
-    // engine.js owns content language state machine.
+    // ✅ IMPORTANT: do NOT force ruleEngine/ruleEngineMode here.
   } catch (e) {
     console.error("[boot] failed:", e);
   }
