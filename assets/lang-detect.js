@@ -9,13 +9,12 @@
 
   // Expose singleton
   const API = (window.__LangDetect = window.__LangDetect || {});
-  API.__state = API.__state || { ver: "v20260303a1", last: null };
+  API.__state = API.__state || { ver: "v20260303a2", last: null };
 
   // ---- Config (conservative) ----
   const MIN_LEN_FRANC = 40;      // shorter than this: franc is noisy
   const MIN_LATIN = 12;          // require some letters for en/de
   const HAN_RATIO_ZH = 0.02;     // Han chars ratio >= 2% => strong zh
-  const UMLAUTS_DE = 2;          // >=2 umlauts => strong de
 
   // Confidence thresholds
   const CONF_LOCK = 0.78;        // >= lock automatically (more conservative than before)
@@ -91,17 +90,7 @@
       };
     }
 
-    // Strong DE
-    if (st.umlauts >= UMLAUTS_DE) {
-      return {
-        lang: "de",
-        confidence: 0.95,
-        needsConfirm: false,
-        candidates: ["de"],
-        reason: "umlauts",
-        source: "heuristic"
-      };
-    }
+    // Strong DE (remove umlauts hard-lock to avoid over-trigger / mixed instability)
     if (st.hasDeKw) {
       // if also has strong EN keywords -> mixed => ask
       if (st.hasEnKw) {
@@ -136,10 +125,11 @@
       };
     }
 
+    // No strong signal => do NOT block franc/pack; let caller continue.
     return {
       lang: "",
       confidence: 0,
-      needsConfirm: true,
+      needsConfirm: false,
       candidates: [],
       reason: "no_strong_signal",
       source: "heuristic"
@@ -278,13 +268,10 @@
 
     const st = stats(trimmed);
 
-    // 1) Strong heuristic first
+    // 1) Strong heuristic first (ONLY when it has a strong decision)
     const h = strongHeuristic(trimmed);
-    if (h.lang || h.needsConfirm) {
-      // If heuristic already says mixed -> ask
-      if (h.needsConfirm) return h;
-      return h;
-    }
+    if (h.lang) return h;
+    if (h.needsConfirm && (h.candidates && h.candidates.length)) return h; // e.g. mixed_de_en_keywords
 
     // 2) franc
     const f = detectByFranc(trimmed);
@@ -399,14 +386,48 @@
       return { ok: true, lang: res.lang, asked: false };
     }
 
-    // Otherwise be safe: ask (if modal exists)
+    // Otherwise be safe: ask once if modal exists
     if (window.__LangModal && typeof window.__LangModal.open === "function") {
-      // Force ask path
-      res.needsConfirm = true;
-      return API.ensureContentLang(s, uiLang);
+      // open modal directly (no recursion)
+      if (window.__LANG_MODAL_OPENING__ === true) return { ok: false, lang: "", asked: true };
+
+      try {
+        window.__LANG_MODAL_OPENING__ = true;
+        window.__LangModal.open({
+          uiLang: normalizePackLang(uiLang) || "en",
+          detected: res && res.lang ? res.lang : "",
+          confidence: res && typeof res.confidence === "number" ? res.confidence : null,
+          candidates: Array.isArray(res && res.candidates) ? res.candidates.slice(0, 6) : [],
+          reason: (res && res.reason) ? ("ask_fallback:" + res.reason) : "ask_fallback",
+          onPick: function (lang) {
+            const L = normalizePackLang(lang);
+            if (!L) return;
+
+            window.ruleEngine = L;
+            window.ruleEngineMode = "lock";
+            window.contentLang = L;
+            window.contentLangMode = "lock";
+
+            window.__LANG_MODAL_OPENING__ = false;
+
+            try {
+              const ta = document.getElementById("inputText");
+              const v = ta ? String(ta.value || "") : s;
+              if (typeof window.applyRules === "function") window.applyRules(v);
+            } catch (_) {}
+          },
+          onClose: function () {
+            window.__LANG_MODAL_OPENING__ = false;
+          }
+        });
+      } catch (_) {
+        window.__LANG_MODAL_OPENING__ = false;
+      }
+
+      return { ok: false, lang: "", asked: true };
     }
 
-    return { ok: true, lang: res.lang || "", asked: false };
+    return { ok: true, lang: res && res.lang ? res.lang : "", asked: false };
   };
 
 })();
