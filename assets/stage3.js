@@ -1,13 +1,85 @@
 // =========================
 // assets/stage3.js (FULL)
-// v20260223-lang-split-stable-a2
-// ✅ Mode A (readable PDF): detect from RAW pdf text, then LOCK for session
-// ✅ Mode B (image / unreadable): keep auto (no lock)
+// v20260223-lang-split-stable-a3
+//
+// ✅ Mode A (readable PDF):
+// - detect from RAW pdf text (content strategy), then LOCK for session (ruleEngine/ruleEngineMode)
+// - applyRules only AFTER language is ensured (if guard exists)
+//
+// ✅ Mode B (image / unreadable):
+// - keep AUTO (no lock)
+//
+// NOTE (de-couple / single-source-of-truth):
+// - DO NOT touch legacy contentLang/contentLangMode here.
+// - Stage3 only controls ruleEngine/ruleEngineMode (content strategy language).
 // =========================
 
 // ✅ NEW: keep raw per-page text items (for Mode A export rect mapping later)
 // NOTE: must keep window pointer in sync whenever we re-assign array
 let lastPdfPagesItems = [];
+
+// ================= Stage 3 helpers =================
+function setRuleEngineAuto() {
+  try { window.ruleEngineMode = "auto"; } catch (_) {}
+}
+
+function lockRuleEngineForSession(lang) {
+  const l = String(lang || "").toLowerCase();
+  if (!(l === "zh" || l === "de" || l === "en")) return;
+  try { window.ruleEngine = l; } catch (_) {}
+  try { window.ruleEngineMode = "lock"; } catch (_) {}
+}
+
+function detectRuleEngineFromRaw(text) {
+  const s = String(text || "");
+  // Prefer centralized detector if present
+  try {
+    if (window.__LangDetect && typeof window.__LangDetect.detectRuleEngine === "function") {
+      const r = window.__LangDetect.detectRuleEngine(s);
+      // allow either string or { lang }
+      if (typeof r === "string") return r;
+      if (r && typeof r.lang === "string") return r.lang;
+    }
+  } catch (_) {}
+
+  // Fallback: pack-level "detect" heuristics (best-effort; no scoring here)
+  try {
+    const packs = window.__ENGINE_LANG_PACKS__ || {};
+    const order = ["de", "en", "zh"]; // bias de/en because you said they are the confusing pair
+    for (const k of order) {
+      const p = packs[k];
+      if (p && typeof p.detect === "function") {
+        const hit = p.detect(s);
+        if (hit === k) return k;
+      }
+    }
+  } catch (_) {}
+
+  return "";
+}
+
+function applyRulesSafely(text) {
+  const s = String(text || "");
+  // If main.js provides a guard, prefer it (prevents bypass + ensures modal path)
+  try {
+    if (typeof window.ensureLangBeforeApply === "function") {
+      // Some builds may be async; we tolerate both.
+      const r = window.ensureLangBeforeApply(s);
+      if (r && typeof r.then === "function") {
+        return r.then(() => {
+          if (typeof window.applyRules === "function") window.applyRules(s);
+        });
+      }
+      if (typeof window.applyRules === "function") window.applyRules(s);
+      return;
+    }
+  } catch (_) {}
+
+  // Fallback: direct applyRules
+  try {
+    if (typeof window.applyRules === "function") window.applyRules(s);
+  } catch (_) {}
+}
 
 // ================= Stage 3 file handler =================
 async function handleFile(file) {
@@ -22,8 +94,9 @@ async function handleFile(file) {
   try { window.lastPdfPagesItems = lastPdfPagesItems; } catch (_) {}
   try { window.__pdf_pages_items = lastPdfPagesItems; } catch (_) {}
 
-  lastFileKind = (file.type === "application/pdf") ? "pdf"
-              : (file.type && file.type.startsWith("image/") ? "image" : "");
+  lastFileKind =
+    file.type === "application/pdf" ? "pdf" :
+    (file.type && file.type.startsWith("image/") ? "image" : "");
 
   __manualRedactSession = null;
   __manualRedactResult = null;
@@ -34,8 +107,8 @@ async function handleFile(file) {
   if (lastFileKind === "image") {
     lastRunMeta.fromPdf = false;
 
-    // ✅ Mode B: do NOT lock contentLang (keep auto)
-    try { window.contentLangMode = "auto"; } catch (_) {}
+    // ✅ Mode B: do NOT lock ruleEngine (keep auto)
+    setRuleEngineAuto();
 
     setStage3Ui("B");
     setManualPanesForMode("B");
@@ -56,7 +129,7 @@ async function handleFile(file) {
       lastRunMeta.fromPdf = false;
 
       // ✅ No probe => treat as Mode B; do NOT lock
-      try { window.contentLangMode = "auto"; } catch (_) {}
+      setRuleEngineAuto();
 
       setStage3Ui("B");
       setManualPanesForMode("B");
@@ -73,7 +146,7 @@ async function handleFile(file) {
     const probe = await window.probePdfTextLayer(file);
     lastProbe = probe || null;
 
-    // ✅ NEW: cache raw per-page items (even if unreadable, it'll be [])
+    // ✅ cache raw per-page items (even if unreadable, it'll be [])
     try {
       lastPdfPagesItems = (probe && Array.isArray(probe.pagesItems)) ? probe.pagesItems : [];
     } catch (_) {
@@ -88,7 +161,7 @@ async function handleFile(file) {
       lastRunMeta.fromPdf = false;
 
       // ✅ Unreadable => Mode B; do NOT lock
-      try { window.contentLangMode = "auto"; } catch (_) {}
+      setRuleEngineAuto();
 
       setStage3Ui("B");
       setManualPanesForMode("B");
@@ -111,11 +184,15 @@ async function handleFile(file) {
     const text = String(probe.text || "").trim();
     lastPdfOriginalText = text;
 
-    // ✅ Detect contentLang from RAW pdf text then LOCK (session stability)
+    // ✅ Detect content-strategy language from RAW pdf text then LOCK (session stability)
+    // (Only if we can actually detect a valid lang; otherwise keep auto.)
     try {
-      if (typeof setLangContentAutoFromRaw === "function") setLangContentAutoFromRaw(text);
-      if (typeof lockContentLangForSession === "function") lockContentLangForSession(window.contentLang || "");
-    } catch (_) {}
+      const detected = detectRuleEngineFromRaw(text);
+      if (detected) lockRuleEngineForSession(detected);
+      else setRuleEngineAuto();
+    } catch (_) {
+      setRuleEngineAuto();
+    }
 
     const ta = $("inputText");
     if (ta) {
@@ -126,8 +203,11 @@ async function handleFile(file) {
     updateInputWatermarkVisibility();
 
     if (text) {
-      applyRules(text);
-      renderInputOverlayForPdf(text);
+      // ✅ apply with guard if available (prevents bypass + allows modal confirm)
+      await applyRulesSafely(text);
+
+      // overlay for Mode A pdf mapping (if present)
+      try { if (typeof window.renderInputOverlayForPdf === "function") window.renderInputOverlayForPdf(text); } catch (_) {}
     }
 
     requestAnimationFrame(() => {
@@ -136,12 +216,12 @@ async function handleFile(file) {
       syncManualRiskHeights();
     });
 
-    window.dispatchEvent(new Event("safe:updated"));
+    try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
   } catch (e) {
     lastRunMeta.fromPdf = false;
 
     // ✅ Failure => Mode B; do NOT lock
-    try { window.contentLangMode = "auto"; } catch (_) {}
+    setRuleEngineAuto();
 
     setStage3Ui("B");
     setManualPanesForMode("B");
