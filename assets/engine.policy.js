@@ -1,18 +1,25 @@
 // =========================
-// assets/engine.policy.js (FULL) ✅ PATCHED
+// assets/engine.policy.js (FULL) ✅ PATCHED (add-only alignment)
 // Strategy layer (NON-language, change here frequently)
 // - baseAlwaysOn (global coverage defaults)
 // - defaultPriority (fallback when packs missing)
 // - phoneGuardDefault (avoid treating long IDs as phone)
 // - risk scoring policy (weights/thresholds/bonuses)
 // - detect: score-based language selection thresholds
+//
+// PATCH GOAL (this file only):
+// - Align risk.weights / risk.groups with DE pack keys:
+//   address_de_street_partial, address_de_inline_street, address_de_extra_partial,
+//   card_expiry_de, card_security_de,
+//   imei2, uuid2, insurance_id2
+// - Keep legacy keys for backward compatibility.
 // =========================
 
 (function () {
   "use strict";
 
   const POLICY = {
-    version: "v20260223-policy-a1",
+    version: "v20260223-policy-a2",
 
     // ✅ global always-on (non-language, product decision)
     // Keep minimal; language-specific additions live in packs[lang].alwaysOn
@@ -52,6 +59,7 @@
     risk: {
       // legacy weights kept for UI "Top risk sources" ranking (no UI change)
       // ✅ PATCH: ref_label -> ref_label_tail
+      // ✅ PATCH (add-only): add DE pack key aliases so hits are counted
       weights: {
         bank: 28,
         account: 26,
@@ -59,35 +67,66 @@
         url: 10,
         secret: 30,
         phone: 16,
+
+        // Address (legacy)
         address_de_street: 18,
         address_cn: 18,
+
+        // ✅ Address (DE pack actual keys)
+        address_de_street_partial: 18,
+        address_de_inline_street: 18,
+        address_de_extra_partial: 8,
+
         handle_label: 10,
         ref_label_tail: 6,
         handle: 10,
         ref: 6,
         title: 4,
         number: 2,
+
         money: 0,
         company: 8,
+
+        // ✅ DE card keys (add-only)
+        card_expiry_de: 12,
+        card_security_de: 30,
+
+        // ✅ DE tracking / identity add-only
+        imei2: 10,
+        uuid2: 10,
+        insurance_id2: 16,
+
         manual_term: 10
       },
 
       // Scheme A config: grouped saturation scoring
-      // ✅ PATCH: remove non-existent "address_cn_partial" key; use "address_cn"
       groups: {
         critical: [
           "secret",
           "api_key_token",
           "bearer_token",
+
+          // card security (EN/ZH)
           "card_security",
+
+          // ✅ card security (DE)
+          "card_security_de",
+
           "security_answer"
         ],
+
         financial: [
           "account",
           "bank",
           "bank_routing_ids",
-          "card_expiry"
+
+          // card expiry (EN/ZH)
+          "card_expiry",
+
+          // ✅ card expiry (DE)
+          "card_expiry_de"
         ],
+
         identity: [
           "dob",
           "place_of_birth",
@@ -97,7 +136,13 @@
           "ein",
           "national_id",
           "tax_id",
+
+          // EN key
           "insurance_id",
+
+          // ✅ DE key
+          "insurance_id2",
+
           "intl_itin",
           "intl_nino",
           "intl_nhs",
@@ -105,28 +150,53 @@
           "intl_tfn",
           "intl_abn"
         ],
+
         contact: [
           "phone",
           "email",
           "url",
+
+          // CN
           "address_cn",
+
+          // legacy DE
           "address_de_street",
+
+          // EN
           "address_en_inline_street",
           "address_en_extra_block",
           "address_en_extra",
+
+          // ✅ DE pack actual keys
+          "address_de_inline_street",
+          "address_de_extra_partial",
+          "address_de_street_partial",
+
           "handle_label",
           "handle",
+
+          // Name keys (packs differ)
           "person_name",
+          "person_name_keep_title",
+
           "company"
         ],
+
         tracking: [
           "ip_label",
           "ip_address",
           "mac_label",
           "mac_address",
+
+          // EN/ZH
           "imei",
-          "device_fingerprint",
           "uuid",
+
+          // ✅ DE variants
+          "imei2",
+          "uuid2",
+
+          "device_fingerprint",
           "wallet_id",
           "tx_hash",
           "crypto_wallet"
