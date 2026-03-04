@@ -292,10 +292,6 @@ function bind() {
           // ✅ fallback: reset ruleEngine only (single source)
           window.ruleEngineMode = "auto";
           window.ruleEngine = "";
-
-          // ❌ do not touch legacy contentLang here unless you explicitly keep a bridge elsewhere
-          // window.contentLangMode = "auto";
-          // window.contentLang = "";
         }
       } catch (_) {}
 
