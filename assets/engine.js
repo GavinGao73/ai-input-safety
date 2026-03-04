@@ -23,14 +23,14 @@
 // - P5: REMOVE engine-side auto language detection/locking to avoid conflicts with lang-detect.js modal chain
 // =========================
 
-// ✅ FIX: version string aligned with deployed query param (?v=20260228a1)
+// ✅ FIX: version string aligned with deployed query param (?v=20260304a1)
 
 "use strict";
 
 // ✅ single source of truth
-const ENGINE_VERSION = "v20260228a1-engine-a5-policy-split";
+const ENGINE_VERSION = "v20260304a1-engine-a5-policy-split";
 
-// ✅ FIX: version string aligned with deployed query param (?v=20260228a1)
+// ✅ FIX: version string aligned with deployed query param (?v=20260304a1)
 console.log("[engine.js] loaded " + ENGINE_VERSION);
 
 /* =========================
