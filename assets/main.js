@@ -1,37 +1,44 @@
 // =======================
 // assets/main.js (FULL)
-// v20260304a1 (PATCHED: no legacy contentLang writes + export lang fallback + LANG STATUS TELEMETRY)
+// v20260304a2-lang-lock-invariant (PATCHED: no legacy contentLang writes + export lang fallback + LANG STATUS TELEMETRY + LOCK INVARIANT)
 //
 // ✅ UI language: window.currentLang 只影响 UI 文案
 // ✅ Content strategy language: window.ruleEngine / window.ruleEngineMode（由 lang-detect.js 的 ensureContentLang + 用户选择锁定）
 // ✅ Clear 必须 resetContentLang(): mode=auto, ruleEngine=""
 // ✅ Export Mode A uses content-strategy lang (ruleEngine), not UI lang
+//
+// ✅ NEW INVARIANT (A2):
+// - If detector returns a concrete lang with ok=true (or last detection is confident), main.js MUST ensure ruleEngine is set + locked.
+// - This prevents content strategy from drifting with UI language when ruleEngine is empty.
 // =========================
 
 /* =========================
-   LANG STATUS TELEMETRY (NEW)
+   LANG STATUS TELEMETRY
    - Keep runtime language state observable in exportStatus box
-   - Does NOT change detection / masking behavior
+   - Does NOT change detection / masking behavior (except lock invariant enforcement in guard)
    ========================= */
 function __normLang3(x) {
   const s = String(x || "").toLowerCase();
-  return (s === "zh" || s === "de" || s === "en") ? s : "";
+  return s === "zh" || s === "de" || s === "en" ? s : "";
 }
 
 function snapshotLangStatus(reason) {
   try {
-    const last = (window.__LangDetect && window.__LangDetect.__state && window.__LangDetect.__state.last)
-      ? window.__LangDetect.__state.last
-      : null;
+    const last =
+      window.__LangDetect && window.__LangDetect.__state && window.__LangDetect.__state.last
+        ? window.__LangDetect.__state.last
+        : null;
 
-    const detected = last ? {
-      lang: __normLang3(last.lang),
-      confidence: (typeof last.confidence === "number") ? last.confidence : null,
-      needsConfirm: !!last.needsConfirm,
-      reason: last.reason || "",
-      source: last.source || "",
-      candidates: Array.isArray(last.candidates) ? last.candidates.map(__normLang3).filter(Boolean) : []
-    } : null;
+    const detected = last
+      ? {
+          lang: __normLang3(last.lang),
+          confidence: typeof last.confidence === "number" ? last.confidence : null,
+          needsConfirm: !!last.needsConfirm,
+          reason: last.reason || "",
+          source: last.source || "",
+          candidates: Array.isArray(last.candidates) ? last.candidates.map(__normLang3).filter(Boolean) : []
+        }
+      : null;
 
     const ui = __normLang3(window.currentLang) || "";
     const re = __normLang3(window.ruleEngine) || "";
@@ -44,7 +51,7 @@ function snapshotLangStatus(reason) {
 
     window.__LANG_STATUS__ = {
       when: Date.now(),
-      iso: (new Date()).toISOString(),
+      iso: new Date().toISOString(),
       reason: String(reason || ""),
       uiLang: ui,
       ruleEngine: re,
@@ -68,8 +75,8 @@ function renderLangStatusLines(t) {
 
   if (st.detected) {
     const d = st.detected;
-    const conf = (typeof d.confidence === "number") ? d.confidence.toFixed(2) : "(?)";
-    const cand = (d.candidates && d.candidates.length) ? d.candidates.join(",") : "-";
+    const conf = typeof d.confidence === "number" ? d.confidence.toFixed(2) : "(?)";
+    const cand = d.candidates && d.candidates.length ? d.candidates.join(",") : "-";
     lines.push(`detect.last=${d.lang || "(?)"} conf=${conf} needsConfirm=${d.needsConfirm ? "true" : "false"}`);
     if (d.reason || d.source) lines.push(`detect.reason=${d.reason || "-"} src=${d.source || "-"}`);
     lines.push(`detect.candidates=${cand}`);
@@ -82,6 +89,39 @@ function renderLangStatusLines(t) {
 }
 
 /* =========================
+   LOCK INVARIANT ENFORCER (A2)
+   - If detector provides a concrete lang (zh/de/en), ensure ruleEngine is set + locked.
+   - Only enforces when current mode is not locked OR ruleEngine is empty.
+   - Does NOT change locked sessions; Clear/manual picker remain the only ways to change.
+   ========================= */
+function ensureRuleEngineLocked(detectResult, reason) {
+  try {
+    const ll = String((detectResult && detectResult.lang) || "").toLowerCase();
+    const L = ll === "zh" || ll === "de" || ll === "en" ? ll : "";
+    if (!L) return { changed: false };
+
+    const cur = String(window.ruleEngine || "").toLowerCase();
+    const mode = String(window.ruleEngineMode || "").toLowerCase();
+
+    // only enforce when not already locked with a concrete lang
+    if (mode !== "lock" || !cur) {
+      window.ruleEngine = L;
+      window.ruleEngineMode = "lock";
+
+      // optional signal for observers
+      try {
+        window.dispatchEvent(new CustomEvent("ruleengine:changed", { detail: { lang: L, reason: reason || "" } }));
+      } catch (_) {}
+
+      return { changed: true, lang: L };
+    }
+    return { changed: false };
+  } catch (_) {
+    return { changed: false };
+  }
+}
+
+/* =========================
    E) Export progress mirror (UI language aligned)
    - show RasterExport phases in exportStatus
    - keep BOOT line without overwriting progress
@@ -89,9 +129,9 @@ function renderLangStatusLines(t) {
 function i18nProgressLine(phase, t) {
   const map = {
     "exportRasterSecurePdfFromReadablePdf:begin": t.progressPhaseBegin || "开始准备…",
-    "autoRedactReadablePdf": t.progressPhaseScan || "扫描并计算遮盖区域…",
+    autoRedactReadablePdf: t.progressPhaseScan || "扫描并计算遮盖区域…",
     "exportRasterSecurePdfFromReadablePdf:export": t.progressPhaseExport || "生成安全PDF（纯图片）…",
-    "exportRasterSecurePdfFromVisual": t.progressPhaseExport || "生成安全PDF（纯图片）…"
+    exportRasterSecurePdfFromVisual: t.progressPhaseExport || "生成安全PDF（纯图片）…"
   };
   return map[phase] || (t.progressPhaseWorking || "处理中…");
 }
@@ -100,16 +140,15 @@ function renderExportStatusCombined() {
   const el = document.getElementById("exportStatus");
   if (!el) return;
 
-  const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
+  const t = window.I18N && window.I18N[currentLang] ? window.I18N[currentLang] : {};
   const s = window.__RasterExportLast || null;
   const bootLine = window.__bootLine || "";
 
-  // ✅ CHANGED: even if no bootLine and no export status, still show lang telemetry
   const lines = [];
 
   if (bootLine) lines.push(bootLine);
 
-  // ✅ NEW: always show language status (if available)
+  // always show language status (if available)
   try {
     const langLines = renderLangStatusLines(t);
     if (langLines && langLines.length) lines.push(...langLines);
@@ -135,7 +174,6 @@ function renderExportStatusCombined() {
     }
   }
 
-  // If nothing at all, keep existing
   if (!lines.length) return;
 
   el.textContent = lines.join("\n");
@@ -144,7 +182,9 @@ function renderExportStatusCombined() {
 function startExportStatusMirror() {
   if (window.__exportStatusTimer) clearInterval(window.__exportStatusTimer);
   window.__exportStatusTimer = setInterval(() => {
-    try { renderExportStatusCombined(); } catch (_) {}
+    try {
+      renderExportStatusCombined();
+    } catch (_) {}
   }, 120);
 }
 
@@ -158,45 +198,69 @@ function stopExportStatusMirror() {
 /* =========================
    LANG DETECT GUARD
    - call before applyRules() to avoid wrong-language pack usage
+   - A2: enforce lock invariant when detector returns a concrete lang
    ========================= */
 function ensureLangBeforeApply(text) {
   try {
-    // ✅ If modal is already opening/open, do NOT run applyRules again (avoid double-modal + drift)
+    // If modal is already opening/open, do NOT run applyRules again
     if (window.__LANG_MODAL_OPENING__) {
-      try { snapshotLangStatus("guard:blocked_by_modal"); } catch (_) {}
-      try { renderExportStatusCombined(); } catch (_) {}
+      try {
+        snapshotLangStatus("guard:blocked_by_modal");
+      } catch (_) {}
+      try {
+        renderExportStatusCombined();
+      } catch (_) {}
       return false;
     }
 
     if (window.__LangDetect && typeof window.__LangDetect.ensureContentLang === "function") {
       const r = window.__LangDetect.ensureContentLang(text, currentLang);
 
-      // ✅ NEW: snapshot after ensureContentLang (whether lock or ask)
+      // ✅ A2: Strongly ensure ruleEngine is set+locked if detector yields a concrete lang
+      try {
+        if (r && r.ok === true && r.lang) {
+          ensureRuleEngineLocked({ lang: r.lang }, "guard:lock_from_return");
+        } else {
+          const last = window.__LangDetect && window.__LangDetect.__state && window.__LangDetect.__state.last;
+          const conf = last && typeof last.confidence === "number" ? last.confidence : null;
+
+          // mirror CONF_LOCK=0.78 (lang-detect.js) but keep safe if confidence missing
+          if (last && last.lang && (conf == null || conf >= 0.78)) {
+            ensureRuleEngineLocked({ lang: last.lang }, "guard:lock_from_last");
+          }
+        }
+      } catch (_) {}
+
+      // snapshot after enforcement
       try {
         snapshotLangStatus("guard:ensureContentLang");
       } catch (_) {}
 
       // if modal opened -> stop this run
       if (r && r.ok === false) {
-        try { renderExportStatusCombined(); } catch (_) {}
+        try {
+          renderExportStatusCombined();
+        } catch (_) {}
         return false;
       }
 
-      // lock happened or ok pass
-      try { renderExportStatusCombined(); } catch (_) {}
-    } else {
-      // detector missing
       try {
-        snapshotLangStatus("guard:LangDetect_missing");
         renderExportStatusCombined();
       } catch (_) {}
+      return true;
     }
+
+    // detector missing
+    try {
+      snapshotLangStatus("guard:LangDetect_missing");
+      renderExportStatusCombined();
+    } catch (_) {}
   } catch (_) {}
 
   return true;
 }
 
-// ✅ IMPORTANT: expose for lang-detect.js / stage3.js rerun chain
+// expose for lang-detect.js / stage3.js rerun chain
 try {
   if (typeof window.ensureLangBeforeApply !== "function") window.ensureLangBeforeApply = ensureLangBeforeApply;
 } catch (_) {}
@@ -208,24 +272,28 @@ window.openLangPicker = function () {
     const v = ta ? String(ta.value || "") : "";
 
     if (window.__LangModal && typeof window.__LangModal.open === "function") {
-      try { window.__LANG_MODAL_OPENING__ = true; } catch (_) {}
+      try {
+        window.__LANG_MODAL_OPENING__ = true;
+      } catch (_) {}
       try {
         snapshotLangStatus("picker:open");
         renderExportStatusCombined();
       } catch (_) {}
 
       window.__LangModal.open({
-        uiLang: (String(currentLang || "en")).toLowerCase(),
+        uiLang: String(currentLang || "en").toLowerCase(),
         detected: (window.getLangContent && window.getLangContent()) || window.ruleEngine || "",
         confidence: null,
         candidates: ["zh", "de", "en"],
         reason: "manual_open",
         onPick: function (lang) {
-          try { window.__LANG_MODAL_OPENING__ = false; } catch (_) {}
+          try {
+            window.__LANG_MODAL_OPENING__ = false;
+          } catch (_) {}
 
-          // ✅ normalize (safety): only accept zh/de/en
+          // normalize (safety): only accept zh/de/en
           const ll = String(lang || "").toLowerCase();
-          const L = (ll === "zh" || ll === "de" || ll === "en") ? ll : "";
+          const L = ll === "zh" || ll === "de" || ll === "en" ? ll : "";
           if (!L) return;
 
           window.ruleEngine = L;
@@ -236,7 +304,7 @@ window.openLangPicker = function () {
             renderExportStatusCombined();
           } catch (_) {}
 
-          // ✅ NEVER call applyRules() directly here; always go through safe/guard entry
+          // never call applyRules() directly here; always go through safe/guard entry
           if (v.trim()) {
             if (typeof window.applyRulesSafely === "function") window.applyRulesSafely(v);
             else if (typeof window.ensureLangBeforeApply === "function" && typeof window.applyRules === "function") {
@@ -246,7 +314,9 @@ window.openLangPicker = function () {
           }
         },
         onClose: function () {
-          try { window.__LANG_MODAL_OPENING__ = false; } catch (_) {}
+          try {
+            window.__LANG_MODAL_OPENING__ = false;
+          } catch (_) {}
           try {
             snapshotLangStatus("picker:onClose");
             renderExportStatusCombined();
@@ -259,9 +329,9 @@ window.openLangPicker = function () {
 
 // ================= bind =================
 function bind() {
-  document.querySelectorAll(".lang button").forEach(b => {
+  document.querySelectorAll(".lang button").forEach((b) => {
     b.onclick = () => {
-      document.querySelectorAll(".lang button").forEach(x => x.classList.remove("active"));
+      document.querySelectorAll(".lang button").forEach((x) => x.classList.remove("active"));
       b.classList.add("active");
 
       // UI language only
@@ -271,18 +341,17 @@ function bind() {
       // refresh UI strings
       setText();
 
-      // ✅ NEW: snapshot on UI change
+      // snapshot on UI change
       try {
         snapshotLangStatus("ui:switch");
         renderExportStatusCombined();
       } catch (_) {}
 
       const ta = $("inputText");
-      const inTxt = (ta && ta.value) ? String(ta.value).trim() : "";
+      const inTxt = ta && ta.value ? String(ta.value).trim() : "";
 
-      // ✅ IMPORTANT: UI switch MUST NOT overwrite ruleEngine/mode
+      // UI switch MUST NOT overwrite ruleEngine/mode
       if (inTxt) {
-        // ✅ ensure correct content language BEFORE applying rules
         if (!ensureLangBeforeApply(inTxt)) return;
         applyRules(inTxt);
       } else window.dispatchEvent(new Event("safe:updated"));
@@ -291,8 +360,9 @@ function bind() {
 
       requestAnimationFrame(syncManualRiskHeights);
 
-      // refresh export status language (same UI lang)
-      try { renderExportStatusCombined(); } catch (_) {}
+      try {
+        renderExportStatusCombined();
+      } catch (_) {}
     };
   });
 
@@ -330,10 +400,11 @@ function bind() {
         applyRules(inTxt);
       } else window.dispatchEvent(new Event("safe:updated"));
 
-      renderInputOverlayForPdf(($("inputText") && $("inputText").value) || "");
+      renderInputOverlayForPdf((($("inputText") && $("inputText").value) || ""));
+
       requestAnimationFrame(syncManualRiskHeights);
 
-      // ✅ NEW: snapshot after manual terms input
+      // snapshot after manual terms input
       try {
         snapshotLangStatus("manualTerms:input");
         renderExportStatusCombined();
@@ -348,31 +419,60 @@ function bind() {
   const btnClear = $("btnClear");
   if (btnClear) {
     btnClear.onclick = () => {
-      // ✅ 0) FIRST: re-init enabled (must not be blocked by later UI errors)
+      // 0) FIRST: re-init enabled (must not be blocked by later UI errors)
       try {
         if (typeof window.initEnabled === "function") window.initEnabled();
         else if (typeof initEnabled === "function") initEnabled();
       } catch (_) {}
 
-      // ✅ 1) everything else: do not allow any single error to abort the rest
-      try { if ($("inputText")) $("inputText").value = ""; } catch (_) {}
-      try { renderOutput(""); } catch (_) {}
+      // 1) everything else: do not allow any single error to abort the rest
+      try {
+        if ($("inputText")) $("inputText").value = "";
+      } catch (_) {}
+      try {
+        renderOutput("");
+      } catch (_) {}
 
-      try { window.__safe_hits = 0; } catch (_) {}
-      try { window.__safe_breakdown = {}; } catch (_) {}
-      try { window.__safe_score = 0; } catch (_) {}
-      try { window.__safe_level = "low"; } catch (_) {}
-      try { window.__safe_report = null; } catch (_) {}
+      try {
+        window.__safe_hits = 0;
+      } catch (_) {}
+      try {
+        window.__safe_breakdown = {};
+      } catch (_) {}
+      try {
+        window.__safe_score = 0;
+      } catch (_) {}
+      try {
+        window.__safe_level = "low";
+      } catch (_) {}
+      try {
+        window.__safe_report = null;
+      } catch (_) {}
 
-      try { lastRunMeta.fromPdf = false; } catch (_) {}
+      try {
+        lastRunMeta.fromPdf = false;
+      } catch (_) {}
 
-      try { if (typeof collapseManualArea === "function") collapseManualArea(); } catch (_) {}
-      try { if (typeof collapseRiskArea === "function") collapseRiskArea(); } catch (_) {}
-      try { if (typeof clearProgress === "function") clearProgress(); } catch (_) {}
-      try { if (typeof clearBodyHeights === "function") clearBodyHeights(); } catch (_) {}
+      try {
+        if (typeof collapseManualArea === "function") collapseManualArea();
+      } catch (_) {}
+      try {
+        if (typeof collapseRiskArea === "function") collapseRiskArea();
+      } catch (_) {}
+      try {
+        if (typeof clearProgress === "function") clearProgress();
+      } catch (_) {}
+      try {
+        if (typeof clearBodyHeights === "function") clearBodyHeights();
+      } catch (_) {}
 
-      try { const rb = $("riskBox"); if (rb) rb.innerHTML = ""; } catch (_) {}
-      try { if ($("pdfName")) $("pdfName").textContent = ""; } catch (_) {}
+      try {
+        const rb = $("riskBox");
+        if (rb) rb.innerHTML = "";
+      } catch (_) {}
+      try {
+        if ($("pdfName")) $("pdfName").textContent = "";
+      } catch (_) {}
 
       try {
         const wrap = $("inputWrap");
@@ -381,7 +481,10 @@ function bind() {
           wrap.classList.remove("has-content");
         }
       } catch (_) {}
-      try { const ov = $("inputOverlay"); if (ov) ov.innerHTML = ""; } catch (_) {}
+      try {
+        const ov = $("inputOverlay");
+        if (ov) ov.innerHTML = "";
+      } catch (_) {}
 
       try {
         manualTerms = [];
@@ -392,48 +495,75 @@ function bind() {
         }
       } catch (_) {}
 
-      try { lastUploadedFile = null; } catch (_) {}
-      try { lastFileKind = ""; } catch (_) {}
-      try { lastProbe = null; } catch (_) {}
-      try { lastPdfOriginalText = ""; } catch (_) {}
-      try { if (typeof setStage3Ui === "function") setStage3Ui("none"); } catch (_) {}
-      try { if (typeof setManualPanesForMode === "function") setManualPanesForMode("none"); } catch (_) {}
+      try {
+        lastUploadedFile = null;
+      } catch (_) {}
+      try {
+        lastFileKind = "";
+      } catch (_) {}
+      try {
+        lastProbe = null;
+      } catch (_) {}
+      try {
+        lastPdfOriginalText = "";
+      } catch (_) {}
+      try {
+        if (typeof setStage3Ui === "function") setStage3Ui("none");
+      } catch (_) {}
+      try {
+        if (typeof setManualPanesForMode === "function") setManualPanesForMode("none");
+      } catch (_) {}
 
-      try { __manualRedactSession = null; } catch (_) {}
-      try { __manualRedactResult = null; } catch (_) {}
-      try { window.__manual_redact_last = null; } catch (_) {}
+      try {
+        __manualRedactSession = null;
+      } catch (_) {}
+      try {
+        __manualRedactResult = null;
+      } catch (_) {}
+      try {
+        window.__manual_redact_last = null;
+      } catch (_) {}
 
-      try { window.__export_snapshot = null; } catch (_) {}
-      try { window.__export_snapshot_byLang = null; } catch (_) {}
+      try {
+        window.__export_snapshot = null;
+      } catch (_) {}
+      try {
+        window.__export_snapshot_byLang = null;
+      } catch (_) {}
 
-      // ✅ RULE C: reset ruleEngine/contentLang
+      // RULE C: reset ruleEngine/contentLang
       try {
         if (typeof resetContentLang === "function") {
           resetContentLang();
         } else {
-          // ✅ fallback: reset ruleEngine only (single source)
           window.ruleEngineMode = "auto";
           window.ruleEngine = "";
         }
       } catch (_) {}
 
-      // ✅ optional: clear export status (keep boot line)
-      try { window.__RasterExportLast = null; } catch (_) {}
+      // clear export status (keep boot line)
+      try {
+        window.__RasterExportLast = null;
+      } catch (_) {}
 
-      // ✅ NEW: snapshot after clear
+      // snapshot after clear
       try {
         snapshotLangStatus("ui:clear");
       } catch (_) {}
 
-      try { if (typeof renderExportStatusCombined === "function") renderExportStatusCombined(); } catch (_) {}
+      try {
+        if (typeof renderExportStatusCombined === "function") renderExportStatusCombined();
+      } catch (_) {}
 
-      // ✅ FINAL: initEnabled again as a last safety net
+      // FINAL: initEnabled again as a last safety net
       try {
         if (typeof window.initEnabled === "function") window.initEnabled();
         else if (typeof initEnabled === "function") initEnabled();
       } catch (_) {}
 
-      try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
+      try {
+        window.dispatchEvent(new Event("safe:updated"));
+      } catch (_) {}
     };
   }
 
@@ -446,7 +576,9 @@ function bind() {
         if (t) {
           const old = btnCopy.textContent;
           btnCopy.textContent = t.btnCopied || old;
-          setTimeout(() => { btnCopy.textContent = t.btnCopy || old; }, 900);
+          setTimeout(() => {
+            btnCopy.textContent = t.btnCopy || old;
+          }, 900);
         }
       } catch (e) {}
     };
@@ -469,7 +601,7 @@ function bind() {
           if (!ensureLangBeforeApply(v)) return;
           applyRules(v);
 
-          // ✅ NEW: snapshot after apply
+          // snapshot after apply
           try {
             snapshotLangStatus("input:applyRules");
             renderExportStatusCombined();
@@ -480,7 +612,7 @@ function bind() {
           if (rb) rb.innerHTML = "";
           clearProgress();
 
-          // ✅ NEW: snapshot on empty
+          // snapshot on empty
           try {
             snapshotLangStatus("input:empty");
             renderExportStatusCombined();
@@ -519,7 +651,7 @@ function bind() {
 
       requestAnimationFrame(syncManualRiskHeights);
 
-      // ✅ NEW: snapshot when manual redact UI opened
+      // snapshot when manual redact UI opened
       try {
         snapshotLangStatus("modeB:manualRedactStart");
         renderExportStatusCombined();
@@ -534,12 +666,14 @@ function bind() {
       expandManualArea();
       requestAnimationFrame(syncManualRiskHeights);
 
-      const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
+      const t = window.I18N && window.I18N[currentLang] ? window.I18N[currentLang] : {};
 
-      // ✅ start mirroring when user clicks export
-      try { startExportStatusMirror(); } catch (_) {}
+      // start mirroring when user clicks export
+      try {
+        startExportStatusMirror();
+      } catch (_) {}
 
-      // ✅ NEW: snapshot at export click
+      // snapshot at export click
       try {
         snapshotLangStatus("export:click");
         renderExportStatusCombined();
@@ -566,8 +700,7 @@ function bind() {
 
           if (!res || !res.pages || !res.rectsByPage) {
             setProgressText(
-              t.progressNeedManualFirst ||
-              "请先点「手工涂抹」完成框选并关闭界面，然后再点「红删PDF」。",
+              t.progressNeedManualFirst || "请先点「手工涂抹」完成框选并关闭界面，然后再点「红删PDF」。",
               true
             );
             return;
@@ -578,11 +711,7 @@ function bind() {
             return;
           }
 
-          setProgressText([
-            (t.progressWorking || "处理中…"),
-            `mode=B`,
-            `dpi=${res.dpi || 600}`
-          ], false);
+          setProgressText([t.progressWorking || "处理中…", "mode=B", `dpi=${res.dpi || 600}`], false);
 
           await window.RasterExport.exportRasterSecurePdfFromVisual(res);
 
@@ -596,7 +725,10 @@ function bind() {
           return;
         }
         if (!lastProbe || !lastProbe.hasTextLayer) {
-          setProgressText(t.progressNotReadable || "PDF 不可读（Mode B），请先手工涂抹并保存框选，然后再点红删PDF。", true);
+          setProgressText(
+            t.progressNotReadable || "PDF 不可读（Mode B），请先手工涂抹并保存框选，然后再点红删PDF。",
+            true
+          );
           return;
         }
 
@@ -608,23 +740,26 @@ function bind() {
         const snap = window.__export_snapshot || {};
         const enabledKeys = Array.isArray(snap.enabledKeys) ? snap.enabledKeys : effectiveEnabledKeys();
 
-        // ✅ KEY FIX: export uses content-strategy lang, not UI lang
+        // export uses content-strategy lang, not UI lang
         const lang =
           snap.langContent ||
           (typeof getLangContent === "function" ? getLangContent() : null) ||
-          ((String(window.ruleEngineMode || "").toLowerCase() === "lock" && window.ruleEngine) ? window.ruleEngine : "") ||
+          (String(window.ruleEngineMode || "").toLowerCase() === "lock" && window.ruleEngine ? window.ruleEngine : "") ||
           "";
 
         const manualTermsSafe = Array.isArray(snap.manualTerms) ? snap.manualTerms : [];
 
-        setProgressText([
-          (t.progressWorking || "处理中…"),
-          `mode=A`,
-          `lang=${lang || "(auto)"}`,
-          `moneyMode=M1`,
-          `enabledKeys=${enabledKeys.length}`,
-          `manualTerms=${manualTermsSafe.length}`
-        ], false);
+        setProgressText(
+          [
+            t.progressWorking || "处理中…",
+            "mode=A",
+            `lang=${lang || "(auto)"}`,
+            "moneyMode=M1",
+            `enabledKeys=${enabledKeys.length}`,
+            `manualTerms=${manualTermsSafe.length}`
+          ],
+          false
+        );
 
         await window.RasterExport.exportRasterSecurePdfFromReadablePdf({
           file: f,
@@ -640,14 +775,16 @@ function bind() {
         requestAnimationFrame(syncManualRiskHeights);
       } catch (e) {
         const msg = (e && (e.message || String(e))) || "Unknown error";
-        const t2 = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : {};
+        const t2 = window.I18N && window.I18N[currentLang] ? window.I18N[currentLang] : {};
         setProgressText(`${t2.progressFailed || "导出失败："}\n${msg}`, true);
         requestAnimationFrame(syncManualRiskHeights);
       } finally {
-        // ✅ stop mirror after completion/failure/early return
-        try { stopExportStatusMirror(); } catch (_) {}
-        // render once at end
-        try { renderExportStatusCombined(); } catch (_) {}
+        try {
+          stopExportStatusMirror();
+        } catch (_) {}
+        try {
+          renderExportStatusCombined();
+        } catch (_) {}
       }
     };
   }
@@ -680,28 +817,36 @@ function bind() {
   }
 
   function rerender() {
-    try { renderExportStatusCombined(); } catch (_) {}
+    try {
+      renderExportStatusCombined();
+    } catch (_) {}
   }
 
-  // react to event from engine.js
   try {
     window.addEventListener("boot:checked", function () {
-      try { updateBootLine(); } catch (_) {}
-      try { rerender(); } catch (_) {}
+      try {
+        updateBootLine();
+      } catch (_) {}
+      try {
+        rerender();
+      } catch (_) {}
     });
   } catch (_) {}
 
-  // also try once on next tick (covers cases where engine fired before listener)
   try {
     setTimeout(() => {
-      try { updateBootLine(); } catch (_) {}
-      try { rerender(); } catch (_) {}
+      try {
+        updateBootLine();
+      } catch (_) {}
+      try {
+        rerender();
+      } catch (_) {}
     }, 0);
   } catch (_) {}
 })();
 
 // ================= boot =================
-(function boot(){
+(function boot() {
   try {
     if (typeof initEnabled === "function") initEnabled();
     if (typeof setText === "function") setText();
@@ -709,13 +854,13 @@ function bind() {
     if (typeof updateInputWatermarkVisibility === "function") updateInputWatermarkVisibility();
     if (typeof initRiskResizeObserver === "function") initRiskResizeObserver();
 
-    // ✅ NEW: snapshot at boot (gives you immediate view even before typing)
+    // snapshot at boot (immediate view even before typing)
     try {
       snapshotLangStatus("boot");
       renderExportStatusCombined();
     } catch (_) {}
 
-    // ✅ IMPORTANT: do NOT force ruleEngine/ruleEngineMode here.
+    // do NOT force ruleEngine/ruleEngineMode here.
   } catch (e) {
     console.error("[boot] failed:", e);
   }
