@@ -171,6 +171,9 @@
     if (!file) return null;
     if (!window.RasterExport) throw new Error("RasterExport missing");
 
+    // ✅ stable filename per session (do NOT change on repeated done())
+    const filename = `raster_secure_${Date.now()}.pdf`;
+
     const ui = createOverlay(lang);
     const canvas = $(".rui-canvas", ui);
     const pageLabel = $(".rui-page", ui);
@@ -342,6 +345,21 @@
       ui.remove();
     }
 
+    function cloneRectsByPage(src) {
+      const out = {};
+      const keys = Object.keys(src || {});
+      for (const k of keys) {
+        const arr = Array.isArray(src[k]) ? src[k] : [];
+        out[k] = arr.map(r => ({
+          x: Number(r.x || 0),
+          y: Number(r.y || 0),
+          w: Number(r.w || 0),
+          h: Number(r.h || 0)
+        }));
+      }
+      return out;
+    }
+
     function buildResult() {
       return {
         pages: pages.map(p => ({
@@ -350,10 +368,11 @@
           width: p.width || (p.canvas ? p.canvas.width : 1),
           height: p.height || (p.canvas ? p.canvas.height : 1)
         })),
-        rectsByPage,
+        // ✅ freeze snapshot (avoid mutable reference)
+        rectsByPage: cloneRectsByPage(rectsByPage),
         lang,
         dpi: DPI,
-        filename: `raster_secure_${Date.now()}.pdf`
+        filename
       };
     }
 
