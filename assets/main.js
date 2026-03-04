@@ -1,12 +1,85 @@
 // =======================
 // assets/main.js (FULL)
-// v20260304a1 (PATCHED: no legacy contentLang writes + export lang fallback)
+// v20260304a1 (PATCHED: no legacy contentLang writes + export lang fallback + LANG STATUS TELEMETRY)
 //
 // ✅ UI language: window.currentLang 只影响 UI 文案
 // ✅ Content strategy language: window.ruleEngine / window.ruleEngineMode（由 lang-detect.js 的 ensureContentLang + 用户选择锁定）
 // ✅ Clear 必须 resetContentLang(): mode=auto, ruleEngine=""
 // ✅ Export Mode A uses content-strategy lang (ruleEngine), not UI lang
 // =========================
+
+/* =========================
+   LANG STATUS TELEMETRY (NEW)
+   - Keep runtime language state observable in exportStatus box
+   - Does NOT change detection / masking behavior
+   ========================= */
+function __normLang3(x) {
+  const s = String(x || "").toLowerCase();
+  return (s === "zh" || s === "de" || s === "en") ? s : "";
+}
+
+function snapshotLangStatus(reason) {
+  try {
+    const last = (window.__LangDetect && window.__LangDetect.__state && window.__LangDetect.__state.last)
+      ? window.__LangDetect.__state.last
+      : null;
+
+    const detected = last ? {
+      lang: __normLang3(last.lang),
+      confidence: (typeof last.confidence === "number") ? last.confidence : null,
+      needsConfirm: !!last.needsConfirm,
+      reason: last.reason || "",
+      source: last.source || "",
+      candidates: Array.isArray(last.candidates) ? last.candidates.map(__normLang3).filter(Boolean) : []
+    } : null;
+
+    const ui = __normLang3(window.currentLang) || "";
+    const re = __normLang3(window.ruleEngine) || "";
+    const mode = String(window.ruleEngineMode || "").toLowerCase() || "";
+
+    let content = "";
+    try {
+      if (typeof window.getLangContent === "function") content = __normLang3(window.getLangContent()) || "";
+    } catch (_) {}
+
+    window.__LANG_STATUS__ = {
+      when: Date.now(),
+      iso: (new Date()).toISOString(),
+      reason: String(reason || ""),
+      uiLang: ui,
+      ruleEngine: re,
+      ruleEngineMode: mode,
+      langContent: content || re || ui || "",
+      modalOpening: !!window.__LANG_MODAL_OPENING__,
+      detected
+    };
+  } catch (_) {}
+}
+
+function renderLangStatusLines(t) {
+  const st = window.__LANG_STATUS__ || null;
+  if (!st) return [];
+
+  const lines = [];
+  lines.push(`UI=${st.uiLang || "(?)"}`);
+  lines.push(`content=${st.langContent || "(?)"}`);
+  lines.push(`ruleEngine=${st.ruleEngine || "(empty)"} (${st.ruleEngineMode || "auto"})`);
+  lines.push(`modal=${st.modalOpening ? "OPEN" : "false"}`);
+
+  if (st.detected) {
+    const d = st.detected;
+    const conf = (typeof d.confidence === "number") ? d.confidence.toFixed(2) : "(?)";
+    const cand = (d.candidates && d.candidates.length) ? d.candidates.join(",") : "-";
+    lines.push(`detect.last=${d.lang || "(?)"} conf=${conf} needsConfirm=${d.needsConfirm ? "true" : "false"}`);
+    if (d.reason || d.source) lines.push(`detect.reason=${d.reason || "-"} src=${d.source || "-"}`);
+    lines.push(`detect.candidates=${cand}`);
+  } else {
+    lines.push("detect.last=(none)");
+  }
+
+  if (st.reason) lines.push(`telemetry=${st.reason}`);
+  return lines;
+}
 
 /* =========================
    E) Export progress mirror (UI language aligned)
@@ -31,11 +104,16 @@ function renderExportStatusCombined() {
   const s = window.__RasterExportLast || null;
   const bootLine = window.__bootLine || "";
 
-  // If nothing to show, keep existing
-  if (!bootLine && !s) return;
-
+  // ✅ CHANGED: even if no bootLine and no export status, still show lang telemetry
   const lines = [];
+
   if (bootLine) lines.push(bootLine);
+
+  // ✅ NEW: always show language status (if available)
+  try {
+    const langLines = renderLangStatusLines(t);
+    if (langLines && langLines.length) lines.push(...langLines);
+  } catch (_) {}
 
   if (s) {
     if (s.phase) lines.push(`${i18nProgressLine(s.phase, t)}  (${s.phase})`);
@@ -56,6 +134,9 @@ function renderExportStatusCombined() {
       }
     }
   }
+
+  // If nothing at all, keep existing
+  if (!lines.length) return;
 
   el.textContent = lines.join("\n");
 }
@@ -81,14 +162,37 @@ function stopExportStatusMirror() {
 function ensureLangBeforeApply(text) {
   try {
     // ✅ If modal is already opening/open, do NOT run applyRules again (avoid double-modal + drift)
-    if (window.__LANG_MODAL_OPENING__) return false;
+    if (window.__LANG_MODAL_OPENING__) {
+      try { snapshotLangStatus("guard:blocked_by_modal"); } catch (_) {}
+      try { renderExportStatusCombined(); } catch (_) {}
+      return false;
+    }
 
     if (window.__LangDetect && typeof window.__LangDetect.ensureContentLang === "function") {
       const r = window.__LangDetect.ensureContentLang(text, currentLang);
+
+      // ✅ NEW: snapshot after ensureContentLang (whether lock or ask)
+      try {
+        snapshotLangStatus("guard:ensureContentLang");
+      } catch (_) {}
+
       // if modal opened -> stop this run
-      if (r && r.ok === false) return false;
+      if (r && r.ok === false) {
+        try { renderExportStatusCombined(); } catch (_) {}
+        return false;
+      }
+
+      // lock happened or ok pass
+      try { renderExportStatusCombined(); } catch (_) {}
+    } else {
+      // detector missing
+      try {
+        snapshotLangStatus("guard:LangDetect_missing");
+        renderExportStatusCombined();
+      } catch (_) {}
     }
   } catch (_) {}
+
   return true;
 }
 
@@ -105,6 +209,10 @@ window.openLangPicker = function () {
 
     if (window.__LangModal && typeof window.__LangModal.open === "function") {
       try { window.__LANG_MODAL_OPENING__ = true; } catch (_) {}
+      try {
+        snapshotLangStatus("picker:open");
+        renderExportStatusCombined();
+      } catch (_) {}
 
       window.__LangModal.open({
         uiLang: (String(currentLang || "en")).toLowerCase(),
@@ -123,6 +231,11 @@ window.openLangPicker = function () {
           window.ruleEngine = L;
           window.ruleEngineMode = "lock";
 
+          try {
+            snapshotLangStatus("picker:onPick_lock");
+            renderExportStatusCombined();
+          } catch (_) {}
+
           // ✅ NEVER call applyRules() directly here; always go through safe/guard entry
           if (v.trim()) {
             if (typeof window.applyRulesSafely === "function") window.applyRulesSafely(v);
@@ -134,6 +247,10 @@ window.openLangPicker = function () {
         },
         onClose: function () {
           try { window.__LANG_MODAL_OPENING__ = false; } catch (_) {}
+          try {
+            snapshotLangStatus("picker:onClose");
+            renderExportStatusCombined();
+          } catch (_) {}
         }
       });
     }
@@ -154,11 +271,16 @@ function bind() {
       // refresh UI strings
       setText();
 
+      // ✅ NEW: snapshot on UI change
+      try {
+        snapshotLangStatus("ui:switch");
+        renderExportStatusCombined();
+      } catch (_) {}
+
       const ta = $("inputText");
       const inTxt = (ta && ta.value) ? String(ta.value).trim() : "";
 
       // ✅ IMPORTANT: UI switch MUST NOT overwrite ruleEngine/mode
-
       if (inTxt) {
         // ✅ ensure correct content language BEFORE applying rules
         if (!ensureLangBeforeApply(inTxt)) return;
@@ -210,6 +332,12 @@ function bind() {
 
       renderInputOverlayForPdf(($("inputText") && $("inputText").value) || "");
       requestAnimationFrame(syncManualRiskHeights);
+
+      // ✅ NEW: snapshot after manual terms input
+      try {
+        snapshotLangStatus("manualTerms:input");
+        renderExportStatusCombined();
+      } catch (_) {}
     });
 
     setManualTermsFromText(termInput.value || "");
@@ -291,12 +419,18 @@ function bind() {
 
       // ✅ optional: clear export status (keep boot line)
       try { window.__RasterExportLast = null; } catch (_) {}
+
+      // ✅ NEW: snapshot after clear
+      try {
+        snapshotLangStatus("ui:clear");
+      } catch (_) {}
+
       try { if (typeof renderExportStatusCombined === "function") renderExportStatusCombined(); } catch (_) {}
 
       // ✅ FINAL: initEnabled again as a last safety net
       try {
         if (typeof window.initEnabled === "function") window.initEnabled();
-       else if (typeof initEnabled === "function") initEnabled();
+        else if (typeof initEnabled === "function") initEnabled();
       } catch (_) {}
 
       try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
@@ -334,11 +468,24 @@ function bind() {
         if (v.trim()) {
           if (!ensureLangBeforeApply(v)) return;
           applyRules(v);
+
+          // ✅ NEW: snapshot after apply
+          try {
+            snapshotLangStatus("input:applyRules");
+            renderExportStatusCombined();
+          } catch (_) {}
         } else {
           renderOutput("");
           const rb = $("riskBox");
           if (rb) rb.innerHTML = "";
           clearProgress();
+
+          // ✅ NEW: snapshot on empty
+          try {
+            snapshotLangStatus("input:empty");
+            renderExportStatusCombined();
+          } catch (_) {}
+
           window.dispatchEvent(new Event("safe:updated"));
         }
       }, AUTO_DELAY);
@@ -371,6 +518,12 @@ function bind() {
       } catch (_) {}
 
       requestAnimationFrame(syncManualRiskHeights);
+
+      // ✅ NEW: snapshot when manual redact UI opened
+      try {
+        snapshotLangStatus("modeB:manualRedactStart");
+        renderExportStatusCombined();
+      } catch (_) {}
     };
   }
 
@@ -385,6 +538,12 @@ function bind() {
 
       // ✅ start mirroring when user clicks export
       try { startExportStatusMirror(); } catch (_) {}
+
+      // ✅ NEW: snapshot at export click
+      try {
+        snapshotLangStatus("export:click");
+        renderExportStatusCombined();
+      } catch (_) {}
 
       try {
         const f = lastUploadedFile;
@@ -549,6 +708,12 @@ function bind() {
     if (typeof bind === "function") bind();
     if (typeof updateInputWatermarkVisibility === "function") updateInputWatermarkVisibility();
     if (typeof initRiskResizeObserver === "function") initRiskResizeObserver();
+
+    // ✅ NEW: snapshot at boot (gives you immediate view even before typing)
+    try {
+      snapshotLangStatus("boot");
+      renderExportStatusCombined();
+    } catch (_) {}
 
     // ✅ IMPORTANT: do NOT force ruleEngine/ruleEngineMode here.
   } catch (e) {
