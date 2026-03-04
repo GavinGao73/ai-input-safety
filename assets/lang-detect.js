@@ -1,7 +1,5 @@
 // =========================
-// assets/lang-detect.js (FULL)
-// v20260304a1 — PATCHED (dedupe + decouple + short_latin fix + stable rerun)
-//
+// assets/lang-detect.js (NEW) — PATCHED (dedupe + decouple + short_latin FIX)
 // Language detection orchestrator (franc-all + pack.detect + conservative fallback)
 // - Exposes window.__LangDetect.detectLang(text, uiLang)
 // - Exposes ensureContentLang() for main.js pre-guard
@@ -18,14 +16,14 @@
   API.__state = API.__state || { ver: "v20260304a1-shortlatin-fix", last: null };
 
   // ---- Config (conservative) ----
-  const MIN_LEN_FRANC = 40; // shorter than this: franc is noisy
-  const MIN_LATIN = 12; // require some letters for en/de
-  const HAN_RATIO_ZH = 0.02; // Han chars ratio >= 2% => strong zh
+  const MIN_LEN_FRANC = 40;      // shorter than this: franc is noisy
+  const MIN_LATIN = 12;          // require some letters for en/de
+  const HAN_RATIO_ZH = 0.02;     // Han chars ratio >= 2% => strong zh
 
   // Confidence thresholds
-  const CONF_LOCK = 0.78; // >= lock automatically
+  const CONF_LOCK = 0.78;        // >= lock automatically
 
-  // Extra safety: short Latin text is often ambiguous EN/DE
+  // Extra safety: short Latin text can be ambiguous EN/DE, but only if no strong DE signals
   const SHORT_LATIN_AMBIG_LEN = 120;
 
   // ISO639-3 -> our pack lang
@@ -64,13 +62,12 @@
     const latin = (s.match(/[A-Za-z]/g) || []).length;
     const umlauts = (s.match(/[äöüÄÖÜß]/g) || []).length;
 
-    // quick keyword signals (used ONLY here, not in engine.js)
-    const hasDeKw = /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Geburtsdatum|USt-IdNr)\b/i.test(
-      s
-    );
-    const hasEnKw = /\b(Invoice|Order\s*ID|Account\s*Number|Username|Address|Phone|Email|Customer|Payment|Bank|Passport|SSN)\b/i.test(
-      s
-    );
+    // keyword signals (used ONLY here, not in engine.js)
+    const hasDeKw = /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Geburtsdatum|USt-IdNr)\b/i.test(s);
+    const hasEnKw = /\b(Invoice|Order\s*ID|Account\s*Number|Username|Address|Phone|Email|Customer|Payment|Bank|Passport|SSN)\b/i.test(s);
+
+    // DE function words: strong indicator for German prose even without keywords/umlauts
+    const deFnWords = (s.match(/\b(der|die|das|den|dem|des|ein|eine|einer|eines|und|oder|nicht|ich|sie|wir|ihr|Sie|mit|für|auf|bei|von|zum|zur|im|am|aus|auch|wird|werden|bitte|danke)\b/gi) || []).length;
 
     return {
       len,
@@ -79,7 +76,8 @@
       umlauts,
       hanRatio: han / Math.max(1, len),
       hasDeKw,
-      hasEnKw
+      hasEnKw,
+      deFnWords
     };
   }
 
@@ -100,7 +98,19 @@
       };
     }
 
-    // Strong DE
+    // ✅ Strong DE by umlaut/ß (very reliable)
+    if (st.umlauts > 0) {
+      return {
+        lang: "de",
+        confidence: 0.94,
+        needsConfirm: false,
+        candidates: ["de"],
+        reason: "umlaut_signal",
+        source: "heuristic"
+      };
+    }
+
+    // Strong DE by keywords
     if (st.hasDeKw) {
       // if also has strong EN keywords -> mixed => ask
       if (st.hasEnKw) {
@@ -123,7 +133,19 @@
       };
     }
 
-    // Strong EN
+    // ✅ Strong DE by function words (German prose)
+    if (st.deFnWords >= 2 && st.latin >= MIN_LATIN) {
+      return {
+        lang: "de",
+        confidence: 0.86,
+        needsConfirm: false,
+        candidates: ["de"],
+        reason: "de_function_words",
+        source: "heuristic"
+      };
+    }
+
+    // Strong EN by keywords
     if (st.latin >= MIN_LATIN && st.hasEnKw) {
       return {
         lang: "en",
@@ -135,7 +157,6 @@
       };
     }
 
-    // No strong signal => do NOT block franc/pack; let caller continue.
     return {
       lang: "",
       confidence: 0,
@@ -180,7 +201,6 @@
 
           // franc score meaning differs by build; treat only as soft indicator
           if (Number.isFinite(topScore) && Number.isFinite(secondScore)) {
-            // gap should be top - second
             const gap = Math.max(0, topScore - secondScore);
             confidence = Math.max(0.62, Math.min(0.92, 0.62 + gap / 120));
           } else {
@@ -210,7 +230,6 @@
         };
       }
 
-      // If candidates include both en/de and confidence not super high => ask (mixed/uncertain)
       let needsConfirm = confidence < CONF_LOCK;
       if (candidates.includes("en") && candidates.includes("de") && confidence < 0.88) needsConfirm = true;
 
@@ -265,29 +284,34 @@
         };
       }
 
-      // "none" is not a conflict; let upper layers decide fallback/ask
       return { lang: "", confidence: 0, needsConfirm: false, candidates: [], reason: "pack_detect_none", source: "pack" };
     } catch (e) {
       return { lang: "", confidence: 0, needsConfirm: true, candidates: [], reason: "pack_detect_error", source: "pack" };
     }
   }
 
-  function isShortLatinAmbiguous(st, resLike) {
-    // Only consider EN/DE ambiguity for short Latin-only texts.
-    if (!(st && st.hanRatio < HAN_RATIO_ZH && st.latin >= MIN_LATIN && st.len <= SHORT_LATIN_AMBIG_LEN)) return false;
+  // ✅ short-latin ambiguity trigger (strict)
+  // Only ambiguous if:
+  // - short Latin content
+  // - no umlauts/ß
+  // - no strong keywords
+  // - AND detector suggests EN/DE uncertainty (both candidates OR low confidence)
+  function shouldAskShortLatin(st, res) {
+    if (!st) return false;
+    if (!(st.hanRatio < HAN_RATIO_ZH && st.latin >= MIN_LATIN && st.len <= SHORT_LATIN_AMBIG_LEN)) return false;
 
-    const lang = normalizePackLang(resLike && resLike.lang);
-    if (!(lang === "en" || lang === "de")) return false;
+    // strong DE signals already handled earlier; do NOT ask here
+    if (st.umlauts > 0) return false;
+    if (st.hasDeKw || st.hasEnKw) return false;
+    if (st.deFnWords >= 2) return false;
 
-    const cand = Array.isArray(resLike && resLike.candidates) ? resLike.candidates : [];
+    const cand = Array.isArray(res && res.candidates) ? res.candidates : [];
     const hasBoth = cand.includes("en") && cand.includes("de");
-    const conf = typeof (resLike && resLike.confidence) === "number" ? resLike.confidence : null;
+    const conf = typeof (res && res.confidence) === "number" ? res.confidence : 0.7;
 
-    // ✅ FIX: do NOT ask just because it is short; ask ONLY when truly ambiguous:
-    // - both candidates present, OR
-    // - confidence is very low
+    // Only ask if both candidates appear, or confidence is clearly not strong
     if (hasBoth) return true;
-    if (conf != null && conf < 0.70) return true;
+    if ((res && (res.lang === "en" || res.lang === "de")) && conf < 0.85) return true;
 
     return false;
   }
@@ -300,20 +324,18 @@
 
     const st = stats(trimmed);
 
-    // 1) Strong heuristic first (ONLY when it has a strong decision)
+    // 1) Strong heuristic first
     const h = strongHeuristic(trimmed);
     if (h.lang) return h;
-    if (h.needsConfirm && (h.candidates && h.candidates.length)) return h; // e.g. mixed_de_en_keywords
+    if (h.needsConfirm && (h.candidates && h.candidates.length)) return h;
 
     // 2) franc
     const f = detectByFranc(trimmed);
     if (f.lang || (f.candidates && f.candidates.length)) {
-      // ✅ FIX: short latin-only does NOT automatically require confirm;
-      // confirm ONLY if EN/DE ambiguity truly exists.
-      if (isShortLatinAmbiguous(st, f)) {
+      if (shouldAskShortLatin(st, f) && (f.lang === "en" || f.lang === "de")) {
         return {
           lang: f.lang,
-          confidence: Math.min(typeof f.confidence === "number" ? f.confidence : 0.7, 0.74),
+          confidence: Math.min(f.confidence || 0.7, 0.74),
           needsConfirm: true,
           candidates: uniq([f.lang, "en", "de"]).filter(Boolean),
           reason: "short_latin_ambiguous",
@@ -326,11 +348,10 @@
     // 3) pack.detect
     const p = detectByPackDetect(trimmed);
     if (p.lang || (p.candidates && p.candidates.length)) {
-      // ✅ FIX: same as above — only ask if truly ambiguous
-      if (isShortLatinAmbiguous(st, p)) {
+      if (shouldAskShortLatin(st, p) && (p.lang === "en" || p.lang === "de")) {
         return {
           lang: p.lang,
-          confidence: Math.min(typeof p.confidence === "number" ? p.confidence : 0.7, 0.74),
+          confidence: Math.min(p.confidence || 0.7, 0.74),
           needsConfirm: true,
           candidates: uniq([p.lang, "en", "de"]).filter(Boolean),
           reason: "short_latin_ambiguous_pack",
@@ -362,7 +383,7 @@
       // 2) Otherwise: guard OK => run applyRules
       if (typeof window.ensureLangBeforeApply === "function") {
         const ok = window.ensureLangBeforeApply(v);
-        if (ok === false) return; // modal opened again, stop
+        if (ok === false) return;
       }
 
       if (typeof window.applyRules === "function") {
@@ -404,7 +425,6 @@
               const L = normalizePackLang(lang);
               if (!L) return;
 
-              // ONLY write ruleEngine (decoupled from legacy contentLang)
               window.ruleEngine = L;
               window.ruleEngineMode = "lock";
 
@@ -447,7 +467,6 @@
             const L = normalizePackLang(lang);
             if (!L) return;
 
-            // ONLY write ruleEngine (decoupled from legacy contentLang)
             window.ruleEngine = L;
             window.ruleEngineMode = "lock";
 
@@ -468,4 +487,5 @@
 
     return { ok: true, lang: res && res.lang ? res.lang : "", asked: false };
   };
+
 })();
