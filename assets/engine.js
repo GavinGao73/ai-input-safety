@@ -139,7 +139,7 @@ function resetRuleEngine() {
     window.ruleEngine = "";
     window.ruleEngineMode = "auto";
 
-    // ✅ compatibility: keep old names in sync
+    // ✅ compatibility: keep old names in sync (ONE-WAY mirror only)
     try {
       window.contentLang = "";
       window.contentLangMode = "auto";
@@ -158,29 +158,13 @@ function resetContentLang() {
 
 /**
  * ✅ P5: engine.js 不再做“自动语言判断/自动锁定”。
- * - 如果外部（lang-detect.js/main.js）已经设置了 ruleEngine，则这里仅把 mode 变为 lock（稳定）
- * - 如果 ruleEngine 为空，则保持空（不猜测、不锁定）
+ * - engine.js MUST NOT lock / detect.
+ * - If external set ruleEngine: engine reads it only.
+ * - If empty: do nothing.
  */
 function setRuleEngineAuto(text) {
-  try {
-    const mode = String(window.ruleEngineMode || "auto").toLowerCase();
-    if (mode !== "auto") return;
-
-    if (normLang(window.ruleEngine)) {
-      window.ruleEngineMode = "lock";
-
-      // ✅ compatibility: lock old names too
-      try {
-        window.contentLang = window.ruleEngine;
-        window.contentLangMode = "lock";
-      } catch (_) {}
-
-      return;
-    }
-
-    // ✅ P5: do nothing when empty (no auto detection inside engine.js)
-    return;
-  } catch (_) {}
+  // ✅ NO-OP by design (kept only for backward compatibility)
+  return;
 }
 
 // Compatibility wrapper (old name used in applyRules)
@@ -877,7 +861,7 @@ function applyRules(text) {
   let hits = 0;
   const hitsByKey = {};
 
-  // ✅ P5: engine-side auto detect is now a no-op when ruleEngine empty
+  // ✅ P5: engine-side auto detect/lock is a NO-OP now
   setLangContentAuto(out);
 
   const PRIORITY = getPriority();
@@ -1239,42 +1223,34 @@ try {
 
 /* =========================
    8) BOOT INIT (RULE A)
-   - ✅ P5: 不做自动识别；只做状态归一化与兼容字段同步
+   - ✅ P5: 不做自动识别；只做状态归一化与兼容字段同步（单向镜像）
    ========================= */
 (function bootRuleEngineInit() {
   try {
     const m = String(window.ruleEngineMode || "").trim().toLowerCase();
     if (!m) window.ruleEngineMode = "auto";
 
-    if (String(window.ruleEngineMode || "").toLowerCase() === "auto") {
-      if (normLang(window.ruleEngine)) {
-        window.ruleEngineMode = "lock";
+    // ✅ One-way mirror ONLY: contentLang follows ruleEngine (never the reverse)
+    const re = normLang(window.ruleEngine);
 
-        // ✅ compatibility: lock old names too
-        try {
-          window.contentLang = window.ruleEngine;
-          window.contentLangMode = "lock";
-        } catch (_) {}
-      } else {
+    if (String(window.ruleEngineMode || "").toLowerCase() === "lock") {
+      // If lock but invalid ruleEngine, DO NOT fallback to UI (would reverse-drive).
+      // Instead, reset to auto+empty and let external guard decide.
+      if (!re) {
         window.ruleEngine = "";
-
-        // ✅ compatibility: reset old names too
-        try {
-          window.contentLang = "";
-          window.contentLangMode = "auto";
-        } catch (_) {}
+        window.ruleEngineMode = "auto";
       }
+    } else {
+      // auto mode: keep ruleEngine as-is (may be empty). No locking here.
+      if (!re) window.ruleEngine = "";
     }
 
-    if (String(window.ruleEngineMode || "").toLowerCase() === "lock" && !normLang(window.ruleEngine)) {
-      window.ruleEngine = getLangUI(); // safe fallback
-
-      // ✅ compatibility: keep old names in sync
-      try {
-        window.contentLang = window.ruleEngine;
-        window.contentLangMode = "lock";
-      } catch (_) {}
-    }
+    // ✅ compatibility mirror (ONE-WAY)
+    try {
+      const r2 = normLang(window.ruleEngine);
+      window.contentLang = r2 || "";
+      window.contentLangMode = String(window.ruleEngineMode || "auto").toLowerCase() === "lock" ? "lock" : "auto";
+    } catch (_) {}
   } catch (_) {}
 })();
 
@@ -1289,16 +1265,23 @@ function setRuleEngineManual(lang) {
     window.ruleEngine = L;
     window.ruleEngineMode = "lock";
 
-    // compatibility (if some older code reads contentLang)
+    // compatibility (if some older code reads contentLang) — ONE-WAY mirror
     try {
       window.contentLang = L;
       window.contentLangMode = "lock";
     } catch (_) {}
 
-    // re-apply rules to current input
+    // re-apply rules to current input — MUST go through safe/guard entry
     const ta = document.getElementById("inputText");
     const v = ta ? String(ta.value || "") : "";
-    if (v.trim() && typeof applyRules === "function") applyRules(v);
+    if (v.trim()) {
+      if (typeof window.applyRulesSafely === "function") {
+        window.applyRulesSafely(v);
+      } else if (typeof window.ensureLangBeforeApply === "function" && typeof window.applyRules === "function") {
+        if (!window.ensureLangBeforeApply(v)) return;
+        window.applyRules(v);
+      }
+    }
   } catch (_) {}
 }
 
