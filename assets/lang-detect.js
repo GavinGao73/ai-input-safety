@@ -330,13 +330,17 @@
 
   function rerunAfterPick(fallbackText) {
     try {
+      // Prefer the provided text, avoid hard-coupling to DOM state when possible
       const ta = document.getElementById("inputText");
-      const v = ta ? String(ta.value || "") : String(fallbackText || "");
-      // ✅ prefer guard chain if exists
-      if (typeof window.ensureLangBeforeApply === "function") {
+      const v = String((fallbackText != null ? fallbackText : (ta ? ta.value : "")) || "");
+
+      // ✅ ALWAYS go through guard chain; never call applyRules() directly here
+      if (typeof window.applyRulesSafely === "function") {
+        window.applyRulesSafely(v);
+      } else if (typeof window.ensureLangBeforeApply === "function") {
         window.ensureLangBeforeApply(v);
-      } else if (typeof window.applyRules === "function") {
-        window.applyRules(v);
+      } else {
+        // No safe entry found; do nothing (avoid bypassing guard by calling applyRules)
       }
     } catch (_) {}
   }
