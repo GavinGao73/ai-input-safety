@@ -26,11 +26,22 @@ async function loadPdfJs() {
 
     s.async = true;
     s.onload = () => resolve(window.pdfjsLib);
-    s.onerror = () => reject(new Error("Failed to load PDF.js"));
+    s.onerror = () => {
+      // ✅ FIX: allow retry after failure (avoid permanently stuck rejected promise)
+      try { __pdfjsPromise = null; } catch (_) {}
+      reject(new Error("Failed to load PDF.js"));
+    };
     document.head.appendChild(s);
   });
 
-  const lib = await __pdfjsPromise;
+  let lib;
+  try {
+    lib = await __pdfjsPromise;
+  } catch (e) {
+    // ✅ FIX: also ensure retry on await rejection
+    try { __pdfjsPromise = null; } catch (_) {}
+    throw e;
+  }
 
   // ✅ Same-origin worker (no CORS)
   try {
@@ -102,13 +113,21 @@ function buildPrettyTextFromPdfItems(items) {
         const aIsCjk = /[\u4E00-\u9FFF]/.test(a);
         const bIsCjk = /[\u4E00-\u9FFF]/.test(b);
 
-        const needSpace =
-          !(aIsCjk || bIsCjk) &&
-          !/[\s\-\(\[\{\/]/.test(b) &&
-          !/[\s\-\(\[\{\/]/.test(a);
+        // ✅ FIX: clearer spacing rules (avoid logic inversion)
+        let needSpace = true;
+
+        // CJK adjacency: no space
+        if (aIsCjk || bIsCjk) needSpace = false;
+
+        // next chunk begins with punctuation/brackets -> no space
+        if (/^[\s\)\]\}\.,;:\/]/.test(chunk)) needSpace = false;
+
+        // previous ends with opening bracket/slash/hyphen -> no space
+        if (/[\s\-\(\[\{\/]$/.test(line)) needSpace = false;
 
         if (needSpace) line += " ";
       }
+
       line += chunk;
     }
 
@@ -148,6 +167,7 @@ async function probePdfTextLayer(file) {
   const pages = [];
 
   // ✅ NEW: preserve raw glyph items per page (for later mapping)
+  // ✅ PATCH: keep only minimal fields to reduce memory pressure
   const pagesItems = [];
 
   for (let p = 1; p <= doc.numPages; p++) {
@@ -168,10 +188,15 @@ async function probePdfTextLayer(file) {
       totalChars += pageText.replace(/\s+/g, "").length; // count non-space for reliability
     }
 
-    // ✅ keep items for export-stage exact rect mapping
+    // ✅ keep items for export-stage exact rect mapping (minimal fields)
     pagesItems.push({
       pageNumber: p,
-      items
+      items: (items || []).map((it) => ({
+        str: it && it.str != null ? String(it.str) : "",
+        transform: Array.isArray(it && it.transform) ? it.transform.slice(0, 6) : [],
+        width: Number(it && it.width) || 0,
+        height: Number(it && it.height) || 0
+      }))
     });
   }
 
