@@ -5,10 +5,12 @@
 // - Content strategy language: window.ruleEngine (+ window.ruleEngineMode)
 //
 // ✅ GOAL (UPDATED):
-// - engine.js 不再做任何“自动语言判断 / 自动锁定”
-// - 语言判断与弹窗完全交给 assets/lang-detect.js + main.js 的 pre-guard（ensureContentLang）
-// - engine.js 只尊重 window.ruleEngine（若已被外部锁定）
-// - Clear resets to (mode=auto, ruleEngine="")
+// - engine.js 不再做任何“自动语言判断 / 自动锁定”  ←（旧目标：已证明会导致 pack 选错）
+// - ✅ 现在改为：engine.js 在 applyRules() 入口做“最低限度的内容语言保证”
+//   - 如果 ruleEngine 为空或未 lock：调用 __LangDetect.ensureContentLang()
+//   - 若弹窗/阻塞：立即停止本次 applyRules（避免用 UI lang 回退导致错 pack）
+//   - 若得到明确语言：由 engine.js 写入 ruleEngine + lock（单一事实来源）
+// - main.js 的 guard 仍可保留（但 engine.js 不再依赖 guard 才能正确）
 //
 // ✅ ISOLATION (HARD):
 // - NO zh/en/de rules/priority/alwaysOn/formatters inside engine.js
@@ -21,16 +23,17 @@
 // - P3: NEW mode "prefix_keep_tail": keep tail unmasked (needed for DE street-only masking while keeping PLZ/City/Country)
 // - P4: Export enabledKeys MUST include ALWAYS_ON (safer & consistent with execution)
 // - P5: REMOVE engine-side auto language detection/locking to avoid conflicts with lang-detect.js modal chain
+// - ✅ P6 (NEW): Engine-level content language guard (fix wrong-pack fallbacks when ruleEngine empty)
 // =========================
 
-// ✅ FIX: version string aligned with deployed query param (?v=20260304a1)
+// ✅ FIX: version string aligned with deployed query param (?v=20260304a2)
 
 "use strict";
 
 // ✅ single source of truth
-const ENGINE_VERSION = "v20260304a1-engine-a5-policy-split";
+const ENGINE_VERSION = "v20260304a2-engine-a6-langstate-fix";
 
-// ✅ FIX: version string aligned with deployed query param (?v=20260304a1)
+// ✅ FIX: version string aligned with deployed query param (?v=20260304a2)
 console.log("[engine.js] loaded " + ENGINE_VERSION);
 
 /* =========================
@@ -125,6 +128,10 @@ function getLangUI() {
  * Content strategy language (rules/placeholder), NOT UI language.
  * - if ruleEngine set -> use it
  * - else -> fallback to UI (display only until external one-shot detect/lock)
+ *
+ * ✅ NOTE:
+ *  fallback to UI is kept for compatibility, but P6 ensures we DON'T execute packs
+ *  with this fallback when content language is unknown.
  */
 function getLangContent() {
   const v = normLang(window.ruleEngine);
@@ -157,10 +164,8 @@ function resetContentLang() {
 }
 
 /**
- * ✅ P5: engine.js 不再做“自动语言判断/自动锁定”。
- * - engine.js MUST NOT lock / detect.
- * - If external set ruleEngine: engine reads it only.
- * - If empty: do nothing.
+ * ✅ P5: engine.js 不再做“自动语言判断/自动锁定”。（旧接口保留）
+ * - kept only for backward compatibility
  */
 function setRuleEngineAuto(text) {
   // ✅ NO-OP by design (kept only for backward compatibility)
@@ -170,6 +175,58 @@ function setRuleEngineAuto(text) {
 // Compatibility wrapper (old name used in applyRules)
 function setLangContentAuto(text) {
   setRuleEngineAuto(text);
+}
+
+/* =========================
+   1.0) ✅ P6: Engine-level content language guard (single-source safety)
+   - Prevent wrong pack usage when ruleEngine is empty and UI!=content
+   - If __LangDetect decides confidently: engine writes ruleEngine + lock
+   - If modal would open / detector blocks: stop this applyRules run
+   ========================= */
+
+function ensureContentLangInEngine(text) {
+  try {
+    // If already locked with a valid lang, nothing to do
+    const mode = String(window.ruleEngineMode || "").toLowerCase();
+    const re = normLang(window.ruleEngine);
+    if (mode === "lock" && re) return true;
+
+    // If modal is already opening/open, do NOT proceed (avoid wrong pack)
+    if (window.__LANG_MODAL_OPENING__) return false;
+
+    // If detector exists, use it
+    if (window.__LangDetect && typeof window.__LangDetect.ensureContentLang === "function") {
+      const ui = getLangUI();
+      const r = window.__LangDetect.ensureContentLang(String(text || ""), ui);
+
+      // If detector indicates it opened/needs modal -> stop (avoid UI fallback pack)
+      if (r && r.ok === false) return false;
+
+      // If detector returned a lang (ok=true), lock it here (single source)
+      const L = r && r.lang ? normLang(r.lang) : "";
+      if (L) {
+        window.ruleEngine = L;
+        window.ruleEngineMode = "lock";
+
+        // compatibility mirror (ONE-WAY)
+        try {
+          window.contentLang = L;
+          window.contentLangMode = "lock";
+        } catch (_) {}
+
+        try {
+          window.dispatchEvent(new CustomEvent("ruleengine:changed", { detail: { lang: L } }));
+        } catch (_) {}
+      }
+      return true;
+    }
+
+    // Detector missing -> allow run (will fallback to UI), but this is a degraded mode
+    return true;
+  } catch (_) {
+    // Fail-open: better to proceed than crash; main.js guard can still protect
+    return true;
+  }
 }
 
 /* =========================
@@ -861,7 +918,15 @@ function applyRules(text) {
   let hits = 0;
   const hitsByKey = {};
 
-  // ✅ P5: engine-side auto detect/lock is a NO-OP now
+  // ✅ P6: engine-level guard MUST run before any pack/rules are read.
+  // If it would open modal / block: STOP this run to avoid wrong-language fallback pack.
+  if (!ensureContentLangInEngine(out)) {
+    // Do NOT render raw/unmasked text (security).
+    // Keep previous output stable.
+    return lastOutputPlain;
+  }
+
+  // ✅ P5 legacy no-op (kept)
   setLangContentAuto(out);
 
   const PRIORITY = getPriority();
@@ -1235,7 +1300,7 @@ try {
 
     if (String(window.ruleEngineMode || "").toLowerCase() === "lock") {
       // If lock but invalid ruleEngine, DO NOT fallback to UI (would reverse-drive).
-      // Instead, reset to auto+empty and let external guard decide.
+      // Instead, reset to auto+empty and let detector decide.
       if (!re) {
         window.ruleEngine = "";
         window.ruleEngineMode = "auto";
@@ -1279,6 +1344,9 @@ function setRuleEngineManual(lang) {
         window.applyRulesSafely(v);
       } else if (typeof window.ensureLangBeforeApply === "function" && typeof window.applyRules === "function") {
         if (!window.ensureLangBeforeApply(v)) return;
+        window.applyRules(v);
+      } else if (typeof window.applyRules === "function") {
+        // fallback
         window.applyRules(v);
       }
     }
