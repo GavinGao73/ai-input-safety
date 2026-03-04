@@ -1,4 +1,4 @@
-// =========================
+======================
 // assets/main.js (FULL)
 // v20260223-lang-split-stable-a4 (PATCHED: no legacy contentLang writes + export lang fallback)
 //
@@ -110,14 +110,27 @@ window.openLangPicker = function () {
         onPick: function (lang) {
           try { window.__LANG_MODAL_OPENING__ = false; } catch (_) {}
 
-          window.ruleEngine = lang;
+          // ✅ normalize (safety): only accept zh/de/en
+          const L = (String(lang || "").toLowerCase() === "zh" || String(lang || "").toLowerCase() === "de" || String(lang || "").toLowerCase() === "en")
+            ? String(lang || "").toLowerCase()
+            : "";
+          if (!L) return;
+
+          window.ruleEngine = L;
           window.ruleEngineMode = "lock";
 
           // ❌ Do NOT write legacy contentLang/contentLangMode (single-source-of-truth)
           // window.contentLang = lang;
           // window.contentLangMode = "lock";
 
-          if (v.trim() && typeof window.applyRules === "function") window.applyRules(v);
+          // ✅ NEVER call applyRules() directly here; always go through safe/guard entry
+          if (v.trim()) {
+            if (typeof window.applyRulesSafely === "function") window.applyRulesSafely(v);
+            else if (typeof window.ensureLangBeforeApply === "function" && typeof window.applyRules === "function") {
+              if (!window.ensureLangBeforeApply(v)) return;
+              window.applyRules(v);
+            }
+          }
         },
         onClose: function () {
           try { window.__LANG_MODAL_OPENING__ = false; } catch (_) {}
