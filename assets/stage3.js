@@ -19,8 +19,15 @@
 let lastPdfPagesItems = [];
 
 // ================= Stage 3 helpers =================
-function setRuleEngineAuto() {
+function resetRuleEngineForNewSession() {
+  // ✅ upload/new file == new session
+  try { window.ruleEngine = ""; } catch (_) {}
   try { window.ruleEngineMode = "auto"; } catch (_) {}
+}
+
+// Backward name (kept)
+function setRuleEngineAuto() {
+  resetRuleEngineForNewSession();
 }
 
 function lockRuleEngineForSession(lang) {
@@ -28,40 +35,6 @@ function lockRuleEngineForSession(lang) {
   if (!(l === "zh" || l === "de" || l === "en")) return;
   try { window.ruleEngine = l; } catch (_) {}
   try { window.ruleEngineMode = "lock"; } catch (_) {}
-}
-
-function detectRuleEngineFromRaw(text) {
-  const s = String(text || "");
-
-  // Prefer centralized detector if present (use detectLang, not detectRuleEngine)
-  try {
-    if (window.__LangDetect && typeof window.__LangDetect.detectLang === "function") {
-      const r = window.__LangDetect.detectLang(s, window.currentLang || "en");
-
-      // Only lock when it's a stable decision (no confirm needed + confidence high enough)
-      if (r && typeof r.lang === "string" && r.lang) {
-        if (r.needsConfirm === false && (typeof r.confidence !== "number" || r.confidence >= 0.78)) {
-          return r.lang;
-        }
-      }
-      return "";
-    }
-  } catch (_) {}
-
-  // Fallback: pack-level "detect" heuristics (best-effort; no scoring here)
-  try {
-    const packs = window.__ENGINE_LANG_PACKS__ || {};
-    const order = ["de", "en", "zh"]; // bias de/en because you said they are the confusing pair
-    for (const k of order) {
-      const p = packs[k];
-      if (p && typeof p.detect === "function") {
-        const hit = p.detect(s);
-        if (hit === k) return k;
-      }
-    }
-  } catch (_) {}
-
-  return "";
 }
 
 function applyRulesSafely(text) {
@@ -94,6 +67,25 @@ function applyRulesSafely(text) {
   } catch (_) {}
 }
 
+// ✅ NEW: ensure content language for Mode A RAW pdf text
+// - Use centralized __LangDetect.ensureContentLang so "uncertain => modal"
+// - Do NOT implement detect/threshold logic here.
+function ensureLangForPdfRaw(text) {
+  const s = String(text || "").trim();
+  if (!s) return { ok: true, asked: false };
+
+  try {
+    if (window.__LangDetect && typeof window.__LangDetect.ensureContentLang === "function") {
+      // This will lock when confident, or open modal when uncertain.
+      const r = window.__LangDetect.ensureContentLang(s, window.currentLang || "en");
+      return r || { ok: true, asked: false };
+    }
+  } catch (_) {}
+
+  // If detector missing, remain auto (do not guess)
+  return { ok: true, asked: false };
+}
+
 // ================= Stage 3 file handler =================
 async function handleFile(file) {
   if (!file) return;
@@ -101,6 +93,9 @@ async function handleFile(file) {
   lastUploadedFile = file;
   lastProbe = null;
   lastPdfOriginalText = "";
+
+  // ✅ reset every upload (new session semantics)
+  resetRuleEngineForNewSession();
 
   // ✅ reset every upload
   lastPdfPagesItems = [];
@@ -120,7 +115,7 @@ async function handleFile(file) {
   if (lastFileKind === "image") {
     lastRunMeta.fromPdf = false;
 
-    // ✅ Mode B: do NOT lock ruleEngine (keep auto)
+    // ✅ Mode B: do NOT lock ruleEngine (keep auto+empty)
     setRuleEngineAuto();
 
     setStage3Ui("B");
@@ -197,16 +192,6 @@ async function handleFile(file) {
     const text = String(probe.text || "").trim();
     lastPdfOriginalText = text;
 
-    // ✅ Detect content-strategy language from RAW pdf text then LOCK (session stability)
-    // (Only if we can actually detect a valid lang; otherwise keep auto.)
-    try {
-      const detected = detectRuleEngineFromRaw(text);
-      if (detected) lockRuleEngineForSession(detected);
-      else setRuleEngineAuto();
-    } catch (_) {
-      setRuleEngineAuto();
-    }
-
     const ta = $("inputText");
     if (ta) {
       ta.value = text;
@@ -216,11 +201,20 @@ async function handleFile(file) {
     updateInputWatermarkVisibility();
 
     if (text) {
-      // ✅ apply with guard if available (prevents bypass + allows modal confirm)
-      await applyRulesSafely(text);
+      // ✅ Mode A: ensure language (lock or modal) BEFORE applyRules
+      const ensured = ensureLangForPdfRaw(text);
 
-      // overlay for Mode A pdf mapping (if present)
-      try { if (typeof window.renderInputOverlayForPdf === "function") window.renderInputOverlayForPdf(text); } catch (_) {}
+      // If modal opened, STOP here (user will pick and rerun via modal callback chain)
+      if (ensured && ensured.ok === false) {
+        // keep overlay ready for readability; no applyRules now
+        try { if (typeof window.renderInputOverlayForPdf === "function") window.renderInputOverlayForPdf(text); } catch (_) {}
+      } else {
+        // ✅ apply with guard if available (prevents bypass + allows modal confirm)
+        await applyRulesSafely(text);
+
+        // overlay for Mode A pdf mapping (if present)
+        try { if (typeof window.renderInputOverlayForPdf === "function") window.renderInputOverlayForPdf(text); } catch (_) {}
+      }
     }
 
     requestAnimationFrame(() => {
