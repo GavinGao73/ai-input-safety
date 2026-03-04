@@ -73,8 +73,8 @@
     // ESC to close
     window.addEventListener("keydown", (e) => {
       if (e && (e.key === "Escape" || e.key === "Esc")) {
-        const r = document.getElementById("langModalRoot");
-        if (r && r.style.display === "flex") API.close();
+        // ✅ use state flag instead of brittle display check
+        if (API.__state && API.__state.isOpen) API.close();
       }
     });
 
@@ -113,6 +113,10 @@
 
   function resetOpeningFlag() {
     try { window.__LANG_MODAL_OPENING__ = false; } catch (_) {}
+  }
+
+  function uniq(arr) {
+    return Array.from(new Set((arr || []).filter(Boolean)));
   }
 
   // internal close core:
@@ -182,7 +186,11 @@
 
     // If detector provides candidates, prefer them (but keep within supported langs)
     const cand = candidates.filter((x) => langs.includes(x));
-    const finalLangs = cand.length ? Array.from(new Set(cand.concat(langs))) : langs;
+
+    // ✅ FIX: show candidates first; then append remaining supported langs (no duplicates)
+    const finalLangs = cand.length
+      ? uniq(cand.concat(langs.filter((x) => !cand.includes(x))))
+      : langs;
 
     const metaParts = [];
     metaParts.push(`detected=${detected || "(none)"}`);
