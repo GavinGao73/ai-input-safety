@@ -1,15 +1,19 @@
 // =========================
-// assets/lang-detect.js (NEW)
+// assets/lang-detect.js (NEW) — PATCHED (dedupe + decouple)
 // Language detection orchestrator (franc-all + pack.detect + conservative fallback)
 // - Exposes window.__LangDetect.detectLang(text, uiLang)
 // - Exposes ensureContentLang() for main.js pre-guard
+//
+// IMPORTANT (project principle):
+// - Content strategy language MUST be single source of truth: window.ruleEngine / window.ruleEngineMode
+// - DO NOT write/read legacy window.contentLang/window.contentLangMode here
 // =========================
 (function () {
   "use strict";
 
   // Expose singleton
   const API = (window.__LangDetect = window.__LangDetect || {});
-  API.__state = API.__state || { ver: "v20260303a2", last: null };
+  API.__state = API.__state || { ver: "v20260303a2-p1", last: null };
 
   // ---- Config (conservative) ----
   const MIN_LEN_FRANC = 40;      // shorter than this: franc is noisy
@@ -17,7 +21,7 @@
   const HAN_RATIO_ZH = 0.02;     // Han chars ratio >= 2% => strong zh
 
   // Confidence thresholds
-  const CONF_LOCK = 0.78;        // >= lock automatically (more conservative than before)
+  const CONF_LOCK = 0.78;        // >= lock automatically
 
   // Extra safety: short Latin text is often ambiguous EN/DE
   const SHORT_LATIN_AMBIG_LEN = 120;
@@ -59,8 +63,12 @@
     const umlauts = (s.match(/[äöüÄÖÜß]/g) || []).length;
 
     // quick keyword signals (used ONLY here, not in engine.js)
-    const hasDeKw = /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Geburtsdatum|USt-IdNr)\b/i.test(s);
-    const hasEnKw = /\b(Invoice|Order\s*ID|Account\s*Number|Username|Address|Phone|Email|Customer|Payment|Bank|Passport|SSN)\b/i.test(s);
+    const hasDeKw = /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Geburtsdatum|USt-IdNr)\b/i.test(
+      s
+    );
+    const hasEnKw = /\b(Invoice|Order\s*ID|Account\s*Number|Username|Address|Phone|Email|Customer|Payment|Bank|Passport|SSN)\b/i.test(
+      s
+    );
 
     return {
       len,
@@ -170,7 +178,8 @@
 
           // franc score meaning differs by build; treat only as soft indicator
           if (Number.isFinite(topScore) && Number.isFinite(secondScore)) {
-            const gap = Math.max(0, secondScore - topScore);
+            // ✅ FIX: gap should be top - second (not second - top)
+            const gap = Math.max(0, topScore - secondScore);
             confidence = Math.max(0.62, Math.min(0.92, 0.62 + gap / 120));
           } else {
             confidence = 0.80;
@@ -254,7 +263,8 @@
         };
       }
 
-      return { lang: "", confidence: 0, needsConfirm: true, candidates: [], reason: "pack_detect_none", source: "pack" };
+      // ✅ FIX: "none" is not a conflict; let upper layers decide fallback/ask
+      return { lang: "", confidence: 0, needsConfirm: false, candidates: [], reason: "pack_detect_none", source: "pack" };
     } catch (e) {
       return { lang: "", confidence: 0, needsConfirm: true, candidates: [], reason: "pack_detect_error", source: "pack" };
     }
@@ -318,6 +328,19 @@
     return { lang: "", confidence: 0, needsConfirm: true, candidates: [], reason: "unknown", source: "fallback" };
   };
 
+  function rerunAfterPick(fallbackText) {
+    try {
+      const ta = document.getElementById("inputText");
+      const v = ta ? String(ta.value || "") : String(fallbackText || "");
+      // ✅ prefer guard chain if exists
+      if (typeof window.ensureLangBeforeApply === "function") {
+        window.ensureLangBeforeApply(v);
+      } else if (typeof window.applyRules === "function") {
+        window.applyRules(v);
+      }
+    } catch (_) {}
+  }
+
   // Pre-guard for main.js:
   // - If uncertain: open modal and return ok=false
   // - If certain: lock ruleEngine and return ok=true
@@ -325,7 +348,7 @@
     const s = safeStr(text).trim();
     if (!s) return { ok: true, lang: "", asked: false };
 
-    // Already locked
+    // Already locked (single source of truth)
     if (safeStr(window.ruleEngineMode).toLowerCase() === "lock" && safeStr(window.ruleEngine)) {
       return { ok: true, lang: safeStr(window.ruleEngine), asked: false };
     }
@@ -351,19 +374,13 @@
               const L = normalizePackLang(lang);
               if (!L) return;
 
+              // ✅ ONLY write ruleEngine (decoupled from legacy contentLang)
               window.ruleEngine = L;
               window.ruleEngineMode = "lock";
-              window.contentLang = L;
-              window.contentLangMode = "lock";
 
               window.__LANG_MODAL_OPENING__ = false;
 
-              // rerun immediately
-              try {
-                const ta = document.getElementById("inputText");
-                const v = ta ? String(ta.value || "") : s;
-                if (typeof window.applyRules === "function") window.applyRules(v);
-              } catch (_) {}
+              rerunAfterPick(s);
             },
             onClose: function () {
               window.__LANG_MODAL_OPENING__ = false;
@@ -381,14 +398,11 @@
     if (res && res.lang && (typeof res.confidence !== "number" || res.confidence >= CONF_LOCK)) {
       window.ruleEngine = res.lang;
       window.ruleEngineMode = "lock";
-      window.contentLang = res.lang;
-      window.contentLangMode = "lock";
       return { ok: true, lang: res.lang, asked: false };
     }
 
     // Otherwise be safe: ask once if modal exists
     if (window.__LangModal && typeof window.__LangModal.open === "function") {
-      // open modal directly (no recursion)
       if (window.__LANG_MODAL_OPENING__ === true) return { ok: false, lang: "", asked: true };
 
       try {
@@ -403,18 +417,13 @@
             const L = normalizePackLang(lang);
             if (!L) return;
 
+            // ✅ ONLY write ruleEngine (decoupled from legacy contentLang)
             window.ruleEngine = L;
             window.ruleEngineMode = "lock";
-            window.contentLang = L;
-            window.contentLangMode = "lock";
 
             window.__LANG_MODAL_OPENING__ = false;
 
-            try {
-              const ta = document.getElementById("inputText");
-              const v = ta ? String(ta.value || "") : s;
-              if (typeof window.applyRules === "function") window.applyRules(v);
-            } catch (_) {}
+            rerunAfterPick(s);
           },
           onClose: function () {
             window.__LANG_MODAL_OPENING__ = false;
