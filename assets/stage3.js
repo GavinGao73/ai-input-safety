@@ -1,6 +1,6 @@
 // =========================
 // assets/stage3.js (FULL)
-// v20260223-lang-split-stable-a3 (PATCHED: guard-respect + detectLang bridge)
+// v20260304a1 — PATCHED (export applyRulesSafely + expose handlers)
 //
 // ✅ Mode A (readable PDF):
 // - detect from RAW pdf text (content strategy), then LOCK for session (ruleEngine/ruleEngineMode)
@@ -268,3 +268,18 @@ function bindPdfUI() {
     });
   }
 }
+
+/* =========================
+   EXPORTS (critical for modal rerun chain + load-order safety)
+   ========================= */
+try {
+  if (typeof window.applyRulesSafely !== "function") window.applyRulesSafely = applyRulesSafely;
+} catch (_) {}
+
+try {
+  if (typeof window.handleFile !== "function") window.handleFile = handleFile;
+} catch (_) {}
+
+try {
+  if (typeof window.bindPdfUI !== "function") window.bindPdfUI = bindPdfUI;
+} catch (_) {}
