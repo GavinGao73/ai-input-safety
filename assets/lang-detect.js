@@ -1,5 +1,7 @@
 // =========================
-// assets/lang-detect.js (NEW) — PATCHED (dedupe + decouple)
+// assets/lang-detect.js (FULL)
+// v20260304a1 — PATCHED (dedupe + decouple + short_latin fix + stable rerun)
+//
 // Language detection orchestrator (franc-all + pack.detect + conservative fallback)
 // - Exposes window.__LangDetect.detectLang(text, uiLang)
 // - Exposes ensureContentLang() for main.js pre-guard
@@ -13,15 +15,15 @@
 
   // Expose singleton
   const API = (window.__LangDetect = window.__LangDetect || {});
-  API.__state = API.__state || { ver: "v20260303a2-p1", last: null };
+  API.__state = API.__state || { ver: "v20260304a1-shortlatin-fix", last: null };
 
   // ---- Config (conservative) ----
-  const MIN_LEN_FRANC = 40;      // shorter than this: franc is noisy
-  const MIN_LATIN = 12;          // require some letters for en/de
-  const HAN_RATIO_ZH = 0.02;     // Han chars ratio >= 2% => strong zh
+  const MIN_LEN_FRANC = 40; // shorter than this: franc is noisy
+  const MIN_LATIN = 12; // require some letters for en/de
+  const HAN_RATIO_ZH = 0.02; // Han chars ratio >= 2% => strong zh
 
   // Confidence thresholds
-  const CONF_LOCK = 0.78;        // >= lock automatically
+  const CONF_LOCK = 0.78; // >= lock automatically
 
   // Extra safety: short Latin text is often ambiguous EN/DE
   const SHORT_LATIN_AMBIG_LEN = 120;
@@ -98,7 +100,7 @@
       };
     }
 
-    // Strong DE (remove umlauts hard-lock to avoid over-trigger / mixed instability)
+    // Strong DE
     if (st.hasDeKw) {
       // if also has strong EN keywords -> mixed => ask
       if (st.hasEnKw) {
@@ -178,7 +180,7 @@
 
           // franc score meaning differs by build; treat only as soft indicator
           if (Number.isFinite(topScore) && Number.isFinite(secondScore)) {
-            // ✅ FIX: gap should be top - second (not second - top)
+            // gap should be top - second
             const gap = Math.max(0, topScore - secondScore);
             confidence = Math.max(0.62, Math.min(0.92, 0.62 + gap / 120));
           } else {
@@ -263,11 +265,31 @@
         };
       }
 
-      // ✅ FIX: "none" is not a conflict; let upper layers decide fallback/ask
+      // "none" is not a conflict; let upper layers decide fallback/ask
       return { lang: "", confidence: 0, needsConfirm: false, candidates: [], reason: "pack_detect_none", source: "pack" };
     } catch (e) {
       return { lang: "", confidence: 0, needsConfirm: true, candidates: [], reason: "pack_detect_error", source: "pack" };
     }
+  }
+
+  function isShortLatinAmbiguous(st, resLike) {
+    // Only consider EN/DE ambiguity for short Latin-only texts.
+    if (!(st && st.hanRatio < HAN_RATIO_ZH && st.latin >= MIN_LATIN && st.len <= SHORT_LATIN_AMBIG_LEN)) return false;
+
+    const lang = normalizePackLang(resLike && resLike.lang);
+    if (!(lang === "en" || lang === "de")) return false;
+
+    const cand = Array.isArray(resLike && resLike.candidates) ? resLike.candidates : [];
+    const hasBoth = cand.includes("en") && cand.includes("de");
+    const conf = typeof (resLike && resLike.confidence) === "number" ? resLike.confidence : null;
+
+    // ✅ FIX: do NOT ask just because it is short; ask ONLY when truly ambiguous:
+    // - both candidates present, OR
+    // - confidence is very low
+    if (hasBoth) return true;
+    if (conf != null && conf < 0.70) return true;
+
+    return false;
   }
 
   // Primary API:
@@ -286,18 +308,17 @@
     // 2) franc
     const f = detectByFranc(trimmed);
     if (f.lang || (f.candidates && f.candidates.length)) {
-      // Extra rule: short latin-only text is ambiguous EN/DE => ask
-      if (st.hanRatio < HAN_RATIO_ZH && st.latin >= MIN_LATIN && st.len <= SHORT_LATIN_AMBIG_LEN) {
-        if (f.lang === "en" || f.lang === "de") {
-          return {
-            lang: f.lang,
-            confidence: Math.min(f.confidence || 0.7, 0.74),
-            needsConfirm: true,
-            candidates: uniq([f.lang, "en", "de"]).filter(Boolean),
-            reason: "short_latin_ambiguous",
-            source: "rule"
-          };
-        }
+      // ✅ FIX: short latin-only does NOT automatically require confirm;
+      // confirm ONLY if EN/DE ambiguity truly exists.
+      if (isShortLatinAmbiguous(st, f)) {
+        return {
+          lang: f.lang,
+          confidence: Math.min(typeof f.confidence === "number" ? f.confidence : 0.7, 0.74),
+          needsConfirm: true,
+          candidates: uniq([f.lang, "en", "de"]).filter(Boolean),
+          reason: "short_latin_ambiguous",
+          source: "rule"
+        };
       }
       return f;
     }
@@ -305,18 +326,16 @@
     // 3) pack.detect
     const p = detectByPackDetect(trimmed);
     if (p.lang || (p.candidates && p.candidates.length)) {
-      // Extra rule: short latin-only => ask even if single claim
-      if (!st.han && st.latin >= MIN_LATIN && st.len <= SHORT_LATIN_AMBIG_LEN) {
-        if (p.lang === "en" || p.lang === "de") {
-          return {
-            lang: p.lang,
-            confidence: Math.min(p.confidence || 0.7, 0.74),
-            needsConfirm: true,
-            candidates: uniq([p.lang, "en", "de"]).filter(Boolean),
-            reason: "short_latin_ambiguous_pack",
-            source: "rule"
-          };
-        }
+      // ✅ FIX: same as above — only ask if truly ambiguous
+      if (isShortLatinAmbiguous(st, p)) {
+        return {
+          lang: p.lang,
+          confidence: Math.min(typeof p.confidence === "number" ? p.confidence : 0.7, 0.74),
+          needsConfirm: true,
+          candidates: uniq([p.lang, "en", "de"]).filter(Boolean),
+          reason: "short_latin_ambiguous_pack",
+          source: "rule"
+        };
       }
       return p;
     }
@@ -329,28 +348,28 @@
   };
 
   function rerunAfterPick(fallbackText) {
-  try {
-    const ta = document.getElementById("inputText");
-    const v = String((fallbackText != null ? fallbackText : (ta ? ta.value : "")) || "");
-    if (!v.trim()) return;
+    try {
+      const ta = document.getElementById("inputText");
+      const v = String((fallbackText != null ? fallbackText : (ta ? ta.value : "")) || "");
+      if (!v.trim()) return;
 
-    // 1) Best: stage3 exposes a safe wrapper
-    if (typeof window.applyRulesSafely === "function") {
-      window.applyRulesSafely(v);
-      return;
-    }
+      // 1) Best: stage3 exposes a safe wrapper
+      if (typeof window.applyRulesSafely === "function") {
+        window.applyRulesSafely(v);
+        return;
+      }
 
-    // 2) Otherwise: guard OK => run applyRules
-    if (typeof window.ensureLangBeforeApply === "function") {
-      const ok = window.ensureLangBeforeApply(v);
-      if (ok === false) return; // modal opened again, stop
-    }
+      // 2) Otherwise: guard OK => run applyRules
+      if (typeof window.ensureLangBeforeApply === "function") {
+        const ok = window.ensureLangBeforeApply(v);
+        if (ok === false) return; // modal opened again, stop
+      }
 
-    if (typeof window.applyRules === "function") {
-      window.applyRules(v);
-    }
-  } catch (_) {}
-}
+      if (typeof window.applyRules === "function") {
+        window.applyRules(v);
+      }
+    } catch (_) {}
+  }
 
   // Pre-guard for main.js:
   // - If uncertain: open modal and return ok=false
@@ -385,7 +404,7 @@
               const L = normalizePackLang(lang);
               if (!L) return;
 
-              // ✅ ONLY write ruleEngine (decoupled from legacy contentLang)
+              // ONLY write ruleEngine (decoupled from legacy contentLang)
               window.ruleEngine = L;
               window.ruleEngineMode = "lock";
 
@@ -428,7 +447,7 @@
             const L = normalizePackLang(lang);
             if (!L) return;
 
-            // ✅ ONLY write ruleEngine (decoupled from legacy contentLang)
+            // ONLY write ruleEngine (decoupled from legacy contentLang)
             window.ruleEngine = L;
             window.ruleEngineMode = "lock";
 
@@ -449,5 +468,4 @@
 
     return { ok: true, lang: res && res.lang ? res.lang : "", asked: false };
   };
-
 })();
