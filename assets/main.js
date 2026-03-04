@@ -1,6 +1,6 @@
 // =======================
 // assets/main.js (FULL)
-// v20260223-lang-split-stable-a4 (PATCHED: no legacy contentLang writes + export lang fallback)
+// v20260304a1 (PATCHED: no legacy contentLang writes + export lang fallback)
 //
 // ✅ UI language: window.currentLang 只影响 UI 文案
 // ✅ Content strategy language: window.ruleEngine / window.ruleEngineMode（由 lang-detect.js 的 ensureContentLang + 用户选择锁定）
@@ -75,7 +75,7 @@ function stopExportStatusMirror() {
 }
 
 /* =========================
-   LANG DETECT GUARD (NEW)
+   LANG DETECT GUARD
    - call before applyRules() to avoid wrong-language pack usage
    ========================= */
 function ensureLangBeforeApply(text) {
@@ -116,17 +116,12 @@ window.openLangPicker = function () {
           try { window.__LANG_MODAL_OPENING__ = false; } catch (_) {}
 
           // ✅ normalize (safety): only accept zh/de/en
-          const L = (String(lang || "").toLowerCase() === "zh" || String(lang || "").toLowerCase() === "de" || String(lang || "").toLowerCase() === "en")
-            ? String(lang || "").toLowerCase()
-            : "";
+          const ll = String(lang || "").toLowerCase();
+          const L = (ll === "zh" || ll === "de" || ll === "en") ? ll : "";
           if (!L) return;
 
           window.ruleEngine = L;
           window.ruleEngineMode = "lock";
-
-          // ❌ Do NOT write legacy contentLang/contentLangMode (single-source-of-truth)
-          // window.contentLang = lang;
-          // window.contentLangMode = "lock";
 
           // ✅ NEVER call applyRules() directly here; always go through safe/guard entry
           if (v.trim()) {
@@ -165,7 +160,7 @@ function bind() {
       // ✅ IMPORTANT: UI switch MUST NOT overwrite ruleEngine/mode
 
       if (inTxt) {
-        // ✅ NEW: ensure correct content language BEFORE applying rules
+        // ✅ ensure correct content language BEFORE applying rules
         if (!ensureLangBeforeApply(inTxt)) return;
         applyRules(inTxt);
       } else window.dispatchEvent(new Event("safe:updated"));
@@ -209,7 +204,6 @@ function bind() {
 
       const inTxt = (($("inputText") && $("inputText").value) || "").trim();
       if (inTxt) {
-        // ✅ NEW
         if (!ensureLangBeforeApply(inTxt)) return;
         applyRules(inTxt);
       } else window.dispatchEvent(new Event("safe:updated"));
@@ -302,7 +296,7 @@ function bind() {
       // ✅ FINAL: initEnabled again as a last safety net
       try {
         if (typeof window.initEnabled === "function") window.initEnabled();
-        else if (typeof initEnabled === "function") initEnabled();
+       else if (typeof initEnabled === "function") initEnabled();
       } catch (_) {}
 
       try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
@@ -338,7 +332,6 @@ function bind() {
       clearTimeout(autoTimer);
       autoTimer = setTimeout(() => {
         if (v.trim()) {
-          // ✅ NEW
           if (!ensureLangBeforeApply(v)) return;
           applyRules(v);
         } else {
