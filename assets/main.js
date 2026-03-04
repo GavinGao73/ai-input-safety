@@ -1,4 +1,4 @@
-======================
+// =======================
 // assets/main.js (FULL)
 // v20260223-lang-split-stable-a4 (PATCHED: no legacy contentLang writes + export lang fallback)
 //
@@ -6,7 +6,7 @@
 // ✅ Content strategy language: window.ruleEngine / window.ruleEngineMode（由 lang-detect.js 的 ensureContentLang + 用户选择锁定）
 // ✅ Clear 必须 resetContentLang(): mode=auto, ruleEngine=""
 // ✅ Export Mode A uses content-strategy lang (ruleEngine), not UI lang
-// =========================
+// =======================
 
 /* =========================
    E) Export progress mirror (UI language aligned)
