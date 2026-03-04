@@ -1,17 +1,11 @@
 // =========================
 // assets/main.js (FULL)
-// v20260223-lang-split-stable-a4
+// v20260223-lang-split-stable-a4 (PATCHED: no legacy contentLang writes + export lang fallback)
 //
 // ✅ UI language: window.currentLang 只影响 UI 文案
 // ✅ Content strategy language: window.ruleEngine / window.ruleEngineMode（由 lang-detect.js 的 ensureContentLang + 用户选择锁定）
 // ✅ Clear 必须 resetContentLang(): mode=auto, ruleEngine=""
-//
-// ✅ Export Mode A uses langContent (rule language) rather than UI lang
-//
-// + v20260228 LANG-DETECT INTEGRATION (conservative)
-// ✅ before applyRules(): ensureContentLang(text, currentLang)
-// ✅ uncertain -> modal choose once -> lock
-// ✅ does NOT add permanent UI buttons (expose window.openLangPicker)
+// ✅ Export Mode A uses content-strategy lang (ruleEngine), not UI lang
 // =========================
 
 /* =========================
@@ -119,9 +113,9 @@ window.openLangPicker = function () {
           window.ruleEngine = lang;
           window.ruleEngineMode = "lock";
 
-          // ✅ compatibility
-          window.contentLang = lang;
-          window.contentLangMode = "lock";
+          // ❌ Do NOT write legacy contentLang/contentLangMode (single-source-of-truth)
+          // window.contentLang = lang;
+          // window.contentLangMode = "lock";
 
           if (v.trim() && typeof window.applyRules === "function") window.applyRules(v);
         },
@@ -277,11 +271,13 @@ function bind() {
         if (typeof resetContentLang === "function") {
           resetContentLang();
         } else {
-          // ✅ fallback: keep BOTH new + legacy vars consistent
+          // ✅ fallback: reset ruleEngine only (single source)
           window.ruleEngineMode = "auto";
           window.ruleEngine = "";
-          window.contentLangMode = "auto";
-          window.contentLang = "";
+
+          // ❌ do not touch legacy contentLang here unless you explicitly keep a bridge elsewhere
+          // window.contentLangMode = "auto";
+          // window.contentLang = "";
         }
       } catch (_) {}
 
@@ -446,18 +442,19 @@ function bind() {
         const snap = window.__export_snapshot || {};
         const enabledKeys = Array.isArray(snap.enabledKeys) ? snap.enabledKeys : effectiveEnabledKeys();
 
-        // ✅ KEY FIX: export uses langContent (rule language), not UI language
+        // ✅ KEY FIX: export uses content-strategy lang, not UI lang
         const lang =
           snap.langContent ||
           (typeof getLangContent === "function" ? getLangContent() : null) ||
-          currentLang;
+          ((String(window.ruleEngineMode || "").toLowerCase() === "lock" && window.ruleEngine) ? window.ruleEngine : "") ||
+          "";
 
         const manualTermsSafe = Array.isArray(snap.manualTerms) ? snap.manualTerms : [];
 
         setProgressText([
           (t.progressWorking || "处理中…"),
           `mode=A`,
-          `lang=${lang}`,
+          `lang=${lang || "(auto)"}`,
           `moneyMode=M1`,
           `enabledKeys=${enabledKeys.length}`,
           `manualTerms=${manualTermsSafe.length}`
