@@ -1,6 +1,6 @@
 // =========================
 // assets/stage3.js (FULL)
-// v20260223-lang-split-stable-a3
+// v20260223-lang-split-stable-a3 (PATCHED: guard-respect + detectLang bridge)
 //
 // ✅ Mode A (readable PDF):
 // - detect from RAW pdf text (content strategy), then LOCK for session (ruleEngine/ruleEngineMode)
@@ -32,13 +32,19 @@ function lockRuleEngineForSession(lang) {
 
 function detectRuleEngineFromRaw(text) {
   const s = String(text || "");
-  // Prefer centralized detector if present
+
+  // Prefer centralized detector if present (use detectLang, not detectRuleEngine)
   try {
-    if (window.__LangDetect && typeof window.__LangDetect.detectRuleEngine === "function") {
-      const r = window.__LangDetect.detectRuleEngine(s);
-      // allow either string or { lang }
-      if (typeof r === "string") return r;
-      if (r && typeof r.lang === "string") return r.lang;
+    if (window.__LangDetect && typeof window.__LangDetect.detectLang === "function") {
+      const r = window.__LangDetect.detectLang(s, window.currentLang || "en");
+
+      // Only lock when it's a stable decision (no confirm needed + confidence high enough)
+      if (r && typeof r.lang === "string" && r.lang) {
+        if (r.needsConfirm === false && (typeof r.confidence !== "number" || r.confidence >= 0.78)) {
+          return r.lang;
+        }
+      }
+      return "";
     }
   } catch (_) {}
 
@@ -60,16 +66,23 @@ function detectRuleEngineFromRaw(text) {
 
 function applyRulesSafely(text) {
   const s = String(text || "");
+
   // If main.js provides a guard, prefer it (prevents bypass + ensures modal path)
   try {
     if (typeof window.ensureLangBeforeApply === "function") {
-      // Some builds may be async; we tolerate both.
       const r = window.ensureLangBeforeApply(s);
+
+      // ✅ IMPORTANT: guard returns false when modal is opening/open => STOP this run
+      if (r === false) return;
+
+      // tolerate async guard (future-proof)
       if (r && typeof r.then === "function") {
-        return r.then(() => {
+        return r.then((ok) => {
+          if (ok === false) return;
           if (typeof window.applyRules === "function") window.applyRules(s);
         });
       }
+
       if (typeof window.applyRules === "function") window.applyRules(s);
       return;
     }
