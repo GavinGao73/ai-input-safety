@@ -329,21 +329,28 @@
   };
 
   function rerunAfterPick(fallbackText) {
-    try {
-      // Prefer the provided text, avoid hard-coupling to DOM state when possible
-      const ta = document.getElementById("inputText");
-      const v = String((fallbackText != null ? fallbackText : (ta ? ta.value : "")) || "");
+  try {
+    const ta = document.getElementById("inputText");
+    const v = String((fallbackText != null ? fallbackText : (ta ? ta.value : "")) || "");
+    if (!v.trim()) return;
 
-      // ✅ ALWAYS go through guard chain; never call applyRules() directly here
-      if (typeof window.applyRulesSafely === "function") {
-        window.applyRulesSafely(v);
-      } else if (typeof window.ensureLangBeforeApply === "function") {
-        window.ensureLangBeforeApply(v);
-      } else {
-        // No safe entry found; do nothing (avoid bypassing guard by calling applyRules)
-      }
-    } catch (_) {}
-  }
+    // 1) Best: stage3 exposes a safe wrapper
+    if (typeof window.applyRulesSafely === "function") {
+      window.applyRulesSafely(v);
+      return;
+    }
+
+    // 2) Otherwise: guard OK => run applyRules
+    if (typeof window.ensureLangBeforeApply === "function") {
+      const ok = window.ensureLangBeforeApply(v);
+      if (ok === false) return; // modal opened again, stop
+    }
+
+    if (typeof window.applyRules === "function") {
+      window.applyRules(v);
+    }
+  } catch (_) {}
+}
 
   // Pre-guard for main.js:
   // - If uncertain: open modal and return ok=false
