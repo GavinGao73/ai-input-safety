@@ -18,6 +18,10 @@
   // ✅ keep version centralized
   const PDFJS_VERSION = "3.11.174";
 
+  // ✅ PATCH: robust script loader locks (avoid double-inject + allow retry)
+  let __pdfjsLoadPromise = null;
+  let __pdflibLoadPromise = null;
+
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
   // kept for compatibility (not drawn anymore)
@@ -28,8 +32,9 @@
   }
 
   // ✅ Base URL that auto-includes repo name on GitHub Pages project sites
+  // ✅ PATCH: align with assets/pdf.js (baseURI-safe)
   function pdfjsBaseUrl() {
-    return new URL(`./pdfjs/${PDFJS_VERSION}/`, window.location.href).toString();
+    return new URL(`./pdfjs/${PDFJS_VERSION}/`, document.baseURI || window.location.href).toString();
   }
 
   // ======================================================
@@ -309,70 +314,90 @@
   // --------- Safe dynamic loaders (no logs) ----------
   async function loadPdfJsIfNeeded() {
     if (window.pdfjsLib && window.pdfjsLib.getDocument) return window.pdfjsLib;
+    if (__pdfjsLoadPromise) return __pdfjsLoadPromise;
 
     const base = pdfjsBaseUrl();
 
-    // ✅ Prefer same-origin pdf.min.js (fixes CORS issues with fonts/CMaps in practice)
-    const candidates = [
-      base + "pdf.min.js",
-      `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.min.js`
-    ];
+    __pdfjsLoadPromise = (async () => {
+      // ✅ Prefer same-origin pdf.min.js (fixes CORS issues with fonts/CMaps in practice)
+      const candidates = [
+        base + "pdf.min.js",
+        `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.min.js`
+      ];
 
-    let loaded = false;
-    let lastErr = null;
+      let loaded = false;
+      let lastErr = null;
 
-    for (const url of candidates) {
+      for (const url of candidates) {
+        try {
+          await new Promise((resolve, reject) => {
+            const s = document.createElement("script");
+            s.src = url;
+            s.async = true;
+            s.onload = resolve;
+            s.onerror = () => reject(new Error("Failed to load PDF.js: " + url));
+            document.head.appendChild(s);
+          });
+          loaded = true;
+          break;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+
+      if (!loaded || !window.pdfjsLib) {
+        throw (lastErr || new Error("pdfjsLib not available"));
+      }
+
+      // ✅ Prefer same-origin worker (critical: no fake worker / no CORS)
       try {
-        await new Promise((resolve, reject) => {
-          const s = document.createElement("script");
-          s.src = url;
-          s.async = true;
-          s.onload = resolve;
-          s.onerror = () => reject(new Error("Failed to load PDF.js: " + url));
-          document.head.appendChild(s);
-        });
-        loaded = true;
-        break;
-      } catch (e) {
-        lastErr = e;
-      }
-    }
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = base + "pdf.worker.min.js";
+      } catch (_) {}
 
-    if (!loaded || !window.pdfjsLib) {
-      throw (lastErr || new Error("pdfjsLib not available"));
-    }
+      // Fallback worker
+      try {
+        if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+            `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`;
+        }
+      } catch (_) {}
 
-    // ✅ Prefer same-origin worker (critical: no fake worker / no CORS)
+      return window.pdfjsLib;
+    })();
+
     try {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = base + "pdf.worker.min.js";
-    } catch (_) {}
-
-    // Fallback worker
-    try {
-      if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-          `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`;
-      }
-    } catch (_) {}
-
-    return window.pdfjsLib;
+      return await __pdfjsLoadPromise;
+    } catch (e) {
+      __pdfjsLoadPromise = null; // ✅ allow retry
+      throw e;
+    }
   }
 
   async function loadPdfLibIfNeeded() {
     if (window.PDFLib && window.PDFLib.PDFDocument) return window.PDFLib;
+    if (__pdflibLoadPromise) return __pdflibLoadPromise;
 
-    const url = "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
-    await new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = url;
-      s.async = true;
-      s.onload = resolve;
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
+    __pdflibLoadPromise = (async () => {
+      const url = "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
+      await new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = url;
+        s.async = true;
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
 
-    if (!window.PDFLib) throw new Error("PDFLib not available");
-    return window.PDFLib;
+      if (!window.PDFLib) throw new Error("PDFLib not available");
+      return window.PDFLib;
+    })();
+
+    try {
+      return await __pdflibLoadPromise;
+    } catch (e) {
+      __pdflibLoadPromise = null; // ✅ allow retry
+      throw e;
+    }
   }
 
   function readFileAsArrayBuffer(file) {
@@ -734,6 +759,18 @@
       }
     }
     return null;
+  }
+
+  // ✅ PATCH: normalize cached items shape (avoid rect=0 when transform/width missing)
+  function normalizeCachedItems(items) {
+    if (!Array.isArray(items)) return [];
+    return items.map((it) => ({
+      str: it && it.str != null ? String(it.str) : "",
+      transform: Array.isArray(it && it.transform) ? it.transform.slice(0, 6) : [1, 0, 0, 1, 0, 0],
+      width: Number(it && it.width) || 0,
+      height: Number(it && it.height) || 0,
+      hasEOL: !!(it && it.hasEOL)
+    }));
   }
 
   // --------- Text items -> rects (value-first, keep labels) ----------
@@ -1260,7 +1297,7 @@
 
       const cachedItems = findCachedItemsForPage(cached, p.pageNumber);
       if (cachedItems && cachedItems.length) {
-        itemsOrTextContent = cachedItems;
+        itemsOrTextContent = normalizeCachedItems(cachedItems);
       } else {
         // fallback: query PDF.js textContent with probe-like options (stability)
         const page = await pdf.getPage(p.pageNumber);
