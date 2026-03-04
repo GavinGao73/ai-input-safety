@@ -1,5 +1,6 @@
 // =========================
-// assets/lang-detect.js (NEW) — PATCHED (dedupe + decouple + short_latin FIX)
+// assets/lang-detect.js (FULL)
+// v20260304a1 — PATCHED (dedupe + decouple + short_latin FIX)
 // Language detection orchestrator (franc-all + pack.detect + conservative fallback)
 // - Exposes window.__LangDetect.detectLang(text, uiLang)
 // - Exposes ensureContentLang() for main.js pre-guard
@@ -295,6 +296,7 @@
   // - short Latin content
   // - no umlauts/ß
   // - no strong keywords
+  // - no German function words
   // - AND detector suggests EN/DE uncertainty (both candidates OR low confidence)
   function shouldAskShortLatin(st, res) {
     if (!st) return false;
