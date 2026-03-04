@@ -6,7 +6,7 @@
 // ✅ Content strategy language: window.ruleEngine / window.ruleEngineMode（由 lang-detect.js 的 ensureContentLang + 用户选择锁定）
 // ✅ Clear 必须 resetContentLang(): mode=auto, ruleEngine=""
 // ✅ Export Mode A uses content-strategy lang (ruleEngine), not UI lang
-// =======================
+// =========================
 
 /* =========================
    E) Export progress mirror (UI language aligned)
@@ -91,6 +91,11 @@ function ensureLangBeforeApply(text) {
   } catch (_) {}
   return true;
 }
+
+// ✅ IMPORTANT: expose for lang-detect.js / stage3.js rerun chain
+try {
+  if (typeof window.ensureLangBeforeApply !== "function") window.ensureLangBeforeApply = ensureLangBeforeApply;
+} catch (_) {}
 
 // Optional manual picker entry (no UI clutter by default)
 window.openLangPicker = function () {
