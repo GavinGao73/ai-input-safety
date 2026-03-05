@@ -1,6 +1,6 @@
 // =========================
 // assets/lang-detect.js (FULL)
-// v20260305a2 — PATCHED (方案 P · franc 优先 · 极简稳定版 · 删除 packDetect)
+// v20260305a3 — PATCHED (方案 P · franc 优先 · 极简稳定版 · 删除 packDetect · bridge 收敛为单点)
 // Language detection orchestrator (franc-first + modal fallback)
 // - Exposes window.__LangDetect.detectLang(text, uiLang)
 // - Exposes ensureContentLang() for main.js pre-guard
@@ -15,14 +15,18 @@
 //
 // CHANGE (A2):
 // - Removed detectByPackDetect() + getPacks() because Scheme P does not use pack.detect for language decision.
+//
+// CHANGE (A3):
+// - Bridge logic consolidated to ONE place only (inside detectByFranc).
+//   (No top-level bridge.)
 // =========================
 (function () {
   "use strict";
 
   // Expose singleton
   const API = (window.__LangDetect = window.__LangDetect || {});
-  API.__state = API.__state || { ver: "v20260305a2-p-franc-first-no-packdetect", last: null };
-  API.__state.ver = "v20260305a2-p-franc-first-no-packdetect";
+  API.__state = API.__state || { ver: "v20260305a3-p-franc-first-single-bridge", last: null };
+  API.__state.ver = "v20260305a3-p-franc-first-single-bridge";
 
   // ---- Config (conservative) ----
   const MIN_LEN_FRANC = 40;      // shorter than this: franc is noisy
@@ -61,17 +65,6 @@
   function uniq(arr) {
     return Array.from(new Set((arr || []).filter(Boolean)));
   }
-
-  // ✅ franc bridge (top-level hardening)
-  // Ensure window.franc / window.francAll exist even when bundle exposes window.FrLang.*
-  try {
-    if (typeof window.franc !== "function" && window.FrLang && typeof window.FrLang.franc === "function") {
-      window.franc = window.FrLang.franc;
-    }
-    if (typeof window.francAll !== "function" && window.FrLang && typeof window.FrLang.francAll === "function") {
-      window.francAll = window.FrLang.francAll;
-    }
-  } catch (_) {}
 
   function stats(text) {
     const s = safeStr(text);
@@ -140,9 +133,9 @@
         return { lang: "", confidence: 0, needsConfirm: false, candidates: [], reason: "empty", source: "franc" };
       }
 
-      // ✅ PATCH (lazy bridge):
-      // If the franc bundle exposes window.FrLang but the inline bridge ran too early (due to defer),
-      // bind window.franc/window.francAll here before using them.
+      // ✅ SINGLE BRIDGE (the only place):
+      // Ensure window.franc / window.francAll exist even when bundle exposes window.FrLang.*
+      // This is done lazily right before detection, so we do not depend on script timing.
       try {
         if (typeof window.franc !== "function" && window.FrLang && typeof window.FrLang.franc === "function") {
           window.franc = window.FrLang.franc;
