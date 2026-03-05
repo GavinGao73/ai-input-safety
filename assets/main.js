@@ -1,13 +1,17 @@
 // =======================
 // assets/main.js (FULL)
-// v20260304a2-lang-lock-invariant (PATCHED: no legacy contentLang writes + export lang fallback + LANG STATUS TELEMETRY + LOCK INVARIANT)
+// v20260305a1-ui-content-telemetry (PATCHED: report content follows UI + keep actual strategy lang visible)
 //
 // ✅ UI language: window.currentLang 只影响 UI 文案
 // ✅ Content strategy language: window.ruleEngine / window.ruleEngineMode（由 lang-detect.js 的 ensureContentLang + 用户选择锁定）
 // ✅ Clear 必须 resetContentLang(): mode=auto, ruleEngine=""
 // ✅ Export Mode A uses content-strategy lang (ruleEngine), not UI lang
 //
-// ✅ NEW INVARIANT (A2):
+// ✅ REPORT POLICY (A1):
+// - “生成进程报告”里的 content 字段：按 UI 语言展示（便于你按 UI 视角读状态）
+// - 同时额外展示 contentActual（实际内容策略语言=ruleEngine/lock 或 getLangContent）用于调试与验收
+//
+// ✅ NEW INVARIANT (A2) 保留：
 // - If detector returns a concrete lang with ok=true (or last detection is confident), main.js MUST ensure ruleEngine is set + locked.
 // - This prevents content strategy from drifting with UI language when ruleEngine is empty.
 // =========================
@@ -15,7 +19,7 @@
 /* =========================
    LANG STATUS TELEMETRY
    - Keep runtime language state observable in exportStatus box
-   - Does NOT change detection / masking behavior (except lock invariant enforcement in guard)
+   - Report policy: content follows UI, but keep actual strategy lang visible as contentActual
    ========================= */
 function __normLang3(x) {
   const s = String(x || "").toLowerCase();
@@ -44,20 +48,32 @@ function snapshotLangStatus(reason) {
     const re = __normLang3(window.ruleEngine) || "";
     const mode = String(window.ruleEngineMode || "").toLowerCase() || "";
 
-    let content = "";
+    // actual content-strategy lang (what masking/export should follow)
+    let contentActual = "";
     try {
-      if (typeof window.getLangContent === "function") content = __normLang3(window.getLangContent()) || "";
+      if (typeof window.getLangContent === "function") contentActual = __normLang3(window.getLangContent()) || "";
     } catch (_) {}
+
+    // report content follows UI (per your request)
+    const contentReported = ui || "";
 
     window.__LANG_STATUS__ = {
       when: Date.now(),
       iso: new Date().toISOString(),
       reason: String(reason || ""),
+
       uiLang: ui,
+
+      // single source of truth for actual strategy
       ruleEngine: re,
       ruleEngineMode: mode,
-      langContent: content || re || ui || "",
+
+      // report vs actual (debug clarity)
+      langContent: contentReported,                 // ✅ report: follows UI
+      langContentActual: contentActual || re || "", // ✅ debug: actual strategy
+
       modalOpening: !!window.__LANG_MODAL_OPENING__,
+
       detected
     };
   } catch (_) {}
@@ -68,9 +84,25 @@ function renderLangStatusLines(t) {
   if (!st) return [];
 
   const lines = [];
+
+  // report view (UI-centric)
   lines.push(`UI=${st.uiLang || "(?)"}`);
-  lines.push(`content=${st.langContent || "(?)"}`);
-  lines.push(`ruleEngine=${st.ruleEngine || "(empty)"} (${st.ruleEngineMode || "auto"})`);
+  lines.push(`content=${st.langContent || "(?)"}`); // ✅ content follows UI
+
+  // actual strategy (must stay visible for debugging / export correctness)
+  const actual = st.langContentActual || "";
+  const re = st.ruleEngine || "";
+  const mode = st.ruleEngineMode || "auto";
+  lines.push(`ruleEngine=${re || "(empty)"} (${mode})`);
+
+  // show actual content strategy lang explicitly (if differs from reported content)
+  if (actual && actual !== st.langContent) {
+    lines.push(`contentActual=${actual}`);
+  } else if (actual) {
+    // still useful to show explicitly even when same
+    lines.push(`contentActual=${actual}`);
+  }
+
   lines.push(`modal=${st.modalOpening ? "OPEN" : "false"}`);
 
   if (st.detected) {
