@@ -1,5 +1,12 @@
 // =========================
 // assets/ui.js (from app.js)
+// v20260305a1 — PATCHED
+// - Keep i18n in i18n.js
+// - ui.js stays “UI logic + UI observability” (NOT language dict)
+// - Moved lang-status / export-status telemetry helpers here (from main.js)
+// - Optional debug flags:
+//   window.__DEBUG_LANG__ = true   -> show extra lines in exportStatus
+//   window.__TRACE_RULEENGINE__ = true -> enable ruleEngine write tracing (hook)
 // =========================
 
 // ================= Stage 3 UI texts =================
@@ -62,10 +69,10 @@ function setStage3Ui(mode) {
   show(btnPdf, lastStage3Mode === "A" || lastStage3Mode === "B");
   show(btnMan, lastStage3Mode === "B");
 
-  const t = (window.I18N && window.I18N[currentLang]) ? window.I18N[currentLang] : null;
+  const t = window.I18N && window.I18N[currentLang] ? window.I18N[currentLang] : null;
 
-  if (btnPdf) btnPdf.textContent = (t && t.btnRedactPdf) ? t.btnRedactPdf : stage3Text("btnExportPdf");
-  if (btnMan) btnMan.textContent = (t && t.btnManualRedact) ? t.btnManualRedact : stage3Text("btnManual");
+  if (btnPdf) btnPdf.textContent = t && t.btnRedactPdf ? t.btnRedactPdf : stage3Text("btnExportPdf");
+  if (btnMan) btnMan.textContent = t && t.btnManualRedact ? t.btnManualRedact : stage3Text("btnManual");
 
   if (btnPdf && !String(btnPdf.textContent || "").trim()) btnPdf.textContent = stage3Text("btnExportPdf");
   if (btnMan && !String(btnMan.textContent || "").trim()) btnMan.textContent = stage3Text("btnManual");
@@ -122,7 +129,7 @@ function setCtlExpanded(btn, body, expanded) {
   }
 }
 function toggleCtl(btn, body) {
-  const cur = (btn && btn.getAttribute("aria-expanded") === "true");
+  const cur = btn && btn.getAttribute("aria-expanded") === "true";
   setCtlExpanded(btn, body, !cur);
 }
 
@@ -147,7 +154,10 @@ function clearBodyHeights() {
 }
 
 function syncManualRiskHeights() {
-  if (isSmallScreen()) { clearBodyHeights(); return; }
+  if (isSmallScreen()) {
+    clearBodyHeights();
+    return;
+  }
 
   const manualBody = $("manualBody");
   const riskBody = $("riskBody");
@@ -155,7 +165,10 @@ function syncManualRiskHeights() {
 
   const manOpen = $("btnToggleManual")?.getAttribute("aria-expanded") === "true";
   const riskOpen = $("btnToggleRisk")?.getAttribute("aria-expanded") === "true";
-  if (!manOpen || !riskOpen) { clearBodyHeights(); return; }
+  if (!manOpen || !riskOpen) {
+    clearBodyHeights();
+    return;
+  }
 
   const rh = riskBody.getBoundingClientRect().height;
   const target = Math.max(Math.ceil(rh || 0), DESKTOP_MIN_OPEN_H);
@@ -271,7 +284,262 @@ function setText() {
   if ($("ui-foot")) $("ui-foot").textContent = t.foot;
 
   setStage3Ui(lastStage3Mode);
+
+  // keep exportStatus informative on text refresh
+  try {
+    if (typeof renderExportStatusCombined === "function") renderExportStatusCombined();
+  } catch (_) {}
 }
+
+/* =========================
+   UI Observability (moved from main.js)
+   - Lang status snapshot + export status combined view
+   - Designed to NOT grow with language count (uses I18N only for a few labels)
+   ========================= */
+
+(function ensureUiDebugFlags() {
+  try {
+    if (typeof window.__DEBUG_LANG__ === "undefined") window.__DEBUG_LANG__ = false;
+    // __TRACE_RULEENGINE__ default false; only enable when you really need traces
+    if (typeof window.__TRACE_RULEENGINE__ === "undefined") window.__TRACE_RULEENGINE__ = false;
+  } catch (_) {}
+})();
+
+function __normLang3(x) {
+  const s = String(x || "").toLowerCase();
+  return s === "zh" || s === "de" || s === "en" ? s : "";
+}
+
+function snapshotLangStatus(reason) {
+  try {
+    const last =
+      window.__LangDetect && window.__LangDetect.__state && window.__LangDetect.__state.last
+        ? window.__LangDetect.__state.last
+        : null;
+
+    const detected = last
+      ? {
+          lang: __normLang3(last.lang),
+          confidence: typeof last.confidence === "number" ? last.confidence : null,
+          needsConfirm: !!last.needsConfirm,
+          reason: last.reason || "",
+          source: last.source || "",
+          candidates: Array.isArray(last.candidates) ? last.candidates.map(__normLang3).filter(Boolean) : []
+        }
+      : null;
+
+    const ui = __normLang3(window.currentLang) || "";
+    const re = __normLang3(window.ruleEngine) || "";
+    const mode = String(window.ruleEngineMode || "").toLowerCase() || "";
+
+    let content = "";
+    try {
+      if (typeof window.getLangContent === "function") content = __normLang3(window.getLangContent()) || "";
+    } catch (_) {}
+
+    window.__LANG_STATUS__ = {
+      when: Date.now(),
+      iso: new Date().toISOString(),
+      reason: String(reason || ""),
+      uiLang: ui,
+      ruleEngine: re,
+      ruleEngineMode: mode,
+      langContent: content || re || ui || "",
+      modalOpening: !!window.__LANG_MODAL_OPENING__,
+      detected
+    };
+  } catch (_) {}
+}
+
+function renderLangStatusLines(t) {
+  const st = window.__LANG_STATUS__ || null;
+  if (!st) return [];
+
+  const lines = [];
+  lines.push(`UI=${st.uiLang || "(?)"}`);
+  lines.push(`content=${st.langContent || "(?)"}`);
+  lines.push(`ruleEngine=${st.ruleEngine || "(empty)"} (${st.ruleEngineMode || "auto"})`);
+  lines.push(`modal=${st.modalOpening ? "OPEN" : "false"}`);
+
+  if (st.detected) {
+    const d = st.detected;
+    const conf = typeof d.confidence === "number" ? d.confidence.toFixed(2) : "(?)";
+    const cand = d.candidates && d.candidates.length ? d.candidates.join(",") : "-";
+    lines.push(`detect.last=${d.lang || "(?)"} conf=${conf} needsConfirm=${d.needsConfirm ? "true" : "false"}`);
+    if (d.reason || d.source) lines.push(`detect.reason=${d.reason || "-"} src=${d.source || "-"}`);
+    lines.push(`detect.candidates=${cand}`);
+
+    // extra debug lines (optional)
+    try {
+      if (window.__DEBUG_LANG__ === true) {
+        // include detector version if present
+        const ver =
+          window.__LangDetect && window.__LangDetect.__state && window.__LangDetect.__state.ver
+            ? String(window.__LangDetect.__state.ver)
+            : "";
+        if (ver) lines.push(`detect.ver=${ver}`);
+      }
+    } catch (_) {}
+  } else {
+    lines.push("detect.last=(none)");
+  }
+
+  if (st.reason) lines.push(`telemetry=${st.reason}`);
+  return lines;
+}
+
+function i18nProgressLine(phase, t) {
+  const map = {
+    "exportRasterSecurePdfFromReadablePdf:begin": (t && t.progressPhaseBegin) || "开始准备…",
+    autoRedactReadablePdf: (t && t.progressPhaseScan) || "扫描并计算遮盖区域…",
+    "exportRasterSecurePdfFromReadablePdf:export": (t && t.progressPhaseExport) || "生成安全PDF（纯图片）…",
+    exportRasterSecurePdfFromVisual: (t && t.progressPhaseExport) || "生成安全PDF（纯图片）…"
+  };
+  return map[phase] || ((t && t.progressPhaseWorking) || "处理中…");
+}
+
+function renderExportStatusCombined() {
+  const el = document.getElementById("exportStatus");
+  if (!el) return;
+
+  const t = window.I18N && window.I18N[currentLang] ? window.I18N[currentLang] : {};
+  const s = window.__RasterExportLast || null;
+  const bootLine = window.__bootLine || "";
+
+  const lines = [];
+
+  if (bootLine) lines.push(bootLine);
+
+  // always show language status (if available)
+  try {
+    const langLines = renderLangStatusLines(t);
+    if (langLines && langLines.length) lines.push(...langLines);
+  } catch (_) {}
+
+  if (s) {
+    if (s.phase) lines.push(`${i18nProgressLine(s.phase, t)}  (${s.phase})`);
+    if (s.phase2) lines.push(`${t.progressPhase2 || "阶段2"}: ${s.phase2}`);
+
+    if (s.lang) lines.push(`lang=${s.lang}`);
+    if (s.dpi) lines.push(`dpi=${s.dpi}`);
+
+    if (typeof s.pages === "number") lines.push(`${t.progressPages || "页数"}=${s.pages}`);
+    if (typeof s.rectsTotal === "number") lines.push(`${t.progressRects || "遮盖块"}=${s.rectsTotal}`);
+
+    if (Array.isArray(s.perPage) && s.perPage.length) {
+      const last = s.perPage[s.perPage.length - 1];
+      if (last && last.pageNumber) {
+        lines.push(
+          `${t.progressPage || "当前页"}=${last.pageNumber}  items=${last.items || 0}  rects=${last.rectCount || 0}`
+        );
+      }
+    }
+  }
+
+  if (!lines.length) return;
+
+  el.style.color = ""; // reset error color if any
+  el.textContent = lines.join("\n");
+}
+
+function startExportStatusMirror() {
+  if (window.__exportStatusTimer) clearInterval(window.__exportStatusTimer);
+  window.__exportStatusTimer = setInterval(() => {
+    try {
+      renderExportStatusCombined();
+    } catch (_) {}
+  }, 120);
+}
+
+function stopExportStatusMirror() {
+  if (window.__exportStatusTimer) {
+    clearInterval(window.__exportStatusTimer);
+    window.__exportStatusTimer = null;
+  }
+}
+
+/* =========================
+   Optional: ruleEngine write tracing (debug only)
+   - Disabled by default. Enable by setting window.__TRACE_RULEENGINE__=true before ui.js loads,
+     or call window.enableRuleEngineTrace(true) after load.
+   ========================= */
+
+function traceRuleEngineWrites() {
+  try {
+    if (window.__TRACE_RULEENGINE__ !== true) return;
+    if (window.__TRACE_RULEENGINE__HOOKED__) return;
+    window.__TRACE_RULEENGINE__HOOKED__ = true;
+
+    // ---- ruleEngine ----
+    let _re = window.ruleEngine;
+
+    Object.defineProperty(window, "ruleEngine", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return _re;
+      },
+      set(v) {
+        _re = v;
+        try {
+          window.__RULEENGINE_LAST_SET__ = {
+            when: Date.now(),
+            iso: new Date().toISOString(),
+            value: String(v),
+            stack: (new Error("ruleEngine set")).stack || ""
+          };
+        } catch (_) {}
+        try {
+          console.warn("[ruleEngine SET]", v);
+          console.trace("[ruleEngine SET TRACE]");
+        } catch (_) {}
+      }
+    });
+
+    // ---- ruleEngineMode ----
+    let _rm = window.ruleEngineMode;
+
+    Object.defineProperty(window, "ruleEngineMode", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return _rm;
+      },
+      set(v) {
+        _rm = v;
+        try {
+          window.__RULEENGINE_MODE_LAST_SET__ = {
+            when: Date.now(),
+            iso: new Date().toISOString(),
+            value: String(v),
+            stack: (new Error("ruleEngineMode set")).stack || ""
+          };
+        } catch (_) {}
+        try {
+          console.warn("[ruleEngineMode SET]", v);
+          console.trace("[ruleEngineMode SET TRACE]");
+        } catch (_) {}
+      }
+    });
+  } catch (_) {}
+}
+
+window.enableRuleEngineTrace = function (on) {
+  try {
+    window.__TRACE_RULEENGINE__ = !!on;
+    traceRuleEngineWrites();
+    return window.__TRACE_RULEENGINE__ === true;
+  } catch (_) {
+    return false;
+  }
+};
+
+// auto-hook if enabled
+(function maybeHookRuleEngineTrace() {
+  try {
+    traceRuleEngineWrites();
+  } catch (_) {}
+})();
 
 // =========================
 // UI boot patch (restored from app.js boot responsibility)
@@ -288,6 +556,12 @@ function setText() {
       // apply all UI texts (includes stage3 buttons)
       if (typeof setText === "function") setText();
       else if (typeof setStage3Ui === "function") setStage3Ui(lastStage3Mode);
+
+      // make export status visible/consistent early
+      try {
+        if (!window.__LANG_STATUS__) snapshotLangStatus("ui:bootPatch");
+        renderExportStatusCombined();
+      } catch (_) {}
     } catch (_) {}
   }
 
