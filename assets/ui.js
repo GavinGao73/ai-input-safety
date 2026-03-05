@@ -398,6 +398,127 @@ function i18nProgressLine(phase, t) {
   return map[phase] || ((t && t.progressPhaseWorking) || "处理中…");
 }
 
+function renderExportStatusCombined() {
+  const el = document.getElementById("exportStatus");
+  if (!el) return;
+
+  const t = window.I18N && window.I18N[currentLang] ? window.I18N[currentLang] : {};
+  const s = window.__RasterExportLast || null;
+  const bootLine = window.__bootLine || "";
+
+  // ✅ UI labels follow UI language (no i18n key changes; safe fallback)
+  function uiLabels(lang) {
+    const LZ = {
+      ui: "UI",
+      content: "content",
+      ruleEngine: "ruleEngine",
+      modal: "modal",
+      detectLast: "detect.last",
+      conf: "conf",
+      needsConfirm: "needsConfirm",
+      reason: "detect.reason",
+      src: "src",
+      candidates: "detect.candidates",
+      telemetry: "telemetry",
+      phase2: "阶段2",
+      lang: "lang",
+      dpi: "dpi",
+      pages: "页数",
+      rects: "遮盖块",
+      page: "当前页",
+      items: "items",
+      rects2: "rects"
+    };
+
+    const LE = {
+      ui: "UI",
+      content: "content",
+      ruleEngine: "ruleEngine",
+      modal: "modal",
+      detectLast: "detect.last",
+      conf: "conf",
+      needsConfirm: "needsConfirm",
+      reason: "detect.reason",
+      src: "src",
+      candidates: "detect.candidates",
+      telemetry: "telemetry",
+      phase2: "Phase 2",
+      lang: "lang",
+      dpi: "dpi",
+      pages: "pages",
+      rects: "rects",
+      page: "page",
+      items: "items",
+      rects2: "rects"
+    };
+
+    const LD = {
+      ui: "UI",
+      content: "content",
+      ruleEngine: "ruleEngine",
+      modal: "modal",
+      detectLast: "detect.last",
+      conf: "conf",
+      needsConfirm: "needsConfirm",
+      reason: "detect.reason",
+      src: "src",
+      candidates: "detect.candidates",
+      telemetry: "telemetry",
+      phase2: "Phase 2",
+      lang: "lang",
+      dpi: "dpi",
+      pages: "Seiten",
+      rects: "Masken",
+      page: "Seite",
+      items: "items",
+      rects2: "rects"
+    };
+
+    const l = String(lang || "").toLowerCase();
+    return l === "de" ? LD : l === "en" ? LE : LZ;
+  }
+
+  const L = uiLabels(currentLang);
+  const lines = [];
+
+  if (bootLine) lines.push(bootLine);
+
+  // always show language status (if available)
+  try {
+    const langLines = renderLangStatusLines(t);
+    if (langLines && langLines.length) lines.push(...langLines);
+  } catch (_) {}
+
+  if (s) {
+    if (s.phase) lines.push(`${i18nProgressLine(s.phase, t)}  (${s.phase})`);
+
+    // phase2 label localized
+    if (s.phase2) lines.push(`${t.progressPhase2 || L.phase2}: ${s.phase2}`);
+
+    // basic export params (labels localized)
+    if (s.lang) lines.push(`${L.lang}=${s.lang}`);
+    if (s.dpi) lines.push(`${L.dpi}=${s.dpi}`);
+
+    // counts (labels localized; keep existing i18n if present)
+    if (typeof s.pages === "number") lines.push(`${t.progressPages || L.pages}=${s.pages}`);
+    if (typeof s.rectsTotal === "number") lines.push(`${t.progressRects || L.rects}=${s.rectsTotal}`);
+
+    if (Array.isArray(s.perPage) && s.perPage.length) {
+      const last = s.perPage[s.perPage.length - 1];
+      if (last && last.pageNumber) {
+        lines.push(
+          `${t.progressPage || L.page}=${last.pageNumber}  ${L.items}=${last.items || 0}  ${L.rects2}=${last.rectCount || 0}`
+        );
+      }
+    }
+  }
+
+  if (!lines.length) return;
+
+  el.style.color = ""; // reset error color if any
+  el.textContent = lines.join("\n");
+}
+
 function startExportStatusMirror() {
   if (window.__exportStatusTimer) clearInterval(window.__exportStatusTimer);
   window.__exportStatusTimer = setInterval(() => {
