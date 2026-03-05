@@ -186,45 +186,64 @@ function setLangContentAuto(text) {
 
 function ensureContentLangInEngine(text) {
   try {
-    // If already locked with a valid lang, nothing to do
     const mode = String(window.ruleEngineMode || "").toLowerCase();
     const re = normLang(window.ruleEngine);
+
+    // 1) already locked & valid
     if (mode === "lock" && re) return true;
 
-    // If modal is already opening/open, do NOT proceed (avoid wrong pack)
+    // 2) modal opening -> block this run (avoid UI fallback pack)
     if (window.__LANG_MODAL_OPENING__) return false;
 
-    // If detector exists, use it
-    if (window.__LangDetect && typeof window.__LangDetect.ensureContentLang === "function") {
-      const ui = getLangUI();
-      const r = window.__LangDetect.ensureContentLang(String(text || ""), ui);
-
-      // If detector indicates it opened/needs modal -> stop (avoid UI fallback pack)
-      if (r && r.ok === false) return false;
-
-      // If detector returned a lang (ok=true), lock it here (single source)
-      const L = r && r.lang ? normLang(r.lang) : "";
-      if (L) {
-        window.ruleEngine = L;
-        window.ruleEngineMode = "lock";
-
-        // compatibility mirror (ONE-WAY)
-        try {
-          window.contentLang = L;
-          window.contentLangMode = "lock";
-        } catch (_) {}
-
-        try {
-          window.dispatchEvent(new CustomEvent("ruleengine:changed", { detail: { lang: L } }));
-        } catch (_) {}
-      }
+    // 3) detector missing -> degraded mode (allow run, will fallback to UI)
+    if (!window.__LangDetect || typeof window.__LangDetect.ensureContentLang !== "function") {
       return true;
     }
 
-    // Detector missing -> allow run (will fallback to UI), but this is a degraded mode
+    const ui = getLangUI();
+    const r = window.__LangDetect.ensureContentLang(String(text || ""), ui);
+
+    // detector blocks / opens modal
+    if (r && r.ok === false) return false;
+
+    // 4) primary: use returned lang if present
+    let L = r && r.lang ? normLang(r.lang) : "";
+
+    // 5) IMPORTANT: if returned lang missing, lock from last confident detection
+    if (!L) {
+      const last = window.__LangDetect && window.__LangDetect.__state && window.__LangDetect.__state.last
+        ? window.__LangDetect.__state.last
+        : null;
+
+      const lastLang = last && last.lang ? normLang(last.lang) : "";
+      const conf = last && typeof last.confidence === "number" ? last.confidence : null;
+
+      // mirror your CONF_LOCK=0.78 (if conf missing, treat as NOT confident)
+      if (lastLang && conf != null && conf >= 0.78 && !last.needsConfirm) {
+        L = lastLang;
+      }
+    }
+
+    // 6) if we got a concrete lang, lock it as SINGLE SOURCE OF TRUTH
+    if (L) {
+      window.ruleEngine = L;
+      window.ruleEngineMode = "lock";
+
+      // compatibility mirror (ONE-WAY)
+      try {
+        window.contentLang = L;
+        window.contentLangMode = "lock";
+      } catch (_) {}
+
+      try {
+        window.dispatchEvent(new CustomEvent("ruleengine:changed", { detail: { lang: L } }));
+      } catch (_) {}
+    }
+
+    // allow run
     return true;
   } catch (_) {
-    // Fail-open: better to proceed than crash; main.js guard can still protect
+    // fail-open: don't crash masking
     return true;
   }
 }
