@@ -173,6 +173,18 @@
         return { lang: "", confidence: 0, needsConfirm: false, candidates: [], reason: "empty", source: "franc" };
       }
 
+      // ✅ PATCH (方案2 / lazy bridge):
+      // If the franc bundle exposes window.FrLang but the inline bridge ran too early (due to defer),
+      // bind window.franc/window.francAll here before using them.
+      try {
+        if (typeof window.franc !== "function" && window.FrLang && typeof window.FrLang.franc === "function") {
+          window.franc = window.FrLang.franc;
+        }
+        if (typeof window.francAll !== "function" && window.FrLang && typeof window.FrLang.francAll === "function") {
+          window.francAll = window.FrLang.francAll;
+        }
+      } catch (_) {}
+
       if (typeof window.franc !== "function") {
         return { lang: "", confidence: 0, needsConfirm: true, candidates: [], reason: "franc_missing", source: "franc" };
       }
