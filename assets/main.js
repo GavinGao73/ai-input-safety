@@ -845,6 +845,62 @@ function bind() {
   } catch (_) {}
 })();
 
+(function traceRuleEngineWrites() {
+  try {
+    if (window.__TRACE_RULEENGINE__) return;
+    window.__TRACE_RULEENGINE__ = true;
+
+    // ---- ruleEngine ----
+    let _re = window.ruleEngine;
+
+    Object.defineProperty(window, "ruleEngine", {
+      configurable: true,
+      enumerable: true,
+      get() { return _re; },
+      set(v) {
+        _re = v;
+        try {
+          window.__RULEENGINE_LAST_SET__ = {
+            when: Date.now(),
+            iso: new Date().toISOString(),
+            value: String(v),
+            stack: (new Error("ruleEngine set")).stack || ""
+          };
+        } catch (_) {}
+        try {
+          console.warn("[ruleEngine SET]", v);
+          console.trace("[ruleEngine SET TRACE]");
+        } catch (_) {}
+      }
+    });
+
+    // ---- ruleEngineMode ----
+    let _rm = window.ruleEngineMode;
+
+    Object.defineProperty(window, "ruleEngineMode", {
+      configurable: true,
+      enumerable: true,
+      get() { return _rm; },
+      set(v) {
+        _rm = v;
+        try {
+          window.__RULEENGINE_MODE_LAST_SET__ = {
+            when: Date.now(),
+            iso: new Date().toISOString(),
+            value: String(v),
+            stack: (new Error("ruleEngineMode set")).stack || ""
+          };
+        } catch (_) {}
+        try {
+          console.warn("[ruleEngineMode SET]", v);
+          console.trace("[ruleEngineMode SET TRACE]");
+        } catch (_) {}
+      }
+    });
+
+  } catch (_) {}
+})();
+
 // ================= boot =================
 (function boot() {
   try {
