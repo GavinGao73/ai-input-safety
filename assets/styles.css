@@ -596,26 +596,23 @@ textarea{
    Progress output — takes remaining height and scrolls
    ========================= */
 
-#exportStatus{
-  flex:1 1 auto;
-  min-height:0;
-  font-size:11px;
-  line-height:1.55;
-  color:rgba(255,255,255,.80);
-  white-space:pre-wrap;
-  overflow:auto;
-}
-
-/* === HARD GUARANTEE: export status never grows outer cards === */
+/* 外层 railcard 永远不被内容撑高 */
 .railcard{
-  overflow: hidden;   /* railcard 自己不被内部内容撑开 */
-  min-height: 0;      /* 允许内部 flex 子项收缩产生滚动 */
+  overflow: hidden;
+  min-height: 0;
 }
 
+/* 内层 exportStatus 只在内部滚动 */
 #exportStatus{
-  overflow-y: auto;   /* 强制纵向滚动策略 */
-  max-height: 100%;   /* 永远不超过 railcard 可用高度 */
-  min-height: 0;      /* flex 场景下允许收缩，滚动才能出现 */
+  flex: 1 1 auto;
+  min-height: 0;          /* ✅ 关键：允许在 flex 中变小，从而出现滚动 */
+  max-height: 100%;       /* ✅ 不超过 railcard 可用高度 */
+  overflow-y: auto;       /* ✅ 强制纵向滚动 */
+  overflow-x: hidden;     /* 可选：避免横向撑开 */
+  font-size: 11px;
+  line-height: 1.55;
+  color: rgba(255,255,255,.80);
+  white-space: pre-wrap;
 }
 
 /* =========================
