@@ -110,26 +110,28 @@
 
     // Strong DE by keywords
     if (st.hasDeKw) {
-      // if also has strong EN keywords -> mixed => ask
-      if (st.hasEnKw) {
-        return {
-          lang: "",
-          confidence: 0.60,
-          needsConfirm: true,
-          candidates: ["de", "en"],
-          reason: "mixed_de_en_keywords",
-          source: "heuristic"
-        };
-      }
+    // ✅ A2 FIX: mixed DE+EN keywords should NOT force modal in heuristic.
+    // Principle: DE/EN relies on franc; heuristic must not preempt.
+    if (st.hasEnKw) {
       return {
-        lang: "de",
-        confidence: 0.92,
+        lang: "",
+        confidence: 0,
         needsConfirm: false,
-        candidates: ["de"],
-        reason: "de_keywords",
-        source: "heuristic"
-      };
+        candidates: [],
+        reason: "mixed_de_en_keywords_defer_to_franc",
+       source: "heuristic"
+     };
     }
+
+      return {
+      lang: "de",
+      confidence: 0.92,
+      needsConfirm: false,
+      candidates: ["de"],
+      reason: "de_keywords",
+      source: "heuristic"
+     };
+   }
 
     // Strong DE by function words (German prose)
     if (st.deFnWords >= 2 && st.latin >= MIN_LATIN) {
