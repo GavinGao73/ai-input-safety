@@ -415,6 +415,52 @@
     const res = API.detectLang(s, uiLang);
     API.__state.last = res;
 
+    // ✅ HARD RULE (project principle):
+// If language is still empty => MUST ask user (modal) when available.
+if (!res || !res.lang) {
+  // if modal already opening/open => block this run
+  if (window.__LANG_MODAL_OPENING__ === true) return { ok: false, lang: "", asked: true };
+
+  // if modal exists, open it
+  if (window.__LangModal && typeof window.__LangModal.open === "function") {
+    try {
+      window.__LANG_MODAL_OPENING__ = true;
+
+      const cand = Array.isArray(res && res.candidates) && res.candidates.length
+        ? res.candidates.slice(0, 6)
+        : ["zh", "de", "en"]; // safe default
+
+      window.__LangModal.open({
+        uiLang: normalizePackLang(uiLang) || "en",
+        detected: "", // unknown
+        confidence: res && typeof res.confidence === "number" ? res.confidence : null,
+        candidates: cand,
+        reason: res && res.reason ? ("unknown_lang:" + res.reason) : "unknown_lang",
+        onPick: function (lang) {
+          const L = normalizePackLang(lang);
+          if (!L) return;
+
+          window.ruleEngine = L;
+          window.ruleEngineMode = "lock";
+
+          window.__LANG_MODAL_OPENING__ = false;
+          rerunAfterPick(s);
+        },
+        onClose: function () {
+          window.__LANG_MODAL_OPENING__ = false;
+        }
+      });
+    } catch (_) {
+      window.__LANG_MODAL_OPENING__ = false;
+    }
+
+    return { ok: false, lang: "", asked: true };
+  }
+
+  // If no modal available, fail-open but DO NOT lock
+  return { ok: true, lang: "", asked: false };
+}
+
     // needsConfirm => open modal
     if (res && res.needsConfirm) {
       if (window.__LANG_MODAL_OPENING__ === true) return { ok: false, lang: "", asked: true };
