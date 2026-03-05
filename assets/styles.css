@@ -606,6 +606,18 @@ textarea{
   overflow:auto;
 }
 
+/* === HARD GUARANTEE: export status never grows outer cards === */
+.railcard{
+  overflow: hidden;   /* railcard 自己不被内部内容撑开 */
+  min-height: 0;      /* 允许内部 flex 子项收缩产生滚动 */
+}
+
+#exportStatus{
+  overflow-y: auto;   /* 强制纵向滚动策略 */
+  max-height: 100%;   /* 永远不超过 railcard 可用高度 */
+  min-height: 0;      /* flex 场景下允许收缩，滚动才能出现 */
+}
+
 /* =========================
    Mobile
    ========================= */
