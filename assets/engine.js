@@ -210,16 +210,17 @@ function ensureContentLangInEngine(text) {
     let L = r && r.lang ? normLang(r.lang) : "";
 
     // 5) IMPORTANT: if returned lang missing, lock from last confident detection
-    if (!L) {
-      const last = window.__LangDetect && window.__LangDetect.__state && window.__LangDetect.__state.last
-        ? window.__LangDetect.__state.last
-        : null;
+        if (!L) {
+      const last =
+        window.__LangDetect && window.__LangDetect.__state && window.__LangDetect.__state.last
+          ? window.__LangDetect.__state.last
+          : null;
 
       const lastLang = last && last.lang ? normLang(last.lang) : "";
       const conf = last && typeof last.confidence === "number" ? last.confidence : null;
 
-      // mirror your CONF_LOCK=0.78 (if conf missing, treat as NOT confident)
-      if (lastLang && conf != null && conf >= 0.78 && !last.needsConfirm) {
+      // ✅ 核心修复：confidence 缺失时也允许锁（只要 needsConfirm=false）
+      if (lastLang && !last.needsConfirm && (conf == null || conf >= 0.78)) {
         L = lastLang;
       }
     }
