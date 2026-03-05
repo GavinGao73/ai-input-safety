@@ -135,6 +135,7 @@ function toggleCtl(btn, body) {
 
 // ================= Desktop equal-height + minimum expanded height =================
 const DESKTOP_MIN_OPEN_H = 260;
+let __LOCKED_OPEN_H = 0;
 
 function clearBodyHeights() {
   const manualBody = $("manualBody");
@@ -151,6 +152,9 @@ function clearBodyHeights() {
     riskBody.style.minHeight = "";
     riskBody.style.overflow = "";
   }
+
+  // ✅ IMPORTANT: reset locked height so next open can re-calc baseline
+  __LOCKED_OPEN_H = 0;
 }
 
 function syncManualRiskHeights() {
@@ -170,8 +174,14 @@ function syncManualRiskHeights() {
     return;
   }
 
-  const rh = riskBody.getBoundingClientRect().height;
-  const target = Math.max(Math.ceil(rh || 0), DESKTOP_MIN_OPEN_H);
+  // ✅ lock ONCE: baseline is riskBody height when both panels are open.
+  // After locking, do NOT grow due to telemetry text expansion.
+  if (!__LOCKED_OPEN_H) {
+    const rh = riskBody.getBoundingClientRect().height;
+    __LOCKED_OPEN_H = Math.max(Math.ceil(rh || 0), DESKTOP_MIN_OPEN_H);
+  }
+
+  const target = __LOCKED_OPEN_H;
 
   manualBody.style.height = `${target}px`;
   manualBody.style.maxHeight = `${target}px`;
@@ -192,6 +202,7 @@ function initRiskResizeObserver() {
   if (__riskResizeObs) __riskResizeObs.disconnect();
 
   __riskResizeObs = new ResizeObserver(() => {
+    // ✅ do not keep increasing height; sync uses locked baseline
     requestAnimationFrame(syncManualRiskHeights);
   });
 
@@ -202,21 +213,35 @@ function expandManualArea() {
   const btn = $("btnToggleManual");
   const body = $("manualBody");
   if (btn && body) setCtlExpanded(btn, body, true);
+
+  // ✅ re-evaluate baseline on user expand
+  __LOCKED_OPEN_H = 0;
+  requestAnimationFrame(syncManualRiskHeights);
 }
 function expandRiskArea() {
   const btn = $("btnToggleRisk");
   const body = $("riskBody");
   if (btn && body) setCtlExpanded(btn, body, true);
+
+  // ✅ re-evaluate baseline on user expand
+  __LOCKED_OPEN_H = 0;
+  requestAnimationFrame(syncManualRiskHeights);
 }
 function collapseManualArea() {
   const btn = $("btnToggleManual");
   const body = $("manualBody");
   if (btn && body) setCtlExpanded(btn, body, false);
+
+  // ✅ collapsing should clear fixed heights + baseline
+  clearBodyHeights();
 }
 function collapseRiskArea() {
   const btn = $("btnToggleRisk");
   const body = $("riskBody");
   if (btn && body) setCtlExpanded(btn, body, false);
+
+  // ✅ collapsing should clear fixed heights + baseline
+  clearBodyHeights();
 }
 
 // ================= Progress area =================
