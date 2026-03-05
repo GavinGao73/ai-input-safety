@@ -541,26 +541,29 @@ window.enableRuleEngineTrace = function (on) {
   } catch (_) {}
 })();
 
-// =========================
-// UI boot patch (restored from app.js boot responsibility)
-// Purpose: ensure UI texts are applied once DOM+i18n are ready,
-// even after app.js is split into multiple files.
-// NOTE: does NOT change any existing logic; only triggers setText/setStage3Ui safely.
-// =========================
+/* =========================
+   UI boot patch (restored from app.js boot responsibility)
+   - ensure UI texts applied once DOM+i18n are ready
+   - keep export status visible/consistent early
+   ========================= */
 (function uiBootPatch() {
   function safeApplyTexts() {
     try {
       // i18n not ready -> skip
-      if (!(window.I18N && window.I18N[currentLang])) return;
+      if (!(window.I18N && window.I18N[window.currentLang])) return;
 
       // apply all UI texts (includes stage3 buttons)
-      if (typeof setText === "function") setText();
-      else if (typeof setStage3Ui === "function") setStage3Ui(lastStage3Mode);
+      if (typeof window.setText === "function") window.setText();
+      else if (typeof window.setStage3Ui === "function") window.setStage3Ui(window.lastStage3Mode);
 
-      // make export status visible/consistent early
+      // make export status visible/consistent early (optional; only if functions exist)
       try {
-        if (!window.__LANG_STATUS__) snapshotLangStatus("ui:bootPatch");
-        renderExportStatusCombined();
+        if (typeof window.snapshotLangStatus === "function") {
+          if (!window.__LANG_STATUS__) window.snapshotLangStatus("ui:bootPatch");
+        }
+        if (typeof window.renderExportStatusCombined === "function") {
+          window.renderExportStatusCombined();
+        }
       } catch (_) {}
     } catch (_) {}
   }
@@ -587,4 +590,27 @@ window.enableRuleEngineTrace = function (on) {
     },
     { once: true }
   );
+})();
+
+/* =========================
+   UI telemetry export (for main.js)
+   - expose functions via window.__UI__ (no new file)
+   ========================= */
+(function exportUiTelemetryApi() {
+  try {
+    window.__UI__ = window.__UI__ || {};
+
+    if (typeof window.snapshotLangStatus === "function") {
+      window.__UI__.snapshotLangStatus = window.snapshotLangStatus;
+    }
+    if (typeof window.renderExportStatusCombined === "function") {
+      window.__UI__.renderExportStatusCombined = window.renderExportStatusCombined;
+    }
+    if (typeof window.startExportStatusMirror === "function") {
+      window.__UI__.startExportStatusMirror = window.startExportStatusMirror;
+    }
+    if (typeof window.stopExportStatusMirror === "function") {
+      window.__UI__.stopExportStatusMirror = window.stopExportStatusMirror;
+    }
+  } catch (_) {}
 })();
