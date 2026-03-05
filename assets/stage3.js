@@ -27,7 +27,8 @@ function resetRuleEngineForNewSession() {
 
 // Backward name (kept)
 function setRuleEngineAuto() {
-  resetRuleEngineForNewSession();
+  // legacy compatibility: DO NOTHING
+  return;
 }
 
 function lockRuleEngineForSession(lang) {
