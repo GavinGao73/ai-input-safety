@@ -506,58 +506,158 @@ function renderExportStatusCombined() {
   const s = window.__RasterExportLast || null;
   const bootLine = window.__bootLine || "";
 
-  // labels follow UI language (no i18n changes)
-  function uiLabels(lang) {
-    const z = { secBoot: "启动", secLang: "语言", secExport: "导出", phase2: "阶段2", lang: "lang", dpi: "dpi", pages: "页数", rects: "遮盖块", page: "当前页", items: "items", rects2: "rects" };
-    const e = { secBoot: "BOOT", secLang: "LANG", secExport: "EXPORT", phase2: "Phase 2", lang: "lang", dpi: "dpi", pages: "pages", rects: "rects", page: "page", items: "items", rects2: "rects" };
-    const d = { secBoot: "BOOT", secLang: "SPRACHE", secExport: "EXPORT", phase2: "Phase 2", lang: "lang", dpi: "dpi", pages: "Seiten", rects: "Masken", page: "Seite", items: "items", rects2: "rects" };
-    const l = String(lang || "").toLowerCase();
-    return l === "de" ? d : (l === "en" ? e : z);
-  }
-  const L = uiLabels(currentLang);
-
-  const lines = [];
-
-  // ===== BOOT =====
-  lines.push(`=== ${L.secBoot} ===`);
-  lines.push(bootLine || "BOOT: (none)");
-
-  // ===== LANG =====
-  lines.push(``);
-  lines.push(`=== ${L.secLang} ===`);
-  try {
-    const langLines = renderLangStatusLines(t);
-    if (langLines && langLines.length) lines.push(...langLines);
-  } catch (_) {
-    lines.push("(lang telemetry unavailable)");
+  // ---------- helpers ----------
+  function esc(x) {
+    return String(x == null ? "" : x)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
-  // ===== EXPORT =====
-  lines.push(``);
-  lines.push(`=== ${L.secExport} ===`);
+  function normLang3(x) {
+    const v = String(x || "").toLowerCase();
+    return v === "zh" || v === "en" || v === "de" ? v : "";
+  }
+
+  // 两字分区标题：中文用 2 字；英德用 2 码缩写
+  function secLabels(uiLang) {
+    const L = normLang3(uiLang || currentLang);
+    if (L === "de") {
+      return { boot: "BT", lang: "SP", state: "ST", detect: "ER", exp: "EX" };
+    }
+    if (L === "en") {
+      return { boot: "BT", lang: "LG", state: "ST", detect: "DT", exp: "EX" };
+    }
+    // zh default
+    return { boot: "启动", lang: "语言", state: "状态", detect: "识别", exp: "导出" };
+  }
+
+  // 两字 key：尽量“两个字/两个码”
+  function keyLabels(uiLang) {
+    const L = normLang3(uiLang || currentLang);
+    if (L === "de") {
+      return {
+        date: "DT", time: "TM",
+        ui: "UI", content: "CT", rule: "RE", modal: "MD",
+        last: "LS", conf: "CF", need: "NC", src: "SC", reason: "RS", cand: "CA",
+        phase: "PH", p2: "P2", lang: "LG", dpi: "DP", pages: "PG", rects: "RC", page: "P#", items: "IT"
+      };
+    }
+    if (L === "en") {
+      return {
+        date: "DT", time: "TM",
+        ui: "UI", content: "CT", rule: "RE", modal: "MD",
+        last: "LS", conf: "CF", need: "NC", src: "SC", reason: "RS", cand: "CA",
+        phase: "PH", p2: "P2", lang: "LG", dpi: "DP", pages: "PG", rects: "RC", page: "P#", items: "IT"
+      };
+    }
+    // zh
+    return {
+      date: "日期", time: "时间",
+      ui: "界面", content: "内容", rule: "规则", modal: "弹窗",
+      last: "结果", conf: "置信", need: "确认", src: "来源", reason: "原因", cand: "候选",
+      phase: "阶段", p2: "二段", lang: "语言", dpi: "精度", pages: "页数", rects: "遮盖", page: "当前", items: "条目"
+    };
+  }
+
+  function sec(title2) {
+    return `<div class="tele-sec">${esc(title2)}</div>`;
+  }
+
+  function line(k2, v) {
+    const vv = String(v == null ? "" : v);
+    return `<div class="tele-line"><span class="tele-k">${esc(k2)}</span><span class="tele-v">${esc(vv)}</span></div>`;
+  }
+
+  // ISO -> date + time split (你要求“日期和时间分开两行”)
+  function splitIso(iso) {
+    const s = String(iso || "");
+    // accept "YYYY-MM-DDTHH:mm:ss.sssZ"
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2}(?:\.\d+)?)(Z)?/);
+    if (!m) return { date: "", time: s };
+    return { date: m[1], time: m[2] + (m[3] ? "Z" : "") };
+  }
+
+  const SEC = secLabels(currentLang);
+  const K = keyLabels(currentLang);
+
+  const html = [];
+
+  // ===== 启动 / BOOT =====
+  html.push(sec(SEC.boot));
+  html.push(line("OK", bootLine || "(none)"));
+
+  // ===== 语言/状态/识别：来自 __LANG_STATUS__ =====
+  const st = window.__LANG_STATUS__ || null;
+
+  html.push("");
+  html.push(sec(SEC.lang));
+
+  if (!st) {
+    html.push(line("—", "(lang telemetry unavailable)"));
+  } else {
+    // 时间分行
+    const ts = st.iso || (typeof st.when === "number" ? new Date(st.when).toISOString() : "");
+    const dt = splitIso(ts);
+
+    if (dt.date) html.push(line(K.date, dt.date));
+    if (dt.time) html.push(line(K.time, dt.time));
+
+    html.push(line(K.ui, st.uiLang || "(?)"));
+    html.push(line(K.content, st.langContent || "(?)"));
+    html.push(line(K.rule, `${st.ruleEngine || "(empty)"} (${st.ruleEngineMode || "auto"})`));
+    html.push(line(K.modal, st.modalOpening ? "OPEN" : "false"));
+
+    // “状态（telemetry）”两字输出
+    if (st.reason) html.push(line("状态", st.reason));
+
+    html.push("");
+    html.push(sec(SEC.detect));
+
+    if (!st.detected) {
+      html.push(line(K.last, "(none)"));
+    } else {
+      const d = st.detected;
+      const conf = typeof d.confidence === "number" ? d.confidence.toFixed(2) : "(?)";
+      const cand = Array.isArray(d.candidates) && d.candidates.length ? d.candidates.join(",") : "-";
+
+      html.push(line(K.last, d.lang || "(?)"));
+      html.push(line(K.conf, conf));
+      html.push(line(K.need, d.needsConfirm ? "true" : "false"));
+      if (d.reason) html.push(line(K.reason, d.reason));
+      if (d.source) html.push(line(K.src, d.source));
+      html.push(line(K.cand, cand));
+    }
+  }
+
+  // ===== 导出 / EXPORT =====
+  html.push("");
+  html.push(sec(SEC.exp));
 
   if (!s) {
-    lines.push("(idle)");
+    html.push(line("—", "(idle)"));
   } else {
-    if (s.phase) lines.push(`${i18nProgressLine(s.phase, t)}  (${s.phase})`);
-    if (s.phase2) lines.push(`${t.progressPhase2 || L.phase2}: ${s.phase2}`);
+    if (s.phase) html.push(line(K.phase, `${i18nProgressLine(s.phase, t)} (${s.phase})`));
+    if (s.phase2) html.push(line(K.p2, s.phase2));
 
-    if (s.lang) lines.push(`${L.lang}=${s.lang}`);
-    if (s.dpi) lines.push(`${L.dpi}=${s.dpi}`);
+    if (s.lang) html.push(line(K.lang, s.lang));
+    if (s.dpi) html.push(line(K.dpi, s.dpi));
 
-    if (typeof s.pages === "number") lines.push(`${t.progressPages || L.pages}=${s.pages}`);
-    if (typeof s.rectsTotal === "number") lines.push(`${t.progressRects || L.rects}=${s.rectsTotal}`);
+    if (typeof s.pages === "number") html.push(line(K.pages, s.pages));
+    if (typeof s.rectsTotal === "number") html.push(line(K.rects, s.rectsTotal));
 
     if (Array.isArray(s.perPage) && s.perPage.length) {
       const last = s.perPage[s.perPage.length - 1];
       if (last && last.pageNumber) {
-        lines.push(`${t.progressPage || L.page}=${last.pageNumber}  ${L.items}=${last.items || 0}  ${L.rects2}=${last.rectCount || 0}`);
+        html.push(line(K.page, last.pageNumber));
+        html.push(line(K.items, `${last.items || 0} / ${last.rectCount || 0}`));
       }
     }
   }
 
+  // render (HTML, not textContent)
   el.style.color = "";
-  el.textContent = lines.join("\n");
+  el.innerHTML = html.filter(Boolean).join("");
 }
 
 function startExportStatusMirror() {
