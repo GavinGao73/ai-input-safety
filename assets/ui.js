@@ -355,36 +355,136 @@ function renderLangStatusLines(t) {
   const st = window.__LANG_STATUS__ || null;
   if (!st) return [];
 
-  const lines = [];
-  lines.push(`UI=${st.uiLang || "(?)"}`);
-  lines.push(`content=${st.langContent || "(?)"}`);
-  lines.push(`ruleEngine=${st.ruleEngine || "(empty)"} (${st.ruleEngineMode || "auto"})`);
-  lines.push(`modal=${st.modalOpening ? "OPEN" : "false"}`);
+  function L(lang) {
+    const z = {
+      secCore: "状态",
+      secDetect: "识别",
+      secDebug: "调试",
+      at: "时间",
+      ui: "界面",
+      content: "内容语言",
+      ruleEngine: "规则引擎",
+      mode: "模式",
+      modal: "语言弹窗",
+      last: "识别结果",
+      conf: "置信度",
+      needs: "需确认",
+      source: "来源",
+      reason: "原因",
+      cand: "候选",
+      telemetry: "状态",
+      none: "(无)",
+      empty: "(空)"
+    };
 
-  if (st.detected) {
-    const d = st.detected;
-    const conf = typeof d.confidence === "number" ? d.confidence.toFixed(2) : "(?)";
-    const cand = d.candidates && d.candidates.length ? d.candidates.join(",") : "-";
-    lines.push(`detect.last=${d.lang || "(?)"} conf=${conf} needsConfirm=${d.needsConfirm ? "true" : "false"}`);
-    if (d.reason || d.source) lines.push(`detect.reason=${d.reason || "-"} src=${d.source || "-"}`);
-    lines.push(`detect.candidates=${cand}`);
+    const e = {
+      secCore: "STATE",
+      secDetect: "DETECT",
+      secDebug: "DEBUG",
+      at: "at",
+      ui: "UI",
+      content: "content",
+      ruleEngine: "ruleEngine",
+      mode: "mode",
+      modal: "modal",
+      last: "last",
+      conf: "conf",
+      needs: "needsConfirm",
+      source: "src",
+      reason: "reason",
+      cand: "candidates",
+      telemetry: "telemetry",
+      none: "(none)",
+      empty: "(empty)"
+    };
 
-    // extra debug lines (optional)
-    try {
-      if (window.__DEBUG_LANG__ === true) {
-        // include detector version if present
-        const ver =
-          window.__LangDetect && window.__LangDetect.__state && window.__LangDetect.__state.ver
-            ? String(window.__LangDetect.__state.ver)
-            : "";
-        if (ver) lines.push(`detect.ver=${ver}`);
-      }
-    } catch (_) {}
-  } else {
-    lines.push("detect.last=(none)");
+    const d = {
+      secCore: "STATUS",
+      secDetect: "ERKENNUNG",
+      secDebug: "DEBUG",
+      at: "Zeit",
+      ui: "UI",
+      content: "Inhalt",
+      ruleEngine: "RuleEngine",
+      mode: "Modus",
+      modal: "Modal",
+      last: "Ergebnis",
+      conf: "Konf.",
+      needs: "Bestätigung",
+      source: "Quelle",
+      reason: "Grund",
+      cand: "Kandidaten",
+      telemetry: "Status",
+      none: "(keins)",
+      empty: "(leer)"
+    };
+
+    const x = String(lang || "").toLowerCase();
+    return x === "de" ? d : (x === "en" ? e : z);
   }
 
-  if (st.reason) lines.push(`telemetry=${st.reason}`);
+  const labels = L(window.currentLang);
+
+  const lines = [];
+
+  // ===== CORE =====
+  lines.push(`=== ${labels.secCore} ===`);
+
+  // 时间：优先 iso；否则用 when
+  const ts = st.iso || (typeof st.when === "number" ? new Date(st.when).toISOString() : "");
+  if (ts) lines.push(`${labels.at}: ${ts}`);
+
+  lines.push(`${labels.ui}: ${st.uiLang || labels.none}`);
+  lines.push(`${labels.content}: ${st.langContent || labels.none}`);
+  lines.push(`${labels.ruleEngine}: ${st.ruleEngine || labels.empty} (${st.ruleEngineMode || "auto"})`);
+  lines.push(`${labels.modal}: ${st.modalOpening ? "OPEN" : "false"}`);
+
+  if (st.reason) lines.push(`${labels.telemetry}: ${st.reason}`);
+
+  // ===== DETECT =====
+  lines.push(``);
+  lines.push(`=== ${labels.secDetect} ===`);
+
+  if (!st.detected) {
+    lines.push(`${labels.last}: ${labels.none}`);
+    return lines;
+  }
+
+  const d = st.detected;
+  const conf = typeof d.confidence === "number" ? d.confidence.toFixed(2) : labels.none;
+  const cand = Array.isArray(d.candidates) && d.candidates.length ? d.candidates.join(",") : "-";
+
+  lines.push(`${labels.last}: ${d.lang || labels.none}`);
+  lines.push(`${labels.conf}: ${conf}   ${labels.needs}: ${d.needsConfirm ? "true" : "false"}`);
+  if (d.reason) lines.push(`${labels.reason}: ${d.reason}`);
+  if (d.source) lines.push(`${labels.source}: ${d.source}`);
+  lines.push(`${labels.cand}: ${cand}`);
+
+  // ===== DEBUG (optional) =====
+  try {
+    if (window.__DEBUG_LANG__ === true) {
+      lines.push(``);
+      lines.push(`=== ${labels.secDebug} ===`);
+
+      const ver =
+        window.__LangDetect &&
+        window.__LangDetect.__state &&
+        window.__LangDetect.__state.ver
+          ? String(window.__LangDetect.__state.ver)
+          : "";
+
+      if (ver) lines.push(`detect.ver: ${ver}`);
+
+      // last set stacks are noisy; only show if present
+      if (window.__RULEENGINE_LAST_SET__ && window.__RULEENGINE_LAST_SET__.iso) {
+        lines.push(`ruleEngine.lastSet: ${window.__RULEENGINE_LAST_SET__.iso} value=${window.__RULEENGINE_LAST_SET__.value || ""}`);
+      }
+      if (window.__RULEENGINE_MODE_LAST_SET__ && window.__RULEENGINE_MODE_LAST_SET__.iso) {
+        lines.push(`ruleEngineMode.lastSet: ${window.__RULEENGINE_MODE_LAST_SET__.iso} value=${window.__RULEENGINE_MODE_LAST_SET__.value || ""}`);
+      }
+    }
+  } catch (_) {}
+
   return lines;
 }
 
@@ -406,116 +506,57 @@ function renderExportStatusCombined() {
   const s = window.__RasterExportLast || null;
   const bootLine = window.__bootLine || "";
 
-  // ✅ UI labels follow UI language (no i18n key changes; safe fallback)
+  // labels follow UI language (no i18n changes)
   function uiLabels(lang) {
-    const LZ = {
-      ui: "UI",
-      content: "content",
-      ruleEngine: "ruleEngine",
-      modal: "modal",
-      detectLast: "detect.last",
-      conf: "conf",
-      needsConfirm: "needsConfirm",
-      reason: "detect.reason",
-      src: "src",
-      candidates: "detect.candidates",
-      telemetry: "telemetry",
-      phase2: "阶段2",
-      lang: "lang",
-      dpi: "dpi",
-      pages: "页数",
-      rects: "遮盖块",
-      page: "当前页",
-      items: "items",
-      rects2: "rects"
-    };
-
-    const LE = {
-      ui: "UI",
-      content: "content",
-      ruleEngine: "ruleEngine",
-      modal: "modal",
-      detectLast: "detect.last",
-      conf: "conf",
-      needsConfirm: "needsConfirm",
-      reason: "detect.reason",
-      src: "src",
-      candidates: "detect.candidates",
-      telemetry: "telemetry",
-      phase2: "Phase 2",
-      lang: "lang",
-      dpi: "dpi",
-      pages: "pages",
-      rects: "rects",
-      page: "page",
-      items: "items",
-      rects2: "rects"
-    };
-
-    const LD = {
-      ui: "UI",
-      content: "content",
-      ruleEngine: "ruleEngine",
-      modal: "modal",
-      detectLast: "detect.last",
-      conf: "conf",
-      needsConfirm: "needsConfirm",
-      reason: "detect.reason",
-      src: "src",
-      candidates: "detect.candidates",
-      telemetry: "telemetry",
-      phase2: "Phase 2",
-      lang: "lang",
-      dpi: "dpi",
-      pages: "Seiten",
-      rects: "Masken",
-      page: "Seite",
-      items: "items",
-      rects2: "rects"
-    };
-
+    const z = { secBoot: "启动", secLang: "语言", secExport: "导出", phase2: "阶段2", lang: "lang", dpi: "dpi", pages: "页数", rects: "遮盖块", page: "当前页", items: "items", rects2: "rects" };
+    const e = { secBoot: "BOOT", secLang: "LANG", secExport: "EXPORT", phase2: "Phase 2", lang: "lang", dpi: "dpi", pages: "pages", rects: "rects", page: "page", items: "items", rects2: "rects" };
+    const d = { secBoot: "BOOT", secLang: "SPRACHE", secExport: "EXPORT", phase2: "Phase 2", lang: "lang", dpi: "dpi", pages: "Seiten", rects: "Masken", page: "Seite", items: "items", rects2: "rects" };
     const l = String(lang || "").toLowerCase();
-    return l === "de" ? LD : l === "en" ? LE : LZ;
+    return l === "de" ? d : (l === "en" ? e : z);
   }
-
   const L = uiLabels(currentLang);
+
   const lines = [];
 
-  if (bootLine) lines.push(bootLine);
+  // ===== BOOT =====
+  lines.push(`=== ${L.secBoot} ===`);
+  lines.push(bootLine || "BOOT: (none)");
 
-  // always show language status (if available)
+  // ===== LANG =====
+  lines.push(``);
+  lines.push(`=== ${L.secLang} ===`);
   try {
     const langLines = renderLangStatusLines(t);
     if (langLines && langLines.length) lines.push(...langLines);
-  } catch (_) {}
+  } catch (_) {
+    lines.push("(lang telemetry unavailable)");
+  }
 
-  if (s) {
+  // ===== EXPORT =====
+  lines.push(``);
+  lines.push(`=== ${L.secExport} ===`);
+
+  if (!s) {
+    lines.push("(idle)");
+  } else {
     if (s.phase) lines.push(`${i18nProgressLine(s.phase, t)}  (${s.phase})`);
-
-    // phase2 label localized
     if (s.phase2) lines.push(`${t.progressPhase2 || L.phase2}: ${s.phase2}`);
 
-    // basic export params (labels localized)
     if (s.lang) lines.push(`${L.lang}=${s.lang}`);
     if (s.dpi) lines.push(`${L.dpi}=${s.dpi}`);
 
-    // counts (labels localized; keep existing i18n if present)
     if (typeof s.pages === "number") lines.push(`${t.progressPages || L.pages}=${s.pages}`);
     if (typeof s.rectsTotal === "number") lines.push(`${t.progressRects || L.rects}=${s.rectsTotal}`);
 
     if (Array.isArray(s.perPage) && s.perPage.length) {
       const last = s.perPage[s.perPage.length - 1];
       if (last && last.pageNumber) {
-        lines.push(
-          `${t.progressPage || L.page}=${last.pageNumber}  ${L.items}=${last.items || 0}  ${L.rects2}=${last.rectCount || 0}`
-        );
+        lines.push(`${t.progressPage || L.page}=${last.pageNumber}  ${L.items}=${last.items || 0}  ${L.rects2}=${last.rectCount || 0}`);
       }
     }
   }
 
-  if (!lines.length) return;
-
-  el.style.color = ""; // reset error color if any
+  el.style.color = "";
   el.textContent = lines.join("\n");
 }
 
