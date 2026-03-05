@@ -1,6 +1,9 @@
 // =======================
 // assets/main.js (FULL)
-// v20260305a1-ui-core (PATCHED: move UI telemetry/progress render to ui-core.js)
+// v20260305a2-ui-telemetry-in-ui-js (PATCHED)
+// - Keep i18n in i18n.js
+// - Telemetry/render/mirror lives in ui.js (global funcs OR window.__UI__ namespace)
+// - main.js calls telemetry via small adapters with robust fallback
 //
 // ✅ UI language: window.currentLang 只影响 UI 文案
 // ✅ Content strategy language: window.ruleEngine / window.ruleEngineMode（由 lang-detect.js 的 ensureContentLang + 用户选择锁定）
@@ -8,45 +11,65 @@
 // ✅ Export Mode A uses content-strategy lang (ruleEngine), not UI lang
 //
 // ✅ NEW INVARIANT (A2):
-// - If detector returns a concrete lang with ok=true (or last detection is confident), main.js MUST ensure ruleEngine is set + locked.
+// - If detector returns a concrete lang with ok=true (or last detection is confident),
+//   main.js MUST ensure ruleEngine is set + locked.
 // - This prevents content strategy from drifting with UI language when ruleEngine is empty.
-//
-// CHANGE (A3):
-// - UI telemetry + exportStatus rendering moved to assets/ui-core.js:
-//   window.__UI__.snapshotLangStatus(...)
-//   window.__UI__.renderExportStatusCombined()
-//   window.__UI__.startExportStatusMirror()
-//   window.__UI__.stopExportStatusMirror()
 // =========================
 
 /* =========================
-   Small adapter: call UI-core telemetry if present
+   Small adapter: call UI telemetry if present
+   - Supports BOTH styles:
+     A) window.__UI__.snapshotLangStatus(...)
+     B) global snapshotLangStatus(...)
    ========================= */
 function __uiSnap(reason) {
   try {
     if (window.__UI__ && typeof window.__UI__.snapshotLangStatus === "function") {
       window.__UI__.snapshotLangStatus(reason);
+      return;
+    }
+    if (typeof window.snapshotLangStatus === "function") {
+      window.snapshotLangStatus(reason);
+      return;
     }
   } catch (_) {}
 }
+
 function __uiRender() {
   try {
     if (window.__UI__ && typeof window.__UI__.renderExportStatusCombined === "function") {
       window.__UI__.renderExportStatusCombined();
+      return;
+    }
+    if (typeof window.renderExportStatusCombined === "function") {
+      window.renderExportStatusCombined();
+      return;
     }
   } catch (_) {}
 }
+
 function __uiMirrorStart() {
   try {
     if (window.__UI__ && typeof window.__UI__.startExportStatusMirror === "function") {
       window.__UI__.startExportStatusMirror();
+      return;
+    }
+    if (typeof window.startExportStatusMirror === "function") {
+      window.startExportStatusMirror();
+      return;
     }
   } catch (_) {}
 }
+
 function __uiMirrorStop() {
   try {
     if (window.__UI__ && typeof window.__UI__.stopExportStatusMirror === "function") {
       window.__UI__.stopExportStatusMirror();
+      return;
+    }
+    if (typeof window.stopExportStatusMirror === "function") {
+      window.stopExportStatusMirror();
+      return;
     }
   } catch (_) {}
 }
@@ -679,62 +702,6 @@ function bind() {
       try { updateBootLine(); } catch (_) {}
       try { rerender(); } catch (_) {}
     }, 0);
-  } catch (_) {}
-})();
-
-(function traceRuleEngineWrites() {
-  try {
-    if (window.__TRACE_RULEENGINE__) return;
-    window.__TRACE_RULEENGINE__ = true;
-
-    // ---- ruleEngine ----
-    let _re = window.ruleEngine;
-
-    Object.defineProperty(window, "ruleEngine", {
-      configurable: true,
-      enumerable: true,
-      get() { return _re; },
-      set(v) {
-        _re = v;
-        try {
-          window.__RULEENGINE_LAST_SET__ = {
-            when: Date.now(),
-            iso: new Date().toISOString(),
-            value: String(v),
-            stack: (new Error("ruleEngine set")).stack || ""
-          };
-        } catch (_) {}
-        try {
-          console.warn("[ruleEngine SET]", v);
-          console.trace("[ruleEngine SET TRACE]");
-        } catch (_) {}
-      }
-    });
-
-    // ---- ruleEngineMode ----
-    let _rm = window.ruleEngineMode;
-
-    Object.defineProperty(window, "ruleEngineMode", {
-      configurable: true,
-      enumerable: true,
-      get() { return _rm; },
-      set(v) {
-        _rm = v;
-        try {
-          window.__RULEENGINE_MODE_LAST_SET__ = {
-            when: Date.now(),
-            iso: new Date().toISOString(),
-            value: String(v),
-            stack: (new Error("ruleEngineMode set")).stack || ""
-          };
-        } catch (_) {}
-        try {
-          console.warn("[ruleEngineMode SET]", v);
-          console.trace("[ruleEngineMode SET TRACE]");
-        } catch (_) {}
-      }
-    });
-
   } catch (_) {}
 })();
 
