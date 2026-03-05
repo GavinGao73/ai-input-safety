@@ -910,3 +910,48 @@ textarea{
   mask-image: none !important;
   filter: none !important;
 }
+
+/* =========================
+   Telemetry line styles (NO layout changes)
+   - Used only when ui.js renders exportStatus with HTML lines/classes
+   ========================= */
+
+.tele-sec{
+  margin: 2px 0 6px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: .3px;
+
+  color: rgba(120,255,240,.92);
+}
+
+.tele-line{
+  display:flex;
+  gap:8px;
+  align-items:flex-start;
+
+  font-size:11px;
+  line-height:1.55;
+
+  padding: 1px 2px;
+}
+
+.tele-k{
+  flex:0 0 auto;
+  min-width: 28px;          /* 两字标题对齐 */
+  color: rgba(43,144,255,.88);
+  font-weight: 900;
+}
+
+.tele-v{
+  flex:1 1 auto;
+  min-width:0;
+  color: rgba(255,255,255,.82);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
