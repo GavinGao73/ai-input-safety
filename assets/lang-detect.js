@@ -1,13 +1,15 @@
 // =========================
 // assets/lang-detect.js (FULL)
-// v20260304a2 — PATCHED (remove umlaut->de + short_latin modal only when NOT confident)
-// Language detection orchestrator (franc-all + pack.detect + conservative fallback)
+// v20260305a1 — PATCHED (方案 P · franc 优先 · 极简稳定版)
+// Language detection orchestrator (franc-first + modal fallback)
 // - Exposes window.__LangDetect.detectLang(text, uiLang)
 // - Exposes ensureContentLang() for main.js pre-guard
 //
 // IMPORTANT (project principle):
-// - Primary basis: franc-all (franc/francAll)
-// - If franc can't decide confidently => modal for user pick
+// 1) 汉字强信号 => zh（唯一允许的 heuristic）
+// 2) 其它语言一律依赖 franc / francAll
+// 3) franc 不确定 => modal 让用户选择 => lock
+//
 // - Content strategy language MUST be single source of truth: window.ruleEngine / window.ruleEngineMode
 // - DO NOT write/read legacy window.contentLang/window.contentLangMode here
 // =========================
@@ -16,19 +18,15 @@
 
   // Expose singleton
   const API = (window.__LangDetect = window.__LangDetect || {});
-  API.__state = API.__state || { ver: "v20260304a2-franc-priority", last: null };
-  API.__state.ver = "v20260304a2-franc-priority";
+  API.__state = API.__state || { ver: "v20260305a1-p-franc-first", last: null };
+  API.__state.ver = "v20260305a1-p-franc-first";
 
   // ---- Config (conservative) ----
   const MIN_LEN_FRANC = 40;      // shorter than this: franc is noisy
-  const MIN_LATIN = 12;          // require some letters for en/de
   const HAN_RATIO_ZH = 0.02;     // Han chars ratio >= 2% => strong zh
 
   // Confidence thresholds
   const CONF_LOCK = 0.78;        // >= lock automatically
-
-  // Extra safety: short Latin text can be ambiguous EN/DE
-  const SHORT_LATIN_AMBIG_LEN = 120;
 
   // ISO639-3 -> our pack lang
   const ISO3_TO_PACK = {
@@ -59,21 +57,37 @@
     return Array.from(new Set((arr || []).filter(Boolean)));
   }
 
+  // ✅ franc bridge (top-level hardening)
+  // Ensure window.franc / window.francAll exist even when bundle exposes window.FrLang.*
+  try {
+    if (typeof window.franc !== "function" && window.FrLang && typeof window.FrLang.franc === "function") {
+      window.franc = window.FrLang.franc;
+    }
+    if (typeof window.francAll !== "function" && window.FrLang && typeof window.FrLang.francAll === "function") {
+      window.francAll = window.FrLang.francAll;
+    }
+  } catch (_) {}
+
   function stats(text) {
     const s = safeStr(text);
     const len = s.length;
     const han = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
     const latin = (s.match(/[A-Za-z]/g) || []).length;
 
-    // NOTE: still measured but NOT used as auto-DE decision anymore
+    // NOTE: still measured (debug only); NOT used as EN/DE auto decision
     const umlauts = (s.match(/[äöüÄÖÜß]/g) || []).length;
 
-    // keyword signals (used ONLY here, not in engine.js)
-    const hasDeKw = /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Geburtsdatum|USt-IdNr)\b/i.test(s);
-    const hasEnKw = /\b(Invoice|Order\s*ID|Account\s*Number|Username|Address|Phone|Email|Customer|Payment|Bank|Passport|SSN)\b/i.test(s);
+    // keyword signals (debug only; NOT used to auto-pick EN/DE)
+    const hasDeKw = /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Geburtsdatum|USt-IdNr)\b/i.test(
+      s
+    );
+    const hasEnKw = /\b(Invoice|Order\s*ID|Account\s*Number|Username|Address|Phone|Email|Customer|Payment|Bank|Passport|SSN)\b/i.test(
+      s
+    );
 
-    // DE function words: indicator for German prose even without keywords
-    const deFnWords = (s.match(/\b(der|die|das|den|dem|des|ein|eine|einer|eines|und|oder|nicht|ich|sie|wir|ihr|Sie|mit|für|auf|bei|von|zum|zur|im|am|aus|auch|wird|werden|bitte|danke)\b/gi) || []).length;
+    // DE function words (debug only; NOT used to auto-pick DE)
+    const deFnWords = (s.match(/\b(der|die|das|den|dem|des|ein|eine|einer|eines|und|oder|nicht|ich|sie|wir|ihr|Sie|mit|für|auf|bei|von|zum|zur|im|am|aus|auch|wird|werden|bitte|danke)\b/gi) || [])
+      .length;
 
     return {
       len,
@@ -87,70 +101,18 @@
     };
   }
 
-  // Strong signals (fast + stable). Allowed here (NOT in engine.js).
+  // ✅ Scheme P: the ONLY allowed heuristic is "Han => zh"
   function strongHeuristic(text) {
     const s = safeStr(text);
     const st = stats(s);
 
-    // Strong ZH
     if (st.hanRatio >= HAN_RATIO_ZH) {
       return {
         lang: "zh",
-        confidence: 0.98,
+        confidence: 0.99,
         needsConfirm: false,
         candidates: ["zh"],
         reason: "han_ratio",
-        source: "heuristic"
-      };
-    }
-
-    // ✅ IMPORTANT CHANGE (A2):
-    // ❌ Removed: "umlaut/ß => de"
-    // Principle: rely on franc for DE/EN when ambiguous; umlaut-only shortcut can mis-route by design.
-
-    // Strong DE by keywords
-    if (st.hasDeKw) {
-      // if also has strong EN keywords -> mixed => ask
-      if (st.hasEnKw) {
-        return {
-          lang: "",
-          confidence: 0.60,
-          needsConfirm: true,
-          candidates: ["de", "en"],
-          reason: "mixed_de_en_keywords",
-          source: "heuristic"
-        };
-      }
-      return {
-        lang: "de",
-        confidence: 0.92,
-        needsConfirm: false,
-        candidates: ["de"],
-        reason: "de_keywords",
-        source: "heuristic"
-      };
-    }
-
-    // Strong DE by function words (German prose)
-    if (st.deFnWords >= 2 && st.latin >= MIN_LATIN) {
-      return {
-        lang: "de",
-        confidence: 0.86,
-        needsConfirm: false,
-        candidates: ["de"],
-        reason: "de_function_words",
-        source: "heuristic"
-      };
-    }
-
-    // Strong EN by keywords
-    if (st.latin >= MIN_LATIN && st.hasEnKw) {
-      return {
-        lang: "en",
-        confidence: 0.88,
-        needsConfirm: false,
-        candidates: ["en"],
-        reason: "en_keywords",
         source: "heuristic"
       };
     }
@@ -173,7 +135,7 @@
         return { lang: "", confidence: 0, needsConfirm: false, candidates: [], reason: "empty", source: "franc" };
       }
 
-      // ✅ PATCH (方案2 / lazy bridge):
+      // ✅ PATCH (lazy bridge):
       // If the franc bundle exposes window.FrLang but the inline bridge ran too early (due to defer),
       // bind window.franc/window.francAll here before using them.
       try {
@@ -196,10 +158,10 @@
       let topIso3 = "";
       let secondIso3 = "";
 
-      // ✅ PATCH: do NOT derive confidence from score-gap (score semantics differ by build)
-      // Use a conservative-but-stable confidence scheme:
-      // - if franc provides a mapped topLang, default confidence >= CONF_LOCK
-      // - if candidates include both en & de => force confirm
+      // ✅ NOTE: do NOT derive confidence from score-gap (score semantics differ by build)
+      // Conservative stable confidence:
+      // - base confidence for mapped result
+      // - force confirm when EN/DE ambiguity appears in candidates
       let confidence = 0.86;
 
       if (typeof window.francAll === "function") {
@@ -214,7 +176,6 @@
 
       if (!topIso3) {
         topIso3 = safeStr(window.franc(s));
-        // keep confidence default 0.86
       }
 
       const topLang = normalizePackLang(ISO3_TO_PACK[topIso3] || "");
@@ -233,7 +194,7 @@
         };
       }
 
-      // ✅ PATCH: if en/de ambiguity exists -> modal
+      // ✅ If EN/DE ambiguity exists -> modal (scheme P)
       if (candidates.includes("en") && candidates.includes("de")) {
         return {
           lang: topLang,
@@ -245,7 +206,6 @@
         };
       }
 
-      // normal path: confident enough to lock
       return {
         lang: topLang,
         confidence,
@@ -259,6 +219,7 @@
     }
   }
 
+  // (kept for future/debug; NOT used by scheme P detectLang)
   function detectByPackDetect(text) {
     try {
       const packs = getPacks();
@@ -303,89 +264,35 @@
     }
   }
 
-  // ✅ short-latin ambiguity trigger (STRICT + aligned to principle)
-  // Only ask if:
-  // - short Latin content
-  // - AND franc/pack is NOT confident enough to lock (confidence < CONF_LOCK)
-  // - AND candidates show EN/DE ambiguity
-  // - AND no strong keyword / DE function words / ZH
-  function shouldAskShortLatin(st, res) {
-    if (!st) return false;
-
-    if (!(st.hanRatio < HAN_RATIO_ZH && st.latin >= MIN_LATIN && st.len <= SHORT_LATIN_AMBIG_LEN)) return false;
-
-    // strong signals -> don't ask here
-    if (st.hasDeKw || st.hasEnKw) return false;
-    if (st.deFnWords >= 2) return false;
-
-    const conf = typeof (res && res.confidence) === "number" ? res.confidence : 0;
-    if (conf >= CONF_LOCK) return false; // ✅ key fix: confident => no modal
-
-    const cand = Array.isArray(res && res.candidates) ? res.candidates : [];
-    const hasBoth = cand.includes("en") && cand.includes("de");
-
-    // Only ask if EN/DE ambiguity is real
-    if (hasBoth) return true;
-
-    return false;
-  }
-
-  // Primary API:
+  // Primary API (Scheme P):
   // Returns: { lang, confidence, needsConfirm, candidates, reason, source }
   API.detectLang = function detectLang(text, uiLang) {
-    const trimmed = safeStr(text).trim();
-    if (!trimmed) return { lang: "", confidence: 0, needsConfirm: false, candidates: [], reason: "empty", source: "none" };
+    const s = safeStr(text).trim();
+    if (!s) {
+      return { lang: "", confidence: 0, needsConfirm: false, candidates: [], reason: "empty", source: "none" };
+    }
 
-    const st = stats(trimmed);
+    // 1) ZH strong signal (唯一允许 heuristic)
+    const h = strongHeuristic(s);
+    if (h.lang === "zh") return h;
 
-    // 1) Strong heuristic first (ZH, DE keywords/fnwords, EN keywords)
-    const h = strongHeuristic(trimmed);
-    if (h.lang) return h;
-    if (h.needsConfirm && (h.candidates && h.candidates.length)) return h;
+    // 2) franc first (EN/DE 等一律只依赖 franc)
+    const f = detectByFranc(s);
 
-    // 2) franc (PRIMARY)
-    const f = detectByFranc(trimmed);
-    if (f.lang || (f.candidates && f.candidates.length)) {
-      // ✅ If franc is confident enough to lock, NEVER force short-latin modal
-      if (f.lang && typeof f.confidence === "number" && f.confidence >= CONF_LOCK && f.needsConfirm === false) {
-        return f;
-      }
-
-      // Otherwise, apply short-latin ambiguity rule (only when not confident)
-      if (shouldAskShortLatin(st, f) && (f.lang === "en" || f.lang === "de")) {
-        return {
-          lang: f.lang,
-          confidence: Math.min(f.confidence || 0.7, 0.74),
-          needsConfirm: true,
-          candidates: uniq([f.lang, "en", "de"]).filter(Boolean),
-          reason: "short_latin_ambiguous",
-          source: "rule"
-        };
-      }
+    // treat "und" as uncertain => modal
+    if (f.lang && f.lang !== "und" && !f.needsConfirm) {
       return f;
     }
 
-    // 3) pack.detect (secondary)
-    const p = detectByPackDetect(trimmed);
-    if (p.lang || (p.candidates && p.candidates.length)) {
-      if (shouldAskShortLatin(st, p) && (p.lang === "en" || p.lang === "de")) {
-        return {
-          lang: p.lang,
-          confidence: Math.min(p.confidence || 0.7, 0.74),
-          needsConfirm: true,
-          candidates: uniq([p.lang, "en", "de"]).filter(Boolean),
-          reason: "short_latin_ambiguous_pack",
-          source: "rule"
-        };
-      }
-      return p;
-    }
-
-    // 4) last fallback: follow UI but ASK (safe)
-    const u = normalizePackLang(uiLang);
-    if (u) return { lang: u, confidence: 0.55, needsConfirm: true, candidates: [u], reason: "fallback_ui_lang", source: "fallback" };
-
-    return { lang: "", confidence: 0, needsConfirm: true, candidates: [], reason: "unknown", source: "fallback" };
+    // 3) franc uncertain => modal
+    return {
+      lang: (f.lang && f.lang !== "und") ? f.lang : "",
+      confidence: f.confidence || 0,
+      needsConfirm: true,
+      candidates: Array.isArray(f.candidates) ? f.candidates : [],
+      reason: f.reason || "franc_uncertain",
+      source: "franc"
+    };
   };
 
   function rerunAfterPick(fallbackText) {
@@ -471,8 +378,8 @@
       return { ok: true, lang: res.lang, asked: false };
     }
 
-    // ✅ PATCH: do NOT open modal "just to be safe" when we already have a lang.
-    // Only ask here when lang is empty (unknown) and modal exists.
+    // If we have a lang but not confident (should be rare under scheme P), do not force modal here.
+    // Only ask when lang is empty and modal exists.
     if ((!res || !res.lang) && window.__LangModal && typeof window.__LangModal.open === "function") {
       if (window.__LANG_MODAL_OPENING__ === true) return { ok: false, lang: "", asked: true };
 
