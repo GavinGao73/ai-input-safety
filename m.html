@@ -187,35 +187,30 @@
 <script src="./assets/catalog.js?v=20260304a2" defer></script>
 <script src="./assets/pdf.js?v=20260304a2" defer></script>
 <script src="./assets/raster-export.js?v=20260304a2" defer></script>
-<script src="./assets/ui.js?v=20260304a2" defer></script>
 
-<!-- ✅ franc bundle must execute before lang-detect (bridge uses FrLang immediately) -->
+<!-- ✅ franc bundle must execute before lang-detect -->
 <script src="./assets/vendor/franc-all.min.js?v=20260304a2" defer></script>
+
 <script>
-  // Bridge: lang-detect expects window.franc / window.francAll
-  // Bundle exports: window.FrLang.franc / window.FrLang.francAll
-  try {
-    if (typeof window.__LANG_MODAL_OPENING__ === "undefined") window.__LANG_MODAL_OPENING__ = false;
-    if (window.FrLang && typeof window.FrLang.franc === "function") window.franc = window.FrLang.franc;
-    if (window.FrLang && typeof window.FrLang.francAll === "function") window.francAll = window.FrLang.francAll;
-  } catch (e) {}
+try {
+  if (typeof window.__LANG_MODAL_OPENING__ === "undefined") window.__LANG_MODAL_OPENING__ = false;
+  if (window.FrLang && typeof window.FrLang.franc === "function") window.franc = window.FrLang.franc;
+  if (window.FrLang && typeof window.FrLang.francAll === "function") window.francAll = window.FrLang.francAll;
+} catch (e) {}
 </script>
 
 <script src="./assets/lang-modal.js?v=20260304a2" defer></script>
 <script src="./assets/lang-detect.js?v=20260304a2" defer></script>
 
-<!-- ✅ content-strategy packs (must load before engine.js) -->
+<!-- content strategy packs -->
 <script src="./assets/engine.zh.js?v=20260304a2" defer></script>
 <script src="./assets/engine.en.js?v=20260304a2" defer></script>
 <script src="./assets/engine.de.js?v=20260304a2" defer></script>
 
-<!-- ✅ NON-language strategy (must load before engine.js) -->
 <script src="./assets/engine.policy.js?v=20260304a2" defer></script>
-
-<!-- ✅ core engine -->
 <script src="./assets/engine.js?v=20260304a2" defer></script>
 
-<!-- ✅ UI wiring -->
+<!-- UI wiring -->
 <script src="./assets/ui.js?v=20260304a2" defer></script>
 <script src="./assets/stage3.js?v=20260304a2" defer></script>
 <script src="./assets/main.js?v=20260304a2" defer></script>
