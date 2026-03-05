@@ -1,6 +1,6 @@
 // =========================
 // assets/lang-detect.js (FULL)
-// v20260305a1 — PATCHED (方案 P · franc 优先 · 极简稳定版)
+// v20260305a2 — PATCHED (方案 P · franc 优先 · 极简稳定版 · 删除 packDetect)
 // Language detection orchestrator (franc-first + modal fallback)
 // - Exposes window.__LangDetect.detectLang(text, uiLang)
 // - Exposes ensureContentLang() for main.js pre-guard
@@ -12,14 +12,17 @@
 //
 // - Content strategy language MUST be single source of truth: window.ruleEngine / window.ruleEngineMode
 // - DO NOT write/read legacy window.contentLang/window.contentLangMode here
+//
+// CHANGE (A2):
+// - Removed detectByPackDetect() + getPacks() because Scheme P does not use pack.detect for language decision.
 // =========================
 (function () {
   "use strict";
 
   // Expose singleton
   const API = (window.__LangDetect = window.__LangDetect || {});
-  API.__state = API.__state || { ver: "v20260305a1-p-franc-first", last: null };
-  API.__state.ver = "v20260305a1-p-franc-first";
+  API.__state = API.__state || { ver: "v20260305a2-p-franc-first-no-packdetect", last: null };
+  API.__state.ver = "v20260305a2-p-franc-first-no-packdetect";
 
   // ---- Config (conservative) ----
   const MIN_LEN_FRANC = 40;      // shorter than this: franc is noisy
@@ -48,10 +51,6 @@
 
   function safeStr(x) {
     return String(x == null ? "" : x);
-  }
-
-  function getPacks() {
-    return window.__ENGINE_LANG_PACKS__ || {};
   }
 
   function normalizePackLang(l) {
@@ -222,51 +221,6 @@
       };
     } catch (e) {
       return { lang: "", confidence: 0, needsConfirm: true, candidates: [], reason: "franc_error", source: "franc" };
-    }
-  }
-
-  // (kept for future/debug; NOT used by scheme P detectLang)
-  function detectByPackDetect(text) {
-    try {
-      const packs = getPacks();
-      const s = safeStr(text);
-      const claims = [];
-
-      ["zh", "de", "en"].forEach((k) => {
-        const p = packs[k];
-        if (p && typeof p.detect === "function") {
-          const r = normalizePackLang(p.detect(s));
-          if (r) claims.push(r);
-        }
-      });
-
-      const u = uniq(claims);
-
-      if (u.length === 1) {
-        return {
-          lang: u[0],
-          confidence: 0.74,
-          needsConfirm: false,
-          candidates: [u[0]],
-          reason: "pack_detect_single",
-          source: "pack"
-        };
-      }
-
-      if (u.length >= 2) {
-        return {
-          lang: "",
-          confidence: 0.55,
-          needsConfirm: true,
-          candidates: u.slice(0, 3),
-          reason: "pack_detect_conflict",
-          source: "pack"
-        };
-      }
-
-      return { lang: "", confidence: 0, needsConfirm: false, candidates: [], reason: "pack_detect_none", source: "pack" };
-    } catch (e) {
-      return { lang: "", confidence: 0, needsConfirm: true, candidates: [], reason: "pack_detect_error", source: "pack" };
     }
   }
 
