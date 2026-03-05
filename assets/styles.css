@@ -514,9 +514,10 @@ textarea{
   margin:4px 0;
 }
 
+/* ✅ CHANGED: make "使用说明" body text match exportStatus font size */
 .side-rail-note{
-  font-size:12px;
-  line-height:1.5;
+  font-size:11px;            /* was 12px */
+  line-height:1.55;          /* align with exportStatus */
   color:rgba(255,255,255,.82);
   white-space:pre-line;
   overflow-wrap:anywhere;
@@ -584,7 +585,12 @@ textarea{
 .riskitem .rk{ font-size:12px; color:rgba(255,255,255,.90); }
 .riskitem .rv{ font-size:12px; color:var(--muted); }
 
-.riskadvice{ font-size:12px; line-height:1.5; color:rgba(255,255,255,.82); }
+/* ✅ CHANGED: make risk advice match exportStatus font size */
+.riskadvice{
+  font-size:11px;            /* was 12px */
+  line-height:1.55;          /* align with exportStatus */
+  color:rgba(255,255,255,.82);
+}
 
 /* =========================
    Progress output — takes remaining height and scrolls
