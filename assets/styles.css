@@ -491,8 +491,13 @@ textarea{
   gap:10px;
 
   min-width:0;
-  height:100%;
+
+  /* ✅ FINAL: do NOT use height:100% (percent chain can break → card grows)
+     Let railcard fill parent via flex, and NEVER be stretched by inner content. */
+  flex:1 1 auto;
+  height:auto;              /* was: 100% */
   min-height:0;
+  overflow:hidden;          /* railcard itself never grows; inner scroll handles overflow */
 }
 
 .railcard-progress-only{
