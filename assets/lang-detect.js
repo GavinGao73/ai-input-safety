@@ -28,6 +28,12 @@
   // Confidence thresholds
   const CONF_LOCK = 0.78;        // >= lock automatically
 
+  // ✅ debug metadata (does NOT affect behavior)
+  try {
+    API.__state.policy = "P-franc-first";
+    API.__state.confLock = CONF_LOCK;
+  } catch (_) {}
+
   // ISO639-3 -> our pack lang
   const ISO3_TO_PACK = {
     eng: "en",
