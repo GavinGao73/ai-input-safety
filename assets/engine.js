@@ -168,13 +168,14 @@ function resetContentLang() {
  * - kept only for backward compatibility
  */
 function setRuleEngineAuto(text) {
-  // ✅ NO-OP by design (kept only for backward compatibility)
+  // NO-OP: legacy interface, disabled
   return;
 }
 
 // Compatibility wrapper (old name used in applyRules)
 function setLangContentAuto(text) {
-  setRuleEngineAuto(text);
+  // NO-OP: legacy interface, disabled
+  return;
 }
 
 /* =========================
