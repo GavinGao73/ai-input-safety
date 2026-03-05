@@ -4,7 +4,6 @@
 // - Mode B manualRedactNote: clearer, shorter, consistent wording (ZH/EN/DE)
 // - Keep all keys/structure unchanged
 // - ✅ v2026-02-23: UI language auto-pick from browser/system; still allows manual override via buttons (setLang)
-// - ✅ adds contentLang defaults (engine uses it) without changing any existing I18N keys
 // =========================
 const I18N = {
   zh: {
@@ -273,11 +272,6 @@ window.I18N = I18N;
 
     window.currentLang = initial;
 
-    // ✅ contentLang defaults used by lang-split engine (no UI binding)
-    // - engine may update contentLang in auto mode based on input/PDF text
-    if (!window.contentLangMode) window.contentLangMode = "auto"; // "auto" | "lock"
-    if (!window.contentLang) window.contentLang = initial;        // default follow UI at boot
-
     if (typeof window.setLang !== "function") {
       window.setLang = function (lang) {
         var next = pick(norm(lang)) || "zh";
@@ -287,25 +281,6 @@ window.I18N = I18N;
           window.dispatchEvent(new CustomEvent("lang:changed", { detail: { lang: next } }));
         } catch (_) {}
         return next;
-      };
-    }
-
-    // optional helpers (non-breaking)
-    if (typeof window.setContentLang !== "function") {
-      window.setContentLang = function(lang){
-        var next = pick(norm(lang)) || "";
-        if (!next) return window.contentLang || initial;
-        window.contentLang = next;
-        window.contentLangMode = "lock";
-        try { window.dispatchEvent(new CustomEvent("contentlang:changed", { detail: { lang: next } })); } catch (_) {}
-        return next;
-      };
-    }
-    if (typeof window.setContentLangAuto !== "function") {
-      window.setContentLangAuto = function(){
-        window.contentLangMode = "auto";
-        try { window.dispatchEvent(new CustomEvent("contentlang:mode", { detail: { mode: "auto" } })); } catch (_) {}
-        return "auto";
       };
     }
 
