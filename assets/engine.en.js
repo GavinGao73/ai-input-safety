@@ -1,19 +1,18 @@
 // =========================
 // assets/engine.en.js
-// UPGRADE v6.3.3 (conservative real-PDF patch + account-holder fix)
+// UPGRADE v6.3.4 (money strategy tighten)
 //
-// - Keep v6.3.2 behavior and structure
-// - FIX 1: account supports strong label + SPACE + value (e.g. "IBAN DE89 ...")
-// - FIX 2: person_name supports label-only whitespace lines
-// - FIX 3: person_name allows optional "Contact Details" prefix on same line
-// - FIX 4: account MUST NOT eat "Account Holder ..."
+// - Keep v6.3.3 behavior and structure
+// - FIX 1: money_label supports real PDF forms:
+//          "Subtotal € 2950.15"
+//          "Total Due 3510.68"
+//          "Amount: $138.48"
+// - FIX 2: money no longer truncates values like 2950.15 -> [Amount]0.15
+// - FIX 3: bare money is more conservative:
+//          keep explicit currency-code amounts
+//          keep larger symbol-led amounts
+//          avoid aggressively eating every small symbol-only table price
 // - Everything else unchanged
-//
-// ✅ CONSERVATIVE PATCH (NO engine changes; pack regex only):
-// - No priority changes
-// - No alwaysOn changes
-// - No formatter changes
-// - Only refine EN regexes for real readable-PDF text
 // =========================
 
 (function () {
@@ -41,9 +40,6 @@
       NAME: "[Name]"
     },
 
-    // ✅ DETECT (CONSERVATIVE)
-    // IMPORTANT: do NOT claim "en" just because of Latin letters.
-    // Let lang-detect.js decide ambiguity (and possibly open modal).
     detect: function (s) {
       s = String(s || "");
       if (!s.trim()) return "";
@@ -200,16 +196,26 @@
         tag: "URL"
       },
 
+      // ✅ stronger label-driven money:
+      // supports:
+      // - Amount: 138.48
+      // - Amount: € 138.48
+      // - Subtotal € 2950.15
+      // - Total Due 3510.68
       money_label: {
         pattern:
-          /((?:amount|total|subtotal|grand[ \t]*total|price|fee|fees|charge|charges|balance|paid|payment|refund|due|net|gross|tax|vat)[ \t]*[:：=][ \t]*)([-+−]?(?:\d{1,3}(?:[, \t]\d{3})*|\d+)\.\d{2})(?!\d)/giu,
+          /((?:amount|total|subtotal|grand[ \t]*total|price|fee|fees|charge|charges|balance|paid|payment|refund|due|total[ \t]*due|net|gross|tax|vat)(?:[ \t]*[:：=][ \t]*|[ \t]+))((?:[€$£¥￥][ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?|\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?|[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})))(?![\dA-Za-z])/giu,
         tag: "MONEY",
         mode: "prefix"
       },
 
+      // ✅ conservative bare money:
+      // 1) explicit currency code always allowed
+      // 2) symbol-led amounts allowed only for grouped or 4+ digit values
+      //    (prevents sweeping every small table cell like € 12.50)
       money: {
         pattern:
-          /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*[-+−]?\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?|\b[-+−]?\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥][ \t]*[-+−]?\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?)/giu,
+          /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?(?![\dA-Za-z])|[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b(?![\dA-Za-z])|[€$£¥￥][ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,})(?:[.,]\d{2})?(?![\dA-Za-z]))/giu,
         tag: "MONEY"
       },
 
