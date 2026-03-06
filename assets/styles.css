@@ -969,3 +969,26 @@ textarea{
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* =========================
+   FIX: remove bottom overlay / shadow band
+   ========================= */
+
+/* 页面底部不要再叠加遮罩感 */
+body::before,
+body::after{
+  content: none !important;
+}
+
+/* 如果 wrap 或主容器有额外底部阴影，也一起禁掉 */
+.wrap::before,
+.wrap::after{
+  content: none !important;
+  box-shadow: none !important;
+  background: none !important;
+}
+
+/* 防止底部出现覆盖层拦截视觉 */
+html, body{
+  overflow-x: hidden;
+}
