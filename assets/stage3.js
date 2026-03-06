@@ -1,10 +1,11 @@
 // =========================
 // assets/stage3.js (FULL)
-// v20260304a1 — PATCHED (export applyRulesSafely + expose handlers)
+// v20260307a1 — PATCHED (cache pagesText for export matcher-core)
 //
 // ✅ Mode A (readable PDF):
 // - detect from RAW pdf text (content strategy), then LOCK for session (ruleEngine/ruleEngineMode)
 // - applyRules only AFTER language is ensured (if guard exists)
+// - ✅ cache pagesItems + pagesText for export-stage matcher-core/page mapping
 //
 // ✅ Mode B (image / unreadable):
 // - keep AUTO (no lock)
@@ -14,9 +15,12 @@
 // - Stage3 only controls ruleEngine/ruleEngineMode (content strategy language).
 // =========================
 
-// ✅ NEW: keep raw per-page text items (for Mode A export rect mapping later)
+// ✅ keep raw per-page text items (for Mode A export rect mapping later)
 // NOTE: must keep window pointer in sync whenever we re-assign array
 let lastPdfPagesItems = [];
+
+// ✅ NEW: keep pretty per-page text (for export matcher-core; preserves page boundaries)
+let lastPdfPagesText = [];
 
 // ================= Stage 3 helpers =================
 function resetRuleEngineForNewSession() {
@@ -68,7 +72,7 @@ function applyRulesSafely(text) {
   } catch (_) {}
 }
 
-// ✅ NEW: ensure content language for Mode A RAW pdf text
+// ✅ ensure content language for Mode A RAW pdf text
 // - Use centralized __LangDetect.ensureContentLang so "uncertain => modal"
 // - Do NOT implement detect/threshold logic here.
 function ensureLangForPdfRaw(text) {
@@ -100,8 +104,13 @@ async function handleFile(file) {
 
   // ✅ reset every upload
   lastPdfPagesItems = [];
+  lastPdfPagesText = [];
+
   try { window.lastPdfPagesItems = lastPdfPagesItems; } catch (_) {}
   try { window.__pdf_pages_items = lastPdfPagesItems; } catch (_) {}
+
+  try { window.lastPdfPagesText = lastPdfPagesText; } catch (_) {}
+  try { window.__pdf_pages_text = lastPdfPagesText; } catch (_) {}
 
   lastFileKind =
     file.type === "application/pdf" ? "pdf" :
@@ -162,9 +171,19 @@ async function handleFile(file) {
       lastPdfPagesItems = [];
     }
 
-    // ✅ IMPORTANT: keep window pointers synced (because we re-assigned array)
+    // ✅ cache pretty per-page text (for export matcher-core)
+    try {
+      lastPdfPagesText = (probe && Array.isArray(probe.pagesText)) ? probe.pagesText : [];
+    } catch (_) {
+      lastPdfPagesText = [];
+    }
+
+    // ✅ IMPORTANT: keep window pointers synced (because we re-assigned arrays)
     try { window.lastPdfPagesItems = lastPdfPagesItems; } catch (_) {}
     try { window.__pdf_pages_items = lastPdfPagesItems; } catch (_) {}
+
+    try { window.lastPdfPagesText = lastPdfPagesText; } catch (_) {}
+    try { window.__pdf_pages_text = lastPdfPagesText; } catch (_) {}
 
     if (!probe || !probe.hasTextLayer) {
       lastRunMeta.fromPdf = false;
@@ -208,13 +227,21 @@ async function handleFile(file) {
       // If modal opened, STOP here (user will pick and rerun via modal callback chain)
       if (ensured && ensured.ok === false) {
         // keep overlay ready for readability; no applyRules now
-        try { if (typeof window.renderInputOverlayForPdf === "function") window.renderInputOverlayForPdf(text); } catch (_) {}
+        try {
+          if (typeof window.renderInputOverlayForPdf === "function") {
+            window.renderInputOverlayForPdf(text);
+          }
+        } catch (_) {}
       } else {
         // ✅ apply with guard if available (prevents bypass + allows modal confirm)
         await applyRulesSafely(text);
 
         // overlay for Mode A pdf mapping (if present)
-        try { if (typeof window.renderInputOverlayForPdf === "function") window.renderInputOverlayForPdf(text); } catch (_) {}
+        try {
+          if (typeof window.renderInputOverlayForPdf === "function") {
+            window.renderInputOverlayForPdf(text);
+          }
+        } catch (_) {}
       }
     }
 
@@ -230,6 +257,16 @@ async function handleFile(file) {
 
     // ✅ Failure => Mode B; do NOT lock
     setRuleEngineAuto();
+
+    // reset caches on failure too
+    lastPdfPagesItems = [];
+    lastPdfPagesText = [];
+
+    try { window.lastPdfPagesItems = lastPdfPagesItems; } catch (_) {}
+    try { window.__pdf_pages_items = lastPdfPagesItems; } catch (_) {}
+
+    try { window.lastPdfPagesText = lastPdfPagesText; } catch (_) {}
+    try { window.__pdf_pages_text = lastPdfPagesText; } catch (_) {}
 
     setStage3Ui("B");
     setManualPanesForMode("B");
