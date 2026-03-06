@@ -147,6 +147,7 @@ let __LOCKED_OPEN_H = 0;
 function clearBodyHeights() {
   const manualBody = $("manualBody");
   const riskBody = $("riskBody");
+
   if (manualBody) {
     manualBody.style.height = "";
     manualBody.style.maxHeight = "";
@@ -160,7 +161,6 @@ function clearBodyHeights() {
     riskBody.style.overflow = "";
   }
 
-  // ✅ IMPORTANT: reset locked height so next open can re-calc baseline
   __LOCKED_OPEN_H = 0;
 }
 
@@ -181,11 +181,45 @@ function syncManualRiskHeights() {
     return;
   }
 
-  // ✅ lock ONCE: baseline is riskBody height when both panels are open.
-  // After locking, do NOT grow due to telemetry text expansion.
+  // ✅ 核心修复：
+  // 不再用 riskBody 作为锁高基准，因为 riskBody 会被“生成进程”卡片内容撑高。
+  // 改为使用左侧 manualBody 的自然高度作为稳定基准。
   if (!__LOCKED_OPEN_H) {
-    const rh = riskBody.getBoundingClientRect().height;
-    __LOCKED_OPEN_H = Math.max(Math.ceil(rh || 0), DESKTOP_MIN_OPEN_H);
+    const prevManH = manualBody.style.height;
+    const prevManMaxH = manualBody.style.maxHeight;
+    const prevManMinH = manualBody.style.minHeight;
+    const prevManOv = manualBody.style.overflow;
+
+    const prevRiskH = riskBody.style.height;
+    const prevRiskMaxH = riskBody.style.maxHeight;
+    const prevRiskMinH = riskBody.style.minHeight;
+    const prevRiskOv = riskBody.style.overflow;
+
+    // 先清掉内联锁高，测“自然高度”
+    manualBody.style.height = "";
+    manualBody.style.maxHeight = "";
+    manualBody.style.minHeight = "";
+    manualBody.style.overflow = "";
+
+    riskBody.style.height = "";
+    riskBody.style.maxHeight = "";
+    riskBody.style.minHeight = "";
+    riskBody.style.overflow = "";
+
+    const manualNatural = Math.ceil(manualBody.getBoundingClientRect().height || 0);
+
+    // 恢复原值（后面会统一重新设置）
+    manualBody.style.height = prevManH;
+    manualBody.style.maxHeight = prevManMaxH;
+    manualBody.style.minHeight = prevManMinH;
+    manualBody.style.overflow = prevManOv;
+
+    riskBody.style.height = prevRiskH;
+    riskBody.style.maxHeight = prevRiskMaxH;
+    riskBody.style.minHeight = prevRiskMinH;
+    riskBody.style.overflow = prevRiskOv;
+
+    __LOCKED_OPEN_H = Math.max(manualNatural, DESKTOP_MIN_OPEN_H);
   }
 
   const target = __LOCKED_OPEN_H;
@@ -209,7 +243,7 @@ function initRiskResizeObserver() {
   if (__riskResizeObs) __riskResizeObs.disconnect();
 
   __riskResizeObs = new ResizeObserver(() => {
-    // ✅ do not keep increasing height; sync uses locked baseline
+    // ✅ 已锁定后，不再让右侧内容增长改变基准
     requestAnimationFrame(syncManualRiskHeights);
   });
 
@@ -221,36 +255,34 @@ function expandManualArea() {
   const body = $("manualBody");
   if (btn && body) setCtlExpanded(btn, body, true);
 
-  // ✅ re-evaluate baseline on user expand
   __LOCKED_OPEN_H = 0;
   requestAnimationFrame(syncManualRiskHeights);
 }
+
 function expandRiskArea() {
   const btn = $("btnToggleRisk");
   const body = $("riskBody");
   if (btn && body) setCtlExpanded(btn, body, true);
 
-  // ✅ re-evaluate baseline on user expand
   __LOCKED_OPEN_H = 0;
   requestAnimationFrame(syncManualRiskHeights);
 }
+
 function collapseManualArea() {
   const btn = $("btnToggleManual");
   const body = $("manualBody");
   if (btn && body) setCtlExpanded(btn, body, false);
 
-  // ✅ collapsing should clear fixed heights + baseline
   clearBodyHeights();
 }
+
 function collapseRiskArea() {
   const btn = $("btnToggleRisk");
   const body = $("riskBody");
   if (btn && body) setCtlExpanded(btn, body, false);
 
-  // ✅ collapsing should clear fixed heights + baseline
   clearBodyHeights();
 }
-
 // ================= Progress area =================
 // ✅ SINGLE WRITER MODEL:
 // - setProgressText / clearProgress only update state
