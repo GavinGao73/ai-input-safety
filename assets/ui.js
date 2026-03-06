@@ -1,12 +1,19 @@
 // =========================
 // assets/ui.js (from app.js)
-// v20260305a1 — PATCHED
+// v20260305a3 — PATCHED
 // - Keep i18n in i18n.js
 // - ui.js stays “UI logic + UI observability” (NOT language dict)
 // - Moved lang-status / export-status telemetry helpers here (from main.js)
 // - Optional debug flags:
 //   window.__DEBUG_LANG__ = true   -> show extra lines in exportStatus
 //   window.__TRACE_RULEENGINE__ = true -> enable ruleEngine write tracing (hook)
+//
+// ✅ FIX (A3):
+// - exportStatus now has SINGLE WRITER only:
+//   renderExportStatusCombined()
+// - setProgressText()/clearProgress() no longer write DOM directly;
+//   they only update window.__UI_PROGRESS_STATE__
+// - This removes textContent vs innerHTML conflicts.
 // =========================
 
 // ================= Stage 3 UI texts =================
@@ -245,18 +252,53 @@ function collapseRiskArea() {
 }
 
 // ================= Progress area =================
-function setProgressText(lines, isError) {
-  const box = $("exportStatus");
-  if (!box) return;
+// ✅ SINGLE WRITER MODEL:
+// - setProgressText / clearProgress only update state
+// - renderExportStatusCombined is the ONLY function that writes #exportStatus
+(function ensureUiProgressState() {
+  try {
+    if (!window.__UI_PROGRESS_STATE__) {
+      window.__UI_PROGRESS_STATE__ = {
+        lines: [],
+        isError: false
+      };
+    }
+  } catch (_) {}
+})();
 
-  const s = Array.isArray(lines) ? lines.join("\n") : String(lines || "");
-  box.style.color = isError ? "#ffb4b4" : "";
-  box.textContent = s;
+function setProgressText(lines, isError) {
+  try {
+    const s = Array.isArray(lines) ? lines.slice(0) : [String(lines || "")];
+    window.__UI_PROGRESS_STATE__ = {
+      lines: s.filter((x) => String(x || "").trim() !== ""),
+      isError: !!isError
+    };
+
+    if (typeof renderExportStatusCombined === "function") {
+      renderExportStatusCombined();
+    } else {
+      const box = $("exportStatus");
+      if (!box) return;
+      box.style.color = isError ? "#ffb4b4" : "";
+      box.textContent = s.join("\n");
+    }
+  } catch (_) {}
 }
 
 function clearProgress() {
-  const a = $("exportStatus");
-  if (a) a.textContent = "";
+  try {
+    window.__UI_PROGRESS_STATE__ = {
+      lines: [],
+      isError: false
+    };
+
+    if (typeof renderExportStatusCombined === "function") {
+      renderExportStatusCombined();
+    } else {
+      const a = $("exportStatus");
+      if (a) a.textContent = "";
+    }
+  } catch (_) {}
 }
 
 // ================= UI text =================
@@ -530,6 +572,7 @@ function renderExportStatusCombined() {
   const t = window.I18N && window.I18N[currentLang] ? window.I18N[currentLang] : {};
   const s = window.__RasterExportLast || null;
   const bootLine = window.__bootLine || "";
+  const pstate = window.__UI_PROGRESS_STATE__ || { lines: [], isError: false };
 
   // ---------- helpers ----------
   function esc(x) {
@@ -548,13 +591,13 @@ function renderExportStatusCombined() {
   function secLabels(uiLang) {
     const L = normLang3(uiLang || currentLang);
     if (L === "de") {
-      return { boot: "BT", lang: "SP", state: "ST", detect: "ER", exp: "EX" };
+      return { boot: "BT", lang: "SP", state: "ST", detect: "ER", exp: "EX", prog: "PR" };
     }
     if (L === "en") {
-      return { boot: "BT", lang: "LG", state: "ST", detect: "DT", exp: "EX" };
+      return { boot: "BT", lang: "LG", state: "ST", detect: "DT", exp: "EX", prog: "PR" };
     }
     // zh default
-    return { boot: "启动", lang: "语言", state: "状态", detect: "识别", exp: "导出" };
+    return { boot: "启动", lang: "语言", state: "状态", detect: "识别", exp: "导出", prog: "进程" };
   }
 
   // 两字 key：尽量“两个字/两个码”
@@ -565,7 +608,8 @@ function renderExportStatusCombined() {
         date: "DT", time: "TM",
         ui: "UI", content: "CT", rule: "RE", modal: "MD",
         last: "LS", conf: "CF", need: "NC", src: "SC", reason: "RS", cand: "CA",
-        phase: "PH", p2: "P2", lang: "LG", dpi: "DP", pages: "PG", rects: "RC", page: "P#", items: "IT"
+        phase: "PH", p2: "P2", lang: "LG", dpi: "DP", pages: "PG", rects: "RC", page: "P#", items: "IT",
+        line: "LN"
       };
     }
     if (L === "en") {
@@ -573,7 +617,8 @@ function renderExportStatusCombined() {
         date: "DT", time: "TM",
         ui: "UI", content: "CT", rule: "RE", modal: "MD",
         last: "LS", conf: "CF", need: "NC", src: "SC", reason: "RS", cand: "CA",
-        phase: "PH", p2: "P2", lang: "LG", dpi: "DP", pages: "PG", rects: "RC", page: "P#", items: "IT"
+        phase: "PH", p2: "P2", lang: "LG", dpi: "DP", pages: "PG", rects: "RC", page: "P#", items: "IT",
+        line: "LN"
       };
     }
     // zh
@@ -581,7 +626,8 @@ function renderExportStatusCombined() {
       date: "日期", time: "时间",
       ui: "界面", content: "内容", rule: "规则", modal: "弹窗",
       last: "结果", conf: "置信", need: "确认", src: "来源", reason: "原因", cand: "候选",
-      phase: "阶段", p2: "二段", lang: "语言", dpi: "精度", pages: "页数", rects: "遮盖", page: "当前", items: "条目"
+      phase: "阶段", p2: "二段", lang: "语言", dpi: "精度", pages: "页数", rects: "遮盖", page: "当前", items: "条目",
+      line: "内容"
     };
   }
 
@@ -589,17 +635,17 @@ function renderExportStatusCombined() {
     return `<div class="tele-sec">${esc(title2)}</div>`;
   }
 
-  function line(k2, v) {
+  function line(k2, v, cls) {
     const vv = String(v == null ? "" : v);
-    return `<div class="tele-line"><span class="tele-k">${esc(k2)}</span><span class="tele-v">${esc(vv)}</span></div>`;
+    const extra = cls ? ` ${cls}` : "";
+    return `<div class="tele-line${extra}"><span class="tele-k">${esc(k2)}</span><span class="tele-v">${esc(vv)}</span></div>`;
   }
 
   // ISO -> date + time split (你要求“日期和时间分开两行”)
   function splitIso(iso) {
-    const s = String(iso || "");
-    // accept "YYYY-MM-DDTHH:mm:ss.sssZ"
-    const m = s.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2}(?:\.\d+)?)(Z)?/);
-    if (!m) return { date: "", time: s };
+    const s2 = String(iso || "");
+    const m = s2.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2}(?:\.\d+)?)(Z)?/);
+    if (!m) return { date: "", time: s2 };
     return { date: m[1], time: m[2] + (m[3] ? "Z" : "") };
   }
 
@@ -621,7 +667,6 @@ function renderExportStatusCombined() {
   if (!st) {
     html.push(line("—", "(lang telemetry unavailable)"));
   } else {
-    // 时间分行
     const ts = st.iso || (typeof st.when === "number" ? new Date(st.when).toISOString() : "");
     const dt = splitIso(ts);
 
@@ -633,7 +678,6 @@ function renderExportStatusCombined() {
     html.push(line(K.rule, `${st.ruleEngine || "(empty)"} (${st.ruleEngineMode || "auto"})`));
     html.push(line(K.modal, st.modalOpening ? "OPEN" : "false"));
 
-    // “状态（telemetry）”两字输出
     if (st.reason) html.push(line("状态", st.reason));
 
     html.push("");
@@ -655,7 +699,16 @@ function renderExportStatusCombined() {
     }
   }
 
-  // ===== 导出 / EXPORT =====
+  // ===== 进程 / PROGRESS (from setProgressText) =====
+  if (Array.isArray(pstate.lines) && pstate.lines.length) {
+    html.push("");
+    html.push(sec(SEC.prog));
+    pstate.lines.forEach((row) => {
+      html.push(line(K.line, row, pstate.isError ? " tele-line-error" : ""));
+    });
+  }
+
+  // ===== 导出 / EXPORT (from __RasterExportLast) =====
   html.push("");
   html.push(sec(SEC.exp));
 
