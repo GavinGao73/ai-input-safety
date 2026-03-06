@@ -1,23 +1,18 @@
 // =========================
 // assets/engine.de.js
 // Content-strategy pack: de (FULL – extended conservative German policy)
-// - placeholders + detect + rules
-// - high-sensitivity German document model
 //
-// LOCKED (as per latest):
-// - Fix: Führerscheinnummer like "D-482771-2026" must match (hyphenated formats)
-// - Address: do NOT mask PLZ+City / Country.
-//   Only mask street + house number; if apartment details exist, include building/floor/room (e.g., Gebäude/OG/Zimmer).
-// - Everything else stays as-is.
+// LOCKED (latest):
+// - Keep titles Herr/Frau/Dr/Prof in output; mask only the person name
+// - Address: only mask street + house number; keep PLZ+City/Country
+// - Zusatz: only mask Gebäude/OG/Zimmer-like fragment; keep Klingel tail
+// - ID policy: overall KEEP prefix/body, mask ONLY the LAST numeric segment
 //
-// USER ADJUST (latest):
-// - Name lines: DO NOT output [Anrede]. Keep Herr/Frau/Dr/Prof titles, only mask the name part -> [Name].
-// - Geburtsort: low priority; can mask, but leaving it is acceptable.
-// - Zusatz: only mask "Gebäude..., OG..., Zimmer..." part; keep ", Klingel „Müller“…"
-//
-// ID POLICY (latest):
-// - ID: overall mask KEEP, but ONLY mask the LAST numeric segment (tail digits).
-//   Example: CASE-2026-00078421 -> CASE-2026-[Referenz]
+// PATCH v20260306-de-a1:
+// - FIX 1: "Kontoinhaber: Prof. David Müller" => keep "Prof.", mask name
+// - FIX 2: insurance_id2 must run BEFORE id_label_tail, so
+//          "Versicherungsnummer: POL-2026-991772" => [Geheim], not tail-only
+// - Everything else unchanged
 // =========================
 
 (function () {
@@ -37,7 +32,7 @@
       ADDRESS: "[Adresse]",
       HANDLE: "[Handle]",
       REF: "[Referenz]",
-      TITLE: "[Anrede]", // NOTE: kept for generic use; title masking is disabled (see Fix Patch)
+      TITLE: "[Anrede]",
       NUMBER: "[Zahl]",
       MONEY: "[Betrag]",
       COMPANY: "[Firma]",
@@ -45,14 +40,10 @@
       NAME: "[Name]"
     },
 
-    // ✅ DETECT (CONSERVATIVE)
-    // IMPORTANT: do NOT claim "de" just because of umlauts/Latin letters.
-    // Let lang-detect.js decide ambiguity (and possibly open modal).
     detect: function (s) {
       s = String(s || "");
       if (!s.trim()) return "";
 
-      // only strong German keywords => de
       if (
         /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Zusatz|Geburtsdatum|Geburtsort|USt-IdNr)\b/i.test(
           s
@@ -61,29 +52,17 @@
         return "de";
       }
 
-      // ❌ removed umlaut-count fallback to avoid over-claim:
-      // const umlauts = (s.match(/[äöüÄÖÜß]/g) || []).length;
-      // if (umlauts >= 3) return "de";
-
       return "";
     },
 
     priority: [
-      // secrets / auth first
       "secret",
       "login",
 
-      // identity / case / reference system (very German)
-      // ✅ ID tail-only policy (mask only last numeric segment)
       "aktenzeichen_tail",
       "id_label_tail",
       "ref_generic_tail_de",
 
-      // keep legacy full rules defined but NOT executed (see note above)
-      // "aktenzeichen",
-      // "id_label",
-
-      // tax / government / personal documents
       "tax_id",
       "vat_id",
       "svnr",
@@ -91,48 +70,31 @@
       "passport",
       "driver_license",
 
-      // personal attributes
       "birthdate",
-      "birthplace", // low priority; not forced always-on (see Fix Patch)
+      "birthplace",
 
-      // financial / banking
       "account",
       "bank",
       "blz",
       "creditcard",
 
-      // communications
       "email",
       "url",
 
-      // money (strict currency)
       "money",
 
-      // phone AFTER IDs to reduce mis-hits
       "phone",
 
-      // person names (STRICT label-driven)
       "person_name_keep_title",
       "person_name",
 
-      // organization BEFORE address (prevents company line being treated as address context)
       "company",
 
-      // ✅ address lines WITHOUT labels (street+houseNo only)
       "address_de_inline_street",
-
-      // ✅ label-driven extras (apartment/building/floor/room) — PARTIAL ONLY
       "address_de_extra_partial",
-
-      // ✅ label-driven address — PARTIAL ONLY (street+houseNo; keeps tail PLZ/City/Country)
       "address_de_street_partial",
 
-      // generic
       "handle",
-
-      // NOTE:
-      // - legacy "ref" masked whole token; disabled by tail-only policy (do not run)
-      // - "title" masking disabled to keep Herr/Frau/Dr/Prof
       "number"
     ],
 
@@ -140,7 +102,6 @@
       "secret",
       "login",
 
-      // ✅ ID tail-only policy (mask only last numeric segment)
       "aktenzeichen_tail",
       "id_label_tail",
       "ref_generic_tail_de",
@@ -153,8 +114,6 @@
       "driver_license",
       "birthdate",
 
-      // birthplace is low priority (user). DO NOT force it.
-
       "account",
       "bank",
       "blz",
@@ -165,35 +124,28 @@
       "money",
       "phone",
 
-      // ✅ Name masking with titles preserved (Herr/Frau/Dr/Prof kept; only name -> [Name])
       "person_name_keep_title",
       "person_name",
 
-      // keep company + street/apartment address always-on (conservative German policy)
       "company",
       "address_de_inline_street",
       "address_de_extra_partial",
       "address_de_street_partial"
     ],
 
-    // phone FP guard (de): prevent ref/order/invoice/customer IDs being masked as phone
     phoneGuard: function ({ label, value }) {
       const lbl = String(label || "").toLowerCase();
       const val = String(value || "");
       const digits = val.replace(/\D+/g, "");
 
-      // long numeric IDs are not phones (also avoids card-like sequences)
       if (digits.length >= 16) return false;
 
-      // label indicates reference/ID -> not phone
       if (
         /\b(?:aktenzeichen|geschäftszeichen|kundennummer|rechnungsnummer|rechnungsnr|vorgangs-?id|referenz|ticketnummer|bestellnummer|antragsnummer)\b/i.test(
           lbl
         )
-      )
-        return false;
+      ) return false;
 
-      // value itself looks like an ID prefix (defensive)
       if (/\b(?:knd|re|ord|ab|ref|v|vg|js)[ \t]*[-/:][ \t]*/i.test(val)) return false;
 
       return true;
@@ -211,14 +163,12 @@
     },
 
     rules: {
-      /* ===================== AUTH / LOGIN (label-driven) ===================== */
       login: {
         pattern: /((?:Benutzername|User(?:name)?|Login-?ID|User-?ID|Account-?ID)[ \t]*[:：=][ \t]*)([^\n\r]{1,80})/giu,
         tag: "HANDLE",
         mode: "prefix"
       },
 
-      /* ===================== SECRET (label-driven) ===================== */
       secret: {
         pattern:
           /((?:Passwort|Kennwort|PIN|TAN|OTP|2FA|Sicherheitscode|verification[ \t]*code|one[- \t]?time[ \t]*code)[ \t]*[:：=][ \t]*)([^\n\r]{1,120})/giu,
@@ -226,9 +176,6 @@
         mode: "prefix"
       },
 
-      /* ===================== CASE FILE / BUSINESS REF ===================== */
-      // ✅ NEW: tail-only masking for Aktenzeichen/Geschäftszeichen
-      // Example: Aktenzeichen: CASE-2026-00078421 -> Aktenzeichen: CASE-2026-[Referenz]
       aktenzeichen_tail: {
         pattern:
           /((?:Aktenzeichen|Geschäftszeichen)[ \t]*[:：=][ \t]*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.\/][A-Za-z0-9\[\]]+){0,10}[-_.\/]))(\d{4,})/giu,
@@ -236,15 +183,12 @@
         mode: "prefix"
       },
 
-      // legacy full mask (definition kept, but prefer tail rule via priority/alwaysOn)
       aktenzeichen: {
         pattern: /((?:Aktenzeichen|Geschäftszeichen)[ \t]*[:：=][ \t]*)([A-Za-z0-9\-\/\.]{6,80})/giu,
         tag: "REF",
         mode: "prefix"
       },
 
-      /* ===================== ID / REF LABELS (always-on) ===================== */
-      // ✅ NEW: tail-only masking for German label IDs
       id_label_tail: {
         pattern:
           /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)[ \t]*[:：=][ \t]*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.\/:][A-Za-z0-9\[\]]+){0,10}[-_.\/:]))(\d{4,})/giu,
@@ -259,14 +203,12 @@
         mode: "prefix"
       },
 
-      // ✅ NEW: generic tail IDs (covers CASE-2026-00078421 style even without label)
       ref_generic_tail_de: {
         pattern: /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-))(\d{5,})\b/gu,
         tag: "REF",
         mode: "prefix"
       },
 
-      /* ===================== TAX (DE) ===================== */
       tax_id: {
         pattern: /((?:Steuer-?ID|Steueridentifikationsnummer)[ \t]*[:：=][ \t]*)(\d[\d \t]{8,20}\d)/giu,
         tag: "SECRET",
@@ -279,7 +221,6 @@
         mode: "prefix"
       },
 
-      /* ===================== SOCIAL SECURITY (DE heuristic) ===================== */
       svnr: {
         pattern:
           /((?:Sozialversicherungsnummer|SV-Nummer|Rentenversicherungsnummer)[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9 \t\-]{5,40})/giu,
@@ -287,7 +228,6 @@
         mode: "prefix"
       },
 
-      /* ===================== DOC IDs (DE) ===================== */
       id_card: {
         pattern: /((?:Personalausweis(?:nummer|[- \t]?Nr\.?))[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-]{4,24})/giu,
         tag: "SECRET",
@@ -301,14 +241,12 @@
       },
 
       driver_license: {
-        // ✅ accepts hyphenated formats, e.g. "D-482771-2026"
         pattern:
           /((?:Führerschein(?:nummer|[- \t]?Nr\.?)|Führerscheinnummer)[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
-      /* ===================== PERSONAL ATTRIBUTES ===================== */
       birthdate: {
         pattern: /((?:Geburtsdatum|Geb\.?[ \t]*Datum)[ \t]*[:：=][ \t]*)(\d{1,2}\.\d{1,2}\.\d{2,4}|\d{4}-\d{2}-\d{2})/giu,
         tag: "SECRET",
@@ -316,15 +254,12 @@
       },
 
       birthplace: {
-        // low priority; not forced always-on
         pattern: /((?:Geburtsort)[ \t]*[:：=][ \t]*)([^\n\r]{2,80})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
-      /* ===================== FINANCIAL / BANKING ===================== */
       account: {
-        // IBAN / Kontonummer / Account Number
         pattern:
           /((?:IBAN|Kontonummer|Account(?:[ \t]*Number)?)[ \t]*[:：=][ \t]*)([A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
         tag: "ACCOUNT",
@@ -332,83 +267,67 @@
       },
 
       bank: {
-        // BIC / SWIFT
         pattern: /((?:BIC|SWIFT|SWIFT[ \t]*Code)[ \t]*[:：=]?[ \t]*)([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
 
       blz: {
-        // Bankleitzahl / BLZ
         pattern: /((?:Bankleitzahl|BLZ)[ \t]*[:：=][ \t]*)(\d{5,12})/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
 
       creditcard: {
-        // label-driven card number (avoid swallowing random IDs)
         pattern:
           /((?:Kreditkarte|Kartennummer|Card(?:[ \t]*Number)?|Visa|Mastercard|Amex)[ \t]*[:：=][ \t]*)(\d(?:[ -]?\d){12,22}\d)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
 
-      /* ===================== MONEY (strict currency required) ===================== */
       money: {
         pattern:
           /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*(?:[€$£¥￥][ \t]*)?\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥][ \t]*\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?[ \t]*[€$£¥￥])/giu,
         tag: "MONEY"
       },
 
-      /* ===================== COMMUNICATION ===================== */
       email: {
         pattern: /\b[A-Z0-9._%+-]+[ \t]*@[ \t]*[A-Z0-9.-]+[ \t]*\.[ \t]*[A-Z]{2,}\b/gi,
         tag: "EMAIL"
       },
 
       url: {
-        // avoid eating trailing brackets/quotes
         pattern: /\b(?:https?:\/\/|www\.)[^\s<>"'）)\]】]+/giu,
         tag: "URL"
       },
 
       phone: {
-        // allow Telefon (Durchwahl): ...
         pattern:
           /((?:tel|telefon|handy|kontakt|phone|mobile|mobil|whatsapp|telegram|signal|fax)(?:[ \t]*\([^)]+\))?[ \t]*[:：=]?[ \t]*)([+＋]?[ \t]*\d[\d \t().-]{5,}\d)\b|(?<![A-Za-z0-9_-])((?:[+＋][ \t]*\d{1,3}|00[ \t]*[1-9]\d{0,2})[\d \t().-]{6,}\d)\b/giu,
         tag: "PHONE",
         mode: "phone"
       },
 
-      /* ===================== PERSON NAME (STRICT label-driven) ===================== */
       person_name_keep_title: {
-        // Expected:
-        // Name: Herr [Name]
-        // Empfänger: Frau [Name]
-        // Ansprechpartner: Dr. [Name]
-        // And never emits [Anrede].
         pattern:
-          /^((?:Name|Kontakt|Ansprechpartner|Empfänger)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+          /^((?:Name|Kontakt|Ansprechpartner|Empfänger|Kontoinhaber)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
 
       person_name: {
-        // legacy (kept) — but prevent newline swallowing
         pattern:
-          /((?:Name|Kontakt|Ansprechpartner|Empfänger)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
+          /((?:Name|Kontakt|Ansprechpartner|Empfänger|Kontoinhaber)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
         tag: "NAME",
         mode: "prefix"
       },
 
-      /* ===================== COMPANY ===================== */
       company: {
         pattern: /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)[ \t]+(?<legal>GmbH|AG|UG|KG|GbR|e\.K\.)\b/gu,
         tag: "COMPANY",
         mode: "company"
       },
 
-      /* ===================== ADDRESS (inline, street + house no only; no PLZ/City) ===================== */
       address_de_inline_street: {
         pattern:
           /^(?!.*\b(?:Lagerplatz|Regal|Fach|SKU|Fehlercode|ERR|Testwert|Artikel|Gutschrift|Kontonummer|Bankleitzahl|Versichertennummer)\b)(?:[A-ZÄÖÜ][\p{L}.'\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][\p{L}.'\-]{1,40}){0,4})[ \t]+\d{1,4}(?:[ \t]*[A-Za-z])?(?:-\d{1,4})?$/gmu,
@@ -416,7 +335,6 @@
       },
 
       address_de_street_partial: {
-        // Street-only masking; keep tail (PLZ/City/Country)
         pattern:
           /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)[ \t]*[:：=][ \t]*)([^,\n\r]{4,120}?)(?=[ \t]*,)/giu,
         tag: "ADDRESS",
@@ -424,14 +342,12 @@
       },
 
       address_de_extra_partial: {
-        // Zusatz: mask only building/floor/room part; keep ", Klingel …" tail
         pattern:
           /((?:Zusatz)[ \t]*[:：=][ \t]*)((?=[^\n\r]{2,260})(?=.*\b(?:Gebäude|Haus|Block|Aufgang|Etage|Stock|Stockwerk|OG|EG|DG|WHG|Wohnung|Zimmer|Raum|App\.?|Apartment)\b)[^\n\r]*?)(?=,[ \t]*(?:Klingel|Tür|Tel\.?|Telefon)\b)/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
 
-      // legacy definitions kept (NOT executed by priority/alwaysOn)
       address_de_extra: {
         pattern:
           /((?:Zusatz)[ \t]*[:：=][ \t]*)((?=[^\n\r]{2,140}$)(?=.*\b(?:Gebäude|Haus|Block|Aufgang|Etage|Stock|Stockwerk|OG|EG|DG|WHG|Wohnung|Zimmer|Raum|App\.?|Apartment|Tür|Klingel)\b)[^\n\r]{2,140})/giu,
@@ -446,13 +362,11 @@
         mode: "prefix"
       },
 
-      /* ===================== GENERIC ===================== */
       handle: {
         pattern: /@[A-Za-z0-9_]{2,32}\b/g,
         tag: "HANDLE"
       },
 
-      // legacy ref rule definition kept (NOT executed; tail-only enforced by priority)
       ref: {
         pattern: /\b[A-Z]{2,6}-?\d{4,14}\b/g,
         tag: "REF"
@@ -463,7 +377,6 @@
         tag: "NUMBER"
       },
 
-      // legacy title rule definition kept (NOT executed)
       title: {
         pattern: /\b(Herr|Frau|Dr\.?|Prof\.?)\b/g,
         tag: "TITLE"
@@ -473,9 +386,7 @@
 })();
 
 // =========================
-// DE High-Risk ADD-ONLY Patch (align with EN patches; German-friendly labels)
-// - SAFE: append priority/alwaysOn; add rules only
-// - DOES NOT modify existing DE rules (address locks preserved)
+// DE High-Risk ADD-ONLY Patch
 // =========================
 (function () {
   "use strict";
@@ -521,6 +432,9 @@
     "crypto_wallet",
     "insurance_id2"
   ];
+
+  // insurance_id2 must run BEFORE id_label_tail
+  DE.priority = insertBefore(DE.priority || [], "id_label_tail", ["insurance_id2"]);
 
   DE.priority = insertBefore(DE.priority || [], "number", NEW_KEYS);
 
@@ -651,13 +565,7 @@
 })();
 
 // =========================
-// DE Fix Patch (UPDATED per user; + Zusatz partial masking)
-// - Fix BLZ with parentheses: "Bankleitzahl (BLZ): ..."
-// - Add card expiry + CVC/CVV
-// - Fix Name masking: KEEP titles (Herr/Frau/Dr/Prof) in output; DO NOT emit [Anrede]; only mask name => [Name]
-// - Geburtsort: low priority; do NOT force masking (remove from alwaysOn)
-// - Address: street-only masking while keeping tail (PLZ/City/Country) WITHOUT requiring new engine modes
-// - Zusatz: mask only "Gebäude..., OG..., Zimmer..." and keep ", Klingel …"
+// DE Fix Patch
 // =========================
 (function () {
   "use strict";
@@ -682,7 +590,6 @@
     return out;
   }
 
-  // New keys (run earlier than older ones they supersede)
   const NEW_KEYS = [
     "birthplace_optional_secret",
     "blz_paren",
@@ -690,46 +597,37 @@
     "card_security_de"
   ];
 
-  // Insert BEFORE existing keys where relevant (conservative)
   DE.priority = insertBefore(DE.priority || [], "birthplace", ["birthplace_optional_secret"]);
   DE.priority = insertBefore(DE.priority || [], "blz", ["blz_paren"]);
   DE.priority = insertBefore(DE.priority || [], "number", ["card_expiry_de", "card_security_de"]);
 
-  // Always-on:
-  // - keep BLZ/expiry/CVC always on
-  // - DO NOT force Geburtsort (user said low priority)
   DE.alwaysOn = Array.isArray(DE.alwaysOn) ? DE.alwaysOn : [];
   uniqPush(DE.alwaysOn, "blz_paren");
   uniqPush(DE.alwaysOn, "card_expiry_de");
   uniqPush(DE.alwaysOn, "card_security_de");
 
-  // Remove birthplace from alwaysOn (soften). Keep birthplace_optional_secret NOT always-on.
   DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "birthplace" && k !== "birthplace_secret");
 
   Object.assign(DE.rules, {
-    /* 1) Geburtsort: optional masking (NOT always-on) */
     birthplace_optional_secret: {
       pattern: /((?:Geburtsort)[ \t]*[:：=][ \t]*)([^\n\r]{2,80})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
-    /* 2) BLZ with parentheses */
     blz_paren: {
       pattern: /((?:Bankleitzahl)[ \t]*(?:\([ \t]*BLZ[ \t]*\))?[ \t]*[:：=][ \t]*)(\d{5,12})/giu,
       tag: "ACCOUNT",
       mode: "prefix"
     },
 
-    /* 3) Card expiry (DE + EN labels) */
     card_expiry_de: {
       pattern:
         /((?:Gültig[ \t]*bis|Gueltig[ \t]*bis|Ablaufdatum|Expiry|Expiration|Exp(?:iry|iration)?(?:[ \t]*Date)?|Valid[ \t]*Thru|Valid[ \t]*Through)[ \t]*[:：=][ \t]*)(\d{2}[ \t]*\/[ \t]*\d{2,4}|\d{2}[ \t]*-[ \t]*\d{2,4}|\d{4}[ \t]*-[ \t]*\d{2})/giu,
-      tag: "SECRET",
-      mode: "prefix"
+        tag: "SECRET",
+        mode: "prefix"
     },
 
-    /* 4) CVC/CVV */
     card_security_de: {
       pattern: /((?:CVC|CVV|CVC2|CAV2)[ \t]*[:：=][ \t]*)(\d{3,4})/giu,
       tag: "SECRET",
