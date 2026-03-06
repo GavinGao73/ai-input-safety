@@ -561,13 +561,6 @@ textarea{
    - Inner exportStatus scrolls; outer never grows by content
    ========================= */
 
-/* grid 子项必须允许收缩，否则内部滚动不会出现 */
-#riskBody.open .io-bottom-grid,
-#riskBody.open .io-bottom-grid > *{
-  min-height:0;
-}
-
-/* railcard 外层：只负责容器高度，不允许被内容撑高 */
 .railcard{
   border:1px solid var(--panel-bd);
   border-radius:14px;
@@ -580,11 +573,11 @@ textarea{
 
   min-width:0;
 
-  /* 保持高度链条：riskBody → grid → railcard */
+  /* ✅ keep percent chain intact (riskBody locked height -> grid stretch -> railcard 100%) */
   height:100%;
   min-height:0;
 
-  /* 防止内容撑开 */
+  /* ✅ outer never grows by content */
   overflow:hidden;
 }
 
@@ -607,7 +600,7 @@ textarea{
   margin:4px 0;
 }
 
-/* 使用说明 railcard 内部也允许滚动 */
+/* ✅ CHANGED: make "使用说明" body text match exportStatus font size */
 .side-rail-note{
   font-size:11px;
   line-height:1.55;
@@ -615,10 +608,8 @@ textarea{
   white-space:pre-line;
   overflow-wrap:anywhere;
   word-break:break-word;
-
-  flex:1 1 auto;
   min-height:0;
-  overflow:auto;
+  overflow:auto; /* 使用说明也允许内部滚动（防止撑高） */
 }
 
 /* =========================
@@ -626,20 +617,19 @@ textarea{
    ========================= */
 
 #exportStatus{
-  /* 占据 railcard 剩余高度 */
+  /* ✅ must be a flex child to take remaining height */
   flex:1 1 auto;
 
-  /* flex 滚动关键属性 */
+  /* ✅ critical for flex overflow scrolling */
   min-height:0;
 
-  /* 内部滚动 */
+  /* ✅ scroll inside */
   overflow-y:auto;
   overflow-x:hidden;
 
   font-size:11px;
   line-height:1.55;
   color:rgba(255,255,255,.80);
-
   white-space:pre-wrap;
   overflow-wrap:anywhere;
   word-break:break-word;
