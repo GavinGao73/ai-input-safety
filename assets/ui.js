@@ -164,6 +164,31 @@ function clearBodyHeights() {
   __LOCKED_OPEN_H = 0;
 }
 
+function getNaturalBodyHeight(el) {
+  if (!el) return 0;
+
+  const save = {
+    height: el.style.height,
+    maxHeight: el.style.maxHeight,
+    minHeight: el.style.minHeight,
+    overflow: el.style.overflow
+  };
+
+  el.style.height = "";
+  el.style.maxHeight = "";
+  el.style.minHeight = "";
+  el.style.overflow = "";
+
+  const h = Math.ceil(el.getBoundingClientRect().height || 0);
+
+  el.style.height = save.height;
+  el.style.maxHeight = save.maxHeight;
+  el.style.minHeight = save.minHeight;
+  el.style.overflow = save.overflow;
+
+  return h;
+}
+
 function syncManualRiskHeights() {
   if (isSmallScreen()) {
     clearBodyHeights();
@@ -181,44 +206,9 @@ function syncManualRiskHeights() {
     return;
   }
 
-  // ✅ 核心修复：
-  // 不再用 riskBody 作为锁高基准，因为 riskBody 会被“生成进程”卡片内容撑高。
-  // 改为使用左侧 manualBody 的自然高度作为稳定基准。
+  // ✅ 唯一正确基准：左侧 manualBody 的自然高度
   if (!__LOCKED_OPEN_H) {
-    const prevManH = manualBody.style.height;
-    const prevManMaxH = manualBody.style.maxHeight;
-    const prevManMinH = manualBody.style.minHeight;
-    const prevManOv = manualBody.style.overflow;
-
-    const prevRiskH = riskBody.style.height;
-    const prevRiskMaxH = riskBody.style.maxHeight;
-    const prevRiskMinH = riskBody.style.minHeight;
-    const prevRiskOv = riskBody.style.overflow;
-
-    // 先清掉内联锁高，测“自然高度”
-    manualBody.style.height = "";
-    manualBody.style.maxHeight = "";
-    manualBody.style.minHeight = "";
-    manualBody.style.overflow = "";
-
-    riskBody.style.height = "";
-    riskBody.style.maxHeight = "";
-    riskBody.style.minHeight = "";
-    riskBody.style.overflow = "";
-
-    const manualNatural = Math.ceil(manualBody.getBoundingClientRect().height || 0);
-
-    // 恢复原值（后面会统一重新设置）
-    manualBody.style.height = prevManH;
-    manualBody.style.maxHeight = prevManMaxH;
-    manualBody.style.minHeight = prevManMinH;
-    manualBody.style.overflow = prevManOv;
-
-    riskBody.style.height = prevRiskH;
-    riskBody.style.maxHeight = prevRiskMaxH;
-    riskBody.style.minHeight = prevRiskMinH;
-    riskBody.style.overflow = prevRiskOv;
-
+    const manualNatural = getNaturalBodyHeight(manualBody);
     __LOCKED_OPEN_H = Math.max(manualNatural, DESKTOP_MIN_OPEN_H);
   }
 
@@ -243,7 +233,7 @@ function initRiskResizeObserver() {
   if (__riskResizeObs) __riskResizeObs.disconnect();
 
   __riskResizeObs = new ResizeObserver(() => {
-    // ✅ 已锁定后，不再让右侧内容增长改变基准
+    // ✅ 已锁定后，只同步，不再改基准
     requestAnimationFrame(syncManualRiskHeights);
   });
 
