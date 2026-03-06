@@ -24,6 +24,7 @@
 // - P4: Export enabledKeys MUST include ALWAYS_ON (safer & consistent with execution)
 // - P5: REMOVE engine-side auto language detection/locking to avoid conflicts with lang-detect.js modal chain
 // - ✅ P6 (NEW): Engine-level content language guard (fix wrong-pack fallbacks when ruleEngine empty)
+// - ✅ P7 (NEW): Parallel matcher-core probe (debug only, no behavior switch)
 // =========================
 
 // ✅ FIX: version string aligned with deployed query param (?v=20260304a2)
@@ -65,7 +66,7 @@ console.log("[engine.js] loaded " + ENGINE_VERSION);
             when: Date.now(),
             iso: new Date().toISOString(),
             valueShape: v && typeof v === "object" ? Object.keys(v) : null,
-            stack: (new Error("DETECTION_ITEMS set")).stack || ""
+            stack: new Error("DETECTION_ITEMS set").stack || ""
           };
         } catch (_) {}
 
@@ -211,7 +212,7 @@ function ensureContentLangInEngine(text) {
     let L = r && r.lang ? normLang(r.lang) : "";
 
     // 5) IMPORTANT: if returned lang missing, lock from last confident detection
-        if (!L) {
+    if (!L) {
       const last =
         window.__LangDetect && window.__LangDetect.__state && window.__LangDetect.__state.last
           ? window.__LangDetect.__state.last
@@ -275,6 +276,123 @@ function getRulesSafe() {
   const pack = getContentPack();
   const rules = pack && pack.rules && typeof pack.rules === "object" ? pack.rules : null;
   return rules && Object.keys(rules).length ? rules : null;
+}
+
+/* =========================
+   1.2) ✅ P7: matcher-core parallel probe (debug only)
+   - NO behavior switch
+   - NO UI side effect
+   - NO export logic switch
+   - Stores in-memory snapshots only
+   ========================= */
+
+function getMatcherCore() {
+  const mc = window.__MATCHER_CORE__;
+  return mc && typeof mc.matchDocument === "function" ? mc : null;
+}
+
+function getCachedPdfPagesForMatcher() {
+  try {
+    const a = window.lastPdfPagesItems;
+    if (Array.isArray(a) && a.length) return a;
+  } catch (_) {}
+
+  try {
+    const b = window.__pdf_pages_items;
+    if (Array.isArray(b) && b.length) return b;
+  } catch (_) {}
+
+  return [];
+}
+
+function buildMatcherCoreDoc(text) {
+  const doc = {
+    text: String(text || ""),
+    pages: [],
+    meta: {
+      fromPdf: !!lastRunMeta.fromPdf
+    }
+  };
+
+  if (!lastRunMeta.fromPdf) return doc;
+
+  const pages = getCachedPdfPagesForMatcher();
+  if (!Array.isArray(pages) || !pages.length) return doc;
+
+  doc.pages = pages.map((p, idx) => ({
+    pageNumber: Number(p && p.pageNumber) || idx + 1,
+    items: Array.isArray(p && p.items)
+      ? p.items.map((it) => ({
+          str: it && it.str != null ? String(it.str) : "",
+          transform: Array.isArray(it && it.transform) ? it.transform.slice(0, 6) : [],
+          width: Number(it && it.width) || 0,
+          height: Number(it && it.height) || 0
+        }))
+      : []
+  }));
+
+  return doc;
+}
+
+function runMatcherCoreProbe(text, enabledKeysArr) {
+  try {
+    const mc = getMatcherCore();
+    if (!mc) {
+      window.__matcher_core_probe = {
+        ok: false,
+        reason: "matcher-core-missing",
+        when: Date.now(),
+        engineVersion: ENGINE_VERSION
+      };
+      return null;
+    }
+
+    const lang = getLangContent();
+    const pack = getContentPack();
+    const policy = getPolicy();
+    const doc = buildMatcherCoreDoc(text);
+
+    const res = mc.matchDocument({
+      doc,
+      lang,
+      pack,
+      policy,
+      enabledKeys: Array.isArray(enabledKeysArr) ? enabledKeysArr.slice(0) : [],
+      moneyMode: moneyMode,
+      manualTerms: manualTerms.slice(0)
+    });
+
+    const probe = {
+      ok: true,
+      when: Date.now(),
+      engineVersion: ENGINE_VERSION,
+      matcherVersion: mc.version || "",
+      lang,
+      fromPdf: !!lastRunMeta.fromPdf,
+      enabledKeys: Array.isArray(enabledKeysArr) ? enabledKeysArr.slice(0) : [],
+      manualTerms: manualTerms.slice(0),
+      summary: res && res.summary ? res.summary : { total: 0, byKey: {} },
+      byKey: res && res.byKey ? res.byKey : {},
+      hitCount: res && res.summary ? Number(res.summary.total || 0) : 0,
+      textMasked: res && typeof res.textMasked === "string" ? res.textMasked : "",
+      hits: res && Array.isArray(res.hits) ? res.hits.slice(0, 80) : [],
+      debug: res && res.debug ? res.debug : {}
+    };
+
+    window.__matcher_core_probe = probe;
+    window.__matcher_core_last = probe;
+
+    return probe;
+  } catch (err) {
+    window.__matcher_core_probe = {
+      ok: false,
+      reason: "matcher-core-error",
+      when: Date.now(),
+      engineVersion: ENGINE_VERSION,
+      error: String((err && err.message) || err || "")
+    };
+    return null;
+  }
 }
 
 /* =========================
@@ -1029,6 +1147,9 @@ function applyRules(text) {
   const enabledKeysArr = effectiveEnabledKeys();
   const enabledSet = new Set(enabledKeysArr);
 
+  // ✅ P7: parallel matcher-core probe (debug only; ignore result for execution)
+  const matcherProbe = runMatcherCoreProbe(out, enabledKeysArr);
+
   lastRunMeta.inputLen = String(text || "").length;
   lastRunMeta.enabledCount = enabledSet.size;
   lastRunMeta.moneyMode = "m1";
@@ -1087,6 +1208,14 @@ function applyRules(text) {
     window.__export_snapshot = snap;
     if (!window.__export_snapshot_byLang) window.__export_snapshot_byLang = {};
     window.__export_snapshot_byLang[_lc] = snap;
+
+    try {
+      window.__safe_report_matcher_probe = {
+        ok: !!(matcherProbe && matcherProbe.ok),
+        byKey: matcherProbe && matcherProbe.byKey ? matcherProbe.byKey : {},
+        hitCount: matcherProbe && Number.isFinite(matcherProbe.hitCount) ? matcherProbe.hitCount : 0
+      };
+    } catch (_) {}
 
     try {
       window.dispatchEvent(new Event("safe:updated"));
@@ -1221,6 +1350,27 @@ function applyRules(text) {
     langContent: getLangContent()
   };
 
+  try {
+    window.__safe_report_matcher_probe = {
+      ok: !!(matcherProbe && matcherProbe.ok),
+      byKey: matcherProbe && matcherProbe.byKey ? matcherProbe.byKey : {},
+      hitCount: matcherProbe && Number.isFinite(matcherProbe.hitCount) ? matcherProbe.hitCount : 0,
+      summary: matcherProbe && matcherProbe.summary ? matcherProbe.summary : { total: 0, byKey: {} },
+      diff: (() => {
+        const a = hitsByKey || {};
+        const b = matcherProbe && matcherProbe.byKey ? matcherProbe.byKey : {};
+        const keys = Array.from(new Set([...Object.keys(a), ...Object.keys(b)])).sort();
+        const outDiff = {};
+        for (const k of keys) {
+          const av = Number(a[k] || 0);
+          const bv = Number(b[k] || 0);
+          if (av !== bv) outDiff[k] = { engine: av, matcher: bv };
+        }
+        return outDiff;
+      })()
+    };
+  } catch (_) {}
+
   window.__lastOutputPlain = out; // ✅ ensure stable plain exists before renderOutput
   renderOutput(out);
   renderRiskBox(report, {
@@ -1297,6 +1447,9 @@ try {
   if (typeof window.getContentPack !== "function") window.getContentPack = getContentPack;
   if (typeof window.getPolicy !== "function") window.getPolicy = getPolicy;
 
+  // Debug matcher-core probe access
+  if (typeof window.runMatcherCoreProbe !== "function") window.runMatcherCoreProbe = runMatcherCoreProbe;
+
   // Main entry
   if (typeof window.applyRules !== "function") window.applyRules = applyRules;
 
@@ -1335,7 +1488,8 @@ try {
     try {
       const r2 = normLang(window.ruleEngine);
       window.contentLang = r2 || "";
-      window.contentLangMode = String(window.ruleEngineMode || "auto").toLowerCase() === "lock" ? "lock" : "auto";
+      window.contentLangMode =
+        String(window.ruleEngineMode || "auto").toLowerCase() === "lock" ? "lock" : "auto";
     } catch (_) {}
   } catch (_) {}
 })();
