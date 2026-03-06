@@ -1,12 +1,19 @@
 // =========================
 // assets/ui.js (from app.js)
-// v20260305a1 — PATCHED
+// v20260305a3 — PATCHED
 // - Keep i18n in i18n.js
 // - ui.js stays “UI logic + UI observability” (NOT language dict)
 // - Moved lang-status / export-status telemetry helpers here (from main.js)
 // - Optional debug flags:
 //   window.__DEBUG_LANG__ = true   -> show extra lines in exportStatus
 //   window.__TRACE_RULEENGINE__ = true -> enable ruleEngine write tracing (hook)
+//
+// ✅ FIX (A3):
+// - exportStatus now has SINGLE WRITER only:
+//   renderExportStatusCombined()
+// - setProgressText()/clearProgress() no longer write DOM directly;
+//   they only update window.__UI_PROGRESS_STATE__
+// - This removes textContent vs innerHTML conflicts.
 // =========================
 
 // ================= Stage 3 UI texts =================
@@ -135,6 +142,7 @@ function toggleCtl(btn, body) {
 
 // ================= Desktop equal-height + minimum expanded height =================
 const DESKTOP_MIN_OPEN_H = 260;
+let __LOCKED_OPEN_H = 0;
 
 function clearBodyHeights() {
   const manualBody = $("manualBody");
@@ -151,6 +159,9 @@ function clearBodyHeights() {
     riskBody.style.minHeight = "";
     riskBody.style.overflow = "";
   }
+
+  // ✅ IMPORTANT: reset locked height so next open can re-calc baseline
+  __LOCKED_OPEN_H = 0;
 }
 
 function syncManualRiskHeights() {
@@ -170,8 +181,14 @@ function syncManualRiskHeights() {
     return;
   }
 
-  const rh = riskBody.getBoundingClientRect().height;
-  const target = Math.max(Math.ceil(rh || 0), DESKTOP_MIN_OPEN_H);
+  // ✅ lock ONCE: baseline is riskBody height when both panels are open.
+  // After locking, do NOT grow due to telemetry text expansion.
+  if (!__LOCKED_OPEN_H) {
+    const rh = riskBody.getBoundingClientRect().height;
+    __LOCKED_OPEN_H = Math.max(Math.ceil(rh || 0), DESKTOP_MIN_OPEN_H);
+  }
+
+  const target = __LOCKED_OPEN_H;
 
   manualBody.style.height = `${target}px`;
   manualBody.style.maxHeight = `${target}px`;
@@ -192,6 +209,7 @@ function initRiskResizeObserver() {
   if (__riskResizeObs) __riskResizeObs.disconnect();
 
   __riskResizeObs = new ResizeObserver(() => {
+    // ✅ do not keep increasing height; sync uses locked baseline
     requestAnimationFrame(syncManualRiskHeights);
   });
 
@@ -202,36 +220,85 @@ function expandManualArea() {
   const btn = $("btnToggleManual");
   const body = $("manualBody");
   if (btn && body) setCtlExpanded(btn, body, true);
+
+  // ✅ re-evaluate baseline on user expand
+  __LOCKED_OPEN_H = 0;
+  requestAnimationFrame(syncManualRiskHeights);
 }
 function expandRiskArea() {
   const btn = $("btnToggleRisk");
   const body = $("riskBody");
   if (btn && body) setCtlExpanded(btn, body, true);
+
+  // ✅ re-evaluate baseline on user expand
+  __LOCKED_OPEN_H = 0;
+  requestAnimationFrame(syncManualRiskHeights);
 }
 function collapseManualArea() {
   const btn = $("btnToggleManual");
   const body = $("manualBody");
   if (btn && body) setCtlExpanded(btn, body, false);
+
+  // ✅ collapsing should clear fixed heights + baseline
+  clearBodyHeights();
 }
 function collapseRiskArea() {
   const btn = $("btnToggleRisk");
   const body = $("riskBody");
   if (btn && body) setCtlExpanded(btn, body, false);
+
+  // ✅ collapsing should clear fixed heights + baseline
+  clearBodyHeights();
 }
 
 // ================= Progress area =================
-function setProgressText(lines, isError) {
-  const box = $("exportStatus");
-  if (!box) return;
+// ✅ SINGLE WRITER MODEL:
+// - setProgressText / clearProgress only update state
+// - renderExportStatusCombined is the ONLY function that writes #exportStatus
+(function ensureUiProgressState() {
+  try {
+    if (!window.__UI_PROGRESS_STATE__) {
+      window.__UI_PROGRESS_STATE__ = {
+        lines: [],
+        isError: false
+      };
+    }
+  } catch (_) {}
+})();
 
-  const s = Array.isArray(lines) ? lines.join("\n") : String(lines || "");
-  box.style.color = isError ? "#ffb4b4" : "";
-  box.textContent = s;
+function setProgressText(lines, isError) {
+  try {
+    const s = Array.isArray(lines) ? lines.slice(0) : [String(lines || "")];
+    window.__UI_PROGRESS_STATE__ = {
+      lines: s.filter((x) => String(x || "").trim() !== ""),
+      isError: !!isError
+    };
+
+    if (typeof renderExportStatusCombined === "function") {
+      renderExportStatusCombined();
+    } else {
+      const box = $("exportStatus");
+      if (!box) return;
+      box.style.color = isError ? "#ffb4b4" : "";
+      box.textContent = s.join("\n");
+    }
+  } catch (_) {}
 }
 
 function clearProgress() {
-  const a = $("exportStatus");
-  if (a) a.textContent = "";
+  try {
+    window.__UI_PROGRESS_STATE__ = {
+      lines: [],
+      isError: false
+    };
+
+    if (typeof renderExportStatusCombined === "function") {
+      renderExportStatusCombined();
+    } else {
+      const a = $("exportStatus");
+      if (a) a.textContent = "";
+    }
+  } catch (_) {}
 }
 
 // ================= UI text =================
@@ -355,36 +422,136 @@ function renderLangStatusLines(t) {
   const st = window.__LANG_STATUS__ || null;
   if (!st) return [];
 
-  const lines = [];
-  lines.push(`UI=${st.uiLang || "(?)"}`);
-  lines.push(`content=${st.langContent || "(?)"}`);
-  lines.push(`ruleEngine=${st.ruleEngine || "(empty)"} (${st.ruleEngineMode || "auto"})`);
-  lines.push(`modal=${st.modalOpening ? "OPEN" : "false"}`);
+  function L(lang) {
+    const z = {
+      secCore: "状态",
+      secDetect: "识别",
+      secDebug: "调试",
+      at: "时间",
+      ui: "界面",
+      content: "内容语言",
+      ruleEngine: "规则引擎",
+      mode: "模式",
+      modal: "语言弹窗",
+      last: "识别结果",
+      conf: "置信度",
+      needs: "需确认",
+      source: "来源",
+      reason: "原因",
+      cand: "候选",
+      telemetry: "状态",
+      none: "(无)",
+      empty: "(空)"
+    };
 
-  if (st.detected) {
-    const d = st.detected;
-    const conf = typeof d.confidence === "number" ? d.confidence.toFixed(2) : "(?)";
-    const cand = d.candidates && d.candidates.length ? d.candidates.join(",") : "-";
-    lines.push(`detect.last=${d.lang || "(?)"} conf=${conf} needsConfirm=${d.needsConfirm ? "true" : "false"}`);
-    if (d.reason || d.source) lines.push(`detect.reason=${d.reason || "-"} src=${d.source || "-"}`);
-    lines.push(`detect.candidates=${cand}`);
+    const e = {
+      secCore: "STATE",
+      secDetect: "DETECT",
+      secDebug: "DEBUG",
+      at: "at",
+      ui: "UI",
+      content: "content",
+      ruleEngine: "ruleEngine",
+      mode: "mode",
+      modal: "modal",
+      last: "last",
+      conf: "conf",
+      needs: "needsConfirm",
+      source: "src",
+      reason: "reason",
+      cand: "candidates",
+      telemetry: "telemetry",
+      none: "(none)",
+      empty: "(empty)"
+    };
 
-    // extra debug lines (optional)
-    try {
-      if (window.__DEBUG_LANG__ === true) {
-        // include detector version if present
-        const ver =
-          window.__LangDetect && window.__LangDetect.__state && window.__LangDetect.__state.ver
-            ? String(window.__LangDetect.__state.ver)
-            : "";
-        if (ver) lines.push(`detect.ver=${ver}`);
-      }
-    } catch (_) {}
-  } else {
-    lines.push("detect.last=(none)");
+    const d = {
+      secCore: "STATUS",
+      secDetect: "ERKENNUNG",
+      secDebug: "DEBUG",
+      at: "Zeit",
+      ui: "UI",
+      content: "Inhalt",
+      ruleEngine: "RuleEngine",
+      mode: "Modus",
+      modal: "Modal",
+      last: "Ergebnis",
+      conf: "Konf.",
+      needs: "Bestätigung",
+      source: "Quelle",
+      reason: "Grund",
+      cand: "Kandidaten",
+      telemetry: "Status",
+      none: "(keins)",
+      empty: "(leer)"
+    };
+
+    const x = String(lang || "").toLowerCase();
+    return x === "de" ? d : (x === "en" ? e : z);
   }
 
-  if (st.reason) lines.push(`telemetry=${st.reason}`);
+  const labels = L(window.currentLang);
+
+  const lines = [];
+
+  // ===== CORE =====
+  lines.push(`=== ${labels.secCore} ===`);
+
+  // 时间：优先 iso；否则用 when
+  const ts = st.iso || (typeof st.when === "number" ? new Date(st.when).toISOString() : "");
+  if (ts) lines.push(`${labels.at}: ${ts}`);
+
+  lines.push(`${labels.ui}: ${st.uiLang || labels.none}`);
+  lines.push(`${labels.content}: ${st.langContent || labels.none}`);
+  lines.push(`${labels.ruleEngine}: ${st.ruleEngine || labels.empty} (${st.ruleEngineMode || "auto"})`);
+  lines.push(`${labels.modal}: ${st.modalOpening ? "OPEN" : "false"}`);
+
+  if (st.reason) lines.push(`${labels.telemetry}: ${st.reason}`);
+
+  // ===== DETECT =====
+  lines.push(``);
+  lines.push(`=== ${labels.secDetect} ===`);
+
+  if (!st.detected) {
+    lines.push(`${labels.last}: ${labels.none}`);
+    return lines;
+  }
+
+  const d = st.detected;
+  const conf = typeof d.confidence === "number" ? d.confidence.toFixed(2) : labels.none;
+  const cand = Array.isArray(d.candidates) && d.candidates.length ? d.candidates.join(",") : "-";
+
+  lines.push(`${labels.last}: ${d.lang || labels.none}`);
+  lines.push(`${labels.conf}: ${conf}   ${labels.needs}: ${d.needsConfirm ? "true" : "false"}`);
+  if (d.reason) lines.push(`${labels.reason}: ${d.reason}`);
+  if (d.source) lines.push(`${labels.source}: ${d.source}`);
+  lines.push(`${labels.cand}: ${cand}`);
+
+  // ===== DEBUG (optional) =====
+  try {
+    if (window.__DEBUG_LANG__ === true) {
+      lines.push(``);
+      lines.push(`=== ${labels.secDebug} ===`);
+
+      const ver =
+        window.__LangDetect &&
+        window.__LangDetect.__state &&
+        window.__LangDetect.__state.ver
+          ? String(window.__LangDetect.__state.ver)
+          : "";
+
+      if (ver) lines.push(`detect.ver: ${ver}`);
+
+      // last set stacks are noisy; only show if present
+      if (window.__RULEENGINE_LAST_SET__ && window.__RULEENGINE_LAST_SET__.iso) {
+        lines.push(`ruleEngine.lastSet: ${window.__RULEENGINE_LAST_SET__.iso} value=${window.__RULEENGINE_LAST_SET__.value || ""}`);
+      }
+      if (window.__RULEENGINE_MODE_LAST_SET__ && window.__RULEENGINE_MODE_LAST_SET__.iso) {
+        lines.push(`ruleEngineMode.lastSet: ${window.__RULEENGINE_MODE_LAST_SET__.iso} value=${window.__RULEENGINE_MODE_LAST_SET__.value || ""}`);
+      }
+    }
+  } catch (_) {}
+
   return lines;
 }
 
@@ -396,6 +563,179 @@ function i18nProgressLine(phase, t) {
     exportRasterSecurePdfFromVisual: (t && t.progressPhaseExport) || "生成安全PDF（纯图片）…"
   };
   return map[phase] || ((t && t.progressPhaseWorking) || "处理中…");
+}
+
+function renderExportStatusCombined() {
+  const el = document.getElementById("exportStatus");
+  if (!el) return;
+
+  const t = window.I18N && window.I18N[currentLang] ? window.I18N[currentLang] : {};
+  const s = window.__RasterExportLast || null;
+  const bootLine = window.__bootLine || "";
+  const pstate = window.__UI_PROGRESS_STATE__ || { lines: [], isError: false };
+
+  // ---------- helpers ----------
+  function esc(x) {
+    return String(x == null ? "" : x)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function normLang3(x) {
+    const v = String(x || "").toLowerCase();
+    return v === "zh" || v === "en" || v === "de" ? v : "";
+  }
+
+  // 两字分区标题：中文用 2 字；英德用 2 码缩写
+  function secLabels(uiLang) {
+    const L = normLang3(uiLang || currentLang);
+    if (L === "de") {
+      return { boot: "BT", lang: "SP", state: "ST", detect: "ER", exp: "EX", prog: "PR" };
+    }
+    if (L === "en") {
+      return { boot: "BT", lang: "LG", state: "ST", detect: "DT", exp: "EX", prog: "PR" };
+    }
+    // zh default
+    return { boot: "启动", lang: "语言", state: "状态", detect: "识别", exp: "导出", prog: "进程" };
+  }
+
+  // 两字 key：尽量“两个字/两个码”
+  function keyLabels(uiLang) {
+    const L = normLang3(uiLang || currentLang);
+    if (L === "de") {
+      return {
+        date: "DT", time: "TM",
+        ui: "UI", content: "CT", rule: "RE", modal: "MD",
+        last: "LS", conf: "CF", need: "NC", src: "SC", reason: "RS", cand: "CA",
+        phase: "PH", p2: "P2", lang: "LG", dpi: "DP", pages: "PG", rects: "RC", page: "P#", items: "IT",
+        line: "LN"
+      };
+    }
+    if (L === "en") {
+      return {
+        date: "DT", time: "TM",
+        ui: "UI", content: "CT", rule: "RE", modal: "MD",
+        last: "LS", conf: "CF", need: "NC", src: "SC", reason: "RS", cand: "CA",
+        phase: "PH", p2: "P2", lang: "LG", dpi: "DP", pages: "PG", rects: "RC", page: "P#", items: "IT",
+        line: "LN"
+      };
+    }
+    // zh
+    return {
+      date: "日期", time: "时间",
+      ui: "界面", content: "内容", rule: "规则", modal: "弹窗",
+      last: "结果", conf: "置信", need: "确认", src: "来源", reason: "原因", cand: "候选",
+      phase: "阶段", p2: "二段", lang: "语言", dpi: "精度", pages: "页数", rects: "遮盖", page: "当前", items: "条目",
+      line: "内容"
+    };
+  }
+
+  function sec(title2) {
+    return `<div class="tele-sec">${esc(title2)}</div>`;
+  }
+
+  function line(k2, v, cls) {
+    const vv = String(v == null ? "" : v);
+    const extra = cls ? ` ${cls}` : "";
+    return `<div class="tele-line${extra}"><span class="tele-k">${esc(k2)}</span><span class="tele-v">${esc(vv)}</span></div>`;
+  }
+
+  // ISO -> date + time split (你要求“日期和时间分开两行”)
+  function splitIso(iso) {
+    const s2 = String(iso || "");
+    const m = s2.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2}(?:\.\d+)?)(Z)?/);
+    if (!m) return { date: "", time: s2 };
+    return { date: m[1], time: m[2] + (m[3] ? "Z" : "") };
+  }
+
+  const SEC = secLabels(currentLang);
+  const K = keyLabels(currentLang);
+
+  const html = [];
+
+  // ===== 启动 / BOOT =====
+  html.push(sec(SEC.boot));
+  html.push(line("OK", bootLine || "(none)"));
+
+  // ===== 语言/状态/识别：来自 __LANG_STATUS__ =====
+  const st = window.__LANG_STATUS__ || null;
+
+  html.push("");
+  html.push(sec(SEC.lang));
+
+  if (!st) {
+    html.push(line("—", "(lang telemetry unavailable)"));
+  } else {
+    const ts = st.iso || (typeof st.when === "number" ? new Date(st.when).toISOString() : "");
+    const dt = splitIso(ts);
+
+    if (dt.date) html.push(line(K.date, dt.date));
+    if (dt.time) html.push(line(K.time, dt.time));
+
+    html.push(line(K.ui, st.uiLang || "(?)"));
+    html.push(line(K.content, st.langContent || "(?)"));
+    html.push(line(K.rule, `${st.ruleEngine || "(empty)"} (${st.ruleEngineMode || "auto"})`));
+    html.push(line(K.modal, st.modalOpening ? "OPEN" : "false"));
+
+    if (st.reason) html.push(line("状态", st.reason));
+
+    html.push("");
+    html.push(sec(SEC.detect));
+
+    if (!st.detected) {
+      html.push(line(K.last, "(none)"));
+    } else {
+      const d = st.detected;
+      const conf = typeof d.confidence === "number" ? d.confidence.toFixed(2) : "(?)";
+      const cand = Array.isArray(d.candidates) && d.candidates.length ? d.candidates.join(",") : "-";
+
+      html.push(line(K.last, d.lang || "(?)"));
+      html.push(line(K.conf, conf));
+      html.push(line(K.need, d.needsConfirm ? "true" : "false"));
+      if (d.reason) html.push(line(K.reason, d.reason));
+      if (d.source) html.push(line(K.src, d.source));
+      html.push(line(K.cand, cand));
+    }
+  }
+
+  // ===== 进程 / PROGRESS (from setProgressText) =====
+  if (Array.isArray(pstate.lines) && pstate.lines.length) {
+    html.push("");
+    html.push(sec(SEC.prog));
+    pstate.lines.forEach((row) => {
+      html.push(line(K.line, row, pstate.isError ? " tele-line-error" : ""));
+    });
+  }
+
+  // ===== 导出 / EXPORT (from __RasterExportLast) =====
+  html.push("");
+  html.push(sec(SEC.exp));
+
+  if (!s) {
+    html.push(line("—", "(idle)"));
+  } else {
+    if (s.phase) html.push(line(K.phase, `${i18nProgressLine(s.phase, t)} (${s.phase})`));
+    if (s.phase2) html.push(line(K.p2, s.phase2));
+
+    if (s.lang) html.push(line(K.lang, s.lang));
+    if (s.dpi) html.push(line(K.dpi, s.dpi));
+
+    if (typeof s.pages === "number") html.push(line(K.pages, s.pages));
+    if (typeof s.rectsTotal === "number") html.push(line(K.rects, s.rectsTotal));
+
+    if (Array.isArray(s.perPage) && s.perPage.length) {
+      const last = s.perPage[s.perPage.length - 1];
+      if (last && last.pageNumber) {
+        html.push(line(K.page, last.pageNumber));
+        html.push(line(K.items, `${last.items || 0} / ${last.rectCount || 0}`));
+      }
+    }
+  }
+
+  // render (HTML, not textContent)
+  el.style.color = "";
+  el.innerHTML = html.filter(Boolean).join("");
 }
 
 function startExportStatusMirror() {
@@ -570,131 +910,3 @@ window.enableRuleEngineTrace = function (on) {
     }
   } catch (_) {}
 })();
-
-
-下面这段代码应该添加到哪个位置，你帮我加好吧，免得又出错了
-
-function renderExportStatusCombined() {
-  const el = document.getElementById("exportStatus");
-  if (!el) return;
-
-  const t = window.I18N && window.I18N[currentLang] ? window.I18N[currentLang] : {};
-  const s = window.__RasterExportLast || null;
-  const bootLine = window.__bootLine || "";
-
-  // ✅ UI labels follow UI language (no i18n key changes; safe fallback)
-  function uiLabels(lang) {
-    const LZ = {
-      ui: "UI",
-      content: "content",
-      ruleEngine: "ruleEngine",
-      modal: "modal",
-      detectLast: "detect.last",
-      conf: "conf",
-      needsConfirm: "needsConfirm",
-      reason: "detect.reason",
-      src: "src",
-      candidates: "detect.candidates",
-      telemetry: "telemetry",
-      phase2: "阶段2",
-      lang: "lang",
-      dpi: "dpi",
-      pages: "页数",
-      rects: "遮盖块",
-      page: "当前页",
-      items: "items",
-      rects2: "rects"
-    };
-
-    const LE = {
-      ui: "UI",
-      content: "content",
-      ruleEngine: "ruleEngine",
-      modal: "modal",
-      detectLast: "detect.last",
-      conf: "conf",
-      needsConfirm: "needsConfirm",
-      reason: "detect.reason",
-      src: "src",
-      candidates: "detect.candidates",
-      telemetry: "telemetry",
-      phase2: "Phase 2",
-      lang: "lang",
-      dpi: "dpi",
-      pages: "pages",
-      rects: "rects",
-      page: "page",
-      items: "items",
-      rects2: "rects"
-    };
-
-    const LD = {
-      ui: "UI",
-      content: "content",
-      ruleEngine: "ruleEngine",
-      modal: "modal",
-      detectLast: "detect.last",
-      conf: "conf",
-      needsConfirm: "needsConfirm",
-      reason: "detect.reason",
-      src: "src",
-      candidates: "detect.candidates",
-      telemetry: "telemetry",
-      phase2: "Phase 2",
-      lang: "lang",
-      dpi: "dpi",
-      pages: "Seiten",
-      rects: "Masken",
-      page: "Seite",
-      items: "items",
-      rects2: "rects"
-    };
-
-    const l = String(lang || "").toLowerCase();
-    return l === "de" ? LD : (l === "en" ? LE : LZ);
-  }
-
-  const L = uiLabels(currentLang);
-
-  const lines = [];
-
-  if (bootLine) lines.push(bootLine);
-
-  // always show language status (if available)
-  try {
-    const langLines = renderLangStatusLines(t);
-
-    // ✅ If renderLangStatusLines already outputs localized strings, keep as-is.
-    // ✅ If it outputs English keys, we still keep it (minimal risk).
-    if (langLines && langLines.length) lines.push(...langLines);
-  } catch (_) {}
-
-  if (s) {
-    if (s.phase) lines.push(`${i18nProgressLine(s.phase, t)}  (${s.phase})`);
-
-    // phase2 label localized
-    if (s.phase2) lines.push(`${t.progressPhase2 || L.phase2}: ${s.phase2}`);
-
-    // basic export params (labels localized)
-    if (s.lang) lines.push(`${L.lang}=${s.lang}`);
-    if (s.dpi) lines.push(`${L.dpi}=${s.dpi}`);
-
-    // counts (labels localized; keep existing i18n if present)
-    if (typeof s.pages === "number") lines.push(`${t.progressPages || L.pages}=${s.pages}`);
-    if (typeof s.rectsTotal === "number") lines.push(`${t.progressRects || L.rects}=${s.rectsTotal}`);
-
-    if (Array.isArray(s.perPage) && s.perPage.length) {
-      const last = s.perPage[s.perPage.length - 1];
-      if (last && last.pageNumber) {
-        lines.push(
-          `${t.progressPage || L.page}=${last.pageNumber}  ${L.items}=${last.items || 0}  ${L.rects2}=${last.rectCount || 0}`
-        );
-      }
-    }
-  }
-
-  if (!lines.length) return;
-
-  el.style.color = ""; // reset error color if any
-  el.textContent = lines.join("\n");
-}
