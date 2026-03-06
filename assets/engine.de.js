@@ -1,16 +1,19 @@
 // =========================
 // assets/engine.de.js
 // Content-strategy pack: de (FULL – extended conservative German policy)
+// - placeholders + detect + rules
+// - high-sensitivity German document model
 //
 // LOCKED (latest):
-// - Keep titles Herr/Frau/Dr/Prof in output; mask only the person name
+// - Keep Herr/Frau/Dr./Prof. in output; mask only the person name
 // - Address: only mask street + house number; keep PLZ+City/Country
 // - Zusatz: only mask Gebäude/OG/Zimmer-like fragment; keep Klingel tail
-// - ID policy: overall KEEP prefix/body, mask ONLY the LAST numeric segment
+// - ID policy: keep prefix/body, mask ONLY the LAST numeric segment
 //
-// PATCH v20260306-de-a1:
-// - FIX 1: "Kontoinhaber: Prof. David Müller" => keep "Prof.", mask name
-// - FIX 2: insurance_id2 must run BEFORE id_label_tail, so
+// PATCH v20260306-de-a2:
+// - FIX 1: dedicated account_holder_name_keep_title rule for
+//          "Kontoinhaber: Prof. David Müller" => "Kontoinhaber: Prof. [Name]"
+// - FIX 2: insurance_id2 must run BEFORE ref_generic_tail_de, so
 //          "Versicherungsnummer: POL-2026-991772" => [Geheim], not tail-only
 // - Everything else unchanged
 // =========================
@@ -45,7 +48,7 @@
       if (!s.trim()) return "";
 
       if (
-        /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Zusatz|Geburtsdatum|Geburtsort|USt-IdNr)\b/i.test(
+        /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Kontoinhaber|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Zusatz|Geburtsdatum|Geburtsort|USt-IdNr)\b/i.test(
           s
         )
       ) {
@@ -144,7 +147,8 @@
         /\b(?:aktenzeichen|geschäftszeichen|kundennummer|rechnungsnummer|rechnungsnr|vorgangs-?id|referenz|ticketnummer|bestellnummer|antragsnummer)\b/i.test(
           lbl
         )
-      ) return false;
+      )
+        return false;
 
       if (/\b(?:knd|re|ord|ab|ref|v|vg|js)[ \t]*[-/:][ \t]*/i.test(val)) return false;
 
@@ -310,14 +314,14 @@
 
       person_name_keep_title: {
         pattern:
-          /^((?:Name|Kontakt|Ansprechpartner|Empfänger|Kontoinhaber)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+          /^((?:Name|Kontakt|Ansprechpartner|Empfänger)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
 
       person_name: {
         pattern:
-          /((?:Name|Kontakt|Ansprechpartner|Empfänger|Kontoinhaber)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
+          /((?:Name|Kontakt|Ansprechpartner|Empfänger)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
         tag: "NAME",
         mode: "prefix"
       },
@@ -433,8 +437,8 @@
     "insurance_id2"
   ];
 
-  // insurance_id2 must run BEFORE id_label_tail
-  DE.priority = insertBefore(DE.priority || [], "id_label_tail", ["insurance_id2"]);
+  // insurance_id2 must run BEFORE generic tail refs
+  DE.priority = insertBefore(DE.priority || [], "ref_generic_tail_de", ["insurance_id2"]);
 
   DE.priority = insertBefore(DE.priority || [], "number", NEW_KEYS);
 
@@ -591,17 +595,21 @@
   }
 
   const NEW_KEYS = [
+    "account_holder_name_keep_title",
     "birthplace_optional_secret",
     "blz_paren",
     "card_expiry_de",
     "card_security_de"
   ];
 
+  // dedicated rule must run BEFORE account
+  DE.priority = insertBefore(DE.priority || [], "account", ["account_holder_name_keep_title"]);
   DE.priority = insertBefore(DE.priority || [], "birthplace", ["birthplace_optional_secret"]);
   DE.priority = insertBefore(DE.priority || [], "blz", ["blz_paren"]);
   DE.priority = insertBefore(DE.priority || [], "number", ["card_expiry_de", "card_security_de"]);
 
   DE.alwaysOn = Array.isArray(DE.alwaysOn) ? DE.alwaysOn : [];
+  uniqPush(DE.alwaysOn, "account_holder_name_keep_title");
   uniqPush(DE.alwaysOn, "blz_paren");
   uniqPush(DE.alwaysOn, "card_expiry_de");
   uniqPush(DE.alwaysOn, "card_security_de");
@@ -609,6 +617,13 @@
   DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "birthplace" && k !== "birthplace_secret");
 
   Object.assign(DE.rules, {
+    account_holder_name_keep_title: {
+      pattern:
+        /^((?:Kontoinhaber)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+      tag: "NAME",
+      mode: "prefix"
+    },
+
     birthplace_optional_secret: {
       pattern: /((?:Geburtsort)[ \t]*[:：=][ \t]*)([^\n\r]{2,80})/giu,
       tag: "SECRET",
