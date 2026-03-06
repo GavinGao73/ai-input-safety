@@ -1,13 +1,12 @@
 // =========================
 // assets/engine.en.js
-// UPGRADE v6.3.2 (conservative real-PDF patch)
+// UPGRADE v6.3.3 (conservative real-PDF patch + account-holder fix)
 //
-// - Keep v6.3.1 behavior and structure
+// - Keep v6.3.2 behavior and structure
 // - FIX 1: account supports strong label + SPACE + value (e.g. "IBAN DE89 ...")
-// - FIX 2: person_name supports label-only whitespace lines:
-//          "Customer Name Dr. Emily Stone"
-//          "Account Holder Prof. David Müller"
+// - FIX 2: person_name supports label-only whitespace lines
 // - FIX 3: person_name allows optional "Contact Details" prefix on same line
+// - FIX 4: account MUST NOT eat "Account Holder ..."
 // - Everything else unchanged
 //
 // ✅ CONSERVATIVE PATCH (NO engine changes; pack regex only):
@@ -60,24 +59,18 @@
         return "en";
       }
 
-      // ❌ removed overly-broad fallback:
-      // if (/[A-Za-z]/.test(s)) return "en";
-
       return "";
     },
 
     priority: [
-      // secrets / auth first
       "secret",
       "api_key_token",
       "bearer_token",
       "handle_label",
 
-      // personal attributes
       "dob",
       "place_of_birth",
 
-      // identity
       "passport",
       "driver_license",
       "ssn",
@@ -85,47 +78,37 @@
       "national_id",
       "tax_id",
 
-      // insurance
       "insurance_id",
 
-      // device / network identifiers
       "ip_label",
       "ip_address",
       "mac_label",
       "mac_address",
       "imei",
 
-      // financial
       "account",
       "bank",
       "card_expiry",
       "card_security",
 
-      // comms
       "email",
       "url",
 
-      // refs / IDs
       "ref_label_tail",
       "ref_generic_tail",
 
-      // money
       "money_label",
       "money",
 
-      // phone AFTER ids
       "phone",
 
-      // person / org
       "person_name",
       "company",
 
-      // address
       "address_en_inline_street",
       "address_en_extra_block",
       "address_en_extra",
 
-      // generic
       "handle",
       "number"
     ],
@@ -181,8 +164,7 @@
       if (
         /\b(?:case|ticket|order|invoice|reference|ref|customer|application|request|account)\b/.test(lbl) &&
         /\b(?:id|no|number|#)\b/.test(lbl)
-      )
-        return false;
+      ) return false;
 
       if (/\b(?:CUST|CASE|ORD|INV|APP|REF|ACC|MEM|INS|REQ|PR)-/i.test(val)) return false;
 
@@ -209,7 +191,6 @@
 
     rules: {
       email: {
-        // ✅ replace \s* with [ \t]* to avoid newline swallowing
         pattern: /\b[A-Z0-9._%+-]+[ \t]*@[ \t]*[A-Z0-9.-]+[ \t]*\.[ \t]*[A-Z]{2,}\b/gi,
         tag: "EMAIL"
       },
@@ -219,9 +200,6 @@
         tag: "URL"
       },
 
-      // ✅ NEW (minimal): label-driven money to catch "Amount: 2950.15" / "Total=-106.82"
-      // - only triggers with strong money labels
-      // - does NOT treat all decimals as money
       money_label: {
         pattern:
           /((?:amount|total|subtotal|grand[ \t]*total|price|fee|fees|charge|charges|balance|paid|payment|refund|due|net|gross|tax|vat)[ \t]*[:：=][ \t]*)([-+−]?(?:\d{1,3}(?:[, \t]\d{3})*|\d+)\.\d{2})(?!\d)/giu,
@@ -230,7 +208,6 @@
       },
 
       money: {
-        // ✅ replace [.,\s] with [., \t] and \s* with [ \t]*
         pattern:
           /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*[-+−]?\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?|\b[-+−]?\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥][ \t]*[-+−]?\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?)/giu,
         tag: "MONEY"
@@ -243,7 +220,6 @@
         mode: "prefix"
       },
 
-      /* FIX A: removed "authorization" here; bearer_token owns it */
       api_key_token: {
         pattern:
           /((?:api[ \t]*key|x-api-key|access[ \t]*token|refresh[ \t]*token|token|auth[ \t]*token|client[ \t]*secret|secret[ \t]*key)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{8,300})/giu,
@@ -257,7 +233,6 @@
         mode: "prefix"
       },
 
-      // ✅ do NOT capture emails as HANDLE (so Login ID email stays [Email])
       handle_label: {
         pattern:
           /((?:username|user[ \t]*id|login[ \t]*id|login|handle)[ \t]*(?:[:：=]|-)[ \t]*)(?![A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b)([A-Za-z0-9_@.\-]{3,80})/giu,
@@ -353,15 +328,9 @@
         mode: "prefix"
       },
 
-      // ✅ PATCH:
-      // support both:
-      // - "IBAN: DE89 ..."
-      // - "IBAN DE89 ..."
-      // - "Account Number 123..."
-      // while keeping strong account labels
       account: {
         pattern:
-          /((?:account(?:[ \t]*number)?|routing[ \t]*number|sort[ \t]*code|iban|credit[ \t]*card|debit[ \t]*card|card[ \t]*number|name[ \t]*on[ \t]*card)(?:[ \t]*[:：=][ \t]*|[ \t]+))([^\n\r]{2,80})/giu,
+          /((?:account(?:[ \t]*number)?(?![ \t]*holder\b)|routing[ \t]*number|sort[ \t]*code|iban|credit[ \t]*card|debit[ \t]*card|card[ \t]*number|name[ \t]*on[ \t]*card)(?:[ \t]*[:：=][ \t]*|[ \t]+))([^\n\r]{2,80})/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -393,12 +362,6 @@
         mode: "phone"
       },
 
-      /* v6.3.2 conservative real-PDF patch:
-         - still LINE-ANCHORED
-         - no cross-line chaining
-         - supports ":" / "=" / plain whitespace after strong labels
-         - supports optional same-line prefix "Contact Details"
-      */
       person_name: {
         pattern:
           /^(?:contact[ \t]*details[ \t]+)?((?:name|customer[ \t]*name|account[ \t]*holder|recipient|name[ \t]*on[ \t]*card|from|to|attn\.?|attention)(?:[ \t]*[:：=][ \t]*|[ \t]+)(?:(?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
@@ -407,7 +370,6 @@
       },
 
       company: {
-        // ✅ replace \s+ with [ \t]+ to avoid newline swallowing
         pattern:
           /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)[ \t]+(?<legal>LLC|L\.?L\.?C\.?|Ltd\.?|Limited|Inc\.?|Incorporated|Corp\.?|Corporation|PLC|LLP|Co\.?|Company)\b/giu,
         tag: "COMPANY",
@@ -415,14 +377,11 @@
       },
 
       address_en_inline_street: {
-        // ✅ replace \s+ with [ \t]+ to avoid newline swallowing
         pattern:
           /\b\d{1,5}[A-Za-z]?(?:-\d{1,5})?[ \t]+(?:[A-Za-z0-9.'’\-]+[ \t]+){0,6}(?:street|st\.?|avenue|ave\.?|road|rd\.?|boulevard|blvd\.?|lane|ln\.?|drive|dr\.?|way|parkway|pkwy\.?|court|ct\.?|place|pl\.?|square|sq\.?|highway|hwy\.?|terrace|ter\.?|crescent|cres\.?|close|cl\.?|gardens?|gdns?\.?|mews|row|alley|aly\.?)\b/giu,
         tag: "ADDRESS"
       },
 
-      /* FIX B: require a digit somewhere on the line */
-      /* ✅ Refine: only redact the "suite/apt/unit/floor/room + id" fragment, not the whole line */
       address_en_extra_block: {
         pattern:
           /\b(?:suite|ste\.?|apt|apartment|unit|floor|fl\.?|room|rm\.?|flat|level)\b(?:[ \t]*(?:#|no\.?|number)?[ \t]*[:：-]?[ \t]*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu,
@@ -473,7 +432,6 @@
   const EN = PACKS.en;
   if (!EN) return;
 
-  // append-only
   const addPrio = ["intl_itin", "intl_nino", "intl_nhs", "intl_sin", "intl_tfn", "intl_abn", "uuid"];
   EN.priority = (EN.priority || []).concat(addPrio);
 
@@ -481,50 +439,42 @@
   EN.alwaysOn = (EN.alwaysOn || []).concat(addAlways);
 
   Object.assign(EN.rules, {
-    /* 🇺🇸 US ITIN (often formatted like SSN but starts with 9xx; keep simple and label-driven) */
     intl_itin: {
       pattern: /((?:us[ \t]*)?itin[ \t]*[:：=][ \t]*)(9\d{2}[- \t]?\d{2}[- \t]?\d{4})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
-    /* 🇬🇧 UK – National Insurance Number (NINO)
-       NOTE: relaxed prefix to allow test/trap values like "QQ" */
     intl_nino: {
       pattern: /((?:uk[ \t]*)?nino[ \t]*[:：=][ \t]*)([A-Z]{2}[ \t]?\d{2}[ \t]?\d{2}[ \t]?\d{2}[ \t]?[A-D])/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
-    /* 🇬🇧 UK – NHS Number (label-driven) */
     intl_nhs: {
       pattern: /((?:uk[ \t]*)?nhs[ \t]*number[ \t]*[:：=][ \t]*)(\d{3}[ \t]?\d{3}[ \t]?\d{4})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
-    /* 🇨🇦 CA – SIN (label-driven) */
     intl_sin: {
       pattern: /((?:ca[ \t]*)?sin[ \t]*[:：=][ \t]*)(\d{3}[ \t]?\d{3}[ \t]?\d{3})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
-    /* 🇦🇺 AU – TFN (label-driven) */
     intl_tfn: {
       pattern: /((?:au[ \t]*)?tfn[ \t]*[:：=][ \t]*)(\d{3}[ \t]?\d{3}[ \t]?\d{3})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
-    /* 🇦🇺 AU – ABN (label-driven) */
     intl_abn: {
       pattern: /((?:au[ \t]*)?abn[ \t]*[:：=][ \t]*)(\d{2}[ \t]?\d{3}[ \t]?\d{3}[ \t]?\d{3})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
 
-    /* 🌐 UUID / GUID */
     uuid: {
       pattern: /\b([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\b/giu,
       tag: "SECRET"
@@ -572,12 +522,7 @@
     "crypto_wallet"
   ];
 
-  // ✅ STABILITY PATCH (small, no new keys):
-  // Ensure device_fingerprint runs early enough (before financial/account-ish rules),
-  // without touching other existing order.
   EN.priority = insertBefore(EN.priority || [], "account", ["device_fingerprint"]);
-
-  // keep original insertion (dedup-safe)
   EN.priority = insertBefore(EN.priority || [], "number", NEW_KEYS);
 
   EN.alwaysOn = EN.alwaysOn || [];
@@ -624,7 +569,6 @@
       mode: "prefix"
     },
 
-    // ✅ STABILITY PATCH: allow ":" / "：" / "=" for real-world logs, keep strict line-bound value length
     device_fingerprint: {
       pattern: /((?:device[ \t]*id|session[ \t]*id|fingerprint|user[ \t]*agent)[ \t]*[:：=][ \t]*)([^\n\r]{1,200})/giu,
       tag: "SECRET",
@@ -650,7 +594,6 @@
     }
   });
 
-  // 🔒 Ensure device_fingerprint keeps prefix semantics (no accidental overwrite)
   ["device_fingerprint"].forEach((k) => {
     const r = EN.rules[k];
     if (r && r.pattern) {
