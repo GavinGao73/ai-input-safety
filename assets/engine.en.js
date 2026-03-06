@@ -1,16 +1,20 @@
 // =========================
 // assets/engine.en.js
-// UPGRADE v6.3.1 (perfect close, keep v6.2 person_name stability)
+// UPGRADE v6.3.2 (conservative real-PDF patch)
 //
-// - Keep v6.3 FIX A / FIX B
-// - Revert FIX C style: person_name is LINE-ANCHORED (no cross-line / no field chaining)
-//   but allows optional trailing inline comment (same line only).
-// - Everything else unchanged from v6.3
+// - Keep v6.3.1 behavior and structure
+// - FIX 1: account supports strong label + SPACE + value (e.g. "IBAN DE89 ...")
+// - FIX 2: person_name supports label-only whitespace lines:
+//          "Customer Name Dr. Emily Stone"
+//          "Account Holder Prof. David Müller"
+// - FIX 3: person_name allows optional "Contact Details" prefix on same line
+// - Everything else unchanged
 //
 // ✅ CONSERVATIVE PATCH (NO engine changes; pack regex only):
-// - For ALL label/prefix rules: replace \s* around separators with [ \t]*
-// - For label internals like "user\s*id": use [ \t]*
-// - For numeric value classes: replace \s with [ \t] where appropriate to avoid newline swallowing
+// - No priority changes
+// - No alwaysOn changes
+// - No formatter changes
+// - Only refine EN regexes for real readable-PDF text
 // =========================
 
 (function () {
@@ -349,16 +353,22 @@
         mode: "prefix"
       },
 
+      // ✅ PATCH:
+      // support both:
+      // - "IBAN: DE89 ..."
+      // - "IBAN DE89 ..."
+      // - "Account Number 123..."
+      // while keeping strong account labels
       account: {
         pattern:
-          /((?:account(?:[ \t]*number)?|routing[ \t]*number|sort[ \t]*code|iban|credit[ \t]*card|debit[ \t]*card|card[ \t]*number|name[ \t]*on[ \t]*card)[ \t]*[:：=][ \t]*)([^\n\r]{2,80})/giu,
+          /((?:account(?:[ \t]*number)?|routing[ \t]*number|sort[ \t]*code|iban|credit[ \t]*card|debit[ \t]*card|card[ \t]*number|name[ \t]*on[ \t]*card)(?:[ \t]*[:：=][ \t]*|[ \t]+))([^\n\r]{2,80})/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
 
       bank: {
         pattern:
-          /((?:swift|swift[ \t]*code|bic)\b[ \t]*[:：=]?[ \t]*)([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
+          /((?:swift|swift[ \t]*code|bic|swift\/bic)\b(?:[ \t]*[:：=][ \t]*|[ \t]+))([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -383,11 +393,15 @@
         mode: "phone"
       },
 
-      /* v6.2-stable: line-anchored, no cross-line; allow optional trailing inline comment */
-      // ✅ Minimal extension: allow From/To/Attn labels (still requires ":/=" and capitalized-name structure)
+      /* v6.3.2 conservative real-PDF patch:
+         - still LINE-ANCHORED
+         - no cross-line chaining
+         - supports ":" / "=" / plain whitespace after strong labels
+         - supports optional same-line prefix "Contact Details"
+      */
       person_name: {
         pattern:
-          /^((?:name|customer[ \t]*name|account[ \t]*holder|recipient|name[ \t]*on[ \t]*card|from|to|attn\.?|attention)[ \t]*[:：=][ \t]*(?:(?:mr|mrs|ms|miss|dr|prof)\.?\s+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+          /^(?:contact[ \t]*details[ \t]+)?((?:name|customer[ \t]*name|account[ \t]*holder|recipient|name[ \t]*on[ \t]*card|from|to|attn\.?|attention)(?:[ \t]*[:：=][ \t]*|[ \t]+)(?:(?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
