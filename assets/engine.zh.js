@@ -11,6 +11,13 @@
 //
 // NOTE (allowed cleanup):
 // - ref_label_full is legacy and NOT executed; removed to reduce confusion/attack surface.
+//
+// ✅ CONSERVATIVE PATCH (this round):
+// - FIX 1: person_name 增加“账户名”标签
+// - FIX 2: 新增中文 tax_id_zh（税号 / 纳税人识别号 / 统一社会信用代码）
+// - FIX 3: 修正 money_label / money，避免 “【金额】9.20 / 【金额】5.45 / 【金额】3.47” 这类尾巴残留
+// - No engine changes
+// - No formatter changes
 // =========================
 
 (function () {
@@ -70,6 +77,7 @@
       "passport",
       "driver_license",
       "license_plate",
+      "tax_id_zh",
 
       // device / tracking
       "ip_label",
@@ -144,6 +152,7 @@
       "passport",
       "driver_license",
       "license_plate",
+      "tax_id_zh",
 
       "ip_label",
       "ip_address",
@@ -343,6 +352,14 @@
         mode: "prefix"
       },
 
+      /* ===================== TAX ID / SOCIAL CREDIT CODE (label-driven; zh) ===================== */
+      tax_id_zh: {
+        pattern:
+          /((?:税号|纳税人识别号|统一社会信用代码)[ \t]*[:：=][ \t]*)([A-Z0-9][A-Z0-9\-]{7,31})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
       /* ===================== CUSTOMER ID (CUST-...) ===================== */
       cust_id: {
         pattern: /((?:Customer[ \t]*ID|客户号|客户ID)[ \t]*[:：=][ \t]*CUST-)(?![^\n\r]*【编号】)(\d{6,})/giu,
@@ -403,7 +420,7 @@
       /* ===================== PERSON NAME (label-driven; CN-realistic) ===================== */
       person_name: {
         pattern:
-          /((?:姓名|收件人|联系人|Name|Recipient|开户名)[ \t]*[:：=][ \t]*)(?![^\n\r]*(?:集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司))((?:(?:Mr\.?|Mrs\.?|Ms\.?|Dr\.?|Prof\.?)[ \t]*)?[\u4E00-\u9FFF]{2,6}|(?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})/gmu,
+          /((?:姓名|收件人|联系人|Name|Recipient|开户名|账户名)[ \t]*[:：=][ \t]*)(?![^\n\r]*(?:集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司))((?:(?:Mr\.?|Mrs\.?|Ms\.?|Dr\.?|Prof\.?)[ \t]*)?[\u4E00-\u9FFF]{2,6}|(?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})/gmu,
         tag: "NAME",
         mode: "prefix"
       },
@@ -425,7 +442,7 @@
       /* ===================== MONEY LABEL (ZH/EN strong labels; no currency sign required) ===================== */
       money_label: {
         pattern:
-          /((?:金额|合计|总计|小计|应付|实付|已付|支付金额|付款金额|收款金额|退款金额|余额|费用|手续费|服务费|税额|税费|增值税|VAT|Amount|Total|Subtotal|Balance|Paid|Payment|Refund|Due|Net|Gross)[ \t]*[:：=][ \t]*)([-+−]?\d{1,3}(?:[, \t]\d{3})*(?:\.\d{1,2}))/giu,
+          /((?:金额|合计|总计|小计|应付|实付|已付|支付金额|付款金额|收款金额|退款金额|余额|费用|手续费|服务费|税额|税费|增值税|VAT|Amount|Total|Subtotal|Balance|Paid|Payment|Refund|Due|Net|Gross)[ \t]*[:：=][ \t]*)((?:[-+−]?(?:\d{1,3}(?:[, \t]\d{3})+|\d+)(?:\.\d{1,2})?))/giu,
         tag: "MONEY",
         mode: "prefix"
       },
@@ -433,7 +450,7 @@
       /* ===================== MONEY (ZH require currency indicator) ===================== */
       money: {
         pattern:
-          /(?:\b(?:人民币|CNY|RMB)\b[ \t]*[-+−]?\d{1,3}(?:[, \t]\d{3})*(?:\.\d{1,2})?[ \t]*(?:元)?|[¥￥][ \t]*[-+−]?\d{1,3}(?:[, \t]\d{3})*(?:\.\d{1,2})?|\b[-+−]?\d{1,3}(?:[, \t]\d{3})*(?:\.\d{1,2})?[ \t]*元|\bUSD\b[ \t]*\$?[ \t]*[-+−]?\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\$[ \t]*[-+−]?\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|€[ \t]*[-+−]?\d{1,3}(?:\.\d{3})*(?:,\d{2})?|\b[-+−]?\d{1,3}(?:\.\d{3})*(?:,\d{2})?[ \t]*€)/giu,
+          /(?:\b(?:人民币|CNY|RMB)\b[ \t]*[-+−]?(?:\d{1,3}(?:[, \t]\d{3})+|\d+)(?:\.\d{1,2})?[ \t]*(?:元)?|[¥￥][ \t]*[-+−]?(?:\d{1,3}(?:[, \t]\d{3})+|\d+)(?:\.\d{1,2})?|\b[-+−]?(?:\d{1,3}(?:[, \t]\d{3})+|\d+)(?:\.\d{1,2})?[ \t]*元|\bUSD\b[ \t]*\$?[ \t]*[-+−]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?|\$[ \t]*[-+−]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?|€[ \t]*[-+−]?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d{2})?|\b[-+−]?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d{2})?[ \t]*€)/giu,
         tag: "MONEY"
       },
 
