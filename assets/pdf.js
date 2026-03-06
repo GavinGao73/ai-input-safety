@@ -113,7 +113,6 @@ function buildPrettyTextFromPdfItems(items) {
         const aIsCjk = /[\u4E00-\u9FFF]/.test(a);
         const bIsCjk = /[\u4E00-\u9FFF]/.test(b);
 
-        // ✅ FIX: clearer spacing rules (avoid logic inversion)
         let needSpace = true;
 
         // CJK adjacency: no space
@@ -166,6 +165,9 @@ async function probePdfTextLayer(file) {
   let totalChars = 0;
   const pages = [];
 
+  // ✅ NEW: keep pretty text per page for export-stage matcher-core
+  const pagesText = [];
+
   // ✅ NEW: preserve raw glyph items per page (for later mapping)
   // ✅ PATCH: keep only minimal fields to reduce memory pressure
   const pagesItems = [];
@@ -186,6 +188,15 @@ async function probePdfTextLayer(file) {
     if (pageText) {
       pages.push(pageText);
       totalChars += pageText.replace(/\s+/g, "").length; // count non-space for reliability
+      pagesText.push({
+        pageNumber: p,
+        text: pageText
+      });
+    } else {
+      pagesText.push({
+        pageNumber: p,
+        text: ""
+      });
     }
 
     // ✅ keep items for export-stage exact rect mapping (minimal fields)
@@ -195,15 +206,23 @@ async function probePdfTextLayer(file) {
         str: it && it.str != null ? String(it.str) : "",
         transform: Array.isArray(it && it.transform) ? it.transform.slice(0, 6) : [],
         width: Number(it && it.width) || 0,
-        height: Number(it && it.height) || 0
+        height: Number(it && it.height) || 0,
+        hasEOL: !!(it && it.hasEOL)
       }))
     });
   }
 
-  if (totalChars < 20) return { hasTextLayer: false, text: "", pagesItems: [] };
+  if (totalChars < 20) {
+    return { hasTextLayer: false, text: "", pagesItems: [], pagesText: [] };
+  }
 
   // pages separated by blank line (kept, readable)
-  return { hasTextLayer: true, text: pages.join("\n\n"), pagesItems };
+  return {
+    hasTextLayer: true,
+    text: pages.join("\n\n"),
+    pagesItems,
+    pagesText
+  };
 }
 
 window.probePdfTextLayer = probePdfTextLayer;
