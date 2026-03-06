@@ -1,17 +1,12 @@
 // =========================
 // assets/engine.en.js
-// UPGRADE v6.3.4 (money strategy tighten)
+// UPGRADE v6.3.5 (money_label VAT-percent patch)
 //
-// - Keep v6.3.3 behavior and structure
-// - FIX 1: money_label supports real PDF forms:
-//          "Subtotal € 2950.15"
-//          "Total Due 3510.68"
-//          "Amount: $138.48"
-// - FIX 2: money no longer truncates values like 2950.15 -> [Amount]0.15
-// - FIX 3: bare money is more conservative:
-//          keep explicit currency-code amounts
-//          keep larger symbol-led amounts
-//          avoid aggressively eating every small symbol-only table price
+// - Keep v6.3.4 behavior and structure
+// - FIX: money_label supports optional percent segment:
+//        "VAT 19% € 560.53"
+//        "Tax 7% $123.45"
+//        "VAT 19% 560.53 EUR"
 // - Everything else unchanged
 // =========================
 
@@ -196,23 +191,18 @@
         tag: "URL"
       },
 
-      // ✅ stronger label-driven money:
-      // supports:
-      // - Amount: 138.48
-      // - Amount: € 138.48
-      // - Subtotal € 2950.15
-      // - Total Due 3510.68
+      // ✅ PATCH:
+      // allow optional percentage segment after strong money labels:
+      // - VAT 19% € 560.53
+      // - Tax 7% $123.45
+      // - VAT 19% 560.53 EUR
       money_label: {
         pattern:
-          /((?:amount|total|subtotal|grand[ \t]*total|price|fee|fees|charge|charges|balance|paid|payment|refund|due|total[ \t]*due|net|gross|tax|vat)(?:[ \t]*[:：=][ \t]*|[ \t]+))((?:[€$£¥￥][ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?|\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?|[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})))(?![\dA-Za-z])/giu,
+          /((?:amount|total|subtotal|grand[ \t]*total|price|fee|fees|charge|charges|balance|paid|payment|refund|due|total[ \t]*due|net|gross|tax|vat)(?:[ \t]+\d{1,3}(?:[.,]\d{1,2})?[ \t]*%)?(?:[ \t]*[:：=][ \t]*|[ \t]+))((?:[€$£¥￥][ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?|\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?|[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})))(?![\dA-Za-z])/giu,
         tag: "MONEY",
         mode: "prefix"
       },
 
-      // ✅ conservative bare money:
-      // 1) explicit currency code always allowed
-      // 2) symbol-led amounts allowed only for grouped or 4+ digit values
-      //    (prevents sweeping every small table cell like € 12.50)
       money: {
         pattern:
           /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?(?![\dA-Za-z])|[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b(?![\dA-Za-z])|[€$£¥￥][ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,})(?:[.,]\d{2})?(?![\dA-Za-z]))/giu,
