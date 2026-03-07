@@ -238,6 +238,33 @@ textarea{
   min-width:0;
 }
 
+/* ===== overlay layer (highlight only) ===== */
+.input-overlay{
+  position:absolute;
+  inset:0;
+
+  padding:12px;
+  border-radius:12px;
+
+  pointer-events:none;
+
+  overflow-x:auto;
+  overflow-y:auto;
+
+  white-space:pre;
+  overflow-wrap:normal;
+  word-break:normal;
+
+  /* 保证和 textarea 字体完全一致 */
+  font:inherit;
+  line-height:inherit;
+  letter-spacing:inherit;
+
+  /* overlay 文字透明，只显示高亮背景 */
+  color:transparent;
+  -webkit-text-fill-color:transparent;
+}
+
 .output{
   width:100%;
   height:320px;
@@ -252,6 +279,7 @@ textarea{
   min-width:0;
 }
 
+/* ===== highlight ===== */
 .hl{
   background: rgba(255, 92, 92, 0.14);
   border: 1px solid rgba(255, 92, 92, 0.35);
@@ -330,14 +358,23 @@ textarea{
 /* ✅ only highlight boxes are visible */
 .hit{
   background: rgba(255, 92, 92, 0.18);
-  border: 1px solid rgba(255, 92, 92, 0.40);
-  border-radius: 10px;
-  padding: 0 4px;
+  border-radius: 6px;
 
-  /* keep overlay characters invisible */
+  /* ✅ 不改变文字布局 */
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 1px solid rgba(255, 92, 92, 0.40);
+  outline-offset: 0;
+
+  /* ✅ 只显示底色，不显示 overlay 文字 */
   color: transparent;
   -webkit-text-fill-color: transparent;
+
+  /* ✅ 多行/断行时更稳定 */
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
+
 /* =========================
    Middle filter (desktop)
    ========================= */
