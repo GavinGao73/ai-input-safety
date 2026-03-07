@@ -1467,7 +1467,7 @@
       }
     }
 
-    return out.map(({ x, y, w, h }) => ({ x, y, w, h }));
+    return out.map(({ x, y, w, h, key }) => ({ x, y, w, h, key }));
   }
 
   function tryMatcherCoreRectsForPage({ pdfjsLib, viewport, itemsOrTextContent, pageNumber, lang, enabledKeys, moneyMode, manualTerms }) {
