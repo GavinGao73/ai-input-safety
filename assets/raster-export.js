@@ -2086,27 +2086,29 @@
           (itemsOrTextContent && Array.isArray(itemsOrTextContent.items)) ? itemsOrTextContent.items.length :
           0;
 
-       window.__RasterExportLast = Object.assign({}, last, {
-         perPage: prevPerPage.concat([{
-           pageNumber: p.pageNumber,
-           items: itemCount,
-           rectCount,
-           rectSource,
-           coreHitCount,
-           coreFailed,
-           coreError,
-           rects: (Array.isArray(rects)
+try {
+  window.__RasterExportLast = Object.assign({}, last, {
+    perPage: prevPerPage.concat([{
+      pageNumber: p.pageNumber,
+      items: itemCount,
+      rectCount,
+      rectSource,
+      coreHitCount,
+      coreFailed,
+      coreError,
+      rects: (Array.isArray(rects)
         ? rects.slice(0, 10).map((r) => ({
-          key: r.key || "",
-          x: r.x,
-          y: r.y,
-          w: r.w,
-          h: r.h
-        }))
-      : [])
+            key: r.key || "",
+            x: r.x,
+            y: r.y,
+            w: r.w,
+            h: r.h
+          }))
+        : [])
     }]),
-   rectsTotal: (Number(last.rectsTotal) || 0) + rectCount
-    });
+    rectsTotal: (Number(last.rectsTotal) || 0) + rectCount
+  });
+} catch (_) {}
       setRasterPhase("autoRedactReadablePdf:apply", `p${p.pageNumber}`);
       drawRedactionsOnCanvas(p.canvas, rects);
     }
