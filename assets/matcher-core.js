@@ -434,69 +434,80 @@
     return true;
   }
 
-  function collectRawHits(opts) {
-    const lang = normLang(opts && opts.lang) || "zh";
-    const pack = (opts && opts.pack) || getPack(lang);
-    const policy = (opts && opts.policy) || getPolicy();
-    const doc = normalizeDocument((opts && opts.doc) || {});
-    const text = safeString(doc.text);
-    const matchers = buildRuleMatchers({
-      lang,
-      pack,
-      policy,
-      enabledKeys: opts && opts.enabledKeys,
-      moneyMode: opts && opts.moneyMode,
-      manualTerms: opts && opts.manualTerms
-    });
+function collectRawHits(opts) {
+  const lang = normLang(opts && opts.lang) || "zh";
+  const pack = (opts && opts.pack) || getPack(lang);
+  const policy = (opts && opts.policy) || getPolicy();
 
-    const rawHits = [];
-
-    for (const matcher of matchers) {
-      const list = execRegexAll(matcher.re, text);
-
-      for (const h of list) {
-        const full = safeString(h.full);
-        const groups = h.groups || [];
-
-        if (!applyPhoneGuardIfNeeded(pack, policy, matcher, groups, full)) continue;
-
-        const sub = chooseValueSubrange(matcher, h);
-        const a = Number(h.index) + Number(sub.offsetStart || 0);
-        const b = Number(h.index) + Number(sub.offsetEnd || 0);
-
-        if (!(b > a)) continue;
-
-        const matchedText = text.slice(a, b);
-        if (!matchedText) continue;
-
-        rawHits.push({
-          id: "",
-          key: matcher.key,
-          ruleId: matcher.ruleKey,
-          source: matcher.source,
-          orderIndex: matcher.orderIndex,
-          priority: matcher.orderIndex,
-          riskLevel: getRiskLevel(policy, matcher.key),
-          placeholder: matcher.key === "manual_term" ? getPlaceholder(pack, "TERM") : matcher.placeholder,
-          matchedText,
-          replacement: matcher.key === "manual_term" ? getPlaceholder(pack, "TERM") : matcher.placeholder,
-          start: a,
-          end: b,
-          page: null,
-          rects: [],
-          meta: {
-            mode: matcher.mode || "",
-            tag: matcher.tag || "",
-            manualTerm: matcher.manualTerm || "",
-            fullMatch: full
-          }
-        });
-      }
-    }
-
-    return rawHits;
+  // ✅ 兼容 doc / document / text 三种调用方式
+  let docInput = {};
+  if (opts && opts.doc && typeof opts.doc === "object") {
+    docInput = opts.doc;
+  } else if (opts && opts.document && typeof opts.document === "object") {
+    docInput = opts.document;
+  } else if (opts && typeof opts.text === "string") {
+    docInput = { text: opts.text };
   }
 
+  const doc = normalizeDocument(docInput);
+  const text = safeString(doc.text);
+
+  const matchers = buildRuleMatchers({
+    lang,
+    pack,
+    policy,
+    enabledKeys: opts && opts.enabledKeys,
+    moneyMode: opts && opts.moneyMode,
+    manualTerms: opts && opts.manualTerms
+  });
+
+  const rawHits = [];
+
+  for (const matcher of matchers) {
+    const list = execRegexAll(matcher.re, text);
+
+    for (const h of list) {
+      const full = safeString(h.full);
+      const groups = h.groups || [];
+
+      if (!applyPhoneGuardIfNeeded(pack, policy, matcher, groups, full)) continue;
+
+      const sub = chooseValueSubrange(matcher, h);
+      const a = Number(h.index) + Number(sub.offsetStart || 0);
+      const b = Number(h.index) + Number(sub.offsetEnd || 0);
+
+      if (!(b > a)) continue;
+
+      const matchedText = text.slice(a, b);
+      if (!matchedText) continue;
+
+      rawHits.push({
+        id: "",
+        key: matcher.key,
+        ruleId: matcher.ruleKey,
+        source: matcher.source,
+        orderIndex: matcher.orderIndex,
+        priority: matcher.orderIndex,
+        riskLevel: getRiskLevel(policy, matcher.key),
+        placeholder: matcher.key === "manual_term" ? getPlaceholder(pack, "TERM") : matcher.placeholder,
+        matchedText,
+        replacement: matcher.key === "manual_term" ? getPlaceholder(pack, "TERM") : matcher.placeholder,
+        start: a,
+        end: b,
+        page: null,
+        rects: [],
+        meta: {
+          mode: matcher.mode || "",
+          tag: matcher.tag || "",
+          manualTerm: matcher.manualTerm || "",
+          fullMatch: full
+        }
+      });
+    }
+  }
+
+  return rawHits;
+}
   function rangesOverlap(a, b) {
     return a.start < b.end && b.start < a.end;
   }
@@ -612,41 +623,55 @@
   }
 
   function matchDocument(opts) {
-    const lang = normLang(opts && opts.lang) || "zh";
-    const pack = (opts && opts.pack) || getPack(lang);
-    const policy = (opts && opts.policy) || getPolicy();
-    const doc = normalizeDocument((opts && opts.doc) || {});
+  const lang = normLang(opts && opts.lang) || "zh";
+  const pack = (opts && opts.pack) || getPack(lang);
+  const policy = (opts && opts.policy) || getPolicy();
 
-    const rawHits = collectRawHits({
-      lang,
-      pack,
-      policy,
-      doc,
-      enabledKeys: opts && opts.enabledKeys,
-      moneyMode: opts && opts.moneyMode,
-      manualTerms: opts && opts.manualTerms
-    });
-
-    const stableHits = assignIds(resolveConflicts(rawHits));
-    const hits = mapHitsToPdfRects(doc, stableHits);
-    const textMasked = applyHitsToText(doc.text, hits);
-    const summary = summarizeHits(hits);
-
-    return {
-      hits,
-      byKey: summary.byKey,
-      textMasked,
-      summary,
-      debug: {
-        version: VERSION,
-        lang,
-        rawHitCount: rawHits.length,
-        finalHitCount: hits.length,
-        hasPdfPages: Array.isArray(doc.pages) && doc.pages.length > 0
-      }
-    };
+  // ✅ 兼容三种入口：
+  // - matchDocument({ doc: {...} })
+  // - matchDocument({ document: {...} })
+  // - matchDocument({ text: "..." })
+  let docInput = {};
+  if (opts && opts.doc && typeof opts.doc === "object") {
+    docInput = opts.doc;
+  } else if (opts && opts.document && typeof opts.document === "object") {
+    docInput = opts.document;
+  } else if (opts && typeof opts.text === "string") {
+    docInput = { text: opts.text };
   }
 
+  const doc = normalizeDocument(docInput);
+
+  const rawHits = collectRawHits({
+    lang,
+    pack,
+    policy,
+    doc,
+    enabledKeys: opts && opts.enabledKeys,
+    moneyMode: opts && opts.moneyMode,
+    manualTerms: opts && opts.manualTerms
+  });
+
+  const stableHits = assignIds(resolveConflicts(rawHits));
+  const hits = mapHitsToPdfRects(doc, stableHits);
+  const textMasked = applyHitsToText(doc.text, hits);
+  const summary = summarizeHits(hits);
+
+  return {
+    hits,
+    byKey: summary.byKey,
+    textMasked,
+    summary,
+    debug: {
+      version: VERSION,
+      lang,
+      rawHitCount: rawHits.length,
+      finalHitCount: hits.length,
+      hasPdfPages: Array.isArray(doc.pages) && doc.pages.length > 0
+    }
+  };
+}
+  
   window[NS] = {
     version: VERSION,
     normLang,
