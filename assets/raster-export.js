@@ -312,6 +312,81 @@
     } catch (_) {}
   }
 
+  function getRasterDebugConfig() {
+    const dbg = window.__RASTER_DEBUG__;
+    const base = (dbg && typeof dbg === "object") ? dbg : {};
+    return {
+      enabled: !!base.enabled,
+      showRects: base.showRects !== false,
+      showItems: !!base.showItems,
+      showLabels: base.showLabels !== false,
+      rectStroke: base.rectStroke || "rgba(255, 0, 0, 0.95)",
+      itemStroke: base.itemStroke || "rgba(0, 128, 255, 0.40)",
+      labelFill: base.labelFill || "rgba(255, 0, 0, 0.95)",
+      rectLineWidth: Number(base.rectLineWidth || 2),
+      itemLineWidth: Number(base.itemLineWidth || 1),
+      font: base.font || "12px sans-serif"
+    };
+  }
+
+  function drawDebugOverlay(canvas, pageDebug, options) {
+    if (!canvas || !pageDebug) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const cfg = options || getRasterDebugConfig();
+    if (!cfg.enabled) return;
+
+    ctx.save();
+
+    if (cfg.showItems && Array.isArray(pageDebug.itemBoxes)) {
+      ctx.strokeStyle = String(cfg.itemStroke || "rgba(0, 128, 255, 0.40)");
+      ctx.lineWidth = Math.max(1, Number(cfg.itemLineWidth || 1));
+
+      for (const b of pageDebug.itemBoxes) {
+        if (!b) continue;
+        const x = Number(b.x);
+        const y = Number(b.y);
+        const w = Number(b.w);
+        const h = Number(b.h);
+        if (!Number.isFinite(x + y + w + h)) continue;
+        if (w <= 0 || h <= 0) continue;
+        ctx.strokeRect(x, y, w, h);
+      }
+    }
+
+    if (cfg.showRects && Array.isArray(pageDebug.rects)) {
+      ctx.strokeStyle = String(cfg.rectStroke || "rgba(255, 0, 0, 0.95)");
+      ctx.lineWidth = Math.max(1, Number(cfg.rectLineWidth || 2));
+      ctx.font = String(cfg.font || "12px sans-serif");
+      ctx.fillStyle = String(cfg.labelFill || "rgba(255, 0, 0, 0.95)");
+
+      for (const r of pageDebug.rects) {
+        if (!r) continue;
+        const x = Number(r.x);
+        const y = Number(r.y);
+        const w = Number(r.w);
+        const h = Number(r.h);
+        if (!Number.isFinite(x + y + w + h)) continue;
+        if (w <= 0 || h <= 0) continue;
+
+        ctx.strokeRect(x, y, w, h);
+
+        if (cfg.showLabels) {
+          const label = String(r.key || r._type || "");
+          if (label) {
+            const tx = x + 2;
+            const ty = Math.max(12, y - 4);
+            ctx.fillText(label, tx, ty);
+          }
+        }
+      }
+    }
+
+    ctx.restore();
+  }
+
   async function loadPdfJsIfNeeded() {
     if (window.pdfjsLib && window.pdfjsLib.getDocument) return window.pdfjsLib;
     if (__pdfjsLoadPromise) return __pdfjsLoadPromise;
@@ -736,6 +811,64 @@
       height: Number(it && it.height) || 0,
       hasEOL: !!(it && it.hasEOL)
     }));
+  }
+
+  function getItemsArray(textContentOrItems) {
+    if (Array.isArray(textContentOrItems)) return textContentOrItems;
+    if (textContentOrItems && Array.isArray(textContentOrItems.items)) return textContentOrItems.items;
+    return [];
+  }
+
+  function buildItemBoxes(pdfjsLib, viewport, textContentOrItems) {
+    const items = getItemsArray(textContentOrItems);
+    if (!items.length || !pdfjsLib || !pdfjsLib.Util || !viewport) return [];
+
+    const Util = pdfjsLib.Util;
+    const out = [];
+
+    for (const it of items) {
+      if (!it) continue;
+      const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0];
+      const tx = Util.transform(viewport.transform, tr);
+
+      const x = Number(tx[4] || 0);
+      const y = Number(tx[5] || 0);
+
+      const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
+      const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
+
+      let fontH = sy * 1.0;
+      if (!Number.isFinite(fontH) || fontH <= 0) {
+        fontH =
+          Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
+          Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
+          10;
+      }
+      fontH = clamp(fontH * 1.12, 6, 110);
+
+      const s = String(it.str || "");
+      let w = 0;
+      try {
+        const iw = Number(it.width || 0);
+        if (Number.isFinite(iw) && iw > 0) w = iw * sx;
+      } catch (_) {}
+
+      if (!Number.isFinite(w) || w <= 0) {
+        w = Math.max(8, s.length * fontH * 0.88);
+      }
+
+      let rx = clamp(x, 0, viewport.width);
+      let ry = clamp(y - fontH, 0, viewport.height);
+      let rw = clamp(w, 1, viewport.width - rx);
+      let rh = clamp(fontH, 6, viewport.height - ry);
+
+      if (!Number.isFinite(rx + ry + rw + rh)) continue;
+      if (rw <= 0 || rh <= 0) continue;
+
+      out.push({ x: rx, y: ry, w: rw, h: rh });
+    }
+
+    return out;
   }
 
   function getMatcherCore() {
@@ -1397,7 +1530,15 @@
     const built = buildPageTextAndRangesFromItems(itemsOrTextContent);
     const pageText = String(built.pageText || "");
     if (!pageText.trim()) {
-      return { ok: true, rects: [], source: "matcher-core", hitCount: 0 };
+      return {
+        ok: true,
+        rects: [],
+        spans: [],
+        source: "matcher-core",
+        hitCount: 0,
+        debug: { reason: "empty-page-text" },
+        summary: { total: 0, byKey: {} }
+      };
     }
 
     const coreRes = collectCoreHitsForPage({
@@ -1421,6 +1562,7 @@
     return {
       ok: true,
       rects,
+      spans: Array.isArray(coreRes.spans) ? coreRes.spans : [],
       source: "matcher-core",
       hitCount: Array.isArray(coreRes.spans) ? coreRes.spans.length : 0,
       debug: coreRes.debug || null,
@@ -1886,6 +2028,7 @@
 
     const matchers = buildRuleMatchers(lang, enabledKeys, moneyMode, manualTerms);
     const _placeholder = langPlaceholder(lang);
+    const dbgCfg = getRasterDebugConfig();
 
     try {
       const PACKS = window.__ENGINE_LANG_PACKS__ || {};
@@ -1901,7 +2044,8 @@
         manualTerms: Array.isArray(manualTerms) ? manualTerms.slice() : [],
         matcherKeys: (matchers || []).map(m => m.key),
         pages: (pages || []).length,
-        lang
+        lang,
+        rasterDebug: Object.assign({}, dbgCfg)
       };
     } catch (_) {}
 
@@ -1930,6 +2074,9 @@
       let coreHitCount = 0;
       let coreFailed = false;
       let coreError = "";
+      let coreSpans = [];
+      let coreDebug = null;
+      let coreSummary = null;
 
       try {
         const coreRes = tryMatcherCoreRectsForPage({
@@ -1947,6 +2094,9 @@
           rects = Array.isArray(coreRes.rects) ? coreRes.rects : [];
           rectSource = coreRes.source || "matcher-core";
           coreHitCount = Number(coreRes.hitCount || 0);
+          coreSpans = Array.isArray(coreRes.spans) ? coreRes.spans : [];
+          coreDebug = coreRes.debug || null;
+          coreSummary = coreRes.summary || null;
         } else {
           rects = textItemsToRects(pdfjsLib, p.viewport, itemsOrTextContent, matchers, lang);
           rectSource = "legacy-regex";
@@ -1957,6 +2107,13 @@
         rects = textItemsToRects(pdfjsLib, p.viewport, itemsOrTextContent, matchers, lang);
         rectSource = "legacy-regex";
       }
+
+      const itemBoxes = buildItemBoxes(pdfjsLib, p.viewport, itemsOrTextContent);
+      const pageDebug = {
+        pageNumber: p.pageNumber,
+        rects: Array.isArray(rects) ? rects.slice() : [],
+        itemBoxes: Array.isArray(itemBoxes) ? itemBoxes.slice() : []
+      };
 
       try {
         const last = window.__RasterExportLast || {};
@@ -1977,15 +2134,33 @@
             coreHitCount,
             coreFailed,
             coreError,
-            rects: (Array.isArray(rects)
-              ? rects.slice(0, 10).map((r) => ({
+            coreDebug,
+            coreSummary,
+            spans: Array.isArray(coreSpans)
+              ? coreSpans.slice(0, 30).map((sp) => ({
+                  key: sp.key || "",
+                  a: Number(sp.a || 0),
+                  b: Number(sp.b || 0),
+                  preferSub: sp.preferSub || null
+                }))
+              : [],
+            rects: Array.isArray(rects)
+              ? rects.slice(0, 30).map((r) => ({
                   key: r.key || "",
                   x: r.x,
                   y: r.y,
                   w: r.w,
                   h: r.h
                 }))
-              : [])
+              : [],
+            itemBoxes: Array.isArray(itemBoxes)
+              ? itemBoxes.slice(0, 50).map((b) => ({
+                  x: b.x,
+                  y: b.y,
+                  w: b.w,
+                  h: b.h
+                }))
+              : []
           }]),
           rectsTotal: (Number(last.rectsTotal) || 0) + rectCount
         });
@@ -1993,6 +2168,10 @@
 
       setRasterPhase("autoRedactReadablePdf:apply", `p${p.pageNumber}`);
       drawRedactionsOnCanvas(p.canvas, rects);
+
+      if (dbgCfg.enabled) {
+        drawDebugOverlay(p.canvas, pageDebug, dbgCfg);
+      }
     }
 
     setRasterPhase("autoRedactReadablePdf:done", null);
@@ -2092,7 +2271,8 @@
           moneyMode: (opts && opts.moneyMode) || "off",
           manualTerms: manualTerms.slice(),
           lang,
-          dpi
+          dpi,
+          rasterDebug: getRasterDebugConfig()
         };
       } catch (_) {}
 
@@ -2134,6 +2314,7 @@
 
       const dpi = (result && result.dpi) ? result.dpi : DEFAULT_DPI;
       const _placeholder = langPlaceholder((result && result.lang) || "zh");
+      const dbgCfg = getRasterDebugConfig();
 
       try {
         window.__RasterExportLast = {
@@ -2142,7 +2323,8 @@
           pages: pages.length,
           hasRectPages: !!(result && result.rectsByPage),
           lang: (result && result.lang) || "zh",
-          dpi
+          dpi,
+          rasterDebug: dbgCfg
         };
       } catch (_) {}
 
@@ -2152,7 +2334,16 @@
       for (const p of pages) {
         const pn = p && p.pageNumber ? p.pageNumber : 1;
         const rects = rectsByPage[pn] || [];
-        if (p && p.canvas) drawRedactionsOnCanvas(p.canvas, rects);
+        if (p && p.canvas) {
+          drawRedactionsOnCanvas(p.canvas, rects);
+          if (dbgCfg.enabled) {
+            drawDebugOverlay(p.canvas, {
+              pageNumber: pn,
+              rects: Array.isArray(rects) ? rects.slice() : [],
+              itemBoxes: []
+            }, dbgCfg);
+          }
+        }
       }
 
       const name = (result && result.filename) ? result.filename : `raster_secure_${Date.now()}.pdf`;
@@ -2165,7 +2356,9 @@
     LANG_TUNING,
     renderPdfToCanvases,
     renderImageToCanvas,
-    drawRedactionsOnCanvas
+    drawRedactionsOnCanvas,
+    drawDebugOverlay,
+    getRasterDebugConfig
   };
 
   try {
