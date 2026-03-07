@@ -1401,7 +1401,7 @@
     const coreRes = collectCoreHitsForPage({
       lang,
       pageText,
-      ageNumber,
+      pageNumber,
       enabledKeys,
       moneyMode,
       manualTerms
