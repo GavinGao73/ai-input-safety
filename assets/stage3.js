@@ -213,9 +213,9 @@ async function handleFile(file) {
     lastPdfOriginalText = text;
 
     const ta = $("inputText");
-    if (ta) {
+      if (ta) {
       ta.value = text;
-      ta.readOnly = false;
+      ta.readOnly = true;
     }
 
     updateInputWatermarkVisibility();
