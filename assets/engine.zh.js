@@ -16,6 +16,8 @@
 // - FIX 1: person_name 增加“账户名”标签
 // - FIX 2: 新增中文 tax_id_zh（税号 / 纳税人识别号 / 统一社会信用代码）
 // - FIX 3: 修正 money_label / money，避免 “【金额】9.20 / 【金额】5.45 / 【金额】3.47” 这类尾巴残留
+// - FIX 4: 新增 person_name_address_block，用于命中“地址块下一行姓名”
+// - FIX 5: 新增 address_cn_block，用于命中“多行地址块中的街道门牌行”
 // - No engine changes
 // - No formatter changes
 // =========================
@@ -119,9 +121,11 @@
       // ✅ company before person_name (开户名等公司字段不应被人名抢走)
       "company",
       "person_name",
+      "person_name_address_block",
 
       // address (CN partial)
       "address_cn",
+      "address_cn_block",
 
       // crypto / chain
       "wallet_id",
@@ -142,6 +146,7 @@
       "ref_label_tail",
 
       "address_cn",
+      "address_cn_block",
 
       "secret",
       "security_answer",
@@ -174,6 +179,7 @@
       // ✅ org before person
       "company",
       "person_name",
+      "person_name_address_block",
 
       "wallet_id",
       "tx_hash",
@@ -197,7 +203,7 @@
 
     // ✅ address_cn_partial formatting (zh-only)
     formatAddressCnPartial: function ({ label, val, placeholder }) {
-      const reRoadNo = /([\u4E00-\u9FFF]{1,20}(?:路|街|道|大道|巷|弄))[ \t]*(\d{1,6}[ \t]*号)/g;
+      const reRoadNo = /([\u4E00-\u9FFF]{1,20}(?:路|街|道|大道|巷|弄|里|坊|胡同|区|镇))[ \t]*(\d{1,6}[ \t]*号)/g;
       if (reRoadNo.test(val)) {
         const v2 = String(val || "").replace(reRoadNo, (m2, a, b) => `${a}${placeholder("ADDRESS")}`);
         return `${label}${v2}`;
@@ -207,7 +213,7 @@
 
     // ✅ highlight helper for pdf overlay (zh-only)
     highlightAddressCnPartial: function ({ label, val, S1, S2 }) {
-      const reRoadNo = /([\u4E00-\u9FFF]{1,20}(?:路|街|道|大道|巷|弄))[ \t]*(\d{1,6}[ \t]*号)/g;
+      const reRoadNo = /([\u4E00-\u9FFF]{1,20}(?:路|街|道|大道|巷|弄|里|坊|胡同|区|镇))[ \t]*(\d{1,6}[ \t]*号)/g;
       const v = String(val || "");
       if (reRoadNo.test(v)) {
         const markedVal = v.replace(reRoadNo, (mm, a, b) => `${a}${S1}${b}${S2}`);
@@ -425,6 +431,14 @@
         mode: "prefix"
       },
 
+      /* ===================== PERSON NAME IN ADDRESS BLOCK (ZH multiline) ===================== */
+      person_name_address_block: {
+        pattern:
+          /((?:账单地址|帳單地址|收货地址|收貨地址|办公地址|辦公地址|通信地址|聯絡地址|联系地址|聯繫地址|地址)[ \t]*[:：=]?[ \t]*(?:\r?\n)+)(?![^\n\r]*(?:集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司))([\u4E00-\u9FFF]{2,6})(?=[ \t]*(?:\r?\n))/gmu,
+        tag: "NAME",
+        mode: "prefix"
+      },
+
       /* ===================== HANDLE (label-driven) ===================== */
       handle_label: {
         pattern: /((?:用户名|用[ \t]*户[ \t]*名|登录账号|登[ \t]*录[ \t]*账[ \t]*号|账号名|账[ \t]*号[ \t]*名|账户名|帐户名|支付账号|支付账户|微信号|WeChat[ \t]*ID|wxid|User[ \t]*ID)[ \t]*[:：=][ \t]*)([A-Za-z0-9_@.\-]{3,80})/giu,
@@ -435,6 +449,14 @@
       /* ===================== ADDRESS (CN partial) ===================== */
       address_cn: {
         pattern: /((?:地址|住址|办公地址|通信地址|收货地址|居住地址|单位地址|联系地址)[ \t]*[:：=][ \t]*)([^\n\r]{2,120})/giu,
+        tag: "ADDRESS",
+        mode: "address_cn_partial"
+      },
+
+      /* ===================== ADDRESS BLOCK (CN multiline partial) ===================== */
+      address_cn_block: {
+        pattern:
+          /((?:账单地址|帳單地址|收货地址|收貨地址|办公地址|辦公地址|通信地址|聯系地址|联系地址|地址)[ \t]*[:：=]?[ \t]*(?:\r?\n)+(?:[\u4E00-\u9FFF]{2,6}[ \t]*(?:\r?\n)+)?)([^\n\r]{2,120}(?:(?:路|街|道|大道|巷|弄|里|坊|胡同|区|镇)[^\n\r]{0,30}\d{1,6}[ \t]*号))/giu,
         tag: "ADDRESS",
         mode: "address_cn_partial"
       },
