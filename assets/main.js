@@ -316,7 +316,10 @@ function bind() {
 
       // 1) everything else: do not allow any single error to abort the rest
       try {
-        if ($("inputText")) $("inputText").value = "";
+        if ($("inputText")) {
+        $("inputText").value = "";
+        $("inputText").readOnly = false;
+        }
       } catch (_) {}
       try {
         renderOutput("");
