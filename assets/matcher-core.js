@@ -187,30 +187,51 @@
     return out;
   }
 
-  function normalizeDocument(doc) {
-    const d = doc && typeof doc === "object" ? doc : {};
+  function normalizeDocument(input) {
+  const d = input && typeof input === "object" ? input : {};
 
-    const text = safeString(d.text);
+  // 兼容三种入口：
+  // 1) { text: "..." }
+  // 2) { document: {...} } -> 外层已经拆掉的话也没关系
+  // 3) { pages: [{ pageNumber, text, items }] }
+  const text = safeString(d.text);
 
-    const rawPages = asArray(d.pages);
-    const pages = rawPages.map((page, idx) => {
-      const pageNumber = Number(page && page.pageNumber) || (idx + 1);
-      const items = asArray(page && page.items).map((it) => ({
-        str: safeString(it && it.str),
-        transform: Array.isArray(it && it.transform) ? it.transform.slice(0, 6) : [],
-        width: Number(it && it.width) || 0,
-        height: Number(it && it.height) || 0
-      }));
-      return { pageNumber, items };
-    });
+  const rawPages = asArray(d.pages);
+  const pages = rawPages.map((page, idx) => {
+    const pageNumber = Number(page && page.pageNumber) || (idx + 1);
+
+    const pageText = safeString(page && page.text);
+
+    const items = asArray(page && page.items).map((it) => ({
+      str: safeString(it && it.str),
+      transform: Array.isArray(it && it.transform) ? it.transform.slice(0, 6) : [],
+      width: Number(it && it.width) || 0,
+      height: Number(it && it.height) || 0,
+      hasEOL: !!(it && it.hasEOL)
+    }));
 
     return {
-      text,
-      pages,
-      meta: cloneSimple(d.meta || {})
+      pageNumber,
+      text: pageText,
+      items
     };
+  });
+
+  // 如果顶层 text 为空，但 pages 里有 text，就拼起来
+  let mergedText = text;
+  if (!mergedText && pages.length) {
+    mergedText = pages
+      .map((p) => safeString(p.text))
+      .filter(Boolean)
+      .join("\n\n");
   }
 
+  return {
+    text: mergedText,
+    pages,
+    meta: cloneSimple(d.meta || {})
+  };
+}
   function buildManualMatchers(manualTerms) {
     const out = [];
     const seen = new Set();
