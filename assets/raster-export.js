@@ -1,4 +1,4 @@
-  /* =========================================================
+/* =========================================================
  * raster-export.js
  * Raster Secure PDF export pipeline (in-memory only)
  * - PDF/image -> 600 DPI raster -> opaque redaction (pixels)
@@ -891,36 +891,84 @@
     };
   }
 
-  function collectCoreHitsForPage({ lang, pageText, enabledKeys, moneyMode, manualTerms }) {
+  function collectCoreHitsForPage({ lang, pageText, pageNumber, enabledKeys, moneyMode, manualTerms }) {
     const mc = getMatcherCore();
     if (!mc) return null;
 
-    const attempts = [
-      () => mc.matchDocument({
-        lang,
-        text: pageText,
-        enabledKeys,
-        moneyMode,
-        manualTerms,
+    const rawText = String(pageText || "");
+    if (!rawText.trim()) {
+      return {
+        ok: true,
+        spans: [],
+        debug: { reason: "empty-page-text" },
+        summary: { total: 0, byKey: {} }
+      };
+    }
+
+    // ✅ 优先使用 stage3 / pdf.js 提供的 pretty per-page text
+    let prettyText = rawText;
+    try {
+      const pagesText = window.__pdf_pages_text || window.lastPdfPagesText || [];
+      const hit = Array.isArray(pagesText)
+        ? pagesText.find((p) => Number(p && p.pageNumber) === Number(pageNumber))
+        : null;
+      if (hit && typeof hit.text === "string" && hit.text.trim()) {
+        prettyText = hit.text;
+      }
+    } catch (_) {}
+
+    // ✅ 关键修复：
+    // matcher-core 的 normalizeDocument 需要 paged document shape，
+    // 不能直接喂 { text: "..." }
+    let normalized = null;
+    try {
+      normalized = mc.normalizeDocument({
+        pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }],
         fromPdf: true
-      }),
-      () => mc.matchDocument({
+      });
+    } catch (_) {
+      normalized = null;
+    }
+
+    const attempts = [];
+
+    // A) normalized paged document
+    if (normalized && (
+      (typeof normalized.text === "string" && normalized.text.trim()) ||
+      (Array.isArray(normalized.pages) && normalized.pages.length)
+    )) {
+      attempts.push(() => mc.matchDocument({
         lang,
-        doc: pageText,
+        document: normalized,
         enabledKeys,
-        moneyMode,
         manualTerms,
-        fromPdf: true
-      }),
-      () => mc.matchDocument({
-        lang,
-        document: pageText,
-        enabledKeys,
         moneyMode,
-        manualTerms,
         fromPdf: true
-      })
-    ];
+      }));
+    }
+
+    // B) raw paged document
+    attempts.push(() => mc.matchDocument({
+      lang,
+      document: {
+        pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }],
+        fromPdf: true
+      },
+      enabledKeys,
+      manualTerms,
+      moneyMode,
+      fromPdf: true
+    }));
+
+    // C) plain text fallback
+    attempts.push(() => mc.matchDocument({
+      lang,
+      text: prettyText,
+      enabledKeys,
+      manualTerms,
+      moneyMode,
+      fromPdf: true
+    }));
 
     let res = null;
     let lastErr = null;
@@ -929,10 +977,16 @@
       try {
         res = run();
         if (res && typeof res.then === "function") {
-          // current matcher-core is sync, but keep this explicit:
           throw new Error("matcher-core-async-not-supported-here");
         }
-        if (res) break;
+        if (res) {
+          const total =
+            Number(res?.summary?.total) ||
+            (Array.isArray(res?.hits) ? res.hits.length : 0) ||
+            (Array.isArray(res?.rawHits) ? res.rawHits.length : 0);
+
+          if (total > 0) break;
+        }
       } catch (e) {
         lastErr = e;
       }
@@ -1263,7 +1317,7 @@
     return out.map(({ x, y, w, h }) => ({ x, y, w, h }));
   }
 
-  function tryMatcherCoreRectsForPage({ pdfjsLib, viewport, itemsOrTextContent, lang, enabledKeys, moneyMode, manualTerms }) {
+  function tryMatcherCoreRectsForPage({ pdfjsLib, viewport, itemsOrTextContent, lang, pageNumber, enabledKeys, moneyMode, manualTerms }) {
     const mc = getMatcherCore();
     if (!mc) return null;
 
@@ -1276,6 +1330,7 @@
     const coreRes = collectCoreHitsForPage({
       lang,
       pageText,
+      pageNumber,
       enabledKeys,
       moneyMode,
       manualTerms
@@ -1847,6 +1902,7 @@
           viewport: p.viewport,
           itemsOrTextContent,
           lang,
+          pageNumber: p.pageNumber,
           enabledKeys,
           moneyMode,
           manualTerms
