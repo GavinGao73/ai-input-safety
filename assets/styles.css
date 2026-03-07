@@ -992,3 +992,22 @@ body::after{
 html, body{
   overflow-x: hidden;
 }
+
+/* ===== PDF extracted text: readonly but selectable ===== */
+#inputText{
+  -webkit-user-select: text;
+  user-select: text;
+  caret-color: transparent; /* 只读时不显示插入光标 */
+}
+
+/* 关键：让选中高亮可见 */
+#inputText::selection{
+  background: rgba(80, 140, 255, 0.35);
+  color: inherit;
+}
+
+#inputText::-moz-selection{
+  background: rgba(80, 140, 255, 0.35);
+  color: inherit;
+}
+
