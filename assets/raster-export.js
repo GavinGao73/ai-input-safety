@@ -809,50 +809,132 @@
   }
 
   function buildPageTextAndRangesFromItems(textContentOrItems) {
-    const items =
-      Array.isArray(textContentOrItems) ? textContentOrItems :
-      (textContentOrItems && Array.isArray(textContentOrItems.items)) ? textContentOrItems.items :
-      [];
+  const items =
+    Array.isArray(textContentOrItems) ? textContentOrItems :
+    (textContentOrItems && Array.isArray(textContentOrItems.items)) ? textContentOrItems.items :
+    [];
 
-    function isWs(ch) {
-      return ch === " " || ch === "\n" || ch === "\t" || ch === "\r";
-    }
-
-    function shouldInsertSpace(prevChar, nextChar) {
-      if (!prevChar || !nextChar) return false;
-      if (isWs(prevChar) || isWs(nextChar)) return false;
-      const a = /[A-Za-z0-9]/.test(prevChar);
-      const b = /[A-Za-z0-9]/.test(nextChar);
-      return a && b;
-    }
-
-    let pageText = "";
-    const itemRanges = [];
-
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i];
-      const s = String((it && it.str) || "");
-      if (!s) continue;
-
-      const prevChar = pageText.length ? pageText[pageText.length - 1] : "";
-      const nextChar = s[0];
-
-      if (pageText && shouldInsertSpace(prevChar, nextChar) && !it.hasEOL) {
-        pageText += " ";
-      }
-
-      const start = pageText.length;
-      pageText += s;
-      const end = pageText.length;
-
-      itemRanges.push({ idx: i, start, end });
-
-      if (it && it.hasEOL) pageText += "\n";
-    }
-
-    return { items, pageText, itemRanges };
+  if (!items.length) {
+    return { items: [], pageText: "", itemRanges: [] };
   }
 
+  function isWs(ch) {
+    return ch === " " || ch === "\n" || ch === "\t" || ch === "\r";
+  }
+
+  // ✅ 与 assets/pdf.js 的 buildPrettyTextFromPdfItems 保持一致
+  function needSpaceBetween(line, chunk) {
+    if (!line || !chunk) return false;
+
+    const a = line[line.length - 1];
+    const b = chunk[0];
+
+    const aIsCjk = /[\u4E00-\u9FFF]/.test(a);
+    const bIsCjk = /[\u4E00-\u9FFF]/.test(b);
+
+    let needSpace = true;
+
+    // CJK adjacency: no space
+    if (aIsCjk || bIsCjk) needSpace = false;
+
+    // next chunk begins with punctuation/brackets -> no space
+    if (/^[\s\)\]\}\.,;:\/]/.test(chunk)) needSpace = false;
+
+    // previous ends with opening bracket/slash/hyphen -> no space
+    if (/[\s\-\(\[\{\/]$/.test(line)) needSpace = false;
+
+    return needSpace;
+  }
+
+  // 1) 先转成 rows，和 pdf.js 一样按 y 分组
+  const rows = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const s0 = String((it && it.str) || "");
+    const s = s0.replace(/\s+/g, " ").trim();
+    if (!s) continue;
+
+    const tr = Array.isArray(it && it.transform) ? it.transform : [];
+    const x = Number(tr[4] || 0);
+    const y = Number(tr[5] || 0);
+
+    // ✅ 与 pdf.js 保持一致
+    const yKey = Math.round(y * 2) / 2;
+
+    rows.push({
+      idx: i,
+      s,
+      x,
+      y: yKey
+    });
+  }
+
+  if (!rows.length) {
+    return { items, pageText: "", itemRanges: [] };
+  }
+
+  // 2) top->bottom, left->right
+  rows.sort((a, b) => (b.y - a.y) || (a.x - b.x));
+
+  // 3) 按 y 分行
+  const lines = [];
+  const Y_EPS = 1.2;
+
+  for (const r of rows) {
+    const last = lines[lines.length - 1];
+    if (!last || Math.abs(last.y - r.y) > Y_EPS) {
+      lines.push({ y: r.y, parts: [r] });
+    } else {
+      last.parts.push(r);
+    }
+  }
+
+  // 4) 组装 pageText，并记录每个 chunk 的 text range
+  let pageText = "";
+  const itemRanges = [];
+  let prevY = null;
+
+  for (const ln of lines) {
+    ln.parts.sort((a, b) => a.x - b.x);
+
+    // ✅ 与 pdf.js 保持一致：大行距插入空行
+    if (prevY !== null) {
+      const gap = prevY - ln.y;
+      if (gap > 12) {
+        pageText += "\n\n";
+      } else if (pageText && !pageText.endsWith("\n")) {
+        pageText += "\n";
+      }
+    }
+
+    let lineText = "";
+
+    for (const part of ln.parts) {
+      const chunk = part.s;
+      if (!chunk) continue;
+
+      if (lineText && needSpaceBetween(lineText, chunk)) {
+        lineText += " ";
+      }
+
+      const startInLine = lineText.length;
+      lineText += chunk;
+      const endInLine = lineText.length;
+
+      itemRanges.push({
+        idx: part.idx,
+        start: pageText.length + startInLine,
+        end: pageText.length + endInLine
+      });
+    }
+
+    pageText += lineText;
+    prevY = ln.y;
+  }
+
+  return { items, pageText, itemRanges };
+}
   function normalizeCoreHit(hit) {
     if (!hit || typeof hit !== "object") return null;
 
