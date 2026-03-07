@@ -1388,7 +1388,7 @@
     return out.map(({ x, y, w, h }) => ({ x, y, w, h }));
   }
 
-  function tryMatcherCoreRectsForPage({ pdfjsLib, viewport, itemsOrTextContent, lang, pageNumber, enabledKeys, moneyMode, manualTerms }) {
+  function tryMatcherCoreRectsForPage({ pdfjsLib, viewport, itemsOrTextContent, pageNumber, lang, enabledKeys, moneyMode, manualTerms }) {
     const mc = getMatcherCore();
     if (!mc) return null;
 
@@ -1401,12 +1401,11 @@
     const coreRes = collectCoreHitsForPage({
       lang,
       pageText,
-      pageNumber,
+      ageNumber,
       enabledKeys,
       moneyMode,
       manualTerms
     });
-
     if (!coreRes || !coreRes.ok) return null;
 
     const rects = textItemsToRectsFromSpans(
@@ -1972,12 +1971,12 @@
           pdfjsLib,
           viewport: p.viewport,
           itemsOrTextContent,
-          lang,
           pageNumber: p.pageNumber,
+          lang,
           enabledKeys,
           moneyMode,
           manualTerms
-        });
+      });
 
         if (coreRes && coreRes.ok) {
           rects = Array.isArray(coreRes.rects) ? coreRes.rects : [];
