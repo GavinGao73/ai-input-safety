@@ -892,130 +892,201 @@
   }
 
   function collectCoreHitsForPage({ lang, pageText, pageNumber, enabledKeys, moneyMode, manualTerms }) {
-    const mc = getMatcherCore();
-    if (!mc) return null;
+  const mc = getMatcherCore();
+  if (!mc) return null;
 
-    const rawText = String(pageText || "");
-    if (!rawText.trim()) {
-      return {
-        ok: true,
-        spans: [],
-        debug: { reason: "empty-page-text" },
-        summary: { total: 0, byKey: {} }
-      };
+  const rawText = String(pageText || "");
+  if (!rawText.trim()) {
+    return {
+      ok: true,
+      spans: [],
+      debug: { reason: "empty-page-text" },
+      summary: { total: 0, byKey: {} }
+    };
+  }
+
+  // 1) 优先拿 pretty per-page text（来自 stage3/pdf.js）
+  let prettyText = rawText;
+  try {
+    const pagesText = window.__pdf_pages_text || window.lastPdfPagesText || [];
+    const hit = Array.isArray(pagesText)
+      ? pagesText.find((p) => Number(p && p.pageNumber) === Number(pageNumber))
+      : null;
+    if (hit && typeof hit.text === "string" && hit.text.trim()) {
+      prettyText = hit.text;
     }
+  } catch (_) {}
 
-    // ✅ 优先使用 stage3 / pdf.js 提供的 pretty per-page text
-    let prettyText = rawText;
+  // 2) 基础清洗：统一换行，去掉 PDF 里偶发的 NUL
+  prettyText = String(prettyText || "")
+    .replace(/\u0000/g, "")
+    .replace(/\r\n?/g, "\n")
+    .trim();
+
+  if (!prettyText) {
+    return {
+      ok: true,
+      spans: [],
+      debug: { reason: "pretty-text-empty-after-clean" },
+      summary: { total: 0, byKey: {} }
+    };
+  }
+
+  // 3) lang 兜底
+  const safeLang = (() => {
+    const l = String(lang || "").toLowerCase();
+    if (l === "zh" || l === "en" || l === "de") return l;
     try {
-      const pagesText = window.__pdf_pages_text || window.lastPdfPagesText || [];
-      const hit = Array.isArray(pagesText)
-        ? pagesText.find((p) => Number(p && p.pageNumber) === Number(pageNumber))
-        : null;
-      if (hit && typeof hit.text === "string" && hit.text.trim()) {
-        prettyText = hit.text;
-      }
+      const p = String(window.__matcher_core_probe?.lang || "").toLowerCase();
+      if (p === "zh" || p === "en" || p === "de") return p;
     } catch (_) {}
-
-    // ✅ 关键修复：
-    // matcher-core 的 normalizeDocument 需要 paged document shape，
-    // 不能直接喂 { text: "..." }
-    let normalized = null;
     try {
-      normalized = mc.normalizeDocument({
-        pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }],
-        fromPdf: true
-      });
-    } catch (_) {
-      normalized = null;
-    }
+      const r = String(window.ruleEngine || "").toLowerCase();
+      if (r === "zh" || r === "en" || r === "de") return r;
+    } catch (_) {}
+    return "zh";
+  })();
 
-    const attempts = [];
+  // 4) 规范化 enabledKeys / manualTerms
+  const safeEnabledKeys = Array.isArray(enabledKeys) ? enabledKeys.slice() : [];
+  const safeManualTerms = Array.isArray(manualTerms)
+    ? manualTerms.map((x) => String(x || "").trim()).filter(Boolean)
+    : [];
 
-    // A) normalized paged document
-    if (normalized && (
+  // 5) matcher-core 需要 paged document shape，不能直接 normalize { text }
+  let normalized = null;
+  try {
+    normalized = mc.normalizeDocument({
+      pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }],
+      fromPdf: true
+    });
+  } catch (_) {
+    normalized = null;
+  }
+
+  const attempts = [];
+
+  // A) normalized paged document（优先）
+  if (
+    normalized &&
+    (
       (typeof normalized.text === "string" && normalized.text.trim()) ||
       (Array.isArray(normalized.pages) && normalized.pages.length)
-    )) {
-      attempts.push(() => mc.matchDocument({
-        lang,
+    )
+  ) {
+    attempts.push({
+      label: "normalized-document",
+      run: () => mc.matchDocument({
+        lang: safeLang,
         document: normalized,
-        enabledKeys,
-        manualTerms,
+        enabledKeys: safeEnabledKeys,
+        manualTerms: safeManualTerms,
         moneyMode,
         fromPdf: true
-      }));
-    }
+      })
+    });
+  }
 
-    // B) raw paged document
-    attempts.push(() => mc.matchDocument({
-      lang,
+  // B) raw paged document
+  attempts.push({
+    label: "raw-paged-document",
+    run: () => mc.matchDocument({
+      lang: safeLang,
       document: {
         pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }],
         fromPdf: true
       },
-      enabledKeys,
-      manualTerms,
+      enabledKeys: safeEnabledKeys,
+      manualTerms: safeManualTerms,
       moneyMode,
       fromPdf: true
-    }));
+    })
+  });
 
-    // C) plain text fallback
-    attempts.push(() => mc.matchDocument({
-      lang,
+  // C) plain text fallback
+  attempts.push({
+    label: "plain-text",
+    run: () => mc.matchDocument({
+      lang: safeLang,
       text: prettyText,
-      enabledKeys,
-      manualTerms,
+      enabledKeys: safeEnabledKeys,
+      manualTerms: safeManualTerms,
       moneyMode,
       fromPdf: true
-    }));
+    })
+  });
 
-    let res = null;
-    let lastErr = null;
+  let res = null;
+  let lastErr = null;
+  let usedAttempt = "";
 
-    for (const run of attempts) {
-      try {
-        res = run();
-        if (res && typeof res.then === "function") {
-          throw new Error("matcher-core-async-not-supported-here");
-        }
-        if (res) {
-          const total =
-            Number(res?.summary?.total) ||
-            (Array.isArray(res?.hits) ? res.hits.length : 0) ||
-            (Array.isArray(res?.rawHits) ? res.rawHits.length : 0);
+  for (const step of attempts) {
+    try {
+      const out = step.run();
 
-          if (total > 0) break;
-        }
-      } catch (e) {
-        lastErr = e;
+      if (out && typeof out.then === "function") {
+        throw new Error("matcher-core-async-not-supported-here");
       }
+
+      if (!out) continue;
+
+      const total =
+        Number(out?.summary?.total) ||
+        (Array.isArray(out?.hits) ? out.hits.length : 0) ||
+        (Array.isArray(out?.rawHits) ? out.rawHits.length : 0) ||
+        (Array.isArray(out?.finalHits) ? out.finalHits.length : 0);
+
+      if (total > 0) {
+        res = out;
+        usedAttempt = step.label;
+        break;
+      }
+
+      // 保留“空结果”作为最后兜底，除非后面找到有命中的结果
+      if (!res) {
+        res = out;
+        usedAttempt = step.label;
+      }
+    } catch (e) {
+      lastErr = e;
     }
-
-    if (!res) {
-      if (lastErr) throw lastErr;
-      return null;
-    }
-
-    const rawHits =
-      Array.isArray(res.hits) ? res.hits :
-      Array.isArray(res.rawHits) ? res.rawHits :
-      Array.isArray(res.finalHits) ? res.finalHits :
-      [];
-
-    const spans = rawHits
-      .map(normalizeCoreHit)
-      .filter(Boolean)
-      .sort((x, y) => (x.a - y.a) || (x.b - y.b));
-
-    return {
-      ok: true,
-      spans,
-      debug: res && res.debug ? res.debug : null,
-      summary: res && res.summary ? res.summary : null
-    };
   }
 
+  if (!res) {
+    if (lastErr) throw lastErr;
+    return null;
+  }
+
+  const rawHits =
+    Array.isArray(res.hits) ? res.hits :
+    Array.isArray(res.rawHits) ? res.rawHits :
+    Array.isArray(res.finalHits) ? res.finalHits :
+    [];
+
+  const spans = rawHits
+    .map(normalizeCoreHit)
+    .filter(Boolean)
+    .filter((sp) => {
+      if (!sp || !sp.key) return false;
+      if (!Number.isFinite(sp.a) || !Number.isFinite(sp.b)) return false;
+      if (sp.b <= sp.a) return false;
+      if (sp.a < 0) return false;
+      if (sp.b > prettyText.length + 4) return false; // 宽松一点，防止极端边界误差
+      return true;
+    })
+    .sort((x, y) => (x.a - y.a) || (x.b - y.b));
+
+  return {
+    ok: true,
+    spans,
+    debug: Object.assign({}, res && res.debug ? res.debug : {}, {
+      attempt: usedAttempt,
+      pageNumber: Number(pageNumber) || 1,
+      pageTextLength: prettyText.length
+    }),
+    summary: res && res.summary ? res.summary : { total: spans.length, byKey: {} }
+  };
+}
   function textItemsToRectsFromSpans(pdfjsLib, viewport, textContentOrItems, spans, lang) {
     const Util = pdfjsLib.Util;
     const tuning = getLangTuning(lang);
