@@ -78,13 +78,11 @@
         number: 60
       },
 
-      // bbox clamp multipliers (by key group)
       bbox: {
-        // default clamps
         default: {
-          maxByPage: 0.30,   // viewport.width * ratio
-          maxByEst: 1.45,    // est * multiplier
-          wHardCapEstRatio: 2.2, // if w > est*ratio -> clamp to est*soft
+          maxByPage: 0.30,
+          maxByEst: 1.45,
+          wHardCapEstRatio: 2.2,
           wSoftCapEstMul: 1.15
         },
         longValue: {
@@ -139,11 +137,9 @@
         account: 90,
         bank: 140,
 
-        // legacy keys kept for compat
         address_de_street: 160,
         address_de_postal: 160,
 
-        // ✅ address keys (whitelist expansion)
         address_de_street_partial: 160,
         address_de_extra_partial: 160,
         address_de_inline_street: 160,
@@ -198,11 +194,9 @@
         account: 90,
         bank: 140,
 
-        // legacy keys kept for compat
         address_de_street: 160,
         address_de_postal: 160,
 
-        // ✅ address keys (whitelist expansion)
         address_de_street_partial: 160,
         address_de_extra_partial: 160,
         address_de_inline_street: 160,
@@ -251,11 +245,6 @@
     return LANG_TUNING[L] || LANG_TUNING.zh;
   }
 
-  // ======================================================
-  // E) Phase beacon (UI language aligned, in-memory only)
-  // - Updates window.__RasterExportLast.phase/phase2
-  // - Also mirrors a concise line into #exportStatus if present
-  // ======================================================
   function uiLang() {
     const l = String(window.currentLang || "").toLowerCase();
     return (l === "de" || l === "en" || l === "zh") ? l : "zh";
@@ -301,7 +290,6 @@
       window.__RasterExportLast = next;
     } catch (_) {}
 
-    // mirror to exportStatus (prepend one line; keep existing)
     try {
       const el = document.getElementById("exportStatus");
       if (!el) return;
@@ -313,12 +301,10 @@
       if (!prev) {
         el.textContent = line;
       } else {
-        // avoid infinite duplication
         if (!prev.startsWith(line)) el.textContent = line + "\n" + prev;
       }
     } catch (_) {}
 
-    // optional event (in case main.js wants to listen later)
     try {
       window.dispatchEvent(new CustomEvent("raster:phase", {
         detail: { when: Date.now(), phase: String(phase || ""), phase2: String(phase2 || "") }
@@ -326,7 +312,6 @@
     } catch (_) {}
   }
 
-  // --------- Safe dynamic loaders (no logs) ----------
   async function loadPdfJsIfNeeded() {
     if (window.pdfjsLib && window.pdfjsLib.getDocument) return window.pdfjsLib;
     if (__pdfjsLoadPromise) return __pdfjsLoadPromise;
@@ -334,7 +319,6 @@
     const base = pdfjsBaseUrl();
 
     __pdfjsLoadPromise = (async () => {
-      // ✅ Prefer same-origin pdf.min.js (fixes CORS issues with fonts/CMaps in practice)
       const candidates = [
         base + "pdf.min.js",
         `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.min.js`
@@ -364,12 +348,10 @@
         throw (lastErr || new Error("pdfjsLib not available"));
       }
 
-      // ✅ Prefer same-origin worker (critical: no fake worker / no CORS)
       try {
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = base + "pdf.worker.min.js";
       } catch (_) {}
 
-      // Fallback worker
       try {
         if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
           window.pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -383,7 +365,7 @@
     try {
       return await __pdfjsLoadPromise;
     } catch (e) {
-      __pdfjsLoadPromise = null; // ✅ allow retry
+      __pdfjsLoadPromise = null;
       throw e;
     }
   }
@@ -410,7 +392,7 @@
     try {
       return await __pdflibLoadPromise;
     } catch (e) {
-      __pdflibLoadPromise = null; // ✅ allow retry
+      __pdflibLoadPromise = null;
       throw e;
     }
   }
@@ -444,7 +426,6 @@
     setTimeout(() => URL.revokeObjectURL(url), 800);
   }
 
-  // --------- Canvas helpers ----------
   function createCanvas(w, h) {
     const c = document.createElement("canvas");
     c.width = Math.max(1, Math.floor(w));
@@ -452,7 +433,6 @@
     return c;
   }
 
-  // ✅ SOLID BLACK ONLY — NO TEXT
   function drawRedactionsOnCanvas(canvas, rects) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -481,26 +461,18 @@
     return new Uint8Array(ab);
   }
 
-  // --------- PDF render ----------
   async function renderPdfToCanvases(file, dpi) {
     const pdfjsLib = await loadPdfJsIfNeeded();
     const ab = await readFileAsArrayBuffer(file);
 
-    // ✅ SAME-ORIGIN CMap + standard fonts base URLs (needed for correct text rendering)
     const BASE = pdfjsBaseUrl();
 
     const loadingTask = pdfjsLib.getDocument({
       data: ab,
-
-      // ✅ keep consistent with probe
       disableFontFace: false,
       useSystemFonts: true,
-
-      // CMaps (font character maps)
       cMapUrl: BASE + "cmaps/",
       cMapPacked: true,
-
-      // Standard font data (LiberationSans, etc.)
       standardFontDataUrl: BASE + "standard_fonts/"
     });
 
@@ -532,7 +504,6 @@
     return { pdf, pages, dpi: dpi || DEFAULT_DPI };
   }
 
-  // --------- Manual terms parsing ----------
   function normalizeTerm(s) {
     return String(s || "").trim();
   }
@@ -559,14 +530,12 @@
   }
 
   function resolveManualTermsFromOptsOrSnapshot(opts) {
-    // 1) explicit opts.manualTerms (string or array)
     const mt = opts && opts.manualTerms;
     let terms = [];
 
     if (Array.isArray(mt)) terms = mt.map(normalizeTerm).filter(Boolean);
     else if (typeof mt === "string") terms = splitTerms(mt);
 
-    // 2) fallback to export snapshot (compat)
     if (!terms.length) {
       const snap = window.__export_snapshot || {};
       if (Array.isArray(snap.manualTerms)) terms = snap.manualTerms.map(normalizeTerm).filter(Boolean);
@@ -574,16 +543,13 @@
       else if (Array.isArray(snap.nameList)) terms = snap.nameList.map(normalizeTerm).filter(Boolean);
     }
 
-    // cap for perf
     return dedupKeepOrder(terms, 24);
   }
 
-  // --------- Manual terms regex helpers ----------
   function escapeRegExp(s) {
     return String(s || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
-  // Latin term: exact word match with boundaries (EN/DE)
   function makeLatinExactRegex(term) {
     const t = String(term || "").trim();
     if (!t) return null;
@@ -591,8 +557,6 @@
     try { return new RegExp(`\\b${src}\\b`, "iu"); } catch (_) { return null; }
   }
 
-  // CJK term: loose boundary (avoid attaching to other CJK blocks)
-  // NOTE: Left boundary is consumed (group1), actual term is group2.
   function makeCjkLooseRegex(term) {
     const t = String(term || "").trim();
     if (!t) return null;
@@ -600,7 +564,6 @@
     try { return new RegExp(`(^|[^\\u4E00-\\u9FFF])(${src})(?=$|[^\\u4E00-\\u9FFF])`, "u"); } catch (_) { return null; }
   }
 
-  // --------- Packs/Policy accessors (NO rules.js dependency) ----------
   function getEnginePolicy() {
     return window.__ENGINE_POLICY__ || {};
   }
@@ -627,7 +590,6 @@
     const pol = getEnginePolicy();
     if (Array.isArray(pol.defaultPriority) && pol.defaultPriority.length) return pol.defaultPriority.slice(0);
 
-    // last resort: keep old behavior
     return [
       "person_name",
       "company",
@@ -662,7 +624,6 @@
     return s;
   }
 
-  // --------- Rules -> matchers (from packs/policy) ----------
   function buildRuleMatchers(lang, enabledKeys, moneyMode, manualTerms) {
     const PRIORITY = getPriorityForLang(lang);
     const ALWAYS_ON = getAlwaysOnSetForLang(lang);
@@ -701,7 +662,6 @@
       try { return new RegExp(re.source, flags); } catch (_) { return null; }
     }
 
-    // ✅ Manual terms matcher(s): highest priority
     const terms = Array.isArray(manualTerms) ? manualTerms : [];
     for (const termRaw of terms) {
       const term = String(termRaw || "").trim();
@@ -716,7 +676,6 @@
       matchers.push({ key: "manual_term", re, mode: "manual", __term: term });
     }
 
-    // Built-in rules
     for (const k of PRIORITY) {
       if (k === "money") {
         if (!moneyMode || moneyMode === "off") continue;
@@ -739,18 +698,10 @@
       matchers.push({ key: k, re, mode: r.mode || "" });
     }
 
-    // Ensure manual first
     matchers.sort((a, b) => (a.key === "manual_term" ? -1 : 0) - (b.key === "manual_term" ? -1 : 0));
-
     return matchers;
   }
 
-  // ======================================================
-  // Mode A improvement: prefer items from stage3 probe (if exposed)
-  // - stage3.js currently caches lastPdfPagesItems in-memory.
-  // - This exporter can optionally read:
-  //   window.lastPdfPagesItems OR window.__pdf_pages_items (compat).
-  // ======================================================
   function getCachedPagesItems() {
     try {
       const a = window.lastPdfPagesItems;
@@ -776,7 +727,6 @@
     return null;
   }
 
-  // ✅ PATCH: normalize cached items shape (avoid rect=0 when transform/width missing)
   function normalizeCachedItems(items) {
     if (!Array.isArray(items)) return [];
     return items.map((it) => ({
@@ -787,12 +737,6 @@
       hasEOL: !!(it && it.hasEOL)
     }));
   }
-
-  // ======================================================
-  // Phase 2-A: matcher-core first, regex fallback
-  // - readable PDF export prefers unified matcher core
-  // - if core missing / throws / bad payload -> fallback to legacy regex path
-  // ======================================================
 
   function getMatcherCore() {
     try {
@@ -809,132 +753,116 @@
   }
 
   function buildPageTextAndRangesFromItems(textContentOrItems) {
-  const items =
-    Array.isArray(textContentOrItems) ? textContentOrItems :
-    (textContentOrItems && Array.isArray(textContentOrItems.items)) ? textContentOrItems.items :
-    [];
+    const items =
+      Array.isArray(textContentOrItems) ? textContentOrItems :
+      (textContentOrItems && Array.isArray(textContentOrItems.items)) ? textContentOrItems.items :
+      [];
 
-  if (!items.length) {
-    return { items: [], pageText: "", itemRanges: [] };
-  }
-
-  function isWs(ch) {
-    return ch === " " || ch === "\n" || ch === "\t" || ch === "\r";
-  }
-
-  // ✅ 与 assets/pdf.js 的 buildPrettyTextFromPdfItems 保持一致
-  function needSpaceBetween(line, chunk) {
-    if (!line || !chunk) return false;
-
-    const a = line[line.length - 1];
-    const b = chunk[0];
-
-    const aIsCjk = /[\u4E00-\u9FFF]/.test(a);
-    const bIsCjk = /[\u4E00-\u9FFF]/.test(b);
-
-    let needSpace = true;
-
-    // CJK adjacency: no space
-    if (aIsCjk || bIsCjk) needSpace = false;
-
-    // next chunk begins with punctuation/brackets -> no space
-    if (/^[\s\)\]\}\.,;:\/]/.test(chunk)) needSpace = false;
-
-    // previous ends with opening bracket/slash/hyphen -> no space
-    if (/[\s\-\(\[\{\/]$/.test(line)) needSpace = false;
-
-    return needSpace;
-  }
-
-  // 1) 先转成 rows，和 pdf.js 一样按 y 分组
-  const rows = [];
-
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
-    const s0 = String((it && it.str) || "");
-    const s = s0.replace(/\s+/g, " ").trim();
-    if (!s) continue;
-
-    const tr = Array.isArray(it && it.transform) ? it.transform : [];
-    const x = Number(tr[4] || 0);
-    const y = Number(tr[5] || 0);
-
-    // ✅ 与 pdf.js 保持一致
-    const yKey = Math.round(y * 2) / 2;
-
-    rows.push({
-      idx: i,
-      s,
-      x,
-      y: yKey
-    });
-  }
-
-  if (!rows.length) {
-    return { items, pageText: "", itemRanges: [] };
-  }
-
-  // 2) top->bottom, left->right
-  rows.sort((a, b) => (b.y - a.y) || (a.x - b.x));
-
-  // 3) 按 y 分行
-  const lines = [];
-  const Y_EPS = 1.2;
-
-  for (const r of rows) {
-    const last = lines[lines.length - 1];
-    if (!last || Math.abs(last.y - r.y) > Y_EPS) {
-      lines.push({ y: r.y, parts: [r] });
-    } else {
-      last.parts.push(r);
-    }
-  }
-
-  // 4) 组装 pageText，并记录每个 chunk 的 text range
-  let pageText = "";
-  const itemRanges = [];
-  let prevY = null;
-
-  for (const ln of lines) {
-    ln.parts.sort((a, b) => a.x - b.x);
-
-    // ✅ 与 pdf.js 保持一致：大行距插入空行
-    if (prevY !== null) {
-      const gap = prevY - ln.y;
-      if (gap > 12) {
-        pageText += "\n\n";
-      } else if (pageText && !pageText.endsWith("\n")) {
-        pageText += "\n";
-      }
+    if (!items.length) {
+      return { items: [], pageText: "", itemRanges: [] };
     }
 
-    let lineText = "";
+    function needSpaceBetween(line, chunk) {
+      if (!line || !chunk) return false;
 
-    for (const part of ln.parts) {
-      const chunk = part.s;
-      if (!chunk) continue;
+      const a = line[line.length - 1];
+      const b = chunk[0];
 
-      if (lineText && needSpaceBetween(lineText, chunk)) {
-        lineText += " ";
-      }
+      const aIsCjk = /[\u4E00-\u9FFF]/.test(a);
+      const bIsCjk = /[\u4E00-\u9FFF]/.test(b);
 
-      const startInLine = lineText.length;
-      lineText += chunk;
-      const endInLine = lineText.length;
+      let needSpace = true;
 
-      itemRanges.push({
-        idx: part.idx,
-        start: pageText.length + startInLine,
-        end: pageText.length + endInLine
+      if (aIsCjk || bIsCjk) needSpace = false;
+      if (/^[\s\)\]\}\.,;:\/]/.test(chunk)) needSpace = false;
+      if (/[\s\-\(\[\{\/]$/.test(line)) needSpace = false;
+
+      return needSpace;
+    }
+
+    const rows = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const s0 = String((it && it.str) || "");
+      const s = s0.replace(/\s+/g, " ").trim();
+      if (!s) continue;
+
+      const tr = Array.isArray(it && it.transform) ? it.transform : [];
+      const x = Number(tr[4] || 0);
+      const y = Number(tr[5] || 0);
+      const yKey = Math.round(y * 2) / 2;
+
+      rows.push({
+        idx: i,
+        s,
+        x,
+        y: yKey
       });
     }
 
-    pageText += lineText;
-    prevY = ln.y;
+    if (!rows.length) {
+      return { items, pageText: "", itemRanges: [] };
+    }
+
+    rows.sort((a, b) => (b.y - a.y) || (a.x - b.x));
+
+    const lines = [];
+    const Y_EPS = 1.2;
+
+    for (const r of rows) {
+      const last = lines[lines.length - 1];
+      if (!last || Math.abs(last.y - r.y) > Y_EPS) {
+        lines.push({ y: r.y, parts: [r] });
+      } else {
+        last.parts.push(r);
+      }
+    }
+
+    let pageText = "";
+    const itemRanges = [];
+    let prevY = null;
+
+    for (const ln of lines) {
+      ln.parts.sort((a, b) => a.x - b.x);
+
+      if (prevY !== null) {
+        const gap = prevY - ln.y;
+        if (gap > 12) {
+          pageText += "\n\n";
+        } else if (pageText && !pageText.endsWith("\n")) {
+          pageText += "\n";
+        }
+      }
+
+      let lineText = "";
+
+      for (const part of ln.parts) {
+        const chunk = part.s;
+        if (!chunk) continue;
+
+        if (lineText && needSpaceBetween(lineText, chunk)) {
+          lineText += " ";
+        }
+
+        const startInLine = lineText.length;
+        lineText += chunk;
+        const endInLine = lineText.length;
+
+        itemRanges.push({
+          idx: part.idx,
+          start: pageText.length + startInLine,
+          end: pageText.length + endInLine
+        });
+      }
+
+      pageText += lineText;
+      prevY = ln.y;
+    }
+
+    return { items, pageText, itemRanges };
   }
 
-  return { items, pageText, itemRanges };
-}
   function normalizeCoreHit(hit) {
     if (!hit || typeof hit !== "object") return null;
 
@@ -974,201 +902,193 @@
   }
 
   function collectCoreHitsForPage({ lang, pageText, pageNumber, enabledKeys, moneyMode, manualTerms }) {
-  const mc = getMatcherCore();
-  if (!mc) return null;
+    const mc = getMatcherCore();
+    if (!mc) return null;
 
-  const rawText = String(pageText || "");
-  if (!rawText.trim()) {
-    return {
-      ok: true,
-      spans: [],
-      debug: { reason: "empty-page-text" },
-      summary: { total: 0, byKey: {} }
-    };
-  }
-
-  // 1) 优先拿 pretty per-page text（来自 stage3/pdf.js）
-  let prettyText = rawText;
-  try {
-    const pagesText = window.__pdf_pages_text || window.lastPdfPagesText || [];
-    const hit = Array.isArray(pagesText)
-      ? pagesText.find((p) => Number(p && p.pageNumber) === Number(pageNumber))
-      : null;
-    if (hit && typeof hit.text === "string" && hit.text.trim()) {
-      prettyText = hit.text;
+    const rawText = String(pageText || "");
+    if (!rawText.trim()) {
+      return {
+        ok: true,
+        spans: [],
+        debug: { reason: "empty-page-text" },
+        summary: { total: 0, byKey: {} }
+      };
     }
-  } catch (_) {}
 
-  // 2) 基础清洗：统一换行，去掉 PDF 里偶发的 NUL
-  prettyText = String(prettyText || "")
-    .replace(/\u0000/g, "")
-    .replace(/\r\n?/g, "\n")
-    .trim();
-
-  if (!prettyText) {
-    return {
-      ok: true,
-      spans: [],
-      debug: { reason: "pretty-text-empty-after-clean" },
-      summary: { total: 0, byKey: {} }
-    };
-  }
-
-  // 3) lang 兜底
-  const safeLang = (() => {
-    const l = String(lang || "").toLowerCase();
-    if (l === "zh" || l === "en" || l === "de") return l;
+    let prettyText = rawText;
     try {
-      const p = String(window.__matcher_core_probe?.lang || "").toLowerCase();
-      if (p === "zh" || p === "en" || p === "de") return p;
+      const pagesText = window.__pdf_pages_text || window.lastPdfPagesText || [];
+      const hit = Array.isArray(pagesText)
+        ? pagesText.find((p) => Number(p && p.pageNumber) === Number(pageNumber))
+        : null;
+      if (hit && typeof hit.text === "string" && hit.text.trim()) {
+        prettyText = hit.text;
+      }
     } catch (_) {}
+
+    prettyText = String(prettyText || "")
+      .replace(/\u0000/g, "")
+      .replace(/\r\n?/g, "\n")
+      .trim();
+
+    if (!prettyText) {
+      return {
+        ok: true,
+        spans: [],
+        debug: { reason: "pretty-text-empty-after-clean" },
+        summary: { total: 0, byKey: {} }
+      };
+    }
+
+    const safeLang = (() => {
+      const l = String(lang || "").toLowerCase();
+      if (l === "zh" || l === "en" || l === "de") return l;
+      try {
+        const p = String(window.__matcher_core_probe?.lang || "").toLowerCase();
+        if (p === "zh" || p === "en" || p === "de") return p;
+      } catch (_) {}
+      try {
+        const r = String(window.ruleEngine || "").toLowerCase();
+        if (r === "zh" || r === "en" || r === "de") return r;
+      } catch (_) {}
+      return "zh";
+    })();
+
+    const safeEnabledKeys = Array.isArray(enabledKeys) ? enabledKeys.slice() : [];
+    const safeManualTerms = Array.isArray(manualTerms)
+      ? manualTerms.map((x) => String(x || "").trim()).filter(Boolean)
+      : [];
+
+    let normalized = null;
     try {
-      const r = String(window.ruleEngine || "").toLowerCase();
-      if (r === "zh" || r === "en" || r === "de") return r;
-    } catch (_) {}
-    return "zh";
-  })();
+      normalized = mc.normalizeDocument({
+        pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }],
+        fromPdf: true
+      });
+    } catch (_) {
+      normalized = null;
+    }
 
-  // 4) 规范化 enabledKeys / manualTerms
-  const safeEnabledKeys = Array.isArray(enabledKeys) ? enabledKeys.slice() : [];
-  const safeManualTerms = Array.isArray(manualTerms)
-    ? manualTerms.map((x) => String(x || "").trim()).filter(Boolean)
-    : [];
+    const attempts = [];
 
-  // 5) matcher-core 需要 paged document shape，不能直接 normalize { text }
-  let normalized = null;
-  try {
-    normalized = mc.normalizeDocument({
-      pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }],
-      fromPdf: true
-    });
-  } catch (_) {
-    normalized = null;
-  }
+    if (
+      normalized &&
+      (
+        (typeof normalized.text === "string" && normalized.text.trim()) ||
+        (Array.isArray(normalized.pages) && normalized.pages.length)
+      )
+    ) {
+      attempts.push({
+        label: "normalized-document",
+        run: () => mc.matchDocument({
+          lang: safeLang,
+          document: normalized,
+          enabledKeys: safeEnabledKeys,
+          manualTerms: safeManualTerms,
+          moneyMode,
+          fromPdf: true
+        })
+      });
+    }
 
-  const attempts = [];
-
-  // A) normalized paged document（优先）
-  if (
-    normalized &&
-    (
-      (typeof normalized.text === "string" && normalized.text.trim()) ||
-      (Array.isArray(normalized.pages) && normalized.pages.length)
-    )
-  ) {
     attempts.push({
-      label: "normalized-document",
+      label: "raw-paged-document",
       run: () => mc.matchDocument({
         lang: safeLang,
-        document: normalized,
+        document: {
+          pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }],
+          fromPdf: true
+        },
         enabledKeys: safeEnabledKeys,
         manualTerms: safeManualTerms,
         moneyMode,
         fromPdf: true
       })
     });
-  }
 
-  // B) raw paged document
-  attempts.push({
-    label: "raw-paged-document",
-    run: () => mc.matchDocument({
-      lang: safeLang,
-      document: {
-        pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }],
+    attempts.push({
+      label: "plain-text",
+      run: () => mc.matchDocument({
+        lang: safeLang,
+        text: prettyText,
+        enabledKeys: safeEnabledKeys,
+        manualTerms: safeManualTerms,
+        moneyMode,
         fromPdf: true
-      },
-      enabledKeys: safeEnabledKeys,
-      manualTerms: safeManualTerms,
-      moneyMode,
-      fromPdf: true
-    })
-  });
+      })
+    });
 
-  // C) plain text fallback
-  attempts.push({
-    label: "plain-text",
-    run: () => mc.matchDocument({
-      lang: safeLang,
-      text: prettyText,
-      enabledKeys: safeEnabledKeys,
-      manualTerms: safeManualTerms,
-      moneyMode,
-      fromPdf: true
-    })
-  });
+    let res = null;
+    let lastErr = null;
+    let usedAttempt = "";
 
-  let res = null;
-  let lastErr = null;
-  let usedAttempt = "";
+    for (const step of attempts) {
+      try {
+        const out = step.run();
 
-  for (const step of attempts) {
-    try {
-      const out = step.run();
+        if (out && typeof out.then === "function") {
+          throw new Error("matcher-core-async-not-supported-here");
+        }
 
-      if (out && typeof out.then === "function") {
-        throw new Error("matcher-core-async-not-supported-here");
+        if (!out) continue;
+
+        const total =
+          Number(out?.summary?.total) ||
+          (Array.isArray(out?.hits) ? out.hits.length : 0) ||
+          (Array.isArray(out?.rawHits) ? out.rawHits.length : 0) ||
+          (Array.isArray(out?.finalHits) ? out.finalHits.length : 0);
+
+        if (total > 0) {
+          res = out;
+          usedAttempt = step.label;
+          break;
+        }
+
+        if (!res) {
+          res = out;
+          usedAttempt = step.label;
+        }
+      } catch (e) {
+        lastErr = e;
       }
-
-      if (!out) continue;
-
-      const total =
-        Number(out?.summary?.total) ||
-        (Array.isArray(out?.hits) ? out.hits.length : 0) ||
-        (Array.isArray(out?.rawHits) ? out.rawHits.length : 0) ||
-        (Array.isArray(out?.finalHits) ? out.finalHits.length : 0);
-
-      if (total > 0) {
-        res = out;
-        usedAttempt = step.label;
-        break;
-      }
-
-      // 保留“空结果”作为最后兜底，除非后面找到有命中的结果
-      if (!res) {
-        res = out;
-        usedAttempt = step.label;
-      }
-    } catch (e) {
-      lastErr = e;
     }
+
+    if (!res) {
+      if (lastErr) throw lastErr;
+      return null;
+    }
+
+    const rawHits =
+      Array.isArray(res.hits) ? res.hits :
+      Array.isArray(res.rawHits) ? res.rawHits :
+      Array.isArray(res.finalHits) ? res.finalHits :
+      [];
+
+    const spans = rawHits
+      .map(normalizeCoreHit)
+      .filter(Boolean)
+      .filter((sp) => {
+        if (!sp || !sp.key) return false;
+        if (!Number.isFinite(sp.a) || !Number.isFinite(sp.b)) return false;
+        if (sp.b <= sp.a) return false;
+        if (sp.a < 0) return false;
+        if (sp.b > prettyText.length + 4) return false;
+        return true;
+      })
+      .sort((x, y) => (x.a - y.a) || (x.b - y.b));
+
+    return {
+      ok: true,
+      spans,
+      debug: Object.assign({}, res && res.debug ? res.debug : {}, {
+        attempt: usedAttempt,
+        pageNumber: Number(pageNumber) || 1,
+        pageTextLength: prettyText.length
+      }),
+      summary: res && res.summary ? res.summary : { total: spans.length, byKey: {} }
+    };
   }
 
-  if (!res) {
-    if (lastErr) throw lastErr;
-    return null;
-  }
-
-  const rawHits =
-    Array.isArray(res.hits) ? res.hits :
-    Array.isArray(res.rawHits) ? res.rawHits :
-    Array.isArray(res.finalHits) ? res.finalHits :
-    [];
-
-  const spans = rawHits
-    .map(normalizeCoreHit)
-    .filter(Boolean)
-    .filter((sp) => {
-      if (!sp || !sp.key) return false;
-      if (!Number.isFinite(sp.a) || !Number.isFinite(sp.b)) return false;
-      if (sp.b <= sp.a) return false;
-      if (sp.a < 0) return false;
-      if (sp.b > prettyText.length + 4) return false; // 宽松一点，防止极端边界误差
-      return true;
-    })
-    .sort((x, y) => (x.a - y.a) || (x.b - y.b));
-
-  return {
-    ok: true,
-    spans,
-    debug: Object.assign({}, res && res.debug ? res.debug : {}, {
-      attempt: usedAttempt,
-      pageNumber: Number(pageNumber) || 1,
-      pageTextLength: prettyText.length
-    }),
-    summary: res && res.summary ? res.summary : { total: spans.length, byKey: {} }
-  };
-}  
   function textItemsToRectsFromSpans(pdfjsLib, viewport, textContentOrItems, spans, lang) {
     const Util = pdfjsLib.Util;
     const tuning = getLangTuning(lang);
@@ -1508,15 +1428,10 @@
     };
   }
 
-  // --------- Text items -> rects (value-first, keep labels) ----------
   function textItemsToRects(pdfjsLib, viewport, textContentOrItems, matchers, lang) {
     const Util = pdfjsLib.Util;
-
     const tuning = getLangTuning(lang);
 
-    // accept either:
-    // - textContent = { items:[...] }
-    // - items = [...]
     const items =
       Array.isArray(textContentOrItems) ? textContentOrItems :
       (textContentOrItems && Array.isArray(textContentOrItems.items)) ? textContentOrItems.items :
@@ -1524,7 +1439,6 @@
 
     if (!items.length || !matchers || !matchers.length) return [];
 
-    // ✅ hard guard: avoid over-redacting if a rule accidentally matches huge spans
     const MAX_MATCH_LEN = Object.assign({}, (tuning && tuning.maxMatchLen) || {});
 
     function isWs(ch) {
@@ -1555,7 +1469,6 @@
       const isLongValueKey =
         key === "account" || key === "phone" || key === "email" || key === "bank";
 
-      // ✅ whitelist: address keys across packs
       const isAddressKey =
         key === "address_de_street" || key === "address_de_postal" ||
         key === "address_de_street_partial" || key === "address_de_extra_partial" || key === "address_de_inline_street" ||
@@ -1569,18 +1482,15 @@
       return "default";
     }
 
-    // ✅ Better bbox: derive width from it.width * scaleX when possible.
     function bboxForItem(it, key) {
       const tx = Util.transform(viewport.transform, it.transform || [1, 0, 0, 1, 0, 0]);
 
       const x = Number(tx[4] || 0);
       const y = Number(tx[5] || 0);
 
-      // scale factors
       const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
       const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
 
-      // font height estimate
       let fontH = sy * 1.0;
       if (!Number.isFinite(fontH) || fontH <= 0) {
         fontH = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
@@ -1590,14 +1500,12 @@
 
       const s = String(it.str || "");
 
-      // width: prefer it.width * sx (PDF.js width is in text space units)
       let w = 0;
       try {
         const iw = Number(it.width || 0);
         if (Number.isFinite(iw) && iw > 0) w = iw * sx;
       } catch (_) {}
 
-      // fallback if width missing
       if (!Number.isFinite(w) || w <= 0) w = Math.max(8, s.length * fontH * 0.88);
 
       const est = Math.max(10, s.length * fontH * 0.90);
@@ -1606,7 +1514,6 @@
       const bboxCfg = (tuning && tuning.bbox) || {};
       const cfg = bboxCfg[group] || bboxCfg.default || { maxByPage: 0.30, maxByEst: 1.45, wHardCapEstRatio: 2.2, wSoftCapEstMul: 1.15 };
 
-      // hard cap extremely wide items
       const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
       const softMul = Number(cfg.wSoftCapEstMul || 1.15);
       if (w > est * hardRatio) w = est * softMul;
@@ -1615,9 +1522,7 @@
       const maxByEst = est * Number(cfg.maxByEst || 1.45);
       w = clamp(w, 1, Math.min(maxByPage, maxByEst));
 
-      const isLongValueKey =
-        group === "longValue";
-
+      const isLongValueKey = group === "longValue";
       const minW = isLongValueKey ? (est * 0.95) : (est * 0.85);
       w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.40 : 0.20)));
 
@@ -1629,9 +1534,8 @@
       return { x: rx, y: ry, w: rw, h: rh };
     }
 
-    // ✅ shrinkByLabel: language-split vocab (reduce masking labels)
     function shrinkByLabel(key, s, ls, le) {
-      if (key === "manual_term") return { ls, le }; // DO NOT shrink
+      if (key === "manual_term") return { ls, le };
 
       if (le <= ls) return { ls, le };
       const sub = s.slice(ls, le);
@@ -1639,7 +1543,6 @@
       const labels = (tuning && tuning.shrinkLabels) || {};
       function makeLabelPrefixRe(words) {
         if (!Array.isArray(words) || !words.length) return null;
-        // Build: ^(?:A|B|C)\s*[:：]?\s*
         const parts = words
           .map((w) => String(w || "").trim())
           .filter(Boolean)
@@ -1696,7 +1599,6 @@
       return pad[key] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
     }
 
-    // Build pageText + item ranges
     let pageText = "";
     const itemRanges = [];
 
@@ -1721,12 +1623,7 @@
       if (it && it.hasEOL) pageText += "\n";
     }
 
-    // ✅ CRITICAL FIX:
-    // Do NOT convert '\n' to spaces (it enables cross-line greedy matches).
-    // Use a sentinel char that typical rules won't match (\u0000).
     const matchText = pageText.replace(/\n/g, "\u0000");
-
-    // spans = {a,b,key,preferSub?}
     const spans = [];
 
     for (const mm of matchers) {
@@ -1743,17 +1640,13 @@
         let b = a + h.len;
         const key = mm.key;
 
-        // ✅ length guard (avoid catastrophic over-redaction)
         const maxLen = MAX_MATCH_LEN[key] || 120;
         if ((b - a) > maxLen) continue;
 
         const m = h.m || [];
         const full = String(m[0] || "");
-
-        // if match contains sentinel, skip
         if (full.indexOf("\u0000") >= 0) continue;
 
-        // ✅ manual_term: adjust span to the real term (avoid left-boundary char in group1)
         if (key === "manual_term") {
           const g2 = (m[2] != null) ? String(m[2]) : "";
           const g1 = (m[1] != null) ? String(m[1]) : "";
@@ -1765,14 +1658,12 @@
               b = a + term.length;
             }
           }
-          // extra guard
           if ((b - a) <= 0 || (b - a) > (MAX_MATCH_LEN.manual_term || 90)) continue;
 
           spans.push({ a, b, key, preferSub: null });
           continue;
         }
 
-        // keep preferSub logic for existing keys only
         let preferSub = null;
 
         function findSubOffsets(subStr) {
@@ -1828,10 +1719,9 @@
 
     if (!spans.length) return [];
 
-    // Merge spans (same key + overlap/close)
     spans.sort((x, y) => (x.a - y.a) || (x.b - y.b));
     const merged = [];
-    const MERGE_GAP = 0; // tighter
+    const MERGE_GAP = 0;
 
     function samePreferSub(p, q) {
       if (!p && !q) return true;
@@ -1858,7 +1748,6 @@
       }
     }
 
-    // Map spans -> rects
     const rects = [];
 
     for (const sp of merged) {
@@ -1906,7 +1795,6 @@
         const x1 = bb.x + bb.w * (ls / len);
         const x2 = bb.x + bb.w * (le / len);
 
-        // ✅ Key-aware padding (language tunable)
         const pcfg = getPadForKey(key);
         const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
         const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
@@ -1921,19 +1809,16 @@
         rw = clamp(rw, 1, viewport.width - rx);
         rh = clamp(rh, 6, viewport.height - ry);
 
-        // ✅ 人名宽度护栏
         if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
           const maxW = Math.min(viewport.width * 0.22, bb.w * 0.55);
           if (rw > maxW) continue;
         }
 
-        // ✅ 公司核心词宽度护栏
         if (key === "company") {
           const maxW = Math.min(viewport.width * 0.18, bb.w * 0.45);
           if (rw > maxW) continue;
         }
 
-        // ✅ 手工词条宽度护栏（防止误涂整行）
         if (key === "manual_term") {
           const maxW = Math.min(viewport.width * 0.28, bb.w * 0.70);
           if (rw > maxW) continue;
@@ -1949,7 +1834,6 @@
 
     if (!rects.length) return [];
 
-    // Conservative merge of rects on same line & same key only
     rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
     const out = [];
 
@@ -1991,7 +1875,7 @@
       }
     }
 
-    return out.map(({ x, y, w, h }) => ({ x, y, w, h }));
+    return out.map(({ x, y, w, h, key }) => ({ x, y, w, h, key }));
   }
 
   async function autoRedactReadablePdf({ file, lang, enabledKeys, moneyMode, dpi, manualTerms }) {
@@ -2000,9 +1884,8 @@
     const pdfjsLib = await loadPdfJsIfNeeded();
     const { pdf, pages } = await renderPdfToCanvases(file, dpi || DEFAULT_DPI);
 
-    // legacy fallback matcher list stays alive
     const matchers = buildRuleMatchers(lang, enabledKeys, moneyMode, manualTerms);
-    const _placeholder = langPlaceholder(lang); // kept for compat (not used)
+    const _placeholder = langPlaceholder(lang);
 
     try {
       const PACKS = window.__ENGINE_LANG_PACKS__ || {};
@@ -2058,7 +1941,7 @@
           enabledKeys,
           moneyMode,
           manualTerms
-      });
+        });
 
         if (coreRes && coreRes.ok) {
           rects = Array.isArray(coreRes.rects) ? coreRes.rects : [];
@@ -2075,7 +1958,6 @@
         rectSource = "legacy-regex";
       }
 
-      // ---- per-page debug snapshot (safe, in-memory only) ----
       try {
         const last = window.__RasterExportLast || {};
         const prevPerPage = Array.isArray(last.perPage) ? last.perPage : [];
@@ -2086,29 +1968,29 @@
           (itemsOrTextContent && Array.isArray(itemsOrTextContent.items)) ? itemsOrTextContent.items.length :
           0;
 
-try {
-  window.__RasterExportLast = Object.assign({}, last, {
-    perPage: prevPerPage.concat([{
-      pageNumber: p.pageNumber,
-      items: itemCount,
-      rectCount,
-      rectSource,
-      coreHitCount,
-      coreFailed,
-      coreError,
-      rects: (Array.isArray(rects)
-        ? rects.slice(0, 10).map((r) => ({
-            key: r.key || "",
-            x: r.x,
-            y: r.y,
-            w: r.w,
-            h: r.h
-          }))
-        : [])
-    }]),
-    rectsTotal: (Number(last.rectsTotal) || 0) + rectCount
-  });
-} catch (_) {}
+        window.__RasterExportLast = Object.assign({}, last, {
+          perPage: prevPerPage.concat([{
+            pageNumber: p.pageNumber,
+            items: itemCount,
+            rectCount,
+            rectSource,
+            coreHitCount,
+            coreFailed,
+            coreError,
+            rects: (Array.isArray(rects)
+              ? rects.slice(0, 10).map((r) => ({
+                  key: r.key || "",
+                  x: r.x,
+                  y: r.y,
+                  w: r.w,
+                  h: r.h
+                }))
+              : [])
+          }]),
+          rectsTotal: (Number(last.rectsTotal) || 0) + rectCount
+        });
+      } catch (_) {}
+
       setRasterPhase("autoRedactReadablePdf:apply", `p${p.pageNumber}`);
       drawRedactionsOnCanvas(p.canvas, rects);
     }
@@ -2117,7 +1999,6 @@ try {
     return pages;
   }
 
-  // ✅ Image -> pages[] (and also compatible with {pages: [...]})
   async function renderImageToCanvas(file, dpi) {
     const dataUrl = await readFileAsDataURL(file);
     const img = await new Promise((resolve) => {
@@ -2140,7 +2021,6 @@ try {
       dpi: dpi || DEFAULT_DPI
     }];
 
-    // ✅ compat: allow callers to treat it as { pages: [...] }
     try { arr.pages = arr; } catch (_) {}
 
     return arr;
@@ -2180,26 +2060,17 @@ try {
     setRasterPhase("exportCanvasesToPdf:done", null);
   }
 
-  // ======================================================
-  // Mode B visual tuning helper (optional UI hook)
-  // - If redact-ui.js / styles are not available here, UI can call this
-  //   to style selection rectangles for white backgrounds.
-  // ======================================================
   function getModeBOverlayStyle() {
-    // High-contrast on white paper: vivid stroke + translucent fill + dashed edge
     return {
       stroke: "rgba(0, 255, 240, 0.95)",
       strokeWidth: 2,
       dash: [6, 4],
       fill: "rgba(0, 255, 240, 0.18)",
-      shadow: "rgba(0,0,0,0.35)", // optional if UI uses canvas shadow
+      shadow: "rgba(0,0,0,0.35)",
       shadowBlur: 4
     };
   }
 
-  // ======================================================
-  // Public API
-  // ======================================================
   const RasterExport = {
     async exportRasterSecurePdfFromReadablePdf(opts) {
       const file = opts && opts.file;
@@ -2207,10 +2078,8 @@ try {
 
       const lang = (opts && opts.lang) || "zh";
       const dpi = (opts && opts.dpi) || DEFAULT_DPI;
-
       const manualTerms = resolveManualTermsFromOptsOrSnapshot(opts);
 
-      // ---- status snapshot before work ----
       try {
         const PACKS = window.__ENGINE_LANG_PACKS__ || {};
         const pack = PACKS[lang] || PACKS.zh || null;
@@ -2240,7 +2109,6 @@ try {
 
       const name = (opts && opts.filename) || `raster_secure_${Date.now()}.pdf`;
 
-      // ---- status snapshot before export ----
       try {
         const last = window.__RasterExportLast || {};
         window.__RasterExportLast = Object.assign({}, last, {
@@ -2257,9 +2125,6 @@ try {
     },
 
     async exportRasterSecurePdfFromVisual(result) {
-      // Accept both:
-      // - result = { pages: [...], rectsByPage, dpi, filename }
-      // - result = pagesArray (compat)
       const pages =
         (result && Array.isArray(result.pages)) ? result.pages :
         (Array.isArray(result)) ? result :
@@ -2268,9 +2133,8 @@ try {
       if (!pages || !pages.length) return;
 
       const dpi = (result && result.dpi) ? result.dpi : DEFAULT_DPI;
-      const _placeholder = langPlaceholder((result && result.lang) || "zh"); // kept for compat (not used)
+      const _placeholder = langPlaceholder((result && result.lang) || "zh");
 
-      // ---- status snapshot ----
       try {
         window.__RasterExportLast = {
           when: Date.now(),
@@ -2297,18 +2161,13 @@ try {
       setRasterPhase("exportVisual:done", null);
     },
 
-    // UI helper for Mode B visibility
     getModeBOverlayStyle,
-
-    // debugging/inspection hook (safe): expose tuning table
     LANG_TUNING,
-
     renderPdfToCanvases,
     renderImageToCanvas,
     drawRedactionsOnCanvas
   };
 
-  // ---- minimal status beacon (no logs, in-memory only) ----
   try {
     const PACKS = window.__ENGINE_LANG_PACKS__ || {};
     const pack = PACKS.zh || null;
