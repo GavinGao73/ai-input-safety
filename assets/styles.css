@@ -10,6 +10,7 @@
    - ✅ FIX: remove bottom shadow/overlay that covered content when expanded
    - ✅ Mobile: show "图片" upload button only on small screens (optional)
    - ✅ FIX (2026-02-21a2): robust inner fill for equal-height lock (A/B)
+   - ✅ FIX (current): PDF source text is directly visible/selectable/copyable; remove overlay ghosting
    ========================= */
 
 :root{
@@ -285,7 +286,7 @@ textarea{
 }
 #inputWrap.has-content .input-watermark{ display:none; }
 
-/* ✅ overlay inset; ✅ hide scrollbars, keep scrollable for sync */
+/* Overlay kept for compatibility, but hidden in current readable/copyable mode */
 .input-overlay{
   display:none;
   position:absolute;
@@ -305,14 +306,19 @@ textarea{
   color: rgba(255,255,255,.92);
 }
 .input-overlay::-webkit-scrollbar{ width:0; height:0; }
-#inputWrap.pdf-overlay-on .input-overlay{ display:block; }
+
+/* ✅ current strategy: textarea itself stays visible; no overlay text layer to avoid ghosting */
+#inputWrap.pdf-overlay-on .input-overlay{ display:none; }
 
 #inputWrap.pdf-overlay-on textarea{
-  color: transparent;
-  caret-color: rgba(255,255,255,.88);
-  -webkit-text-fill-color: transparent;
+  color: rgba(255,255,255,.92);
+  caret-color: transparent;
+  -webkit-text-fill-color: rgba(255,255,255,.92);
 }
-#inputWrap.pdf-overlay-on textarea::selection{ background: transparent; }
+#inputWrap.pdf-overlay-on textarea::selection{
+  background: rgba(80, 140, 255, 0.35);
+  color: inherit;
+}
 
 .hit{
   background: rgba(255, 92, 92, 0.12);
@@ -495,9 +501,9 @@ textarea{
   /* ✅ FINAL: do NOT use height:100% (percent chain can break → card grows)
      Let railcard fill parent via flex, and NEVER be stretched by inner content. */
   flex:1 1 auto;
-  height:auto;              /* was: 100% */
+  height:auto;
   min-height:0;
-  overflow:hidden;          /* railcard itself never grows; inner scroll handles overflow */
+  overflow:hidden;
 }
 
 .railcard-progress-only{
@@ -521,8 +527,8 @@ textarea{
 
 /* ✅ CHANGED: make "使用说明" body text match exportStatus font size */
 .side-rail-note{
-  font-size:11px;            /* was 12px */
-  line-height:1.55;          /* align with exportStatus */
+  font-size:11px;
+  line-height:1.55;
   color:rgba(255,255,255,.82);
   white-space:pre-line;
   overflow-wrap:anywhere;
@@ -592,8 +598,8 @@ textarea{
 
 /* ✅ CHANGED: make risk advice match exportStatus font size */
 .riskadvice{
-  font-size:11px;            /* was 12px */
-  line-height:1.55;          /* align with exportStatus */
+  font-size:11px;
+  line-height:1.55;
   color:rgba(255,255,255,.82);
 }
 
@@ -610,10 +616,10 @@ textarea{
 /* 内层 exportStatus 只在内部滚动 */
 #exportStatus{
   flex: 1 1 auto;
-  min-height: 0;          /* ✅ 关键：允许在 flex 中变小，从而出现滚动 */
-  max-height: 100%;       /* ✅ 不超过 railcard 可用高度 */
-  overflow-y: auto;       /* ✅ 强制纵向滚动 */
-  overflow-x: hidden;     /* 可选：避免横向撑开 */
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   font-size: 11px;
   line-height: 1.55;
   color: rgba(255,255,255,.80);
@@ -668,14 +674,14 @@ textarea{
 
   .io-tabs{
     display:flex;
-    gap:0;                 /* ✅ 连体：去掉间距 */
+    gap:0;
     margin: 8px 0 10px;
     flex: 0 0 auto;
 
     border:1px solid rgba(255,255,255,.16);
     background: rgba(255,255,255,.03);
     border-radius: 999px;
-    padding: 3px;          /* 外壳内边距，形成“槽” */
+    padding: 3px;
     overflow:hidden;
   }
 
@@ -683,8 +689,8 @@ textarea{
     flex:1 1 0;
     min-height:36px;
     margin:0;
-    border:0;              /* ✅ 子按钮不要外框 */
-    border-radius: 999px;  /* ✅ 选中态内部胶囊 */
+    border:0;
+    border-radius: 999px;
     background: transparent;
     color: rgba(255,255,255,.70);
 
@@ -874,13 +880,13 @@ textarea{
 
 .export-status{
   white-space: pre-wrap;
-  word-break: break-word;     /* 防止被整行裁切 */
-  overflow-wrap: anywhere;    /* 关键：允许断开 */
-  min-width: 0;               /* ⚠️ 在 flex 布局中极重要 */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .railcard{
-  min-width: 0;               /* 如果父级是 flex，必须有 */
+  min-width: 0;
 }
 
 /* =========================
@@ -894,7 +900,7 @@ textarea{
   pointer-events: none !important;
   position: relative !important;
   z-index: 0 !important;
-  overflow: hidden !important;   /* critical: clip any gradient shadow inside */
+  overflow: hidden !important;
 }
 
 /* 2) if there is a pseudo-element doing fade/shadow, clip/disable it */
@@ -905,7 +911,6 @@ textarea{
   filter: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  /* if your shadow is from a gradient mask, kill it */
   background-image: none !important;
   -webkit-mask-image: none !important;
   mask-image: none !important;
@@ -957,7 +962,7 @@ textarea{
 
 .tele-k{
   flex:0 0 auto;
-  min-width: 28px;          /* 两字标题对齐 */
+  min-width: 28px;
   color: rgba(43,144,255,.88);
   font-weight: 900;
 }
@@ -974,13 +979,11 @@ textarea{
    FIX: remove bottom overlay / shadow band
    ========================= */
 
-/* 页面底部不要再叠加遮罩感 */
 body::before,
 body::after{
   content: none !important;
 }
 
-/* 如果 wrap 或主容器有额外底部阴影，也一起禁掉 */
 .wrap::before,
 .wrap::after{
   content: none !important;
@@ -988,26 +991,22 @@ body::after{
   background: none !important;
 }
 
-/* 防止底部出现覆盖层拦截视觉 */
 html, body{
   overflow-x: hidden;
 }
 
 /* =========================
    Readonly PDF source text
+   - visible
    - selectable
    - copyable
-   - visible selection highlight
+   - no ghosting from overlay
    ========================= */
 
 #inputText{
   -webkit-user-select: text;
   user-select: text;
   caret-color: transparent;
-  background: transparent;
-  color: inherit;
-  position: relative;
-  z-index: 1;
 }
 
 #inputText[readonly]{
