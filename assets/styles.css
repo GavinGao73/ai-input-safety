@@ -993,14 +993,27 @@ html, body{
   overflow-x: hidden;
 }
 
-/* ===== PDF extracted text: readonly but selectable ===== */
+/* =========================
+   Readonly PDF source text
+   - selectable
+   - copyable
+   - visible selection highlight
+   ========================= */
+
 #inputText{
   -webkit-user-select: text;
   user-select: text;
-  caret-color: transparent; /* 只读时不显示插入光标 */
+  caret-color: transparent;
+  background: transparent;
+  color: inherit;
+  position: relative;
+  z-index: 1;
 }
 
-/* 关键：让选中高亮可见 */
+#inputText[readonly]{
+  cursor: text;
+}
+
 #inputText::selection{
   background: rgba(80, 140, 255, 0.35);
   color: inherit;
@@ -1010,4 +1023,3 @@ html, body{
   background: rgba(80, 140, 255, 0.35);
   color: inherit;
 }
-
