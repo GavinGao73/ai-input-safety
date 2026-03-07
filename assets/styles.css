@@ -286,7 +286,7 @@ textarea{
 }
 #inputWrap.has-content .input-watermark{ display:none; }
 
-/* Overlay kept for compatibility, but hidden in current readable/copyable mode */
+/* Overlay: visible only as highlight layer, text itself stays transparent */
 .input-overlay{
   display:none;
   position:absolute;
@@ -303,30 +303,41 @@ textarea{
   word-break:normal;
 
   pointer-events:none;
-  color: rgba(255,255,255,.92);
+
+  /* ✅ overlay text invisible, so no ghosting */
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background: transparent;
 }
 .input-overlay::-webkit-scrollbar{ width:0; height:0; }
 
-/* ✅ current strategy: textarea itself stays visible; no overlay text layer to avoid ghosting */
-#inputWrap.pdf-overlay-on .input-overlay{ display:none; }
+/* ✅ when PDF overlay mode is on, show overlay highlight layer */
+#inputWrap.pdf-overlay-on .input-overlay{
+  display:block;
+}
 
 #inputWrap.pdf-overlay-on textarea{
   color: rgba(255,255,255,.92);
   caret-color: transparent;
   -webkit-text-fill-color: rgba(255,255,255,.92);
 }
+
 #inputWrap.pdf-overlay-on textarea::selection{
   background: rgba(80, 140, 255, 0.35);
   color: inherit;
 }
 
+/* ✅ only highlight boxes are visible */
 .hit{
-  background: rgba(255, 92, 92, 0.12);
-  border: 1px solid rgba(255, 92, 92, 0.28);
+  background: rgba(255, 92, 92, 0.18);
+  border: 1px solid rgba(255, 92, 92, 0.40);
   border-radius: 10px;
   padding: 0 4px;
-}
 
+  /* keep overlay characters invisible */
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
 /* =========================
    Middle filter (desktop)
    ========================= */
