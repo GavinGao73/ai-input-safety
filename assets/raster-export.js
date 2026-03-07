@@ -1086,7 +1086,7 @@
     }),
     summary: res && res.summary ? res.summary : { total: spans.length, byKey: {} }
   };
-}
+}  
   function textItemsToRectsFromSpans(pdfjsLib, viewport, textContentOrItems, spans, lang) {
     const Util = pdfjsLib.Util;
     const tuning = getLangTuning(lang);
