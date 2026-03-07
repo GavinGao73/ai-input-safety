@@ -819,58 +819,72 @@
     return [];
   }
 
-  function buildItemBoxes(pdfjsLib, viewport, textContentOrItems) {
-    const items = getItemsArray(textContentOrItems);
-    if (!items.length || !pdfjsLib || !pdfjsLib.Util || !viewport) return [];
+function buildItemBoxes(pdfjsLib, viewport, textContentOrItems) {
+  const items = getItemsArray(textContentOrItems);
+  if (!items.length || !pdfjsLib || !pdfjsLib.Util || !viewport) return [];
 
-    const Util = pdfjsLib.Util;
-    const out = [];
+  const Util = pdfjsLib.Util;
+  const out = [];
 
-    for (const it of items) {
-      if (!it) continue;
-      const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0];
-      const tx = Util.transform(viewport.transform, tr);
+  for (const it of items) {
+    if (!it) continue;
 
-      const x = Number(tx[4] || 0);
-      const y = Number(tx[5] || 0);
+    const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0];
+    const tx = Util.transform(viewport.transform, tr);
 
-      const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
-      const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
+    const x = Number(tx[4] || 0);
+    const y = Number(tx[5] || 0);
 
-      let fontH = sy * 1.0;
-      if (!Number.isFinite(fontH) || fontH <= 0) {
-        fontH =
-          Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
-          Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
-          10;
-      }
-      fontH = clamp(fontH * 1.12, 6, 110);
+    const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
+    const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
 
-      const s = String(it.str || "");
-      let w = 0;
-      try {
-        const iw = Number(it.width || 0);
-        if (Number.isFinite(iw) && iw > 0) w = iw * sx;
-      } catch (_) {}
+    let fontH = sy;
+    if (!Number.isFinite(fontH) || fontH <= 0) {
+      fontH =
+        Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
+        Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
+        10;
+    }
+    fontH = clamp(fontH * 1.08, 6, 96);
 
-      if (!Number.isFinite(w) || w <= 0) {
-        w = Math.max(8, s.length * fontH * 0.88);
-      }
+    const s = String(it.str || "");
+    const textLen = Math.max(1, s.length);
 
-      let rx = clamp(x, 0, viewport.width);
-      let ry = clamp(y - fontH, 0, viewport.height);
-      let rw = clamp(w, 1, viewport.width - rx);
-      let rh = clamp(fontH, 6, viewport.height - ry);
+    let w = 0;
+    try {
+      const iw = Number(it.width || 0);
+      if (Number.isFinite(iw) && iw > 0) w = iw * sx;
+    } catch (_) {}
 
-      if (!Number.isFinite(rx + ry + rw + rh)) continue;
-      if (rw <= 0 || rh <= 0) continue;
+    const est = Math.max(8, textLen * fontH * 0.72);
 
-      out.push({ x: rx, y: ry, w: rw, h: rh });
+    if (!Number.isFinite(w) || w <= 0) {
+      w = est;
     }
 
-    return out;
+    // ✅ 收紧 item bbox：不要像 redaction bbox 那样保守
+    // 目标：蓝框更接近真实字宽，而不是“可能宽度”
+    const hardCap = est * 1.18;
+    if (w > hardCap) w = hardCap;
+
+    // 对非常短的 token 再保守一点
+    if (textLen <= 4) {
+      w = Math.min(w, est * 1.10);
+    }
+
+    let rx = clamp(x, 0, viewport.width);
+    let ry = clamp(y - fontH, 0, viewport.height);
+    let rw = clamp(w, 1, viewport.width - rx);
+    let rh = clamp(fontH, 6, viewport.height - ry);
+
+    if (!Number.isFinite(rx + ry + rw + rh)) continue;
+    if (rw <= 0 || rh <= 0) continue;
+
+    out.push({ x: rx, y: ry, w: rw, h: rh });
   }
 
+  return out;
+}
   function getMatcherCore() {
     try {
       const mc = window.__MATCHER_CORE__;
@@ -1249,64 +1263,69 @@
     }
 
     function bboxForItem(it, key) {
-      const tx = Util.transform(viewport.transform, it.transform || [1, 0, 0, 1, 0, 0]);
+  const tx = Util.transform(viewport.transform, it.transform || [1, 0, 0, 1, 0, 0]);
 
-      const x = Number(tx[4] || 0);
-      const y = Number(tx[5] || 0);
+  const x = Number(tx[4] || 0);
+  const y = Number(tx[5] || 0);
 
-      const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
-      const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
+  const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
+  const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
 
-      let fontH = sy * 1.0;
-      if (!Number.isFinite(fontH) || fontH <= 0) {
-        fontH =
-          Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
-          Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
-          10;
-      }
-      fontH = clamp(fontH * 1.12, 6, 110);
+  let fontH = sy * 1.0;
+  if (!Number.isFinite(fontH) || fontH <= 0) {
+    fontH =
+      Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
+      Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
+      10;
+  }
+  fontH = clamp(fontH * 1.10, 6, 104);
 
-      const s = String(it.str || "");
+  const s = String(it.str || "");
+  const textLen = Math.max(1, s.length);
 
-      let w = 0;
-      try {
-        const iw = Number(it.width || 0);
-        if (Number.isFinite(iw) && iw > 0) w = iw * sx;
-      } catch (_) {}
+  let w = 0;
+  try {
+    const iw = Number(it.width || 0);
+    if (Number.isFinite(iw) && iw > 0) w = iw * sx;
+  } catch (_) {}
 
-      if (!Number.isFinite(w) || w <= 0) w = Math.max(8, s.length * fontH * 0.88);
+  const est = Math.max(10, textLen * fontH * 0.82);
 
-      const est = Math.max(10, s.length * fontH * 0.90);
+  if (!Number.isFinite(w) || w <= 0) {
+    w = est;
+  }
 
-      const group = keyGroupForBBox(key);
-      const bboxCfg = (tuning && tuning.bbox) || {};
-      const cfg = bboxCfg[group] || bboxCfg.default || {
-        maxByPage: 0.30,
-        maxByEst: 1.45,
-        wHardCapEstRatio: 2.2,
-        wSoftCapEstMul: 1.15
-      };
+  const group = keyGroupForBBox(key);
+  const bboxCfg = (tuning && tuning.bbox) || {};
+  const cfg = bboxCfg[group] || bboxCfg.default || {
+    maxByPage: 0.30,
+    maxByEst: 1.45,
+    wHardCapEstRatio: 2.2,
+    wSoftCapEstMul: 1.15
+  };
 
-      const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
-      const softMul = Number(cfg.wSoftCapEstMul || 1.15);
-      if (w > est * hardRatio) w = est * softMul;
+  const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
+  const softMul = Number(cfg.wSoftCapEstMul || 1.15);
 
-      const maxByPage = viewport.width * Number(cfg.maxByPage || 0.30);
-      const maxByEst = est * Number(cfg.maxByEst || 1.45);
-      w = clamp(w, 1, Math.min(maxByPage, maxByEst));
+  if (w > est * hardRatio) {
+    w = est * softMul;
+  }
 
-      const isLongValueKey = group === "longValue";
-      const minW = isLongValueKey ? (est * 0.95) : (est * 0.85);
-      w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.40 : 0.20)));
+  const maxByPage = viewport.width * Number(cfg.maxByPage || 0.30);
+  const maxByEst = est * Number(cfg.maxByEst || 1.45);
+  w = clamp(w, 1, Math.min(maxByPage, maxByEst));
 
-      let rx = clamp(x, 0, viewport.width);
-      let ry = clamp(y - fontH, 0, viewport.height);
-      let rw = clamp(w, 1, viewport.width - rx);
-      let rh = clamp(fontH, 6, viewport.height - ry);
+  const isLongValueKey = group === "longValue";
+  const minW = isLongValueKey ? (est * 0.92) : (est * 0.80);
+  w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.38 : 0.18)));
 
-      return { x: rx, y: ry, w: rw, h: rh };
-    }
+  let rx = clamp(x, 0, viewport.width);
+  let ry = clamp(y - fontH, 0, viewport.height);
+  let rw = clamp(w, 1, viewport.width - rx);
+  let rh = clamp(fontH, 6, viewport.height - ry);
 
+  return { x: rx, y: ry, w: rw, h: rh };
+}
     function shrinkByLabel(key, s, ls, le) {
       if (key === "manual_term") return { ls, le };
       if (le <= ls) return { ls, le };
@@ -1503,7 +1522,7 @@
       const similarHeight = heightRatio > 0.80;
 
       const gap = r.x - (last.x + last.w);
-      const near = gap >= -1 && gap <= 2;
+      const near = gap >= 0 && gap <= 1.2;
 
       if (sameKey && sameLine && similarHeight && near) {
         const nx = Math.min(last.x, r.x);
@@ -1625,57 +1644,66 @@
     }
 
     function bboxForItem(it, key) {
-      const tx = Util.transform(viewport.transform, it.transform || [1, 0, 0, 1, 0, 0]);
+  const tx = Util.transform(viewport.transform, it.transform || [1, 0, 0, 1, 0, 0]);
 
-      const x = Number(tx[4] || 0);
-      const y = Number(tx[5] || 0);
+  const x = Number(tx[4] || 0);
+  const y = Number(tx[5] || 0);
 
-      const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
-      const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
+  const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
+  const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
 
-      let fontH = sy * 1.0;
-      if (!Number.isFinite(fontH) || fontH <= 0) {
-        fontH = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
-                Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 10;
-      }
-      fontH = clamp(fontH * 1.12, 6, 110);
+  let fontH = sy * 1.0;
+  if (!Number.isFinite(fontH) || fontH <= 0) {
+    fontH =
+      Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
+      Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
+      10;
+  }
+  fontH = clamp(fontH * 1.10, 6, 104);
 
-      const s = String(it.str || "");
+  const s = String(it.str || "");
+  const textLen = Math.max(1, s.length);
 
-      let w = 0;
-      try {
-        const iw = Number(it.width || 0);
-        if (Number.isFinite(iw) && iw > 0) w = iw * sx;
-      } catch (_) {}
+  let w = 0;
+  try {
+    const iw = Number(it.width || 0);
+    if (Number.isFinite(iw) && iw > 0) w = iw * sx;
+  } catch (_) {}
 
-      if (!Number.isFinite(w) || w <= 0) w = Math.max(8, s.length * fontH * 0.88);
+  const est = Math.max(10, textLen * fontH * 0.82);
 
-      const est = Math.max(10, s.length * fontH * 0.90);
+  if (!Number.isFinite(w) || w <= 0) {
+    w = est;
+  }
 
-      const group = keyGroupForBBox(key);
-      const bboxCfg = (tuning && tuning.bbox) || {};
-      const cfg = bboxCfg[group] || bboxCfg.default || { maxByPage: 0.30, maxByEst: 1.45, wHardCapEstRatio: 2.2, wSoftCapEstMul: 1.15 };
+  const group = keyGroupForBBox(key);
+  const bboxCfg = (tuning && tuning.bbox) || {};
+  const cfg = bboxCfg[group] || bboxCfg.default || {
+    maxByPage: 0.30,
+    maxByEst: 1.45,
+    wHardCapEstRatio: 2.2,
+    wSoftCapEstMul: 1.15
+  };
 
-      const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
-      const softMul = Number(cfg.wSoftCapEstMul || 1.15);
-      if (w > est * hardRatio) w = est * softMul;
+  const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
+  const softMul = Number(cfg.wSoftCapEstMul || 1.15);
+  if (w > est * hardRatio) w = est * softMul;
 
-      const maxByPage = viewport.width * Number(cfg.maxByPage || 0.30);
-      const maxByEst = est * Number(cfg.maxByEst || 1.45);
-      w = clamp(w, 1, Math.min(maxByPage, maxByEst));
+  const maxByPage = viewport.width * Number(cfg.maxByPage || 0.30);
+  const maxByEst = est * Number(cfg.maxByEst || 1.45);
+  w = clamp(w, 1, Math.min(maxByPage, maxByEst));
 
-      const isLongValueKey = group === "longValue";
-      const minW = isLongValueKey ? (est * 0.95) : (est * 0.85);
-      w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.40 : 0.20)));
+  const isLongValueKey = group === "longValue";
+  const minW = isLongValueKey ? (est * 0.92) : (est * 0.80);
+  w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.38 : 0.18)));
 
-      let rx = clamp(x, 0, viewport.width);
-      let ry = clamp(y - fontH, 0, viewport.height);
-      let rw = clamp(w, 1, viewport.width - rx);
-      let rh = clamp(fontH, 6, viewport.height - ry);
+  let rx = clamp(x, 0, viewport.width);
+  let ry = clamp(y - fontH, 0, viewport.height);
+  let rw = clamp(w, 1, viewport.width - rx);
+  let rh = clamp(fontH, 6, viewport.height - ry);
 
-      return { x: rx, y: ry, w: rw, h: rh };
-    }
-
+  return { x: rx, y: ry, w: rw, h: rh };
+}
     function shrinkByLabel(key, s, ls, le) {
       if (key === "manual_term") return { ls, le };
 
@@ -2000,7 +2028,7 @@
       const similarHeight = heightRatio > 0.80;
 
       const gap = r.x - (last.x + last.w);
-      const near = gap >= -1 && gap <= 2;
+      const near = gap >= 0 && gap <= 1.2;
 
       if (sameKey && sameLine && similarHeight && near) {
         const nx = Math.min(last.x, r.x);
