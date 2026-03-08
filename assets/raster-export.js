@@ -452,23 +452,50 @@
   }
 
   function buildMatcherDocFromCachedPages(cachedPages) {
-    const pages = Array.isArray(cachedPages) ? cachedPages : [];
+  const pages = Array.isArray(cachedPages) ? cachedPages : [];
+
+  let pagesTextMap = new Map();
+  try {
+    const arr = window.__pdf_pages_text || window.lastPdfPagesText || [];
+    if (Array.isArray(arr)) {
+      for (const p of arr) {
+        const pn = Number(p && p.pageNumber);
+        if (!pn) continue;
+        pagesTextMap.set(pn, String((p && p.text) || ""));
+      }
+    }
+  } catch (_) {}
+
+  const outPages = pages.map((p, idx) => {
+    const pageNumber = Number(p && p.pageNumber) || (idx + 1);
+    const pageText = pagesTextMap.get(pageNumber) || "";
+
     return {
-      pages: pages.map((p, idx) => ({
-        pageNumber: Number(p && p.pageNumber) || (idx + 1),
-        items: Array.isArray(p && p.items)
-          ? p.items.map((it) => ({
-              str: it && it.str != null ? String(it.str) : "",
-              transform: Array.isArray(it && it.transform) ? it.transform.slice(0, 6) : [1, 0, 0, 1, 0, 0],
-              width: Number(it && it.width) || 0,
-              height: Number(it && it.height) || 0,
-              hasEOL: !!(it && it.hasEOL)
-            }))
-          : []
-      })),
-      meta: { fromPdf: true }
+      pageNumber,
+      text: pageText,
+      items: Array.isArray(p && p.items)
+        ? p.items.map((it) => ({
+            str: it && it.str != null ? String(it.str) : "",
+            transform: Array.isArray(it && it.transform) ? it.transform.slice(0, 6) : [1, 0, 0, 1, 0, 0],
+            width: Number(it && it.width) || 0,
+            height: Number(it && it.height) || 0,
+            hasEOL: !!(it && it.hasEOL)
+          }))
+        : []
     };
-  }
+  });
+
+  const fullText = outPages
+    .map((p) => String(p.text || ""))
+    .filter(Boolean)
+    .join("\n\n");
+
+  return {
+    text: fullText,
+    pages: outPages,
+    meta: { fromPdf: true }
+  };
+}
   
   async function autoRedactReadablePdf({ file, lang, enabledKeys, moneyMode, dpi, manualTerms }) {
     setRasterPhase("autoRedactReadablePdf:begin", null);
@@ -504,11 +531,24 @@
 
     const cached = getCachedPagesItems();
 
-    const matcherCore = getMatcherCore();
+        const matcherCore = getMatcherCore();
     let unifiedMatchResult = null;
 
     try {
-      if (matcherCore && Array.isArray(cached) && cached.length) {
+      const last = window.__MatcherLast;
+      if (
+        last &&
+        last.source === "matcher-core" &&
+        String(last.lang || "") === String(lang || "") &&
+        Array.isArray(last.hits) &&
+        last.hits.length > 0
+      ) {
+        unifiedMatchResult = last;
+      }
+    } catch (_) {}
+
+    try {
+      if (!unifiedMatchResult && matcherCore && Array.isArray(cached) && cached.length) {
         const doc = buildMatcherDocFromCachedPages(cached);
         const fn = typeof matcherCore.match === "function" ? matcherCore.match : matcherCore.matchDocument;
         unifiedMatchResult = fn.call(matcherCore, {
@@ -522,7 +562,7 @@
     } catch (e) {
       unifiedMatchResult = null;
     }
-
+    
     try {
       const last = window.__RasterExportLast || {};
       window.__RasterExportLast = Object.assign({}, last, {
@@ -549,6 +589,32 @@
         });
       }
 
+          try {
+      if (unifiedMatchResult && typeof rc.mapMatchResultToRects === "function") {
+        const pagesForCore = pages.map((p) => {
+          const cachedItems = findCachedItemsForPage(cached, p.pageNumber);
+          const itemsOrTextContent = (cachedItems && cachedItems.length)
+            ? normalizeCachedItems(cachedItems)
+            : null;
+
+          return {
+            pageNumber: p.pageNumber,
+            width: p.width,
+            height: p.height,
+            viewport: p.viewport,
+            itemsOrTextContent
+          };
+        });
+
+        rc.mapMatchResultToRects({
+          pdfjsLib,
+          pages: pagesForCore,
+          matchResult: unifiedMatchResult,
+          lang
+        });
+      }
+    } catch (_) {}
+      
       setRasterPhase("autoRedactReadablePdf:match", `p${p.pageNumber}`);
 
             let rects = [];
