@@ -38,7 +38,7 @@
     if (typeof mc.matchDocument === "function") return mc;
     return null;
   }
-  
+
   function uiLang() {
     const l = String(window.currentLang || "").toLowerCase();
     return (l === "de" || l === "en" || l === "zh") ? l : "zh";
@@ -346,7 +346,6 @@
     });
 
     const pdf = await loadingTask.promise;
-
     const scale = (dpi || DEFAULT_DPI) / 72;
     const pages = [];
 
@@ -452,51 +451,51 @@
   }
 
   function buildMatcherDocFromCachedPages(cachedPages) {
-  const pages = Array.isArray(cachedPages) ? cachedPages : [];
+    const pages = Array.isArray(cachedPages) ? cachedPages : [];
 
-  let pagesTextMap = new Map();
-  try {
-    const arr = window.__pdf_pages_text || window.lastPdfPagesText || [];
-    if (Array.isArray(arr)) {
-      for (const p of arr) {
-        const pn = Number(p && p.pageNumber);
-        if (!pn) continue;
-        pagesTextMap.set(pn, String((p && p.text) || ""));
+    let pagesTextMap = new Map();
+    try {
+      const arr = window.__pdf_pages_text || window.lastPdfPagesText || [];
+      if (Array.isArray(arr)) {
+        for (const p of arr) {
+          const pn = Number(p && p.pageNumber);
+          if (!pn) continue;
+          pagesTextMap.set(pn, String((p && p.text) || ""));
+        }
       }
-    }
-  } catch (_) {}
+    } catch (_) {}
 
-  const outPages = pages.map((p, idx) => {
-    const pageNumber = Number(p && p.pageNumber) || (idx + 1);
-    const pageText = pagesTextMap.get(pageNumber) || "";
+    const outPages = pages.map((p, idx) => {
+      const pageNumber = Number(p && p.pageNumber) || (idx + 1);
+      const pageText = pagesTextMap.get(pageNumber) || "";
+
+      return {
+        pageNumber,
+        text: pageText,
+        items: Array.isArray(p && p.items)
+          ? p.items.map((it) => ({
+              str: it && it.str != null ? String(it.str) : "",
+              transform: Array.isArray(it && it.transform) ? it.transform.slice(0, 6) : [1, 0, 0, 1, 0, 0],
+              width: Number(it && it.width) || 0,
+              height: Number(it && it.height) || 0,
+              hasEOL: !!(it && it.hasEOL)
+            }))
+          : []
+      };
+    });
+
+    const fullText = outPages
+      .map((p) => String(p.text || ""))
+      .filter(Boolean)
+      .join("\n\n");
 
     return {
-      pageNumber,
-      text: pageText,
-      items: Array.isArray(p && p.items)
-        ? p.items.map((it) => ({
-            str: it && it.str != null ? String(it.str) : "",
-            transform: Array.isArray(it && it.transform) ? it.transform.slice(0, 6) : [1, 0, 0, 1, 0, 0],
-            width: Number(it && it.width) || 0,
-            height: Number(it && it.height) || 0,
-            hasEOL: !!(it && it.hasEOL)
-          }))
-        : []
+      text: fullText,
+      pages: outPages,
+      meta: { fromPdf: true }
     };
-  });
+  }
 
-  const fullText = outPages
-    .map((p) => String(p.text || ""))
-    .filter(Boolean)
-    .join("\n\n");
-
-  return {
-    text: fullText,
-    pages: outPages,
-    meta: { fromPdf: true }
-  };
-}
-  
   async function autoRedactReadablePdf({ file, lang, enabledKeys, moneyMode, dpi, manualTerms }) {
     setRasterPhase("autoRedactReadablePdf:begin", null);
 
@@ -509,6 +508,9 @@
     const matchers = rc.buildRuleMatchers(lang, enabledKeys, moneyMode, manualTerms);
     const _placeholder = langPlaceholder(lang);
     const dbgCfg = getRasterDebugConfig();
+
+    let usedPerPageCoreFallback = false;
+    let usedLegacyFallback = false;
 
     try {
       const PACKS = window.__ENGINE_LANG_PACKS__ || {};
@@ -530,8 +532,7 @@
     } catch (_) {}
 
     const cached = getCachedPagesItems();
-
-        const matcherCore = getMatcherCore();
+    const matcherCore = getMatcherCore();
     let unifiedMatchResult = null;
 
     try {
@@ -559,10 +560,10 @@
           manualTerms
         });
       }
-    } catch (e) {
+    } catch (_) {
       unifiedMatchResult = null;
     }
-    
+
     try {
       const last = window.__RasterExportLast || {};
       window.__RasterExportLast = Object.assign({}, last, {
@@ -572,13 +573,12 @@
           : 0
       });
     } catch (_) {}
-    
-    for (const p of pages) {
-      setRasterPhase("autoRedactReadablePdf:page", `p${p.pageNumber}`);
 
+    const pageInputs = [];
+    for (const p of pages) {
+      const cachedItems = findCachedItemsForPage(cached, p.pageNumber);
       let itemsOrTextContent = null;
 
-      const cachedItems = findCachedItemsForPage(cached, p.pageNumber);
       if (cachedItems && cachedItems.length) {
         itemsOrTextContent = normalizeCachedItems(cachedItems);
       } else {
@@ -589,35 +589,38 @@
         });
       }
 
-          try {
+      pageInputs.push({
+        pageNumber: p.pageNumber,
+        width: p.width,
+        height: p.height,
+        viewport: p.viewport,
+        itemsOrTextContent
+      });
+    }
+
+    let unifiedRectResult = null;
+    try {
       if (unifiedMatchResult && typeof rc.mapMatchResultToRects === "function") {
-        const pagesForCore = pages.map((p) => {
-          const cachedItems = findCachedItemsForPage(cached, p.pageNumber);
-          const itemsOrTextContent = (cachedItems && cachedItems.length)
-            ? normalizeCachedItems(cachedItems)
-            : null;
-
-          return {
-            pageNumber: p.pageNumber,
-            width: p.width,
-            height: p.height,
-            viewport: p.viewport,
-            itemsOrTextContent
-          };
-        });
-
-        rc.mapMatchResultToRects({
+        unifiedRectResult = rc.mapMatchResultToRects({
           pdfjsLib,
-          pages: pagesForCore,
+          pages: pageInputs,
           matchResult: unifiedMatchResult,
           lang
         });
       }
-    } catch (_) {}
-      
+    } catch (_) {
+      unifiedRectResult = null;
+    }
+
+    for (let idx = 0; idx < pages.length; idx += 1) {
+      const p = pages[idx];
+      const prepared = pageInputs[idx];
+      const itemsOrTextContent = prepared ? prepared.itemsOrTextContent : null;
+
+      setRasterPhase("autoRedactReadablePdf:page", `p${p.pageNumber}`);
       setRasterPhase("autoRedactReadablePdf:match", `p${p.pageNumber}`);
 
-            let rects = [];
+      let rects = [];
       let rectSource = "legacy-regex";
       let coreHitCount = 0;
       let coreFailed = false;
@@ -627,20 +630,24 @@
       let coreSummary = null;
 
       try {
-        if (unifiedMatchResult && typeof rc.mapMatchResultPageToRects === "function") {
-          const mapped = rc.mapMatchResultPageToRects({
-            pdfjsLib,
-            viewport: p.viewport,
-            itemsOrTextContent,
-            matchResult: unifiedMatchResult,
-            pageNumber: p.pageNumber,
-            lang
-          });
+        if (unifiedRectResult && Array.isArray(unifiedRectResult.pages)) {
+          const pageRectData = unifiedRectResult.pages.find((x) => Number(x && x.pageIndex) === idx) || null;
+          const pageRectList = pageRectData && Array.isArray(pageRectData.rects) ? pageRectData.rects : [];
 
-          rects = Array.isArray(mapped && mapped.rects) ? mapped.rects : [];
-          coreSpans = Array.isArray(mapped && mapped.spans) ? mapped.spans : [];
+          rects = pageRectList.map((r) => ({
+            x: Number(r && r.x) || 0,
+            y: Number(r && r.y) || 0,
+            w: Number(r && r.w) || 0,
+            h: Number(r && r.h) || 0,
+            key: String((r && r.key) || "")
+          }));
+
+          coreSpans = typeof rc.buildSpansFromMatchResultForPage === "function"
+            ? rc.buildSpansFromMatchResultForPage(unifiedMatchResult, p.pageNumber)
+            : [];
+
           rectSource = "matcher-core";
-          coreHitCount = coreSpans.length;
+          coreHitCount = Array.isArray(coreSpans) ? coreSpans.length : 0;
           coreSummary = unifiedMatchResult && unifiedMatchResult.summary ? unifiedMatchResult.summary : null;
           coreDebug = {
             mode: "match-result-main",
@@ -659,13 +666,15 @@
           });
 
           if (coreRes && coreRes.ok) {
+            usedPerPageCoreFallback = true;
             rects = Array.isArray(coreRes.rects) ? coreRes.rects : [];
-            rectSource = coreRes.source || "matcher-core";
+            rectSource = coreRes.source || "matcher-core-page-fallback";
             coreHitCount = Number(coreRes.hitCount || 0);
             coreSpans = Array.isArray(coreRes.spans) ? coreRes.spans : [];
             coreDebug = coreRes.debug || null;
             coreSummary = coreRes.summary || null;
           } else {
+            usedLegacyFallback = true;
             rects = rc.textItemsToRects(pdfjsLib, p.viewport, itemsOrTextContent, matchers, lang);
             rectSource = "legacy-fallback";
           }
@@ -673,10 +682,11 @@
       } catch (e) {
         coreFailed = true;
         coreError = e && e.message ? String(e.message) : "matcher-core-error";
+        usedLegacyFallback = true;
         rects = rc.textItemsToRects(pdfjsLib, p.viewport, itemsOrTextContent, matchers, lang);
         rectSource = "legacy-fallback";
       }
-      
+
       const itemBoxes = rc.buildItemBoxes(pdfjsLib, p.viewport, itemsOrTextContent, lang);
       const pageDebug = {
         pageNumber: p.pageNumber,
@@ -743,6 +753,17 @@
       }
     }
 
+    try {
+      const last = window.__RasterExportLast || {};
+      window.__RasterExportLast = Object.assign({}, last, {
+        usedPerPageCoreFallback,
+        usedLegacyFallback,
+        primaryRectSource: usedLegacyFallback
+          ? "legacy-fallback"
+          : (usedPerPageCoreFallback ? "matcher-core-page-fallback" : "matcher-core-main")
+      });
+    } catch (_) {}
+
     setRasterPhase("autoRedactReadablePdf:done", null);
     return pages;
   }
@@ -779,7 +800,6 @@
 
     const PDFLib = await loadPdfLibIfNeeded();
     const { PDFDocument } = PDFLib;
-
     const doc = await PDFDocument.create();
 
     for (const p of (pages || [])) {
