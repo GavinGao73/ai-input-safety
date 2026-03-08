@@ -1,13 +1,14 @@
 // =========================
-// assets/engine.js (FULL) ✅ SLIMMED / STABLE / NO INPUT-HL
+// assets/engine.js (FULL) ✅ SLIMMED / STABLE
 // ROUTER + STABLE CORE (no lang rules/priority/alwaysOn/formatters inside)
 // - UI language: window.currentLang (UI only)
 // - Content strategy language: window.ruleEngine (+ window.ruleEngineMode)
+// - Input overlay: plain-text mirror only (NO hit highlighting)
 // =========================
 
 "use strict";
 
-const ENGINE_VERSION = "v20260308-engine-a6-slim3-primary-source-fix";
+const ENGINE_VERSION = "v20260308-engine-a6-slim4-no-input-hit-chain";
 console.log("[engine.js] loaded " + ENGINE_VERSION);
 
 /* =========================
@@ -604,14 +605,9 @@ function buildExportSnapshot(enabledKeysArr, source) {
 function storeExportSnapshot(enabledKeysArr, source) {
   const snap = buildExportSnapshot(enabledKeysArr, source);
   const _lc = snap.langContent;
-
   window.__export_snapshot = snap;
   if (!window.__export_snapshot_byLang) window.__export_snapshot_byLang = {};
   window.__export_snapshot_byLang[_lc] = snap;
-
-  try {
-    window.__ENGINE_PRIMARY_SOURCE = String(source || "");
-  } catch (_) {}
 }
 
 function dispatchSafeUpdated() {
@@ -674,9 +670,7 @@ function phoneGuardOk({ label, value, match }) {
 }
 
 /* =========================
-   4) PDF input overlay
-   - no highlight logic anymore
-   - keep only raw text mirror for PDF mode
+   4) Input overlay: plain-text mirror only
    ========================= */
 
 function renderInputOverlayForPdf(originalText) {
@@ -697,12 +691,12 @@ function renderInputOverlayForPdf(originalText) {
   overlay.innerHTML = escapeHTML(String(originalText || ""));
   wrap.classList.add("pdf-overlay-on");
 
+  overlay.scrollTop = ta.scrollTop;
+  overlay.scrollLeft = ta.scrollLeft;
+
   try {
     window.__overlay_source = "plain-text";
   } catch (_) {}
-
-  overlay.scrollTop = ta.scrollTop;
-  overlay.scrollLeft = ta.scrollLeft;
 }
 
 /* =========================
@@ -1308,6 +1302,7 @@ try {
   if (typeof window.applyRules !== "function") window.applyRules = applyRules;
   if (typeof window.setManualTermsFromText !== "function") window.setManualTermsFromText = setManualTermsFromText;
   if (typeof window.initEnabled !== "function") window.initEnabled = initEnabled;
+  if (typeof window.renderInputOverlayForPdf !== "function") window.renderInputOverlayForPdf = renderInputOverlayForPdf;
 } catch (_) {}
 
 /* =========================
