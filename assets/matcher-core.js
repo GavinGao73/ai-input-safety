@@ -513,6 +513,10 @@ function collectRawHits(opts) {
   }
 
   function choosePreferred(a, b) {
+    // FIX: email 优先级高于 domain/url，避免 example.com 被重复命中
+    if (a.key === "email" && (b.key === "domain" || b.key === "url")) return a;
+    if (b.key === "email" && (a.key === "domain" || a.key === "url")) return b;
+
     // manual term always wins
     if (a.source === "manual" && b.source !== "manual") return a;
     if (b.source === "manual" && a.source !== "manual") return b;
@@ -585,11 +589,45 @@ function collectRawHits(opts) {
     const hasPdfItems = Array.isArray(d.pages) && d.pages.some((p) => Array.isArray(p.items) && p.items.length);
     if (!hasPdfItems) return hits;
 
-    return hits.map((h) => ({
-      ...h,
-      page: null,
-      rects: []
-    }));
+    return hits.map((h) => {
+      const target = safeString(h.matchedText || "");
+      if (!target) {
+        return {
+          ...h,
+          page: null,
+          rects: []
+        };
+      }
+
+      for (const page of d.pages) {
+        const items = Array.isArray(page.items) ? page.items : [];
+
+        for (const it of items) {
+          const str = safeString(it && it.str);
+          if (!str) continue;
+
+          if (str.includes(target)) {
+            const tr = Array.isArray(it.transform) ? it.transform : [];
+            return {
+              ...h,
+              page: page.pageNumber,
+              rects: [{
+                x: Number(tr[4]) || 0,
+                y: Number(tr[5]) || 0,
+                w: Number(it.width) || 0,
+                h: Number(it.height) || 0
+              }]
+            };
+          }
+        }
+      }
+
+      return {
+        ...h,
+        page: null,
+        rects: []
+      };
+    });
   }
 
   function applyHitsToText(text, hits) {
