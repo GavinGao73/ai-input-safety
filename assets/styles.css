@@ -238,7 +238,27 @@ textarea{
   min-width:0;
 }
 
-/* ===== overlay layer: align to textarea content box ===== */
+.output{
+  width:100%;
+  height:320px;
+  max-height:320px;
+  background:var(--box-bg);
+  border:1px solid var(--box-bd);
+  border-radius:12px;
+  padding:12px;
+
+  white-space:pre-wrap;
+  overflow:auto;
+  min-width:0;
+}
+
+.hl{
+  background: rgba(255, 92, 92, 0.14);
+  border: 1px solid rgba(255, 92, 92, 0.35);
+  color: rgba(255,255,255,.96);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
 
 .tiny{ font-size:11px; line-height:1.45; }
 .muted{ color:var(--muted); }
@@ -266,16 +286,13 @@ textarea{
 }
 #inputWrap.has-content .input-watermark{ display:none; }
 
-/* Overlay: highlight layer only; must align exactly with textarea text flow */
+/* Overlay kept for compatibility, but hidden in current readable/copyable mode */
 .input-overlay{
   display:none;
   position:absolute;
-  left:12px;
-  right:12px;
-  top:12px;
-  bottom:12px;
+  left:12px; right:12px; top:12px; bottom:12px;
   padding:0;
-  border-radius:0;
+  border-radius:10px;
 
   overflow:auto;
   scrollbar-width:none;
@@ -286,56 +303,28 @@ textarea{
   word-break:normal;
 
   pointer-events:none;
-
-  /* keep layout identical to textarea */
-  font: inherit;
-  line-height: inherit;
-  letter-spacing: inherit;
-
-  /* overlay text invisible; only highlight boxes should be visible */
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  background: transparent;
+  color: rgba(255,255,255,.92);
 }
+.input-overlay::-webkit-scrollbar{ width:0; height:0; }
 
-.input-overlay::-webkit-scrollbar{
-  width:0;
-  height:0;
-}
-
-/* PDF overlay mode ON */
-#inputWrap.pdf-overlay-on .input-overlay{
-  display:block;
-}
+/* ✅ current strategy: textarea itself stays visible; no overlay text layer to avoid ghosting */
+#inputWrap.pdf-overlay-on .input-overlay{ display:none; }
 
 #inputWrap.pdf-overlay-on textarea{
   color: rgba(255,255,255,.92);
   caret-color: transparent;
   -webkit-text-fill-color: rgba(255,255,255,.92);
 }
-
 #inputWrap.pdf-overlay-on textarea::selection{
   background: rgba(80, 140, 255, 0.35);
   color: inherit;
 }
 
-/* highlight boxes: visible, but must NOT change layout */
 .hit{
-  display:inline;
-  background: rgba(255, 92, 92, 0.18);
-  outline: 1px solid rgba(255, 92, 92, 0.40);
-  outline-offset: 0;
-
-  padding: 0 !important;
-  border: 0 !important;
-  margin: 0 !important;
-  border-radius: 4px;
-
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
+  background: rgba(255, 92, 92, 0.12);
+  border: 1px solid rgba(255, 92, 92, 0.28);
+  border-radius: 10px;
+  padding: 0 4px;
 }
 
 /* =========================
