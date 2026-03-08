@@ -1,6 +1,6 @@
 // =======================
 // assets/main.js (FULL)
-// v20260308a1-main-slim1
+// v20260308a2-main-slim2-ui-orchestrator
 // - UI orchestration only
 // - no rule logic here
 // - no matcher logic here
@@ -20,12 +20,14 @@ function __uiCall(nsFn, globalFn, arg) {
       return true;
     }
   } catch (_) {}
+
   try {
     if (typeof window[globalFn] === "function") {
       window[globalFn](arg);
       return true;
     }
   } catch (_) {}
+
   return false;
 }
 
@@ -71,7 +73,7 @@ function ensureRuleEngineLocked(detectResult, reason) {
       return { changed: true, lang: L };
     }
 
-    return { changed: false };
+    return { changed: false, lang: cur };
   } catch (_) {
     return { changed: false };
   }
@@ -90,13 +92,15 @@ function ensureLangBeforeApply(text) {
     }
 
     if (window.__LangDetect && typeof window.__LangDetect.ensureContentLang === "function") {
-      const r = window.__LangDetect.ensureContentLang(text, currentLang);
+      const ui = String(window.currentLang || "").toLowerCase();
+      const r = window.__LangDetect.ensureContentLang(text, ui);
 
       try {
         if (r && r.ok === true && r.lang) {
           ensureRuleEngineLocked({ lang: r.lang }, "guard:lock_from_return");
         } else {
-          const last = window.__LangDetect &&
+          const last =
+            window.__LangDetect &&
             window.__LangDetect.__state &&
             window.__LangDetect.__state.last;
 
@@ -127,9 +131,7 @@ function ensureLangBeforeApply(text) {
 }
 
 try {
-  if (typeof window.ensureLangBeforeApply !== "function") {
-    window.ensureLangBeforeApply = ensureLangBeforeApply;
-  }
+  window.ensureLangBeforeApply = ensureLangBeforeApply;
 } catch (_) {}
 
 /* =========================
@@ -149,7 +151,7 @@ function __reapplyCurrentInput() {
   const v = __getInputText();
   if (!v.trim()) return;
   if (!ensureLangBeforeApply(v)) return;
-  if (typeof applyRules === "function") applyRules(v);
+  if (typeof window.applyRules === "function") window.applyRules(v);
 }
 
 function __dispatchSafeUpdated() {
@@ -160,7 +162,13 @@ function __dispatchSafeUpdated() {
 
 function __syncHeightsSoon() {
   try {
-    requestAnimationFrame(syncManualRiskHeights);
+    requestAnimationFrame(() => {
+      try {
+        if (typeof window.syncManualRiskHeights === "function") {
+          window.syncManualRiskHeights();
+        }
+      } catch (_) {}
+    });
   } catch (_) {}
 }
 
@@ -188,7 +196,7 @@ function __clearInputOverlay() {
 
 function __resetManualTermsUi() {
   try {
-    manualTerms = [];
+    window.manualTerms = [];
   } catch (_) {}
 
   try {
@@ -201,21 +209,22 @@ function __resetManualTermsUi() {
 }
 
 function __resetStage3State() {
-  try { lastUploadedFile = null; } catch (_) {}
-  try { lastFileKind = ""; } catch (_) {}
-  try { lastProbe = null; } catch (_) {}
-  try { lastPdfOriginalText = ""; } catch (_) {}
-  try { lastStage3Mode = "none"; } catch (_) {}
+  try { window.lastUploadedFile = null; } catch (_) {}
+  try { window.lastFileKind = ""; } catch (_) {}
+  try { window.lastProbe = null; } catch (_) {}
+  try { window.lastPdfOriginalText = ""; } catch (_) {}
+  try { window.lastStage3Mode = "none"; } catch (_) {}
 
-  try { __manualRedactSession = null; } catch (_) {}
-  try { __manualRedactResult = null; } catch (_) {}
+  try { window.__manualRedactSession = null; } catch (_) {}
+  try { window.__manualRedactResult = null; } catch (_) {}
   try { window.__manual_redact_last = null; } catch (_) {}
 
   try {
-    if (typeof setStage3Ui === "function") setStage3Ui("none");
+    if (typeof window.setStage3Ui === "function") window.setStage3Ui("none");
   } catch (_) {}
+
   try {
-    if (typeof setManualPanesForMode === "function") setManualPanesForMode("none");
+    if (typeof window.setManualPanesForMode === "function") window.setManualPanesForMode("none");
   } catch (_) {}
 }
 
@@ -232,12 +241,13 @@ function __resetSafeState() {
   try { window.__safe_level = "low"; } catch (_) {}
   try { window.__safe_report = null; } catch (_) {}
   try { window.__ENGINE_PRIMARY_SOURCE = ""; } catch (_) {}
+  try { window.__overlay_source = ""; } catch (_) {}
 }
 
 function __resetContentLangState() {
   try {
-    if (typeof resetContentLang === "function") {
-      resetContentLang();
+    if (typeof window.resetContentLang === "function") {
+      window.resetContentLang();
     } else {
       window.ruleEngineMode = "auto";
       window.ruleEngine = "";
@@ -247,7 +257,9 @@ function __resetContentLangState() {
 
 function __setProgress(msg, isError) {
   try {
-    if (typeof setProgressText === "function") setProgressText(msg, !!isError);
+    if (typeof window.setProgressText === "function") {
+      window.setProgressText(msg, !!isError);
+    }
   } catch (_) {}
 }
 
@@ -258,7 +270,9 @@ function __getExportEnabledKeys() {
   } catch (_) {}
 
   try {
-    if (typeof effectiveEnabledKeys === "function") return effectiveEnabledKeys();
+    if (typeof window.effectiveEnabledKeys === "function") {
+      return window.effectiveEnabledKeys();
+    }
   } catch (_) {}
 
   return [];
@@ -271,7 +285,7 @@ function __getExportLang() {
   } catch (_) {}
 
   try {
-    if (typeof getLangContent === "function") return getLangContent();
+    if (typeof window.getLangContent === "function") return window.getLangContent();
   } catch (_) {}
 
   try {
@@ -307,7 +321,7 @@ window.openLangPicker = function () {
     __uiRender();
 
     window.__LangModal.open({
-      uiLang: String(currentLang || "en").toLowerCase(),
+      uiLang: String(window.currentLang || "en").toLowerCase(),
       detected: (window.getLangContent && window.getLangContent()) || window.ruleEngine || "",
       confidence: null,
       candidates: ["zh", "de", "en"],
@@ -346,10 +360,9 @@ function bindLangButtons() {
       document.querySelectorAll(".lang button").forEach((x) => x.classList.remove("active"));
       b.classList.add("active");
 
-      currentLang = b.dataset.lang;
-      window.currentLang = currentLang;
+      window.currentLang = b.dataset.lang;
 
-      if (typeof setText === "function") setText();
+      if (typeof window.setText === "function") window.setText();
 
       __uiSnap("ui:switch");
       __uiRender();
@@ -390,10 +403,16 @@ function bindManualTermsInput() {
   if (!termInput) return;
 
   termInput.addEventListener("input", () => {
-    setManualTermsFromText(termInput.value || "");
+    if (typeof window.setManualTermsFromText === "function") {
+      window.setManualTermsFromText(termInput.value || "");
+    }
 
     if (!window.__export_snapshot) window.__export_snapshot = {};
-    window.__export_snapshot.manualTerms = manualTerms.slice(0);
+    try {
+      window.__export_snapshot.manualTerms = Array.isArray(window.manualTerms) ? window.manualTerms.slice(0) : [];
+    } catch (_) {
+      window.__export_snapshot.manualTerms = [];
+    }
 
     if (__hasInputText()) __reapplyCurrentInput();
     else __dispatchSafeUpdated();
@@ -403,9 +422,16 @@ function bindManualTermsInput() {
     __uiRender();
   });
 
-  setManualTermsFromText(termInput.value || "");
+  if (typeof window.setManualTermsFromText === "function") {
+    window.setManualTermsFromText(termInput.value || "");
+  }
+
   if (!window.__export_snapshot) window.__export_snapshot = {};
-  window.__export_snapshot.manualTerms = manualTerms.slice(0);
+  try {
+    window.__export_snapshot.manualTerms = Array.isArray(window.manualTerms) ? window.manualTerms.slice(0) : [];
+  } catch (_) {
+    window.__export_snapshot.manualTerms = [];
+  }
 }
 
 function bindClearButton() {
@@ -415,7 +441,6 @@ function bindClearButton() {
   btnClear.onclick = () => {
     try {
       if (typeof window.initEnabled === "function") window.initEnabled();
-      else if (typeof initEnabled === "function") initEnabled();
     } catch (_) {}
 
     try {
@@ -425,13 +450,16 @@ function bindClearButton() {
       }
     } catch (_) {}
 
-    try { renderOutput(""); } catch (_) {}
-    try { lastRunMeta.fromPdf = false; } catch (_) {}
+    try {
+      if (typeof window.renderOutput === "function") window.renderOutput("");
+    } catch (_) {}
 
-    try { if (typeof collapseManualArea === "function") collapseManualArea(); } catch (_) {}
-    try { if (typeof collapseRiskArea === "function") collapseRiskArea(); } catch (_) {}
-    try { if (typeof clearProgress === "function") clearProgress(); } catch (_) {}
-    try { if (typeof clearBodyHeights === "function") clearBodyHeights(); } catch (_) {}
+    try { if (window.lastRunMeta) window.lastRunMeta.fromPdf = false; } catch (_) {}
+
+    try { if (typeof window.collapseManualArea === "function") window.collapseManualArea(); } catch (_) {}
+    try { if (typeof window.collapseRiskArea === "function") window.collapseRiskArea(); } catch (_) {}
+    try { if (typeof window.clearProgress === "function") window.clearProgress(); } catch (_) {}
+    try { if (typeof window.clearBodyHeights === "function") window.clearBodyHeights(); } catch (_) {}
 
     __clearRiskBox();
     __clearInputOverlay();
@@ -450,7 +478,6 @@ function bindClearButton() {
 
     try {
       if (typeof window.initEnabled === "function") window.initEnabled();
-      else if (typeof initEnabled === "function") initEnabled();
     } catch (_) {}
 
     __dispatchSafeUpdated();
@@ -462,9 +489,9 @@ function bindCopyButton() {
   if (!btnCopy) return;
 
   btnCopy.onclick = async () => {
-    const t = window.I18N && window.I18N[currentLang];
+    const t = window.I18N && window.I18N[window.currentLang];
     try {
-      await navigator.clipboard.writeText(lastOutputPlain || "");
+      await navigator.clipboard.writeText(window.__lastOutputPlain || "");
       if (t) {
         const old = btnCopy.textContent;
         btnCopy.textContent = t.btnCopied || old;
@@ -484,7 +511,11 @@ function bindInputAutoApply() {
   if (!ta) return;
 
   ta.addEventListener("input", () => {
-    updateInputWatermarkVisibility();
+    try {
+      if (typeof window.updateInputWatermarkVisibility === "function") {
+        window.updateInputWatermarkVisibility();
+      }
+    } catch (_) {}
 
     const v = String(ta.value || "");
     clearTimeout(autoTimer);
@@ -492,13 +523,15 @@ function bindInputAutoApply() {
     autoTimer = setTimeout(() => {
       if (v.trim()) {
         if (!ensureLangBeforeApply(v)) return;
-        applyRules(v);
+        if (typeof window.applyRules === "function") window.applyRules(v);
         __uiSnap("input:applyRules");
         __uiRender();
       } else {
-        renderOutput("");
+        try {
+          if (typeof window.renderOutput === "function") window.renderOutput("");
+        } catch (_) {}
         __clearRiskBox();
-        try { clearProgress(); } catch (_) {}
+        try { if (typeof window.clearProgress === "function") window.clearProgress(); } catch (_) {}
         __uiSnap("input:empty");
         __uiRender();
         __dispatchSafeUpdated();
@@ -520,18 +553,18 @@ function bindManualRedactButton() {
   if (!btnManual) return;
 
   btnManual.onclick = async () => {
-    const f = lastUploadedFile;
+    const f = window.lastUploadedFile;
     if (!f) return;
     if (!window.RedactUI || !window.RedactUI.start) return;
 
-    __manualRedactSession = await window.RedactUI.start({
+    window.__manualRedactSession = await window.RedactUI.start({
       file: f,
-      fileKind: lastFileKind,
-      lang: currentLang
+      fileKind: window.lastFileKind,
+      lang: window.currentLang
     });
 
     try {
-      if (window.__manual_redact_last) __manualRedactResult = window.__manual_redact_last;
+      if (window.__manual_redact_last) window.__manualRedactResult = window.__manual_redact_last;
     } catch (_) {}
 
     __syncHeightsSoon();
@@ -541,14 +574,14 @@ function bindManualRedactButton() {
 }
 
 async function handleModeBExport(t) {
-  let res = __manualRedactResult || null;
+  let res = window.__manualRedactResult || null;
 
   try {
     if (!res && window.__manual_redact_last) res = window.__manual_redact_last;
   } catch (_) {}
 
-  if (!res && __manualRedactSession && typeof __manualRedactSession.done === "function") {
-    res = await __manualRedactSession.done();
+  if (!res && window.__manualRedactSession && typeof window.__manualRedactSession.done === "function") {
+    res = await window.__manualRedactSession.done();
   }
 
   if (!res || !res.pages || !res.rectsByPage) {
@@ -573,12 +606,12 @@ async function handleModeBExport(t) {
 }
 
 async function handleModeAExport(f, t) {
-  if (lastFileKind !== "pdf") {
+  if (window.lastFileKind !== "pdf") {
     __setProgress(t.progressNotPdf || "当前不是 PDF 文件。", true);
     return;
   }
 
-  if (!lastProbe || !lastProbe.hasTextLayer) {
+  if (!window.lastProbe || !window.lastProbe.hasTextLayer) {
     __setProgress(
       t.progressNotReadable || "PDF 不可读（Mode B），请先手工涂抹并保存框选，然后再点红删PDF。",
       true
@@ -626,24 +659,24 @@ function bindExportButton() {
   if (!btnExportRasterPdf) return;
 
   btnExportRasterPdf.onclick = async () => {
-    try { expandRiskArea(); } catch (_) {}
-    try { expandManualArea(); } catch (_) {}
+    try { if (typeof window.expandRiskArea === "function") window.expandRiskArea(); } catch (_) {}
+    try { if (typeof window.expandManualArea === "function") window.expandManualArea(); } catch (_) {}
     __syncHeightsSoon();
 
-    const t = window.I18N && window.I18N[currentLang] ? window.I18N[currentLang] : {};
+    const t = window.I18N && window.I18N[window.currentLang] ? window.I18N[window.currentLang] : {};
     __uiMirrorStart();
     __uiSnap("export:click");
     __uiRender();
 
     try {
-      const f = lastUploadedFile;
+      const f = window.lastUploadedFile;
 
       if (!f) {
         __setProgress(t.progressNoFile || "未检测到文件，请先上传 PDF。", true);
         return;
       }
 
-      if (lastStage3Mode === "B") {
+      if (window.lastStage3Mode === "B") {
         await handleModeBExport(t);
         return;
       }
@@ -651,7 +684,7 @@ function bindExportButton() {
       await handleModeAExport(f, t);
     } catch (e) {
       const msg = (e && (e.message || String(e))) || "Unknown error";
-      const t2 = window.I18N && window.I18N[currentLang] ? window.I18N[currentLang] : {};
+      const t2 = window.I18N && window.I18N[window.currentLang] ? window.I18N[window.currentLang] : {};
       __setProgress(`${t2.progressFailed || "导出失败："}\n${msg}`, true);
       __syncHeightsSoon();
     } finally {
@@ -672,9 +705,11 @@ function bind() {
   bindExportButton();
 
   try {
-    bindPdfUI();
+    if (typeof window.bindPdfUI === "function") window.bindPdfUI();
   } catch (_) {}
 }
+
+window.bind = bind;
 
 /* =========================
    Boot self-check UI wire
@@ -725,11 +760,15 @@ function bind() {
 
 (function boot() {
   try {
-    if (typeof initEnabled === "function") initEnabled();
-    if (typeof setText === "function") setText();
-    if (typeof bind === "function") bind();
-    if (typeof updateInputWatermarkVisibility === "function") updateInputWatermarkVisibility();
-    if (typeof initRiskResizeObserver === "function") initRiskResizeObserver();
+    if (typeof window.initEnabled === "function") window.initEnabled();
+    if (typeof window.setText === "function") window.setText();
+    if (typeof window.bind === "function") window.bind();
+    if (typeof window.updateInputWatermarkVisibility === "function") {
+      window.updateInputWatermarkVisibility();
+    }
+    if (typeof window.initRiskResizeObserver === "function") {
+      window.initRiskResizeObserver();
+    }
 
     __uiSnap("boot");
     __uiRender();
