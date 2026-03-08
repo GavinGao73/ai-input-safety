@@ -1,33 +1,33 @@
 // =========================
-// assets/engine.policy.js (FULL) ✅ PATCHED (add-only alignment)
-// Strategy layer (NON-language, change here frequently)
-// - baseAlwaysOn (global coverage defaults)
-// - defaultPriority (fallback when packs missing)
-// - phoneGuardDefault (avoid treating long IDs as phone)
-// - risk scoring policy (weights/thresholds/bonuses)
-// - detect: score-based language selection thresholds
-//
-// PATCH GOAL (this file only):
-// - Align risk.weights / risk.groups with DE pack keys:
-//   address_de_street_partial, address_de_inline_street, address_de_extra_partial,
-//   card_expiry_de, card_security_de,
-//   imei2, uuid2, insurance_id2
-// - Keep legacy keys for backward compatibility.
+// assets/engine.policy.js
+// v20260308-policy-slim1
+// Strategy layer only
+// - baseAlwaysOn
+// - defaultPriority
+// - phoneGuardDefault
+// - risk scoring policy
+// - detect thresholds / fallback
 // =========================
 
 (function () {
   "use strict";
 
   const POLICY = {
-    version: "v20260223-policy-a2",
+    version: "v20260308-policy-slim1",
 
-    // ✅ global always-on (non-language, product decision)
-    // Keep minimal; language-specific additions live in packs[lang].alwaysOn
-    baseAlwaysOn: ["secret", "url", "email", "phone", "account", "bank", "company", "money"],
+    // Global always-on coverage
+    baseAlwaysOn: [
+      "secret",
+      "url",
+      "email",
+      "phone",
+      "account",
+      "bank",
+      "company",
+      "money"
+    ],
 
-    // ✅ fallback execution order if pack missing (product default)
-    // If you prefer "no fallback" (fail closed), set this to []
-    // ✅ PATCH: ref_label -> ref_label_tail (new key). Keep others as-is.
+    // Fallback execution order when lang pack is unavailable
     defaultPriority: [
       "secret",
       "account",
@@ -47,19 +47,16 @@
       "number"
     ],
 
-    // ✅ language-agnostic default phone guard (used only if pack.phoneGuard missing)
-    phoneGuardDefault: function ({ label, value, match }) {
+    // Default phone guard to avoid masking long IDs as phone numbers
+    phoneGuardDefault: function ({ value }) {
       const digits = String(value || "").replace(/\D+/g, "");
-      // protect against long numeric IDs (Order ID / refs / account etc.)
       if (digits.length >= 16) return false;
       return true;
     },
 
-    // ✅ risk scoring policy (non-language)
+    // Risk scoring policy
     risk: {
-      // legacy weights kept for UI "Top risk sources" ranking (no UI change)
-      // ✅ PATCH: ref_label -> ref_label_tail
-      // ✅ PATCH (add-only): add DE pack key aliases so hits are counted
+      // Used for UI "Top risk sources" ranking
       weights: {
         bank: 28,
         account: 26,
@@ -68,11 +65,8 @@
         secret: 30,
         phone: 16,
 
-        // Address (legacy)
         address_de_street: 18,
         address_cn: 18,
-
-        // ✅ Address (DE pack actual keys)
         address_de_street_partial: 18,
         address_de_inline_street: 18,
         address_de_extra_partial: 8,
@@ -87,11 +81,9 @@
         money: 0,
         company: 8,
 
-        // ✅ DE card keys (add-only)
         card_expiry_de: 12,
         card_security_de: 30,
 
-        // ✅ DE tracking / identity add-only
         imei2: 10,
         uuid2: 10,
         insurance_id2: 16,
@@ -99,19 +91,13 @@
         manual_term: 10
       },
 
-      // Scheme A config: grouped saturation scoring
       groups: {
         critical: [
           "secret",
           "api_key_token",
           "bearer_token",
-
-          // card security (EN/ZH)
           "card_security",
-
-          // ✅ card security (DE)
           "card_security_de",
-
           "security_answer"
         ],
 
@@ -119,11 +105,7 @@
           "account",
           "bank",
           "bank_routing_ids",
-
-          // card expiry (EN/ZH)
           "card_expiry",
-
-          // ✅ card expiry (DE)
           "card_expiry_de"
         ],
 
@@ -136,13 +118,8 @@
           "ein",
           "national_id",
           "tax_id",
-
-          // EN key
           "insurance_id",
-
-          // ✅ DE key
           "insurance_id2",
-
           "intl_itin",
           "intl_nino",
           "intl_nhs",
@@ -155,30 +132,18 @@
           "phone",
           "email",
           "url",
-
-          // CN
           "address_cn",
-
-          // legacy DE
           "address_de_street",
-
-          // EN
           "address_en_inline_street",
           "address_en_extra_block",
           "address_en_extra",
-
-          // ✅ DE pack actual keys
           "address_de_inline_street",
           "address_de_extra_partial",
           "address_de_street_partial",
-
           "handle_label",
           "handle",
-
-          // Name keys (packs differ)
           "person_name",
           "person_name_keep_title",
-
           "company"
         ],
 
@@ -187,15 +152,10 @@
           "ip_address",
           "mac_label",
           "mac_address",
-
-          // EN/ZH
           "imei",
           "uuid",
-
-          // ✅ DE variants
           "imei2",
           "uuid2",
-
           "device_fingerprint",
           "wallet_id",
           "tx_hash",
@@ -203,7 +163,6 @@
         ]
       },
 
-      // group weights MUST sum to 1.0
       groupWeights: {
         critical: 0.32,
         financial: 0.28,
@@ -212,7 +171,6 @@
         tracking: 0.10
       },
 
-      // saturation speed per group (higher => saturates faster)
       groupK: {
         critical: 0.35,
         financial: 0.30,
@@ -221,13 +179,11 @@
         tracking: 0.20
       },
 
-      // thresholds (tuned for Scheme A distribution)
       thresholds: {
         mid: 40,
         high: 70
       },
 
-      // score bonuses (kept, but reduced so high-intensity docs don't constant-hit 100)
       bonus: {
         base: 0,
         len1500: 2,
@@ -235,34 +191,20 @@
         fromPdf: 2
       },
 
-      // cap hits per key to avoid runaway within a group
       capPerKey: 12,
-
       clampMin: 0,
       clampMax: 100
     },
 
-    // ✅ detection thresholds for score-based pack detectors
-    // engine.detectRuleEngine() 读取这里：pol.detect
+    // Language-detect thresholds
     detect: {
-      // 锁定语言的最低得分：只有 >=72 才允许锁 pack
       lockScore: 72,
-
-      // 第一名与第二名的最小分差：差距不足视为“混合/不稳定”
       minGap: 14,
-
-      // 允许“混合模式”：为 true 时，在分数不够稳时允许返回 ""（不锁 ruleEngine）
       allowMixed: true,
-
-      // 混合模式下如果你想强行指定一个语言，就填 "en"/"de"/"zh"
-      // 推荐先保持 ""：mixed 场景下让 detectRuleEngine 返回 ""，保持引擎中立
       mixedLang: ""
     },
 
-    // ✅ language detection fallback behavior
-    // If pack detectors all return "", use this:
-    // - "ui": return UI lang
-    // - "en": always fallback to en
+    // Fallback if all detectors return empty
     detectFallback: "en"
   };
 
