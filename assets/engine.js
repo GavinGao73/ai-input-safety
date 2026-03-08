@@ -7,7 +7,7 @@
 
 "use strict";
 
-const ENGINE_VERSION = "v20260308-engine-a6-slim2-no-input-highlight";
+const ENGINE_VERSION = "v20260308-engine-a6-slim3-primary-source-fix";
 console.log("[engine.js] loaded " + ENGINE_VERSION);
 
 /* =========================
@@ -604,9 +604,14 @@ function buildExportSnapshot(enabledKeysArr, source) {
 function storeExportSnapshot(enabledKeysArr, source) {
   const snap = buildExportSnapshot(enabledKeysArr, source);
   const _lc = snap.langContent;
+
   window.__export_snapshot = snap;
   if (!window.__export_snapshot_byLang) window.__export_snapshot_byLang = {};
   window.__export_snapshot_byLang[_lc] = snap;
+
+  try {
+    window.__ENGINE_PRIMARY_SOURCE = String(source || "");
+  } catch (_) {}
 }
 
 function dispatchSafeUpdated() {
