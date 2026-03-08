@@ -1271,7 +1271,6 @@ function applyRules(text) {
 
   return out;
 }
-
 /* =========================
    7) Stability patches
    ========================= */
