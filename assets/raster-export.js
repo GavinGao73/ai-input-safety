@@ -464,26 +464,27 @@
     };
   }
 
+  function hasUsablePdfMatcherDoc(doc) {
+    return !!(
+      doc &&
+      Array.isArray(doc.pages) &&
+      doc.pages.length &&
+      doc.pages.some((p) => {
+        const t = String((p && p.text) || "");
+        const items = Array.isArray(p && p.items) ? p.items : [];
+        return t.trim() || items.length;
+      })
+    );
+  }
+
   function getStableMatchResult({ lang, enabledKeys, moneyMode, manualTerms, cachedPages }) {
     let unifiedMatchResult = null;
 
     try {
-      const last = window.__MatcherLast;
-      if (
-        last &&
-        last.source === "matcher-core" &&
-        String(last.lang || "") === String(lang || "") &&
-        Array.isArray(last.hits)
-      ) {
-        unifiedMatchResult = last;
-      }
-    } catch (_) {}
-
-    try {
-      if (!unifiedMatchResult) {
-        const matcherCore = getMatcherCore();
-        if (matcherCore && Array.isArray(cachedPages) && cachedPages.length) {
-          const doc = buildMatcherDocFromCachedPages(cachedPages);
+      const matcherCore = getMatcherCore();
+      if (matcherCore && Array.isArray(cachedPages) && cachedPages.length) {
+        const doc = buildMatcherDocFromCachedPages(cachedPages);
+        if (hasUsablePdfMatcherDoc(doc)) {
           const fn = typeof matcherCore.match === "function" ? matcherCore.match : matcherCore.matchDocument;
           unifiedMatchResult = fn.call(matcherCore, {
             doc,
@@ -492,6 +493,22 @@
             moneyMode,
             manualTerms
           });
+        }
+      }
+    } catch (_) {
+      unifiedMatchResult = null;
+    }
+
+    try {
+      if (!unifiedMatchResult) {
+        const last = window.__MatcherLast;
+        if (
+          last &&
+          last.source === "matcher-core" &&
+          String(last.lang || "") === String(lang || "") &&
+          Array.isArray(last.hits)
+        ) {
+          unifiedMatchResult = last;
         }
       }
     } catch (_) {
