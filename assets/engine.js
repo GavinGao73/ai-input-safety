@@ -739,85 +739,44 @@ function renderInputOverlayForPdf(originalText) {
   if (!lastRunMeta.fromPdf) {
     overlay.innerHTML = "";
     wrap.classList.remove("pdf-overlay-on");
+    try {
+      window.__overlay_source = "";
+    } catch (_) {}
     return;
   }
 
   let marked = null;
+  let source = "legacy";
 
   // primary: unified MatchResult path
   try {
-    marked = markHitsInOriginalFromMatchResult(originalText);
+    if (typeof markHitsInOriginalFromMatchResult === "function") {
+      marked = markHitsInOriginalFromMatchResult(originalText);
+      if (marked) source = "matcher-core";
+    }
   } catch (_) {
     marked = null;
   }
 
   // fallback: legacy regex highlight
   if (!marked) {
-    marked = markHitsInOriginal(originalText);
+    try {
+      marked = markHitsInOriginal(originalText);
+      source = "legacy";
+    } catch (_) {
+      marked = null;
+    }
   }
 
   try {
-    window.__overlay_source =
-      marked && window.__MatcherLast && window.__MatcherLast.source === "matcher-core"
-        ? "matcher-core"
-        : "legacy";
+    window.__overlay_source = source;
   } catch (_) {}
-   
+
   overlay.innerHTML = marked || escapeHTML(String(originalText || ""));
   wrap.classList.add("pdf-overlay-on");
 
   overlay.scrollTop = ta.scrollTop;
   overlay.scrollLeft = ta.scrollLeft;
-}
-
-function escapeHtmlPreserve(s) {
-  return String(s || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function markHitsInOriginalFromMatchResult(text) {
-  const src = String(text || "");
-  const mr = window.__MatcherLast;
-
-  if (!mr || mr.source !== "matcher-core" || !Array.isArray(mr.hits) || !mr.hits.length) {
-    return null;
-  }
-
-  const ordered = mr.hits
-    .filter((h) => {
-      const a = Number(h && h.start);
-      const b = Number(h && h.end);
-      return Number.isFinite(a) && Number.isFinite(b) && b > a && a >= 0 && b <= src.length;
-    })
-    .slice()
-    .sort((a, b) => {
-      const da = Number(a.start) - Number(b.start);
-      if (da !== 0) return da;
-      return Number(a.end) - Number(b.end);
-    });
-
-  if (!ordered.length) return null;
-
-  let out = "";
-  let cursor = 0;
-
-  for (const h of ordered) {
-    const a = Number(h.start);
-    const b = Number(h.end);
-
-    if (a < cursor) continue;
-
-    out += escapeHtmlPreserve(src.slice(cursor, a));
-    out += `<span class="hit">` + escapeHtmlPreserve(src.slice(a, b)) + `</span>`;
-    cursor = b;
-  }
-
-  out += escapeHtmlPreserve(src.slice(cursor));
-  return out;
 }
 
 function escapeHtmlPreserve(s) {
@@ -1341,14 +1300,14 @@ function applyRules(text) {
 
   // keep old probe only as fallback comparison
   const matcherProbe = matchResult ? null : runMatcherCoreProbe(out, enabledKeysArr);
-   
+
   lastRunMeta.inputLen = String(text || "").length;
   lastRunMeta.enabledCount = enabledSet.size;
   lastRunMeta.moneyMode = "m1";
   lastRunMeta.langUI = getLangUI();
   lastRunMeta.langContent = getLangContent();
 
-     if (matchResult && typeof matchResult.textMasked === "string") {
+  if (matchResult && typeof matchResult.textMasked === "string") {
     const byKey =
       matchResult.summary && matchResult.summary.byKey && typeof matchResult.summary.byKey === "object"
         ? matchResult.summary.byKey
@@ -1396,6 +1355,7 @@ function applyRules(text) {
       };
     } catch (_) {}
 
+    window.__ENGINE_PRIMARY_SOURCE__ = "matcher-core";
     window.__lastOutputPlain = matchResult.textMasked;
     renderOutput(matchResult.textMasked);
 
@@ -1445,11 +1405,12 @@ function applyRules(text) {
 
     return matchResult.textMasked;
   }
-   
+
   // If packs not loaded, only manual terms
   if (!rules) {
     out = applyManualTermsMask(out, () => addHit("manual_term"));
-    window.__lastOutputPlain = out; // ✅ ensure stable plain exists even if renderOutput not reached
+    window.__ENGINE_PRIMARY_SOURCE__ = "legacy-fallback";
+    window.__lastOutputPlain = out;
     renderOutput(out);
 
     const report = computeRiskReport(hitsByKey, {
@@ -1661,7 +1622,8 @@ function applyRules(text) {
     };
   } catch (_) {}
 
-  window.__lastOutputPlain = out; // ✅ ensure stable plain exists before renderOutput
+  window.__ENGINE_PRIMARY_SOURCE__ = "legacy-fallback";
+  window.__lastOutputPlain = out;
   renderOutput(out);
   renderRiskBox(report, {
     hits,
