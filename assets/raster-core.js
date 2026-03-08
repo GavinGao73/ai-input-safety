@@ -12,7 +12,7 @@
   "use strict";
 
   const NS = "__RASTER_CORE__";
-  const VERSION = "raster-core-r3-matchresult";
+  const VERSION = "raster-core-r4-hitrect-fallback";
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
   function safeString(v) { return typeof v === "string" ? v : (v == null ? "" : String(v)); }
