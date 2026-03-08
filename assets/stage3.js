@@ -229,7 +229,6 @@ async function handleFile(file) {
         // keep overlay ready for readability; no applyRules now
         try {
           if (typeof window.renderInputOverlayForPdf === "function") {
-            window.renderInputOverlayForPdf(text);
           }
         } catch (_) {}
       } else {
@@ -239,7 +238,6 @@ async function handleFile(file) {
         // overlay for Mode A pdf mapping (if present)
         try {
           if (typeof window.renderInputOverlayForPdf === "function") {
-            window.renderInputOverlayForPdf(text);
           }
         } catch (_) {}
       }
