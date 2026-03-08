@@ -585,51 +585,115 @@ function collectRawHits(opts) {
   // current pdf.js data does not carry reliable text offsets/rect alignment.
   // keep rect mapping empty for now to avoid fake precision.
   function mapHitsToPdfRects(doc, hits) {
-    const d = normalizeDocument(doc);
-    const hasPdfItems = Array.isArray(d.pages) && d.pages.some((p) => Array.isArray(p.items) && p.items.length);
-    if (!hasPdfItems) return hits;
 
-    return hits.map((h) => {
-      const target = safeString(h.matchedText || "");
-      if (!target) {
-        return {
-          ...h,
-          page: null,
-          rects: []
-        };
+  const d = normalizeDocument(doc);
+  const pages = Array.isArray(d.pages) ? d.pages : [];
+
+  if (!pages.length) return hits;
+
+  // -----------------------------
+  // Build char stream → item map
+  // -----------------------------
+
+  const charMap = [];
+  let stream = "";
+
+  for (const page of pages) {
+
+    const items = Array.isArray(page.items) ? page.items : [];
+
+    for (let i = 0; i < items.length; i++) {
+
+      const it = items[i];
+      const str = safeString(it.str);
+
+      if (!str) continue;
+
+      for (let c = 0; c < str.length; c++) {
+
+        charMap.push({
+          pageNumber: page.pageNumber,
+          itemIndex: i,
+          charIndex: stream.length
+        });
+
+        stream += str[c];
       }
 
-      for (const page of d.pages) {
-        const items = Array.isArray(page.items) ? page.items : [];
+      // preserve spaces between items
+      stream += " ";
+      charMap.push({
+        pageNumber: page.pageNumber,
+        itemIndex: i,
+        charIndex: stream.length - 1
+      });
 
-        for (const it of items) {
-          const str = safeString(it && it.str);
-          if (!str) continue;
+    }
 
-          if (str.includes(target)) {
-            const tr = Array.isArray(it.transform) ? it.transform : [];
-            return {
-              ...h,
-              page: page.pageNumber,
-              rects: [{
-                x: Number(tr[4]) || 0,
-                y: Number(tr[5]) || 0,
-                w: Number(it.width) || 0,
-                h: Number(it.height) || 0
-              }]
-            };
-          }
-        }
-      }
-
-      return {
-        ...h,
-        page: null,
-        rects: []
-      };
-    });
+    stream += "\n";
   }
 
+  // -----------------------------
+  // Map hits
+  // -----------------------------
+
+  return hits.map((h) => {
+
+    const start = Number(h.start);
+    const end = Number(h.end);
+
+    if (!(end > start)) {
+      return { ...h, page: null, rects: [] };
+    }
+
+    const itemsHit = new Map();
+
+    for (let i = start; i < end && i < charMap.length; i++) {
+
+      const m = charMap[i];
+      if (!m) continue;
+
+      const key = m.pageNumber + "_" + m.itemIndex;
+      itemsHit.set(key, m);
+    }
+
+    if (!itemsHit.size) {
+      return { ...h, page: null, rects: [] };
+    }
+
+    const rects = [];
+
+    itemsHit.forEach((m) => {
+
+      const page = pages.find(p => p.pageNumber === m.pageNumber);
+      if (!page) return;
+
+      const item = page.items[m.itemIndex];
+      if (!item) return;
+
+      const tr = Array.isArray(item.transform) ? item.transform : [];
+
+      rects.push({
+        x: Number(tr[4]) || 0,
+        y: Number(tr[5]) || 0,
+        w: Number(item.width) || 0,
+        h: Number(item.height) || 0
+      });
+
+    });
+
+    const pageNumber = rects.length ? charMap[start]?.pageNumber : null;
+
+    return {
+      ...h,
+      page: pageNumber,
+      rects
+    };
+
+  });
+
+}
+  
   function applyHitsToText(text, hits) {
     const src = safeString(text);
     const ordered = hits.slice().sort((a, b) => a.start - b.start);
