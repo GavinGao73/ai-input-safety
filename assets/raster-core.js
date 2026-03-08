@@ -6,26 +6,36 @@
  * - NO PDF exporting
  * - NO DOM side effects
  * - Pure-ish rect building layer for raster-export.js
+ *
+ * BOUNDARY
+ * - PRIMARY: matchResult -> spans -> rects
+ * - LEGACY: regex/span fallback retained only for transition safety
  * ======================================================= */
 
 (function () {
   "use strict";
 
   const NS = "__RASTER_CORE__";
-  const VERSION = "raster-core-r5-unified-main";
+  const VERSION = "raster-core-r6-matchresult-primary";
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
   function safeString(v) { return typeof v === "string" ? v : (v == null ? "" : String(v)); }
+
   function normLang(l) {
     const s = String(l || "").toLowerCase();
     return (s === "zh" || s === "en" || s === "de") ? s : "zh";
   }
-  function escapeRegExp(s) { return String(s || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+  function escapeRegExp(s) {
+    return String(s || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
   function makeLatinExactRegex(term) {
     const t = String(term || "").trim();
     if (!t) return null;
     try { return new RegExp(`\\b${escapeRegExp(t)}\\b`, "iu"); } catch (_) { return null; }
   }
+
   function makeCjkLooseRegex(term) {
     const t = String(term || "").trim();
     if (!t) return null;
@@ -46,12 +56,30 @@
       version: "fallback",
       limits: {
         maxMatchLen: {
-          manual_term: 90, person_name: 40, person_name_keep_title: 40, account_holder_name_keep_title: 40,
-          company: 70, email: 90, phone: 60, account: 90, bank: 140,
-          address_de_street: 160, address_de_postal: 160, address_de_street_partial: 160,
-          address_de_extra_partial: 160, address_de_inline_street: 160, address_en_inline_street: 160,
-          address_en_extra_block: 160, address_en_extra: 160, address_cn: 160,
-          handle: 90, ref: 90, title: 90, money: 70, money_label: 70, number: 70
+          manual_term: 90,
+          person_name: 40,
+          person_name_keep_title: 40,
+          account_holder_name_keep_title: 40,
+          company: 70,
+          email: 90,
+          phone: 60,
+          account: 90,
+          bank: 140,
+          address_de_street: 160,
+          address_de_postal: 160,
+          address_de_street_partial: 160,
+          address_de_extra_partial: 160,
+          address_de_inline_street: 160,
+          address_en_inline_street: 160,
+          address_en_extra_block: 160,
+          address_en_extra: 160,
+          address_cn: 160,
+          handle: 90,
+          ref: 90,
+          title: 90,
+          money: 70,
+          money_label: 70,
+          number: 70
         }
       },
       bbox: {
@@ -81,8 +109,12 @@
       ...base,
       ...picked,
       limits: {
-        ...(base.limits || {}), ...(picked.limits || {}),
-        maxMatchLen: { ...(((base.limits || {}).maxMatchLen) || {}), ...((((picked || {}).limits || {}).maxMatchLen) || {}) }
+        ...(base.limits || {}),
+        ...(picked.limits || {}),
+        maxMatchLen: {
+          ...(((base.limits || {}).maxMatchLen) || {}),
+          ...((((picked || {}).limits || {}).maxMatchLen) || {})
+        }
       },
       bbox: { ...(base.bbox || {}), ...(picked.bbox || {}) },
       pad: { ...(base.pad || {}), ...(picked.pad || {}) },
@@ -94,7 +126,9 @@
   }
 
   function getLangTuning(lang) {
-    const L = normLang(lang), packs = getRasterLangPacks(), base = getDefaultRasterTuning();
+    const L = normLang(lang);
+    const packs = getRasterLangPacks();
+    const base = getDefaultRasterTuning();
     const picked = packs[L] || packs.zh || null;
     return (!picked || typeof picked !== "object") ? base : mergeObjects(base, picked);
   }
@@ -132,7 +166,8 @@
   }
 
   function getPackForLang(lang) {
-    const PACKS = getPacks(), L = normLang(lang);
+    const PACKS = getPacks();
+    const L = normLang(lang);
     return PACKS[L] || PACKS.zh || null;
   }
 
@@ -141,7 +176,21 @@
     if (pack && Array.isArray(pack.priority) && pack.priority.length) return pack.priority.slice(0);
     const pol = getEnginePolicy();
     if (Array.isArray(pol.defaultPriority) && pol.defaultPriority.length) return pol.defaultPriority.slice(0);
-    return ["person_name", "company", "email", "bank", "account", "phone", "money", "address_de_street", "address_de_postal", "handle", "ref", "title", "number"];
+    return [
+      "person_name",
+      "company",
+      "email",
+      "bank",
+      "account",
+      "phone",
+      "money",
+      "address_de_street",
+      "address_de_postal",
+      "handle",
+      "ref",
+      "title",
+      "number"
+    ];
   }
 
   function getAlwaysOnSetForLang(lang) {
@@ -156,8 +205,14 @@
     } else if (extra && typeof extra.forEach === "function") {
       try { extra.forEach((k) => set.add(k)); } catch (_) {}
     }
+
     return set;
   }
+
+  /* =========================
+     LEGACY MATCHER BUILDERS
+     - retained only for transition fallback
+     ========================= */
 
   function buildRuleMatchers(lang, enabledKeys, moneyMode, manualTerms) {
     const PRIORITY = getPriorityForLang(lang);
@@ -263,6 +318,22 @@
 
   function makeRectId(n) {
     return `rect_${String(n).padStart(6, "0")}`;
+  }
+
+  function extractPageHitsFromMatchResult(matchResult, pageNumber) {
+    const mr = normalizeMatchResult(matchResult);
+    const targetPage = Number(pageNumber);
+
+    return mr.hits
+      .filter((h) => Number(h.page) === targetPage && Number(h.end) > Number(h.start))
+      .map((h) => ({
+        id: safeString(h.id),
+        key: safeString(h.key),
+        start: Number(h.start) || 0,
+        end: Number(h.end) || 0,
+        rects: asArray(h.rects)
+      }))
+      .sort((a, b) => (a.start - b.start) || (a.end - b.end));
   }
 
   const BBoxEngine = {
@@ -620,6 +691,7 @@
             usedAttempt = step.label;
             break;
           }
+
           if (!res) {
             res = out;
             usedAttempt = step.label;
@@ -939,10 +1011,10 @@
           const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
           const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
 
-          let rx = clamp(x1 - padX, 0, viewport.width);
-          let ry = clamp(bb.y - padY, 0, viewport.height);
-          let rw = clamp((x2 - x1) + padX * 2, 1, viewport.width - clamp(x1 - padX, 0, viewport.width));
-          let rh = clamp(bb.h + padY * 2, 6, viewport.height - clamp(bb.y - padY, 0, viewport.height));
+          const rx = clamp(x1 - padX, 0, viewport.width);
+          const ry = clamp(bb.y - padY, 0, viewport.height);
+          const rw = clamp((x2 - x1) + padX * 2, 1, viewport.width - clamp(x1 - padX, 0, viewport.width));
+          const rh = clamp(bb.h + padY * 2, 6, viewport.height - clamp(bb.y - padY, 0, viewport.height));
 
           if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
             if (rw > Math.min(viewport.width * 0.22, bb.w * 0.55)) continue;
@@ -1005,30 +1077,32 @@
   function textItemsToRectsFromSpans(pdfjsLib, viewport, textContentOrItems, spans, lang) {
     const built = SpanEngine.buildPageTextAndRangesFromItems(textContentOrItems);
     if (!built.items.length || !Array.isArray(spans) || !spans.length) return [];
-    return RectEngine.buildRects(pdfjsLib, viewport, built.items, built.itemRanges, spans, lang, getMergeCfg(getLangTuning(lang)).nearGapCore);
+    return RectEngine.buildRects(
+      pdfjsLib,
+      viewport,
+      built.items,
+      built.itemRanges,
+      spans,
+      lang,
+      getMergeCfg(getLangTuning(lang)).nearGapCore
+    );
   }
 
   function buildSpansFromMatchResultForPage(matchResult, pageNumber) {
-    const mr = normalizeMatchResult(matchResult);
-    const targetPage = Number(pageNumber);
+    const pageHits = extractPageHitsFromMatchResult(matchResult, pageNumber);
 
-    return mr.hits
-      .filter((h) => Number(h.page) === targetPage && h.end > h.start)
-      .map((h) => ({
-        a: Number(h.start),
-        b: Number(h.end),
-        key: h.key,
-        preferSub: null,
-        hitId: h.id
-      }))
-      .sort((a, b) => (a.a - b.a) || (a.b - b.b));
+    return pageHits.map((h) => ({
+      a: Number(h.start),
+      b: Number(h.end),
+      key: h.key,
+      preferSub: null,
+      hitId: h.id
+    }));
   }
 
   function mapMatchResultPageToRects({ pdfjsLib, viewport, itemsOrTextContent, matchResult, pageNumber, lang }) {
-    const mr = normalizeMatchResult(matchResult);
-    const targetPage = Number(pageNumber);
+    const pageHits = extractPageHitsFromMatchResult(matchResult, pageNumber);
 
-    const pageHits = mr.hits.filter((h) => Number(h.page) === targetPage && h.end > h.start);
     const spans = pageHits.map((h) => ({
       a: Number(h.start),
       b: Number(h.end),
@@ -1044,17 +1118,16 @@
     );
 
     for (const h of pageHits) {
-      const hitId = safeString(h && h.id);
-      if (!hitId) continue;
-      if (mappedHitIds.has(hitId)) continue;
+      const hitId = safeString(h.id);
+      if (!hitId || mappedHitIds.has(hitId)) continue;
 
-      const fallbackRects = asArray(h && h.rects)
+      const fallbackRects = asArray(h.rects)
         .map((r) => ({
           x: Number(r && r.x) || 0,
           y: Number(r && r.y) || 0,
           w: Number(r && r.w) || 0,
           h: Number(r && r.h) || 0,
-          key: safeString(h && h.key),
+          key: safeString(h.key),
           hitId
         }))
         .filter((r) => Number.isFinite(r.x + r.y + r.w + r.h) && r.w > 0 && r.h > 0);
@@ -1215,7 +1288,15 @@
       };
     }
 
-    const coreRes = SpanEngine.collectCoreHitsForPage({ lang, pageText, pageNumber, enabledKeys, moneyMode, manualTerms });
+    const coreRes = SpanEngine.collectCoreHitsForPage({
+      lang,
+      pageText,
+      pageNumber,
+      enabledKeys,
+      moneyMode,
+      manualTerms
+    });
+
     if (!coreRes || !coreRes.ok) return null;
 
     return {
@@ -1251,19 +1332,29 @@
     normLang,
     getLangTuning,
     getRasterLangPacks,
+
+    /* legacy transition */
     buildRuleMatchers,
+
+    /* shared helpers */
     getItemsArray,
     buildItemBoxes,
     buildPageTextAndRangesFromItems,
     normalizeCoreHit,
     collectCoreHitsForPage,
-    textItemsToRectsFromSpans,
+    normalizePagesItems,
+
+    /* primary path */
     buildSpansFromMatchResultForPage,
     mapMatchResultPageToRects,
     mapMatchResultToRects,
+    buildRasterRectResult,
+
+    /* low-level geometry */
+    textItemsToRectsFromSpans,
+
+    /* transition fallback */
     tryMatcherCoreRectsForPage,
-    textItemsToRects,
-    normalizePagesItems,
-    buildRasterRectResult
+    textItemsToRects
   };
 })();
