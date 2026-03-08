@@ -1,48 +1,17 @@
 // =========================
-// assets/engine.js (FULL)  ✅ PATCHED
+// assets/engine.js (FULL)  ✅ SLIMMED / STABLE
 // ROUTER + STABLE CORE (no lang rules/priority/alwaysOn/formatters inside)
 // - UI language: window.currentLang (UI only)
 // - Content strategy language: window.ruleEngine (+ window.ruleEngineMode)
-//
-// ✅ GOAL (UPDATED):
-// - engine.js 不再做任何“自动语言判断 / 自动锁定”  ←（旧目标：已证明会导致 pack 选错）
-// - ✅ 现在改为：engine.js 在 applyRules() 入口做“最低限度的内容语言保证”
-//   - 如果 ruleEngine 为空或未 lock：调用 __LangDetect.ensureContentLang()
-//   - 若弹窗/阻塞：立即停止本次 applyRules（避免用 UI lang 回退导致错 pack）
-//   - 若得到明确语言：由 engine.js 写入 ruleEngine + lock（单一事实来源）
-// - main.js 的 guard 仍可保留（但 engine.js 不再依赖 guard 才能正确）
-//
-// ✅ ISOLATION (HARD):
-// - NO zh/en/de rules/priority/alwaysOn/formatters inside engine.js
-// - ALL language-specific logic must live in packs: window.__ENGINE_LANG_PACKS__[lang]
-// - ALL non-language strategy must live in window.__ENGINE_POLICY__
-//
-// ✅ PATCHES (this file):
-// - P1: Prefix-mode replacement preserves trailing whitespace/newlines (prevents line-merge when a pack regex accidentally eats \n)
-// - P2: Placeholder protection ONLY shields engine-generated placeholders (avoid protecting arbitrary [..] such as Markdown links)
-// - P3: NEW mode "prefix_keep_tail": keep tail unmasked (needed for DE street-only masking while keeping PLZ/City/Country)
-// - P4: Export enabledKeys MUST include ALWAYS_ON (safer & consistent with execution)
-// - P5: REMOVE engine-side auto language detection/locking to avoid conflicts with lang-detect.js modal chain
-// - ✅ P6 (NEW): Engine-level content language guard (fix wrong-pack fallbacks when ruleEngine empty)
-// - ✅ P7 (NEW): Parallel matcher-core probe (debug only, no behavior switch)
 // =========================
-
-// ✅ FIX: version string aligned with deployed query param (?v=20260304a2)
 
 "use strict";
 
-// ✅ single source of truth
-const ENGINE_VERSION = "v20260304a2-engine-a6-langstate-fix";
-
-// ✅ FIX: version string aligned with deployed query param (?v=20260304a2)
+const ENGINE_VERSION = "v20260304a2-engine-a6-langstate-fix-slim1";
 console.log("[engine.js] loaded " + ENGINE_VERSION);
 
 /* =========================
    DETECTION_ITEMS write-trace (BOOT EARLY)
-   - capture who sets window.DETECTION_ITEMS
-   - re-init enabled after each set
-   - ✅ FIX: even if initEnabled is not ready yet, schedule a deferred init
-   - ✅ FIX: DO NOT self-assign window.DETECTION_ITEMS (prevents "last set" being polluted by engine.js)
    ========================= */
 (function traceDetectionItemsBoot() {
   try {
@@ -60,7 +29,6 @@ console.log("[engine.js] loaded " + ENGINE_VERSION);
       set(v) {
         _v = v;
 
-        // store for later inspection (even if console is noisy)
         try {
           window.__DETECTION_ITEMS_LAST_SET__ = {
             when: Date.now(),
@@ -70,13 +38,11 @@ console.log("[engine.js] loaded " + ENGINE_VERSION);
           };
         } catch (_) {}
 
-        // visible trace (optional but useful)
         try {
           console.warn("[DETECTION_ITEMS SET]", "time=", new Date().toISOString());
           console.trace("[DETECTION_ITEMS SET TRACE]");
         } catch (_) {}
 
-        // keep enabled in sync (defer to survive load order)
         try {
           setTimeout(() => {
             try {
@@ -88,9 +54,6 @@ console.log("[engine.js] loaded " + ENGINE_VERSION);
       }
     });
 
-    // ✅ If DETECTION_ITEMS already existed before hook:
-    // DO NOT write it back (would pollute "last set" stack with engine.js).
-    // Instead: do a best-effort deferred init only.
     try {
       if (_v && typeof _v === "object") {
         setTimeout(() => {
@@ -105,7 +68,7 @@ console.log("[engine.js] loaded " + ENGINE_VERSION);
 })();
 
 /* =========================
-   0) Policy access (NON-language)
+   0) Policy access
    ========================= */
 
 function getPolicy() {
@@ -118,36 +81,23 @@ function normLang(l) {
 }
 
 /* =========================
-   1) Language helpers (UI vs Content Strategy)
+   1) Language helpers
    ========================= */
 
 function getLangUI() {
   return normLang(window.currentLang) || "zh";
 }
 
-/**
- * Content strategy language (rules/placeholder), NOT UI language.
- * - if ruleEngine set -> use it
- * - else -> fallback to UI (display only until external one-shot detect/lock)
- *
- * ✅ NOTE:
- *  fallback to UI is kept for compatibility, but P6 ensures we DON'T execute packs
- *  with this fallback when content language is unknown.
- */
 function getLangContent() {
   const v = normLang(window.ruleEngine);
   return v || getLangUI();
 }
 
-/**
- * RULE C: Clear resets content strategy language to first-enter start.
- */
 function resetRuleEngine() {
   try {
     window.ruleEngine = "";
     window.ruleEngineMode = "auto";
 
-    // ✅ compatibility: keep old names in sync (ONE-WAY mirror only)
     try {
       window.contentLang = "";
       window.contentLangMode = "auto";
@@ -159,31 +109,20 @@ function resetRuleEngine() {
   } catch (_) {}
 }
 
-// Backward compatible name (main.js may call this)
 function resetContentLang() {
   resetRuleEngine();
 }
 
-/**
- * ✅ P5: engine.js 不再做“自动语言判断/自动锁定”。（旧接口保留）
- * - kept only for backward compatibility
- */
-function setRuleEngineAuto(text) {
-  // NO-OP: legacy interface, disabled
+function setRuleEngineAuto() {
   return;
 }
 
-// Compatibility wrapper (old name used in applyRules)
-function setLangContentAuto(text) {
-  // NO-OP: legacy interface, disabled
+function setLangContentAuto() {
   return;
 }
 
 /* =========================
-   1.0) ✅ P6: Engine-level content language guard (single-source safety)
-   - Prevent wrong pack usage when ruleEngine is empty and UI!=content
-   - If __LangDetect decides confidently: engine writes ruleEngine + lock
-   - If modal would open / detector blocks: stop this applyRules run
+   1.0) Engine-level content language guard
    ========================= */
 
 function ensureContentLangInEngine(text) {
@@ -191,48 +130,39 @@ function ensureContentLangInEngine(text) {
     const mode = String(window.ruleEngineMode || "").toLowerCase();
     const re = normLang(window.ruleEngine);
 
-    // 1) already locked & valid
     if (mode === "lock" && re) return true;
-
-    // 2) modal opening -> block this run (avoid UI fallback pack)
     if (window.__LANG_MODAL_OPENING__) return false;
 
-    // 3) detector missing -> degraded mode (allow run, will fallback to UI)
     if (!window.__LangDetect || typeof window.__LangDetect.ensureContentLang !== "function") {
       return true;
     }
 
     const ui = getLangUI();
     const r = window.__LangDetect.ensureContentLang(String(text || ""), ui);
-
-    // detector blocks / opens modal
     if (r && r.ok === false) return false;
 
-    // 4) primary: use returned lang if present
     let L = r && r.lang ? normLang(r.lang) : "";
 
-    // 5) IMPORTANT: if returned lang missing, lock from last confident detection
     if (!L) {
       const last =
-        window.__LangDetect && window.__LangDetect.__state && window.__LangDetect.__state.last
+        window.__LangDetect &&
+        window.__LangDetect.__state &&
+        window.__LangDetect.__state.last
           ? window.__LangDetect.__state.last
           : null;
 
       const lastLang = last && last.lang ? normLang(last.lang) : "";
       const conf = last && typeof last.confidence === "number" ? last.confidence : null;
 
-      // ✅ 核心修复：confidence 缺失时也允许锁（只要 needsConfirm=false）
       if (lastLang && !last.needsConfirm && (conf == null || conf >= 0.78)) {
         L = lastLang;
       }
     }
 
-    // 6) if we got a concrete lang, lock it as SINGLE SOURCE OF TRUTH
     if (L) {
       window.ruleEngine = L;
       window.ruleEngineMode = "lock";
 
-      // compatibility mirror (ONE-WAY)
       try {
         window.contentLang = L;
         window.contentLangMode = "lock";
@@ -243,10 +173,8 @@ function ensureContentLangInEngine(text) {
       } catch (_) {}
     }
 
-    // allow run
     return true;
   } catch (_) {
-    // fail-open: don't crash masking
     return true;
   }
 }
@@ -271,7 +199,6 @@ function getUiPack() {
   return PACKS[lang] || null;
 }
 
-// rules are loaded ONLY from language packs
 function getRulesSafe() {
   const pack = getContentPack();
   const rules = pack && pack.rules && typeof pack.rules === "object" ? pack.rules : null;
@@ -279,11 +206,7 @@ function getRulesSafe() {
 }
 
 /* =========================
-   1.2) ✅ P7: matcher-core parallel probe (debug only)
-   - NO behavior switch
-   - NO UI side effect
-   - NO export logic switch
-   - Stores in-memory snapshots only
+   1.2) matcher-core helpers
    ========================= */
 
 function getMatcherCore() {
@@ -339,7 +262,6 @@ function buildMatcherCoreDoc(text) {
 
 function normalizeMatchResult(result) {
   const safe = result && typeof result === "object" ? result : {};
-
   const hits = Array.isArray(safe.hits) ? safe.hits : [];
   const textMasked = typeof safe.textMasked === "string" ? safe.textMasked : "";
   const byKey =
@@ -373,17 +295,14 @@ function runMatcherCoreMain(text, enabledKeysArr) {
     const mc = getMatcherCore();
     if (!mc) return null;
 
-    const lang = getLangContent();
-    const pack = getContentPack();
-    const policy = getPolicy();
     const doc = buildMatcherCoreDoc(text);
-
     const fn = typeof mc.match === "function" ? mc.match : mc.matchDocument;
+
     const res = fn.call(mc, {
       doc,
-      lang,
-      pack,
-      policy,
+      lang: getLangContent(),
+      pack: getContentPack(),
+      policy: getPolicy(),
       enabledKeys: Array.isArray(enabledKeysArr) ? enabledKeysArr.slice(0) : [],
       moneyMode: moneyMode,
       manualTerms: manualTerms.slice(0)
@@ -418,16 +337,11 @@ function runMatcherCoreProbe(text, enabledKeysArr) {
       return null;
     }
 
-    const lang = getLangContent();
-    const pack = getContentPack();
-    const policy = getPolicy();
-    const doc = buildMatcherCoreDoc(text);
-
     const res = mc.matchDocument({
-      doc,
-      lang,
-      pack,
-      policy,
+      doc: buildMatcherCoreDoc(text),
+      lang: getLangContent(),
+      pack: getContentPack(),
+      policy: getPolicy(),
       enabledKeys: Array.isArray(enabledKeysArr) ? enabledKeysArr.slice(0) : [],
       moneyMode: moneyMode,
       manualTerms: manualTerms.slice(0)
@@ -438,7 +352,7 @@ function runMatcherCoreProbe(text, enabledKeysArr) {
       when: Date.now(),
       engineVersion: ENGINE_VERSION,
       matcherVersion: mc.version || "",
-      lang,
+      lang: getLangContent(),
       fromPdf: !!lastRunMeta.fromPdf,
       enabledKeys: Array.isArray(enabledKeysArr) ? enabledKeysArr.slice(0) : [],
       manualTerms: manualTerms.slice(0),
@@ -452,7 +366,6 @@ function runMatcherCoreProbe(text, enabledKeysArr) {
 
     window.__matcher_core_probe = probe;
     window.__matcher_core_last = probe;
-
     return probe;
   } catch (err) {
     window.__matcher_core_probe = {
@@ -467,40 +380,30 @@ function runMatcherCoreProbe(text, enabledKeysArr) {
 }
 
 /* =========================
-   2) Core state (language-agnostic)
+   2) Core state
    ========================= */
 
 const enabled = new Set();
-
-// ✅ Money protection always ON (M1). No UI selector.
 let moneyMode = "m1";
 window.__safe_moneyMode = moneyMode;
 
 let lastOutputPlain = "";
 
-// ================= Stage 3 state =================
-let lastUploadedFile = null; // File object (pdf or image)
-let lastFileKind = ""; // "pdf" | "image" | ""
-let lastProbe = null; // { hasTextLayer, text }
-let lastPdfOriginalText = ""; // extracted text for readable PDF
-let lastStage3Mode = "none"; // "A" | "B" | "none"
+let lastUploadedFile = null;
+let lastFileKind = "";
+let lastProbe = null;
+let lastPdfOriginalText = "";
+let lastStage3Mode = "none";
 
-// store manual redaction session/result (Mode B export via main button)
 let __manualRedactSession = null;
 let __manualRedactResult = null;
 
-// ================= Manual terms =================
 let manualTerms = [];
 
 function normalizeTerm(s) {
   return String(s || "").trim();
 }
 
-/**
- * - split by comma/newline/;、 etc
- * - dedup case-insensitive
- * - cap 24
- */
 function setManualTermsFromText(raw) {
   const s = String(raw || "");
   const parts = s
@@ -532,7 +435,6 @@ function isSmallScreen() {
   }
 }
 
-// --- Risk scoring meta ---
 let lastRunMeta = {
   fromPdf: false,
   inputLen: 0,
@@ -555,16 +457,14 @@ function escapeHTML(s) {
     .replaceAll("'", "&#039;");
 }
 
-// ================= ENABLED KEYS FOR EXPORT =================
-// ✅ PATCH P4: export enabledKeys MUST include ALWAYS_ON (policy + pack)
-// - enabled = UI-selected defaults/toggles
-// - ALWAYS_ON = enforced coverage regardless of UI
-function effectiveEnabledKeys() {
-  const MUST_INCLUDE = ["company"]; // keep as-is (your build choice)
+/* =========================
+   Common helpers
+   ========================= */
 
+function effectiveEnabledKeys() {
+  const MUST_INCLUDE = ["company"];
   const base = new Set(Array.from(enabled || []));
 
-  // include always-on keys (policy + pack)
   try {
     const ALWAYS_ON = getAlwaysOnSet();
     if (ALWAYS_ON && typeof ALWAYS_ON.forEach === "function") {
@@ -576,14 +476,12 @@ function effectiveEnabledKeys() {
   return Array.from(base);
 }
 
-// ================= placeholders (follow CONTENT STRATEGY language) =================
 function placeholder(key) {
   const pack = getContentPack() || (getPacks().zh || null);
   const table = pack && pack.placeholders ? pack.placeholders : null;
 
   if (table && table[key]) return table[key];
 
-  // last resort
   const fallback = {
     PHONE: "[Phone]",
     EMAIL: "[Email]",
@@ -602,10 +500,9 @@ function placeholder(key) {
   return fallback[key] || `[${key}]`;
 }
 
-// ================= output render =================
 function renderOutput(outPlain) {
   lastOutputPlain = String(outPlain || "");
-  window.__lastOutputPlain = lastOutputPlain; // debug + stable copy source
+  window.__lastOutputPlain = lastOutputPlain;
   const host = $("outputText");
   if (!host) return;
 
@@ -617,7 +514,6 @@ function renderOutput(outPlain) {
   host.innerHTML = html;
 }
 
-// ================= copy source (stable) =================
 function getCopyText() {
   return window.__lastOutputPlain ?? document.getElementById("outputText")?.innerText ?? "";
 }
@@ -625,7 +521,6 @@ try {
   if (typeof window.getCopyText !== "function") window.getCopyText = getCopyText;
 } catch (_) {}
 
-// ================= input watermark hide =================
 function updateInputWatermarkVisibility() {
   const ta = $("inputText");
   const wrap = $("inputWrap");
@@ -634,7 +529,6 @@ function updateInputWatermarkVisibility() {
   wrap.classList.toggle("has-content", has);
 }
 
-// ================= Manual terms masking =================
 function escapeRegExp(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -672,8 +566,57 @@ function applyManualTermsMask(out, addHit) {
   return s;
 }
 
+function afterRenderUi() {
+  try {
+    const ta2 = $("inputText");
+    const hasInput = !!(ta2 && String(ta2.value || "").trim());
+    if (hasInput) {
+      if (typeof window.expandManualArea === "function") window.expandManualArea();
+      if (typeof window.expandRiskArea === "function") window.expandRiskArea();
+      if (typeof window.syncManualRiskHeights === "function") window.syncManualRiskHeights();
+    }
+  } catch (_) {}
+
+  updateInputWatermarkVisibility();
+
+  try {
+    const ta = $("inputText");
+    if (ta) renderInputOverlayForPdf(ta.value || "");
+  } catch (_) {}
+}
+
+function buildExportSnapshot(enabledKeysArr, source) {
+  const _lc = getLangContent();
+  return {
+    enabledKeys: enabledKeysArr,
+    moneyMode: "m1",
+    langUI: getLangUI(),
+    langContent: _lc,
+    ruleEngine: _lc,
+    ruleEngineMode: String(window.ruleEngineMode || "auto"),
+    contentLangMode: String(window.ruleEngineMode || "auto"),
+    fromPdf: !!lastRunMeta.fromPdf,
+    manualTerms: manualTerms.slice(0),
+    source: source || ""
+  };
+}
+
+function storeExportSnapshot(enabledKeysArr, source) {
+  const snap = buildExportSnapshot(enabledKeysArr, source);
+  const _lc = snap.langContent;
+  window.__export_snapshot = snap;
+  if (!window.__export_snapshot_byLang) window.__export_snapshot_byLang = {};
+  window.__export_snapshot_byLang[_lc] = snap;
+}
+
+function dispatchSafeUpdated() {
+  try {
+    window.dispatchEvent(new Event("safe:updated"));
+  } catch (_) {}
+}
+
 /* =========================
-   3) Policy-driven execution (NON-language strategy read from policy)
+   3) Policy-driven execution
    ========================= */
 
 function getAlwaysOnSet() {
@@ -722,12 +665,11 @@ function phoneGuardOk({ label, value, match }) {
     }
   }
 
-  // last resort safe permissive
   return true;
 }
 
 /* =========================
-   4) PDF overlay highlight (language hooks in packs)
+   4) PDF overlay highlight
    ========================= */
 
 function renderInputOverlayForPdf(originalText) {
@@ -748,17 +690,13 @@ function renderInputOverlayForPdf(originalText) {
   let marked = null;
   let source = "legacy";
 
-  // primary: unified MatchResult path
   try {
-    if (typeof markHitsInOriginalFromMatchResult === "function") {
-      marked = markHitsInOriginalFromMatchResult(originalText);
-      if (marked) source = "matcher-core";
-    }
+    marked = markHitsInOriginalFromMatchResult(originalText);
+    if (marked) source = "matcher-core";
   } catch (_) {
     marked = null;
   }
 
-  // fallback: legacy regex highlight
   if (!marked) {
     try {
       marked = markHitsInOriginal(originalText);
@@ -817,7 +755,6 @@ function markHitsInOriginalFromMatchResult(text) {
   for (const h of ordered) {
     const a = Number(h.start);
     const b = Number(h.end);
-
     if (a < cursor) continue;
 
     out += escapeHtmlPreserve(src.slice(cursor, a));
@@ -838,7 +775,6 @@ function markHitsInOriginal(text) {
   const enabledKeysArr = snap && Array.isArray(snap.enabledKeys) ? snap.enabledKeys : Array.from(enabled || []);
   const enabledSet = new Set(enabledKeysArr);
 
-  // manual terms highlight
   if (manualTerms && manualTerms.length) {
     for (const tm of manualTerms) {
       const hasCjk = /[\u4E00-\u9FFF]/.test(tm);
@@ -872,7 +808,6 @@ function markHitsInOriginal(text) {
       continue;
     }
 
-    // ✅ P3: prefix_keep_tail (highlight ONLY the masked segment, keep tail as normal)
     if (r.mode === "prefix_keep_tail") {
       s = s.replace(r.pattern, (m, p1, p2, p3) => {
         const label = p1 || "";
@@ -928,7 +863,6 @@ function markHitsInOriginal(text) {
           } catch (_) {}
         }
 
-        // conservative fallback (no splitting)
         return `${S1}${match}${S2}`;
       });
       continue;
@@ -941,7 +875,10 @@ function markHitsInOriginal(text) {
   return esc.replaceAll(S1, `<span class="hit">`).replaceAll(S2, `</span>`);
 }
 
-// ================= init enabled =================
+/* =========================
+   init enabled
+   ========================= */
+
 function initEnabled() {
   enabled.clear();
   Object.values(window.DETECTION_ITEMS || {})
@@ -952,7 +889,7 @@ function initEnabled() {
 }
 
 /* =========================
-   5) Risk scoring (policy weights; UI text from packs)
+   5) Risk scoring
    ========================= */
 
 function clamp(n, a, b) {
@@ -963,7 +900,6 @@ function getRiskI18n() {
   const pack = getUiPack();
   if (pack && pack.ui && pack.ui.riskI18n) return pack.ui.riskI18n;
 
-  // ✅ fallback follows UI language (NOT content/rule language)
   const L = getLangUI();
 
   if (L === "zh") {
@@ -988,14 +924,12 @@ function getRiskI18n() {
       top: "Top-Risikoquellen",
       advice: "Hinweis",
       adviceLow: "OK. Geldschutz ist standardmäßig aktiv (M1).",
-      // ✅ FIX: replace Chinese punctuation with German/Latin period
       adviceMid: "Top-Risiken prüfen; ggf. stärker maskieren oder manuelle Schwärzung/Begriffe ergänzen.",
       adviceHigh: "Nicht so versenden: Signatur/Konten entfernen und stärker maskieren.",
       meta: (m) => `Treffer ${m.hits}｜Money M1${m.fromPdf ? "｜Datei" : ""}`
     };
   }
 
-  // EN default
   return {
     low: "Low",
     mid: "Medium",
@@ -1016,20 +950,10 @@ function labelForKey(k) {
   return k;
 }
 
-/**
- * Scheme A (grouped saturation):
- * - score is computed from 5 risk groups with diminishing returns: 1 - exp(-k * hits)
- * - group weights sum to 1.0, final score in [0..100]
- * - keeps "top" list based on legacy weights for UI explanation (no UI changes)
- */
 function computeRiskReport(hitsByKey, meta) {
   const pol = getPolicy();
   const R = pol && pol.risk ? pol.risk : {};
-
-  // legacy (UI top list)
   const W = R && R.weights ? R.weights : {};
-
-  // thresholds/bonus
   const T = R && R.thresholds ? R.thresholds : { mid: 40, high: 70 };
   const B = R && R.bonus ? R.bonus : { base: 0, len1500: 2, len4000: 3, fromPdf: 2 };
 
@@ -1041,8 +965,6 @@ function computeRiskReport(hitsByKey, meta) {
   const gw = R && R.groupWeights && typeof R.groupWeights === "object" ? R.groupWeights : null;
   const gk = R && R.groupK && typeof R.groupK === "object" ? R.groupK : null;
 
-  // Safe defaults (only used if policy missing)
-  // ✅ PATCH: remove non-existent "address_cn_partial" key; the key is "address_cn" (mode may be address_cn_partial)
   const DEFAULT_GROUPS = {
     critical: ["secret", "api_key_token", "bearer_token", "card_security", "security_answer", "otp", "pin", "2fa"],
     financial: ["account", "bank", "bank_routing_ids", "card_expiry"],
@@ -1127,8 +1049,8 @@ function computeRiskReport(hitsByKey, meta) {
     const k = Number(GK[gname] || 0);
     base += w * satScore(hits, k);
   }
-  let score = Math.round(base * 100);
 
+  let score = Math.round(base * 100);
   score += Number(B.base || 0);
   if (meta && meta.inputLen >= 1500) score += Number(B.len1500 || 0);
   if (meta && meta.inputLen >= 4000) score += Number(B.len4000 || 0);
@@ -1178,18 +1100,15 @@ function renderRiskBox(report, meta) {
       <div class="riskleft">
         <div class="riskmeta">${t.meta(meta)}</div>
       </div>
-
       <div class="riskscore">
         <div class="n">${report.score}</div>
         <div class="l">${levelText}</div>
       </div>
     </div>
-
     <div class="risksec">
       <div class="risklabel">${t.top}</div>
       <div class="risklist">${topHtml}</div>
     </div>
-
     <div class="risksec">
       <div class="risklabel">${t.advice}</div>
       <div class="riskadvice">${advice}</div>
@@ -1198,7 +1117,7 @@ function renderRiskBox(report, meta) {
 }
 
 /* =========================
-   6) Rule application (pack-driven; strategy from policy)
+   6) Rule application
    ========================= */
 
 function applyRules(text) {
@@ -1206,15 +1125,10 @@ function applyRules(text) {
   let hits = 0;
   const hitsByKey = {};
 
-  // ✅ P6: engine-level guard MUST run before any pack/rules are read.
-  // If it would open modal / block: STOP this run to avoid wrong-language fallback pack.
   if (!ensureContentLangInEngine(out)) {
-    // Do NOT render raw/unmasked text (security).
-    // Keep previous output stable.
     return lastOutputPlain;
   }
 
-  // ✅ P5 legacy no-op (kept)
   setLangContentAuto(out);
 
   const PRIORITY = getPriority();
@@ -1225,50 +1139,21 @@ function applyRules(text) {
     hitsByKey[key] = (hitsByKey[key] || 0) + 1;
   }
 
-  // P2: protect ONLY engine-generated placeholders (do NOT protect arbitrary [..] such as Markdown labels)
   function protectPlaceholders(s) {
     const map = [];
     let t = String(s || "");
 
-    // (A) Protect 【...】 blocks
     t = t.replace(/【[^【】\n\r]{1,120}】/g, (m) => {
       const id = map.length;
       map.push(m);
       return `\uE000${id}\uE001`;
     });
 
-    // (B) Protect ONLY known placeholder tokens in square brackets
     const PH = [
-      // DE
-      "Telefon",
-      "E-Mail",
-      "URL",
-      "Geheim",
-      "Konto",
-      "Adresse",
-      "Handle",
-      "Referenz",
-      "Anrede",
-      "Zahl",
-      "Betrag",
-      "Firma",
-      "Name",
-      // EN fallback tokens
-      "Phone",
-      "Email",
-      "Secret",
-      "Account",
-      "Address",
-      "Ref",
-      "Title",
-      "Number",
-      "Amount",
-      "Company",
-      // generic
+      "Telefon", "E-Mail", "URL", "Geheim", "Konto", "Adresse", "Handle", "Referenz", "Anrede", "Zahl", "Betrag", "Firma", "Name",
+      "Phone", "Email", "Secret", "Account", "Address", "Ref", "Title", "Number", "Amount", "Company",
       "REDACTED"
-    ]
-      .map(escapeRegExp)
-      .join("|");
+    ].map(escapeRegExp).join("|");
 
     const rePH = new RegExp(`\\[(?:${PH})\\]`, "g");
     t = t.replace(rePH, (m) => {
@@ -1291,14 +1176,10 @@ function applyRules(text) {
 
   const rules = getRulesSafe();
   const pack = getContentPack();
-
   const enabledKeysArr = effectiveEnabledKeys();
   const enabledSet = new Set(enabledKeysArr);
 
-  // matcher-core is now PRIMARY path
   const matchResult = runMatcherCoreMain(out, enabledKeysArr);
-
-  // keep old probe only as fallback comparison
   const matcherProbe = matchResult ? null : runMatcherCoreProbe(out, enabledKeysArr);
 
   lastRunMeta.inputLen = String(text || "").length;
@@ -1307,6 +1188,7 @@ function applyRules(text) {
   lastRunMeta.langUI = getLangUI();
   lastRunMeta.langContent = getLangContent();
 
+  // -------- matcher-core primary --------
   if (matchResult && typeof matchResult.textMasked === "string") {
     const byKey =
       matchResult.summary && matchResult.summary.byKey && typeof matchResult.summary.byKey === "object"
@@ -1358,7 +1240,6 @@ function applyRules(text) {
     window.__ENGINE_PRIMARY_SOURCE__ = "matcher-core";
     window.__lastOutputPlain = matchResult.textMasked;
     renderOutput(matchResult.textMasked);
-
     renderRiskBox(report, {
       hits: hitCount,
       enabledCount: enabledSet.size,
@@ -1366,52 +1247,15 @@ function applyRules(text) {
       fromPdf: lastRunMeta.fromPdf,
       inputLen: lastRunMeta.inputLen
     });
-
-    try {
-      const ta2 = $("inputText");
-      const hasInput = !!(ta2 && String(ta2.value || "").trim());
-      if (hasInput) {
-        if (typeof window.expandManualArea === "function") window.expandManualArea();
-        if (typeof window.expandRiskArea === "function") window.expandRiskArea();
-        if (typeof window.syncManualRiskHeights === "function") window.syncManualRiskHeights();
-      }
-    } catch (_) {}
-
-    updateInputWatermarkVisibility();
-    const ta = $("inputText");
-    if (ta) renderInputOverlayForPdf(ta.value || "");
-
-    const _lc = getLangContent();
-    const snap = {
-      enabledKeys: enabledKeysArr,
-      moneyMode: "m1",
-      langUI: getLangUI(),
-      langContent: _lc,
-      ruleEngine: _lc,
-      ruleEngineMode: String(window.ruleEngineMode || "auto"),
-      contentLangMode: String(window.ruleEngineMode || "auto"),
-      fromPdf: !!lastRunMeta.fromPdf,
-      manualTerms: manualTerms.slice(0),
-      source: "matcher-core"
-    };
-
-    window.__export_snapshot = snap;
-    if (!window.__export_snapshot_byLang) window.__export_snapshot_byLang = {};
-    window.__export_snapshot_byLang[_lc] = snap;
-
-    try {
-      window.dispatchEvent(new Event("safe:updated"));
-    } catch (_) {}
-
+    afterRenderUi();
+    storeExportSnapshot(enabledKeysArr, "matcher-core");
+    dispatchSafeUpdated();
     return matchResult.textMasked;
   }
 
-  // If packs not loaded, only manual terms
+  // -------- no rules loaded --------
   if (!rules) {
     out = applyManualTermsMask(out, () => addHit("manual_term"));
-    window.__ENGINE_PRIMARY_SOURCE__ = "legacy-fallback";
-    window.__lastOutputPlain = out;
-    renderOutput(out);
 
     const report = computeRiskReport(hitsByKey, {
       hits,
@@ -1421,45 +1265,6 @@ function applyRules(text) {
       inputLen: out.length
     });
 
-    renderRiskBox(report, {
-      hits,
-      enabledCount: enabledSet.size,
-      moneyMode,
-      fromPdf: lastRunMeta.fromPdf,
-      inputLen: out.length
-    });
-
-    try {
-      const ta2 = $("inputText");
-      const hasInput = !!(ta2 && String(ta2.value || "").trim());
-      if (hasInput) {
-        if (typeof window.expandManualArea === "function") window.expandManualArea();
-        if (typeof window.expandRiskArea === "function") window.expandRiskArea();
-        if (typeof window.syncManualRiskHeights === "function") window.syncManualRiskHeights();
-      }
-    } catch (_) {}
-
-    updateInputWatermarkVisibility();
-    const ta = $("inputText");
-    if (ta) renderInputOverlayForPdf(ta.value || "");
-
-    const _lc = getLangContent();
-    const snap = {
-      enabledKeys: enabledKeysArr,
-      moneyMode: "m1",
-      langUI: getLangUI(),
-      langContent: _lc,
-      ruleEngine: _lc,
-      ruleEngineMode: String(window.ruleEngineMode || "auto"),
-      contentLangMode: String(window.ruleEngineMode || "auto"),
-      fromPdf: !!lastRunMeta.fromPdf,
-      manualTerms: manualTerms.slice(0)
-    };
-
-    window.__export_snapshot = snap;
-    if (!window.__export_snapshot_byLang) window.__export_snapshot_byLang = {};
-    window.__export_snapshot_byLang[_lc] = snap;
-
     try {
       window.__safe_report_matcher_probe = {
         ok: !!(matcherProbe && matcherProbe.ok),
@@ -1468,16 +1273,24 @@ function applyRules(text) {
       };
     } catch (_) {}
 
-    try {
-      window.dispatchEvent(new Event("safe:updated"));
-    } catch (_) {}
+    window.__ENGINE_PRIMARY_SOURCE__ = "legacy-fallback";
+    window.__lastOutputPlain = out;
+    renderOutput(out);
+    renderRiskBox(report, {
+      hits,
+      enabledCount: enabledSet.size,
+      moneyMode,
+      fromPdf: lastRunMeta.fromPdf,
+      inputLen: out.length
+    });
+    afterRenderUi();
+    storeExportSnapshot(enabledKeysArr, "legacy-fallback");
+    dispatchSafeUpdated();
     return out;
   }
 
-  // manual first
+  // -------- legacy fallback path --------
   out = applyManualTermsMask(out, () => addHit("manual_term"));
-
-  // protect existing placeholders
   const p0 = protectPlaceholders(out);
   out = p0.t;
 
@@ -1509,7 +1322,6 @@ function applyRules(text) {
 
       if (r.mode === "prefix_keep_tail") {
         const label = String(args[1] || "");
-        const toMask = String(args[2] || "");
         const tail = String(args[3] || "");
         addHit(key);
         return `${label}${placeholder(r.tag)}${tail}`;
@@ -1632,47 +1444,15 @@ function applyRules(text) {
     fromPdf: lastRunMeta.fromPdf,
     inputLen: lastRunMeta.inputLen
   });
-
-  try {
-    const ta2 = $("inputText");
-    const hasInput = !!(ta2 && String(ta2.value || "").trim());
-    if (hasInput) {
-      if (typeof window.expandManualArea === "function") window.expandManualArea();
-      if (typeof window.expandRiskArea === "function") window.expandRiskArea();
-      if (typeof window.syncManualRiskHeights === "function") window.syncManualRiskHeights();
-    }
-  } catch (_) {}
-
-  updateInputWatermarkVisibility();
-  const ta = $("inputText");
-  if (ta) renderInputOverlayForPdf(ta.value || "");
-
-  const _lc = getLangContent();
-  const snap2 = {
-    enabledKeys: enabledKeysArr,
-    moneyMode: "m1",
-    langUI: getLangUI(),
-    langContent: _lc,
-    ruleEngine: _lc,
-    ruleEngineMode: String(window.ruleEngineMode || "auto"),
-    contentLangMode: String(window.ruleEngineMode || "auto"),
-    fromPdf: !!lastRunMeta.fromPdf,
-    manualTerms: manualTerms.slice(0)
-  };
-
-  window.__export_snapshot = snap2;
-  if (!window.__export_snapshot_byLang) window.__export_snapshot_byLang = {};
-  window.__export_snapshot_byLang[_lc] = snap2;
-
-  try {
-    window.dispatchEvent(new Event("safe:updated"));
-  } catch (_) {}
+  afterRenderUi();
+  storeExportSnapshot(enabledKeysArr, "legacy-fallback");
+  dispatchSafeUpdated();
 
   return out;
 }
 
 /* =========================
-   7) Stability patches (safe no-op)
+   7) Stability patches
    ========================= */
 try {
   if (typeof window.$ !== "function") window.$ = $;
@@ -1687,56 +1467,41 @@ try {
   if (typeof syncManualRiskHeights !== "function") var syncManualRiskHeights = window.syncManualRiskHeights;
 } catch (_) {}
 
-// expose helpers
+/* =========================
+   Expose helpers
+   ========================= */
 try {
   if (typeof window.getLangUI !== "function") window.getLangUI = getLangUI;
   if (typeof window.getLangContent !== "function") window.getLangContent = getLangContent;
-
   if (typeof window.resetRuleEngine !== "function") window.resetRuleEngine = resetRuleEngine;
   if (typeof window.resetContentLang !== "function") window.resetContentLang = resetContentLang;
-
-  // Debug pack access
   if (typeof window.getContentPack !== "function") window.getContentPack = getContentPack;
   if (typeof window.getPolicy !== "function") window.getPolicy = getPolicy;
-
-  // Debug matcher-core probe access
   if (typeof window.runMatcherCoreProbe !== "function") window.runMatcherCoreProbe = runMatcherCoreProbe;
-
-  // Main entry
   if (typeof window.applyRules !== "function") window.applyRules = applyRules;
-
-  // manual terms setter (if main.js uses it)
   if (typeof window.setManualTermsFromText !== "function") window.setManualTermsFromText = setManualTermsFromText;
-
-  // init enabled (if main.js uses it)
   if (typeof window.initEnabled !== "function") window.initEnabled = initEnabled;
 } catch (_) {}
 
 /* =========================
-   8) BOOT INIT (RULE A)
-   - ✅ P5: 不做自动识别；只做状态归一化与兼容字段同步（单向镜像）
+   8) BOOT INIT
    ========================= */
 (function bootRuleEngineInit() {
   try {
     const m = String(window.ruleEngineMode || "").trim().toLowerCase();
     if (!m) window.ruleEngineMode = "auto";
 
-    // ✅ One-way mirror ONLY: contentLang follows ruleEngine (never the reverse)
     const re = normLang(window.ruleEngine);
 
     if (String(window.ruleEngineMode || "").toLowerCase() === "lock") {
-      // If lock but invalid ruleEngine, DO NOT fallback to UI (would reverse-drive).
-      // Instead, reset to auto+empty and let detector decide.
       if (!re) {
         window.ruleEngine = "";
         window.ruleEngineMode = "auto";
       }
     } else {
-      // auto mode: keep ruleEngine as-is (may be empty). No locking here.
       if (!re) window.ruleEngine = "";
     }
 
-    // ✅ compatibility mirror (ONE-WAY)
     try {
       const r2 = normLang(window.ruleEngine);
       window.contentLang = r2 || "";
@@ -1747,7 +1512,7 @@ try {
 })();
 
 /* =========================
-   9) Content strategy: manual switch (NO CLEAR, keep file)
+   9) Content strategy: manual switch
    ========================= */
 function setRuleEngineManual(lang) {
   const L = normLang(lang);
@@ -1757,13 +1522,11 @@ function setRuleEngineManual(lang) {
     window.ruleEngine = L;
     window.ruleEngineMode = "lock";
 
-    // compatibility (if some older code reads contentLang) — ONE-WAY mirror
     try {
       window.contentLang = L;
       window.contentLangMode = "lock";
     } catch (_) {}
 
-    // re-apply rules to current input — MUST go through safe/guard entry
     const ta = document.getElementById("inputText");
     const v = ta ? String(ta.value || "") : "";
     if (v.trim()) {
@@ -1773,7 +1536,6 @@ function setRuleEngineManual(lang) {
         if (!window.ensureLangBeforeApply(v)) return;
         window.applyRules(v);
       } else if (typeof window.applyRules === "function") {
-        // fallback
         window.applyRules(v);
       }
     }
@@ -1785,9 +1547,7 @@ try {
 } catch (_) {}
 
 /* =========================
-   E) BOOT SELF-CHECK (in-memory only)
-   - Detect missing packs/policy early
-   - No console logs, no storage
+   E) BOOT SELF-CHECK
    ========================= */
 (function bootSelfCheck() {
   try {
@@ -1824,11 +1584,9 @@ try {
       hasPolicy: hasPolicyObj,
       hasPacks: hasPacksObj,
       missingPacks,
-      // helpful runtime hints
       langUI: typeof window.getLangUI === "function" ? window.getLangUI() : window.currentLang || "",
       langContent: typeof window.getLangContent === "function" ? window.getLangContent() : window.ruleEngine || "",
       ruleEngineMode: String(window.ruleEngineMode || ""),
-      // ✅ FIX: align with deployed version tag
       engineVersion: ENGINE_VERSION
     };
 
