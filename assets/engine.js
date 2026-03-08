@@ -744,23 +744,80 @@ function renderInputOverlayForPdf(originalText) {
 
   let marked = null;
 
-  // single-track primary path
+  // primary: unified MatchResult path
   try {
     marked = markHitsInOriginalFromMatchResult(originalText);
   } catch (_) {
     marked = null;
   }
 
-  // legacy fallback
+  // fallback: legacy regex highlight
   if (!marked) {
     marked = markHitsInOriginal(originalText);
   }
 
+  try {
+    window.__overlay_source =
+      marked && window.__MatcherLast && window.__MatcherLast.source === "matcher-core"
+        ? "matcher-core"
+        : "legacy";
+  } catch (_) {}
+   
   overlay.innerHTML = marked || escapeHTML(String(originalText || ""));
   wrap.classList.add("pdf-overlay-on");
 
   overlay.scrollTop = ta.scrollTop;
   overlay.scrollLeft = ta.scrollLeft;
+}
+
+function escapeHtmlPreserve(s) {
+  return String(s || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function markHitsInOriginalFromMatchResult(text) {
+  const src = String(text || "");
+  const mr = window.__MatcherLast;
+
+  if (!mr || mr.source !== "matcher-core" || !Array.isArray(mr.hits) || !mr.hits.length) {
+    return null;
+  }
+
+  const ordered = mr.hits
+    .filter((h) => {
+      const a = Number(h && h.start);
+      const b = Number(h && h.end);
+      return Number.isFinite(a) && Number.isFinite(b) && b > a && a >= 0 && b <= src.length;
+    })
+    .slice()
+    .sort((a, b) => {
+      const da = Number(a.start) - Number(b.start);
+      if (da !== 0) return da;
+      return Number(a.end) - Number(b.end);
+    });
+
+  if (!ordered.length) return null;
+
+  let out = "";
+  let cursor = 0;
+
+  for (const h of ordered) {
+    const a = Number(h.start);
+    const b = Number(h.end);
+
+    if (a < cursor) continue;
+
+    out += escapeHtmlPreserve(src.slice(cursor, a));
+    out += `<span class="hit">` + escapeHtmlPreserve(src.slice(a, b)) + `</span>`;
+    cursor = b;
+  }
+
+  out += escapeHtmlPreserve(src.slice(cursor));
+  return out;
 }
 
 function escapeHtmlPreserve(s) {
