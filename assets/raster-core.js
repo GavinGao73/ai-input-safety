@@ -12,7 +12,7 @@
   "use strict";
 
   const NS = "__RASTER_CORE__";
-  const VERSION = "raster-core-r2-slim";
+  const VERSION = "raster-core-r3-matchresult";
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
   function safeString(v) { return typeof v === "string" ? v : (v == null ? "" : String(v)); }
@@ -30,6 +30,10 @@
     const t = String(term || "").trim();
     if (!t) return null;
     try { return new RegExp(`(^|[^\\u4E00-\\u9FFF])(${escapeRegExp(t)})(?=$|[^\\u4E00-\\u9FFF])`, "u"); } catch (_) { return null; }
+  }
+
+  function asArray(v) {
+    return Array.isArray(v) ? v : [];
   }
 
   function getRasterLangPacks() { return window.__RASTER_LANG_PACKS__ || {}; }
@@ -190,6 +194,45 @@
     return [];
   }
 
+  function normalizePagesItems(pagesItems) {
+    return asArray(pagesItems).map((p, idx) => ({
+      pageNumber: Number(p && p.pageNumber) || idx + 1,
+      items: asArray(p && p.items).map((it) => ({
+        str: safeString(it && it.str),
+        transform: Array.isArray(it && it.transform) ? it.transform.slice(0, 6) : [1, 0, 0, 1, 0, 0],
+        width: Number(it && it.width) || 0,
+        height: Number(it && it.height) || 0,
+        hasEOL: !!(it && it.hasEOL)
+      }))
+    }));
+  }
+
+  function normalizeMatchResult(matchResult) {
+    const mr = matchResult && typeof matchResult === "object" ? matchResult : {};
+    return {
+      version: safeString(mr.version || "match-result-v1"),
+      source: safeString(mr.source || "matcher-core"),
+      lang: normLang(mr.lang) || "zh",
+      hits: asArray(mr.hits).map((h) => ({
+        id: safeString(h && h.id),
+        key: safeString(h && h.key),
+        page: Number.isFinite(h && h.page) ? Number(h.page) : null,
+        start: Number(h && h.start) || 0,
+        end: Number(h && h.end) || 0,
+        text: safeString(h && h.text),
+        masked: safeString(h && h.masked),
+        rects: asArray(h && h.rects),
+        rule: h && typeof h.rule === "object" ? h.rule : {},
+        meta: h && typeof h.meta === "object" ? h.meta : {}
+      })),
+      summary: mr && typeof mr.summary === "object" ? mr.summary : {}
+    };
+  }
+
+  function makeRectId(n) {
+    return `rect_${String(n).padStart(6, "0")}`;
+  }
+
   const BBoxEngine = {
     keyGroup(key) {
       const isLong = key === "account" || key === "phone" || key === "email" || key === "bank";
@@ -270,7 +313,7 @@
         if (aIsCjk || bIsCjk) return false;
         if (/^[\s\)\]\}\.,;:\/]/.test(chunk)) return false;
         if (/[\s\-\(\[\{\/]$/.test(line)) return false;
-        return true;
+        return /[A-Za-z0-9]/.test(a) && /[A-Za-z0-9]/.test(b);
       }
 
       const rows = [];
@@ -319,7 +362,7 @@
       const aRaw = Number.isFinite(hit.a) ? hit.a : (Number.isFinite(hit.start) ? hit.start : (Number.isFinite(hit.from) ? hit.from : (Number.isFinite(hit.index) ? hit.index : null)));
       const bRaw = Number.isFinite(hit.b) ? hit.b : (Number.isFinite(hit.end) ? hit.end : (Number.isFinite(hit.to) ? hit.to : (Number.isFinite(aRaw) && Number.isFinite(hit.len) ? aRaw + Number(hit.len) : null)));
       if (!key || !Number.isFinite(aRaw) || !Number.isFinite(bRaw) || bRaw <= aRaw) return null;
-      return { key, a: Math.max(0, Number(aRaw)), b: Math.max(0, Number(bRaw)), preferSub: hit.preferSub || null };
+      return { key, a: Math.max(0, Number(aRaw)), b: Math.max(0, Number(bRaw)), preferSub: hit.preferSub || null, hitId: safeString(hit.id || "") };
     },
 
     collectCoreHitsForPage({ lang, pageText, pageNumber, enabledKeys, moneyMode, manualTerms }) {
@@ -340,7 +383,7 @@
       const safeLang = normLang(lang), safeEnabledKeys = Array.isArray(enabledKeys) ? enabledKeys.slice() : [];
       const safeManualTerms = Array.isArray(manualTerms) ? manualTerms.map((x) => String(x || "").trim()).filter(Boolean) : [];
       let normalized = null;
-      try { normalized = mc.normalizeDocument({ pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }], fromPdf: true }); } catch (_) { normalized = null; }
+      try { normalized = mc.normalizeDocument ? mc.normalizeDocument({ pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }], fromPdf: true }) : null; } catch (_) { normalized = null; }
 
       const attempts = [];
       if (normalized && ((typeof normalized.text === "string" && normalized.text.trim()) || (Array.isArray(normalized.pages) && normalized.pages.length))) {
@@ -355,7 +398,7 @@
           const out = step.run();
           if (out && typeof out.then === "function") throw new Error("matcher-core-async-not-supported-here");
           if (!out) continue;
-          const total = Number(out?.summary?.total) || (Array.isArray(out?.hits) ? out.hits.length : 0) || (Array.isArray(out?.rawHits) ? out.rawHits.length : 0) || (Array.isArray(out?.finalHits) ? out.finalHits.length : 0);
+          const total = Number(out?.summary?.total) || Number(out?.summary?.hitCount) || (Array.isArray(out?.hits) ? out.hits.length : 0) || (Array.isArray(out?.rawHits) ? out.rawHits.length : 0) || (Array.isArray(out?.finalHits) ? out.finalHits.length : 0);
           if (total > 0) { res = out; usedAttempt = step.label; break; }
           if (!res) { res = out; usedAttempt = step.label; }
         } catch (e) { lastErr = e; }
@@ -507,7 +550,7 @@
         if ((sp.b - sp.a) > (MAX_MATCH_LEN[sp.key] || 120)) continue;
         const last = merged[merged.length - 1];
         if (last && last.key === sp.key && sp.a <= last.b) last.b = Math.max(last.b, sp.b);
-        else merged.push({ a: sp.a, b: sp.b, key: sp.key, preferSub: sp.preferSub || null });
+        else merged.push({ a: sp.a, b: sp.b, key: sp.key, preferSub: sp.preferSub || null, hitId: sp.hitId || "" });
       }
       return merged;
     },
@@ -515,7 +558,7 @@
     buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
       const tuning = getLangTuning(lang), mergeCfg = getMergeCfg(tuning), rects = [];
       for (const sp of RectEngine.filterAndMergeSpans(spans, tuning)) {
-        const A = sp.a, B = sp.b, key = sp.key, preferSub = sp.preferSub;
+        const A = sp.a, B = sp.b, key = sp.key, preferSub = sp.preferSub, hitId = safeString(sp.hitId || "");
         for (const r of itemRanges) {
           const a0 = Math.max(A, r.start), b0 = Math.min(B, r.end);
           if (b0 <= a0) continue;
@@ -540,7 +583,7 @@
           if (key === "company") { if (rw > Math.min(viewport.width * 0.18, bb.w * 0.45)) continue; }
           if (key === "manual_term") { if (rw > Math.min(viewport.width * 0.28, bb.w * 0.70)) continue; }
           if (rw > viewport.width * 0.92 || rh > viewport.height * 0.35 || (rw > viewport.width * 0.85 && rh > viewport.height * 0.20)) continue;
-          rects.push({ x: rx, y: ry, w: rw, h: rh, key });
+          rects.push({ x: rx, y: ry, w: rw, h: rh, key, hitId });
         }
       }
       if (!rects.length) return [];
@@ -549,18 +592,18 @@
       for (const r of rects) {
         if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
         const last = out[out.length - 1];
-        if (!last) { out.push({ x: r.x, y: r.y, w: r.w, h: r.h, key: r.key }); continue; }
+        if (!last) { out.push({ x: r.x, y: r.y, w: r.w, h: r.h, key: r.key, hitId: r.hitId }); continue; }
         const overlap = Math.max(0, Math.min(last.y + last.h, r.y + r.h) - Math.max(last.y, r.y));
         const minH = Math.max(1, Math.min(last.h, r.h));
         const sameLine = (overlap / minH) > mergeCfg.sameLineOverlapRatio;
         const similarHeight = (Math.min(last.h, r.h) / Math.max(last.h, r.h)) > mergeCfg.similarHeightRatio;
         const gap = r.x - (last.x + last.w), near = gap >= 0 && gap <= nearGap;
-        if (r.key === last.key && sameLine && similarHeight && near) {
+        if (r.key === last.key && r.hitId === last.hitId && sameLine && similarHeight && near) {
           const nx = Math.min(last.x, r.x), ny = Math.min(last.y, r.y), nr = Math.max(last.x + last.w, r.x + r.w), nb = Math.max(last.y + last.h, r.y + r.h);
           last.x = nx; last.y = ny; last.w = nr - nx; last.h = nb - ny;
-        } else out.push({ x: r.x, y: r.y, w: r.w, h: r.h, key: r.key });
+        } else out.push({ x: r.x, y: r.y, w: r.w, h: r.h, key: r.key, hitId: r.hitId });
       }
-      return out.map(({ x, y, w, h, key }) => ({ x, y, w, h, key }));
+      return out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId }));
     }
   };
 
@@ -572,6 +615,138 @@
     const built = SpanEngine.buildPageTextAndRangesFromItems(textContentOrItems);
     if (!built.items.length || !Array.isArray(spans) || !spans.length) return [];
     return RectEngine.buildRects(pdfjsLib, viewport, built.items, built.itemRanges, spans, lang, getMergeCfg(getLangTuning(lang)).nearGapCore);
+  }
+
+  function buildSpansFromMatchResultForPage(matchResult, pageNumber) {
+    const mr = normalizeMatchResult(matchResult);
+    const targetPage = Number(pageNumber);
+    return mr.hits
+      .filter((h) => Number(h.page) === targetPage && h.end > h.start)
+      .map((h) => ({
+        a: Number(h.start),
+        b: Number(h.end),
+        key: h.key,
+        preferSub: null,
+        hitId: h.id
+      }))
+      .sort((a, b) => (a.a - b.a) || (a.b - b.b));
+  }
+
+  function mapMatchResultPageToRects({ pdfjsLib, viewport, itemsOrTextContent, matchResult, pageNumber, lang }) {
+    const spans = buildSpansFromMatchResultForPage(matchResult, pageNumber);
+    const rects = textItemsToRectsFromSpans(pdfjsLib, viewport, itemsOrTextContent, spans, lang);
+    return {
+      rects,
+      spans
+    };
+  }
+
+  function buildRasterRectResult({ pageEntries, matchResult, lang }) {
+    const mr = normalizeMatchResult(matchResult);
+    const pages = [];
+    let rectSeq = 1;
+    let mappedHitIds = new Set();
+    let totalRects = 0;
+
+    for (const entry of asArray(pageEntries)) {
+      const pageIndex = Number(entry && entry.pageIndex) || 0;
+      const width = Number(entry && entry.width) || 0;
+      const height = Number(entry && entry.height) || 0;
+      const rectsIn = asArray(entry && entry.rects);
+
+      const rects = rectsIn.map((r) => {
+        const hitId = safeString(r && r.hitId);
+        if (hitId) mappedHitIds.add(hitId);
+        totalRects += 1;
+        return {
+          id: makeRectId(rectSeq++),
+          hitId,
+          key: safeString(r && r.key),
+          x: Number(r && r.x) || 0,
+          y: Number(r && r.y) || 0,
+          w: Number(r && r.w) || 0,
+          h: Number(r && r.h) || 0,
+          source: "matcher-core",
+          confidence: 1,
+          meta: {
+            itemCount: 1,
+            matchStrategy: "text-items-overlap"
+          }
+        };
+      });
+
+      const pageHits = mr.hits.filter((h) => Number(h.page) === pageIndex + 1);
+      pages.push({
+        pageIndex,
+        width,
+        height,
+        stats: {
+          coreHitCount: pageHits.length,
+          mappedHitCount: pageHits.filter((h) => mappedHitIds.has(h.id)).length,
+          rectCount: rects.length
+        },
+        rects
+      });
+    }
+
+    return {
+      version: "raster-rect-result-v1",
+      source: "matcher-core",
+      pageCount: pages.length,
+      summary: {
+        coreHitCount: mr.hits.length,
+        mappedHitCount: mappedHitIds.size,
+        rectCount: totalRects
+      },
+      pages
+    };
+  }
+
+  function mapMatchResultToRects({ pdfjsLib, pages, matchResult, lang }) {
+    const mr = normalizeMatchResult(matchResult);
+    const pageEntries = [];
+
+    for (let i = 0; i < asArray(pages).length; i += 1) {
+      const p = pages[i];
+      const pageNumber = Number(p && p.pageNumber) || (i + 1);
+      const viewport = p && p.viewport;
+      const itemsOrTextContent = p && p.itemsOrTextContent;
+
+      if (!viewport || !itemsOrTextContent) {
+        pageEntries.push({
+          pageIndex: i,
+          width: Number(p && p.width) || 0,
+          height: Number(p && p.height) || 0,
+          rects: []
+        });
+        continue;
+      }
+
+      const one = mapMatchResultPageToRects({
+        pdfjsLib,
+        viewport,
+        itemsOrTextContent,
+        matchResult: mr,
+        pageNumber,
+        lang: normLang(lang || mr.lang)
+      });
+
+      pageEntries.push({
+        pageIndex: i,
+        width: Number(p && p.width) || 0,
+        height: Number(p && p.height) || 0,
+        rects: asArray(one.rects)
+      });
+    }
+
+    const result = buildRasterRectResult({
+      pageEntries,
+      matchResult: mr,
+      lang: normLang(lang || mr.lang)
+    });
+
+    try { window.__RasterCoreLast = result; } catch (_) {}
+    return result;
   }
 
   function tryMatcherCoreRectsForPage({ pdfjsLib, viewport, itemsOrTextContent, pageNumber, lang, enabledKeys, moneyMode, manualTerms }) {
@@ -610,7 +785,12 @@
     normalizeCoreHit,
     collectCoreHitsForPage,
     textItemsToRectsFromSpans,
+    buildSpansFromMatchResultForPage,
+    mapMatchResultPageToRects,
+    mapMatchResultToRects,
     tryMatcherCoreRectsForPage,
-    textItemsToRects
+    textItemsToRects,
+    normalizePagesItems,
+    buildRasterRectResult
   };
 })();
