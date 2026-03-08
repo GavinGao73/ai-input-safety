@@ -38,211 +38,136 @@
   }
 
   // ======================================================
-  // LANG_TUNING (zh/en/de)
-  // - MAX_MATCH_LEN per key (guard over-redaction)
-  // - bbox clamp (maxByPage/maxByEst multipliers)
-  // - padX/padY per key
-  // - shrinkByLabel label vocab per language (avoid masking labels)
+  // RASTER LANG PACK ACCESS
+  // - language-specific rendering tuning is moved out of raster-export.js
+  // - source of truth: window.__RASTER_LANG_PACKS__
+  // - keep a safe fallback here to prevent crash if packs are missing
   // ======================================================
-  const LANG_TUNING = {
-    zh: {
-      maxMatchLen: {
-        manual_term: 90,
-        person_name: 32,
-        person_name_keep_title: 32,
-        account_holder_name_keep_title: 32,
-        company: 60,
-        email: 80,
-        phone: 50,
-        account: 80,
-        bank: 120,
 
-        // legacy keys kept for compat
-        address_de_street: 140,
-        address_de_postal: 140,
-
-        // ✅ address keys (whitelist expansion)
-        address_de_street_partial: 140,
-        address_de_extra_partial: 140,
-        address_de_inline_street: 140,
-        address_en_inline_street: 140,
-        address_en_extra_block: 140,
-        address_en_extra: 140,
-        address_cn: 140,
-
-        handle: 80,
-        ref: 80,
-        title: 80,
-        money: 60,
-        money_label: 60,
-        number: 60
-      },
-
-      bbox: {
-        default: {
-          maxByPage: 0.30,
-          maxByEst: 1.45,
-          wHardCapEstRatio: 2.2,
-          wSoftCapEstMul: 1.15
-        },
-        longValue: {
-          maxByPage: 0.55,
-          maxByEst: 2.20,
-          wHardCapEstRatio: 2.8,
-          wSoftCapEstMul: 1.60
-        },
-        address: {
-          maxByPage: 0.60,
-          maxByEst: 2.10,
-          wHardCapEstRatio: 3.2,
-          wSoftCapEstMul: 1.70
-        },
-        money: {
-          maxByPage: 0.35,
-          maxByEst: 1.80
-        },
-        manual_term: {
-          maxByPage: 0.40,
-          maxByEst: 1.80
+  function getDefaultRasterTuning() {
+    return {
+      lang: "zh",
+      version: "fallback",
+      limits: {
+        maxMatchLen: {
+          manual_term: 90,
+          person_name: 40,
+          person_name_keep_title: 40,
+          account_holder_name_keep_title: 40,
+          company: 70,
+          email: 90,
+          phone: 60,
+          account: 90,
+          bank: 140,
+          address_de_street: 160,
+          address_de_postal: 160,
+          address_de_street_partial: 160,
+          address_de_extra_partial: 160,
+          address_de_inline_street: 160,
+          address_en_inline_street: 160,
+          address_en_extra_block: 160,
+          address_en_extra: 160,
+          address_cn: 160,
+          handle: 90,
+          ref: 90,
+          title: 90,
+          money: 70,
+          money_label: 70,
+          number: 70
         }
       },
-
-      pad: {
-        person_name: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
-        person_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
-        account_holder_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
-        company:     { pxW: 0.0045, pyH: 0.032, minX: 0.55, minY: 0.60 },
-        manual_term: { pxW: 0.0040, pyH: 0.035, minX: 0.55, minY: 0.65 },
-        _default:    { pxW: 0.0050, pyH: 0.045, minX: 0.55, minY: 0.75 }
-      },
-
-      shrinkLabels: {
-        phone:   ["电话", "手机", "联系电话", "联系方式"],
-        account: ["银行账号", "账号", "卡号", "银行卡号", "账户", "对公账户", "收款账号", "IBAN"],
-        email:   ["邮箱", "电子邮箱"],
-        address: ["地址", "住址", "办公地址", "通信地址", "收货地址", "居住地址", "单位地址", "联系地址"],
-        bank:    ["开户行", "开户银行", "银行", "SWIFT", "BIC"]
-      }
-    },
-
-    en: {
-      maxMatchLen: {
-        manual_term: 90,
-        person_name: 40,
-        person_name_keep_title: 40,
-        account_holder_name_keep_title: 40,
-        company: 70,
-        email: 90,
-        phone: 60,
-        account: 90,
-        bank: 140,
-
-        address_de_street: 160,
-        address_de_postal: 160,
-
-        address_de_street_partial: 160,
-        address_de_extra_partial: 160,
-        address_de_inline_street: 160,
-        address_en_inline_street: 160,
-        address_en_extra_block: 160,
-        address_en_extra: 160,
-        address_cn: 160,
-
-        handle: 90,
-        ref: 90,
-        title: 90,
-        money: 70,
-        money_label: 70,
-        number: 70
-      },
-
       bbox: {
-        default:   { maxByPage: 0.30, maxByEst: 1.45, wHardCapEstRatio: 2.2, wSoftCapEstMul: 1.15 },
+        default: { maxByPage: 0.30, maxByEst: 1.45, wHardCapEstRatio: 2.2, wSoftCapEstMul: 1.15 },
         longValue: { maxByPage: 0.55, maxByEst: 2.20, wHardCapEstRatio: 2.8, wSoftCapEstMul: 1.60 },
-        address:   { maxByPage: 0.60, maxByEst: 2.10, wHardCapEstRatio: 3.2, wSoftCapEstMul: 1.70 },
-        money:     { maxByPage: 0.35, maxByEst: 1.80 },
-        manual_term:{ maxByPage: 0.40, maxByEst: 1.80 }
+        address: { maxByPage: 0.60, maxByEst: 2.10, wHardCapEstRatio: 3.2, wSoftCapEstMul: 1.70 },
+        money: { maxByPage: 0.35, maxByEst: 1.80 },
+        manual_term: { maxByPage: 0.40, maxByEst: 1.80 }
       },
-
       pad: {
         person_name: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
         person_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
         account_holder_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
-        company:     { pxW: 0.0045, pyH: 0.032, minX: 0.55, minY: 0.60 },
+        company: { pxW: 0.0045, pyH: 0.032, minX: 0.55, minY: 0.60 },
         manual_term: { pxW: 0.0040, pyH: 0.035, minX: 0.55, minY: 0.65 },
-        _default:    { pxW: 0.0050, pyH: 0.045, minX: 0.55, minY: 0.75 }
+        _default: { pxW: 0.0050, pyH: 0.045, minX: 0.55, minY: 0.75 }
       },
-
       shrinkLabels: {
-        phone:   ["Phone", "Mobile", "Tel", "Telephone", "Contact"],
-        account: ["Account", "Account No", "Account Number", "IBAN", "Card Number", "Routing Number"],
-        email:   ["Email", "E-mail"],
-        address: ["Address", "Shipping Address", "Billing Address", "Mailing Address"],
-        bank:    ["Bank", "Bank Name", "BIC", "SWIFT", "SWIFT/BIC"]
+        phone: [],
+        account: [],
+        email: [],
+        address: [],
+        bank: []
+      },
+      merge: {
+        nearGapLegacy: 1.2,
+        nearGapCore: 1.2,
+        sameLineOverlapRatio: 0.88,
+        similarHeightRatio: 0.80
+      },
+      itemBox: {
+        fontHeightMul: 1.08,
+        fontHeightMin: 6,
+        fontHeightMax: 96,
+        widthEstMul: 0.72,
+        shortTokenCap: 1.10,
+        hardCap: 1.18
+      },
+      rectBox: {
+        fontHeightMul: 1.10,
+        fontHeightMin: 6,
+        fontHeightMax: 104,
+        widthEstMul: 0.82
       }
-    },
+    };
+  }
 
-    de: {
-      maxMatchLen: {
-        manual_term: 90,
-        person_name: 40,
-        person_name_keep_title: 40,
-        account_holder_name_keep_title: 40,
-        company: 70,
-        email: 90,
-        phone: 60,
-        account: 90,
-        bank: 140,
-
-        address_de_street: 160,
-        address_de_postal: 160,
-
-        address_de_street_partial: 160,
-        address_de_extra_partial: 160,
-        address_de_inline_street: 160,
-        address_en_inline_street: 160,
-        address_en_extra_block: 160,
-        address_en_extra: 160,
-        address_cn: 160,
-
-        handle: 90,
-        ref: 90,
-        title: 90,
-        money: 70,
-        money_label: 70,
-        number: 70
-      },
-
-      bbox: {
-        default:   { maxByPage: 0.30, maxByEst: 1.45, wHardCapEstRatio: 2.2, wSoftCapEstMul: 1.15 },
-        longValue: { maxByPage: 0.55, maxByEst: 2.20, wHardCapEstRatio: 2.8, wSoftCapEstMul: 1.60 },
-        address:   { maxByPage: 0.60, maxByEst: 2.10, wHardCapEstRatio: 3.2, wSoftCapEstMul: 1.70 },
-        money:     { maxByPage: 0.35, maxByEst: 1.80 },
-        manual_term:{ maxByPage: 0.40, maxByEst: 1.80 }
-      },
-
-      pad: {
-        person_name: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
-        person_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
-        account_holder_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
-        company:     { pxW: 0.0045, pyH: 0.032, minX: 0.55, minY: 0.60 },
-        manual_term: { pxW: 0.0040, pyH: 0.035, minX: 0.55, minY: 0.65 },
-        _default:    { pxW: 0.0050, pyH: 0.045, minX: 0.55, minY: 0.75 }
-      },
-
-      shrinkLabels: {
-        phone:   ["Telefon", "Tel", "Handy", "Mobil", "Mobile", "Phone", "Kontakt"],
-        account: ["Konto", "Kontonummer", "Account", "IBAN", "Kontoinhaber"],
-        email:   ["E-mail", "Email", "E-Mail"],
-        address: ["Anschrift", "Adresse", "Address", "Rechnungsadresse", "Lieferadresse"],
-        bank:    ["Bank", "Bankname", "BIC", "SWIFT", "Bankleitzahl", "BLZ"]
-      }
-    }
-  };
+  function getRasterLangPacks() {
+    return window.__RASTER_LANG_PACKS__ || {};
+  }
 
   function getLangTuning(lang) {
     const L = String(lang || "").toLowerCase();
-    return LANG_TUNING[L] || LANG_TUNING.zh;
+    const packs = getRasterLangPacks();
+    const base = getDefaultRasterTuning();
+    const picked = packs[L] || packs.zh || null;
+    if (!picked || typeof picked !== "object") return base;
+
+    return {
+      ...base,
+      ...picked,
+      limits: {
+        ...(base.limits || {}),
+        ...((picked && picked.limits) || {}),
+        maxMatchLen: {
+          ...(((base.limits || {}).maxMatchLen) || {}),
+          ...((((picked && picked.limits) || {}).maxMatchLen) || {})
+        }
+      },
+      bbox: {
+        ...(base.bbox || {}),
+        ...((picked && picked.bbox) || {})
+      },
+      pad: {
+        ...(base.pad || {}),
+        ...((picked && picked.pad) || {})
+      },
+      shrinkLabels: {
+        ...(base.shrinkLabels || {}),
+        ...((picked && picked.shrinkLabels) || {})
+      },
+      merge: {
+        ...(base.merge || {}),
+        ...((picked && picked.merge) || {})
+      },
+      itemBox: {
+        ...(base.itemBox || {}),
+        ...((picked && picked.itemBox) || {})
+      },
+      rectBox: {
+        ...(base.rectBox || {}),
+        ...((picked && picked.rectBox) || {})
+      }
+    };
   }
 
   function uiLang() {
@@ -819,72 +744,73 @@
     return [];
   }
 
-function buildItemBoxes(pdfjsLib, viewport, textContentOrItems) {
-  const items = getItemsArray(textContentOrItems);
-  if (!items.length || !pdfjsLib || !pdfjsLib.Util || !viewport) return [];
+  function buildItemBoxes(pdfjsLib, viewport, textContentOrItems) {
+    const items = getItemsArray(textContentOrItems);
+    if (!items.length || !pdfjsLib || !pdfjsLib.Util || !viewport) return [];
 
-  const Util = pdfjsLib.Util;
-  const out = [];
+    const Util = pdfjsLib.Util;
+    const out = [];
 
-  for (const it of items) {
-    if (!it) continue;
+    for (const it of items) {
+      if (!it) continue;
 
-    const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0];
-    const tx = Util.transform(viewport.transform, tr);
+      const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0];
+      const tx = Util.transform(viewport.transform, tr);
 
-    const x = Number(tx[4] || 0);
-    const y = Number(tx[5] || 0);
+      const x = Number(tx[4] || 0);
+      const y = Number(tx[5] || 0);
 
-    const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
-    const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
+      const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
+      const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
 
-    let fontH = sy;
-    if (!Number.isFinite(fontH) || fontH <= 0) {
-      fontH =
-        Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
-        Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
-        10;
+      let fontH = sy;
+      if (!Number.isFinite(fontH) || fontH <= 0) {
+        fontH =
+          Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
+          Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
+          10;
+      }
+      fontH = clamp(fontH * 1.08, 6, 96);
+
+      const s = String(it.str || "");
+      const textLen = Math.max(1, s.length);
+
+      let w = 0;
+      try {
+        const iw = Number(it.width || 0);
+        if (Number.isFinite(iw) && iw > 0) w = iw * sx;
+      } catch (_) {}
+
+      const est = Math.max(8, textLen * fontH * 0.72);
+
+      if (!Number.isFinite(w) || w <= 0) {
+        w = est;
+      }
+
+      // ✅ 收紧 item bbox：不要像 redaction bbox 那样保守
+      // 目标：蓝框更接近真实字宽，而不是“可能宽度”
+      const hardCap = est * 1.18;
+      if (w > hardCap) w = hardCap;
+
+      // 对非常短的 token 再保守一点
+      if (textLen <= 4) {
+        w = Math.min(w, est * 1.10);
+      }
+
+      let rx = clamp(x, 0, viewport.width);
+      let ry = clamp(y - fontH, 0, viewport.height);
+      let rw = clamp(w, 1, viewport.width - rx);
+      let rh = clamp(fontH, 6, viewport.height - ry);
+
+      if (!Number.isFinite(rx + ry + rw + rh)) continue;
+      if (rw <= 0 || rh <= 0) continue;
+
+      out.push({ x: rx, y: ry, w: rw, h: rh });
     }
-    fontH = clamp(fontH * 1.08, 6, 96);
 
-    const s = String(it.str || "");
-    const textLen = Math.max(1, s.length);
-
-    let w = 0;
-    try {
-      const iw = Number(it.width || 0);
-      if (Number.isFinite(iw) && iw > 0) w = iw * sx;
-    } catch (_) {}
-
-    const est = Math.max(8, textLen * fontH * 0.72);
-
-    if (!Number.isFinite(w) || w <= 0) {
-      w = est;
-    }
-
-    // ✅ 收紧 item bbox：不要像 redaction bbox 那样保守
-    // 目标：蓝框更接近真实字宽，而不是“可能宽度”
-    const hardCap = est * 1.18;
-    if (w > hardCap) w = hardCap;
-
-    // 对非常短的 token 再保守一点
-    if (textLen <= 4) {
-      w = Math.min(w, est * 1.10);
-    }
-
-    let rx = clamp(x, 0, viewport.width);
-    let ry = clamp(y - fontH, 0, viewport.height);
-    let rw = clamp(w, 1, viewport.width - rx);
-    let rh = clamp(fontH, 6, viewport.height - ry);
-
-    if (!Number.isFinite(rx + ry + rw + rh)) continue;
-    if (rw <= 0 || rh <= 0) continue;
-
-    out.push({ x: rx, y: ry, w: rw, h: rh });
+    return out;
   }
 
-  return out;
-}
   function getMatcherCore() {
     try {
       const mc = window.__MATCHER_CORE__;
@@ -1243,7 +1169,7 @@ function buildItemBoxes(pdfjsLib, viewport, textContentOrItems) {
     const { items, itemRanges } = buildPageTextAndRangesFromItems(textContentOrItems);
     if (!items.length || !Array.isArray(spans) || !spans.length) return [];
 
-    const MAX_MATCH_LEN = Object.assign({}, (tuning && tuning.maxMatchLen) || {});
+    const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
 
     function keyGroupForBBox(key) {
       const isLongValueKey =
@@ -1263,69 +1189,70 @@ function buildItemBoxes(pdfjsLib, viewport, textContentOrItems) {
     }
 
     function bboxForItem(it, key) {
-  const tx = Util.transform(viewport.transform, it.transform || [1, 0, 0, 1, 0, 0]);
+      const tx = Util.transform(viewport.transform, it.transform || [1, 0, 0, 1, 0, 0]);
 
-  const x = Number(tx[4] || 0);
-  const y = Number(tx[5] || 0);
+      const x = Number(tx[4] || 0);
+      const y = Number(tx[5] || 0);
 
-  const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
-  const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
+      const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
+      const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
 
-  let fontH = sy * 1.0;
-  if (!Number.isFinite(fontH) || fontH <= 0) {
-    fontH =
-      Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
-      Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
-      10;
-  }
-  fontH = clamp(fontH * 1.10, 6, 104);
+      let fontH = sy * 1.0;
+      if (!Number.isFinite(fontH) || fontH <= 0) {
+        fontH =
+          Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
+          Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
+          10;
+      }
+      fontH = clamp(fontH * 1.10, 6, 104);
 
-  const s = String(it.str || "");
-  const textLen = Math.max(1, s.length);
+      const s = String(it.str || "");
+      const textLen = Math.max(1, s.length);
 
-  let w = 0;
-  try {
-    const iw = Number(it.width || 0);
-    if (Number.isFinite(iw) && iw > 0) w = iw * sx;
-  } catch (_) {}
+      let w = 0;
+      try {
+        const iw = Number(it.width || 0);
+        if (Number.isFinite(iw) && iw > 0) w = iw * sx;
+      } catch (_) {}
 
-  const est = Math.max(10, textLen * fontH * 0.82);
+      const est = Math.max(10, textLen * fontH * 0.82);
 
-  if (!Number.isFinite(w) || w <= 0) {
-    w = est;
-  }
+      if (!Number.isFinite(w) || w <= 0) {
+        w = est;
+      }
 
-  const group = keyGroupForBBox(key);
-  const bboxCfg = (tuning && tuning.bbox) || {};
-  const cfg = bboxCfg[group] || bboxCfg.default || {
-    maxByPage: 0.30,
-    maxByEst: 1.45,
-    wHardCapEstRatio: 2.2,
-    wSoftCapEstMul: 1.15
-  };
+      const group = keyGroupForBBox(key);
+      const bboxCfg = (tuning && tuning.bbox) || {};
+      const cfg = bboxCfg[group] || bboxCfg.default || {
+        maxByPage: 0.30,
+        maxByEst: 1.45,
+        wHardCapEstRatio: 2.2,
+        wSoftCapEstMul: 1.15
+      };
 
-  const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
-  const softMul = Number(cfg.wSoftCapEstMul || 1.15);
+      const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
+      const softMul = Number(cfg.wSoftCapEstMul || 1.15);
 
-  if (w > est * hardRatio) {
-    w = est * softMul;
-  }
+      if (w > est * hardRatio) {
+        w = est * softMul;
+      }
 
-  const maxByPage = viewport.width * Number(cfg.maxByPage || 0.30);
-  const maxByEst = est * Number(cfg.maxByEst || 1.45);
-  w = clamp(w, 1, Math.min(maxByPage, maxByEst));
+      const maxByPage = viewport.width * Number(cfg.maxByPage || 0.30);
+      const maxByEst = est * Number(cfg.maxByEst || 1.45);
+      w = clamp(w, 1, Math.min(maxByPage, maxByEst));
 
-  const isLongValueKey = group === "longValue";
-  const minW = isLongValueKey ? (est * 0.92) : (est * 0.80);
-  w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.38 : 0.18)));
+      const isLongValueKey = group === "longValue";
+      const minW = isLongValueKey ? (est * 0.92) : (est * 0.80);
+      w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.38 : 0.18)));
 
-  let rx = clamp(x, 0, viewport.width);
-  let ry = clamp(y - fontH, 0, viewport.height);
-  let rw = clamp(w, 1, viewport.width - rx);
-  let rh = clamp(fontH, 6, viewport.height - ry);
+      let rx = clamp(x, 0, viewport.width);
+      let ry = clamp(y - fontH, 0, viewport.height);
+      let rw = clamp(w, 1, viewport.width - rx);
+      let rh = clamp(fontH, 6, viewport.height - ry);
 
-  return { x: rx, y: ry, w: rw, h: rh };
-}
+      return { x: rx, y: ry, w: rw, h: rh };
+    }
+
     function shrinkByLabel(key, s, ls, le) {
       if (key === "manual_term") return { ls, le };
       if (le <= ls) return { ls, le };
@@ -1600,7 +1527,7 @@ function buildItemBoxes(pdfjsLib, viewport, textContentOrItems) {
 
     if (!items.length || !matchers || !matchers.length) return [];
 
-    const MAX_MATCH_LEN = Object.assign({}, (tuning && tuning.maxMatchLen) || {});
+    const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
 
     function isWs(ch) {
       return ch === " " || ch === "\n" || ch === "\t" || ch === "\r";
@@ -1644,66 +1571,67 @@ function buildItemBoxes(pdfjsLib, viewport, textContentOrItems) {
     }
 
     function bboxForItem(it, key) {
-  const tx = Util.transform(viewport.transform, it.transform || [1, 0, 0, 1, 0, 0]);
+      const tx = Util.transform(viewport.transform, it.transform || [1, 0, 0, 1, 0, 0]);
 
-  const x = Number(tx[4] || 0);
-  const y = Number(tx[5] || 0);
+      const x = Number(tx[4] || 0);
+      const y = Number(tx[5] || 0);
 
-  const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
-  const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
+      const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
+      const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
 
-  let fontH = sy * 1.0;
-  if (!Number.isFinite(fontH) || fontH <= 0) {
-    fontH =
-      Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
-      Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
-      10;
-  }
-  fontH = clamp(fontH * 1.10, 6, 104);
+      let fontH = sy * 1.0;
+      if (!Number.isFinite(fontH) || fontH <= 0) {
+        fontH =
+          Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
+          Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
+          10;
+      }
+      fontH = clamp(fontH * 1.10, 6, 104);
 
-  const s = String(it.str || "");
-  const textLen = Math.max(1, s.length);
+      const s = String(it.str || "");
+      const textLen = Math.max(1, s.length);
 
-  let w = 0;
-  try {
-    const iw = Number(it.width || 0);
-    if (Number.isFinite(iw) && iw > 0) w = iw * sx;
-  } catch (_) {}
+      let w = 0;
+      try {
+        const iw = Number(it.width || 0);
+        if (Number.isFinite(iw) && iw > 0) w = iw * sx;
+      } catch (_) {}
 
-  const est = Math.max(10, textLen * fontH * 0.82);
+      const est = Math.max(10, textLen * fontH * 0.82);
 
-  if (!Number.isFinite(w) || w <= 0) {
-    w = est;
-  }
+      if (!Number.isFinite(w) || w <= 0) {
+        w = est;
+      }
 
-  const group = keyGroupForBBox(key);
-  const bboxCfg = (tuning && tuning.bbox) || {};
-  const cfg = bboxCfg[group] || bboxCfg.default || {
-    maxByPage: 0.30,
-    maxByEst: 1.45,
-    wHardCapEstRatio: 2.2,
-    wSoftCapEstMul: 1.15
-  };
+      const group = keyGroupForBBox(key);
+      const bboxCfg = (tuning && tuning.bbox) || {};
+      const cfg = bboxCfg[group] || bboxCfg.default || {
+        maxByPage: 0.30,
+        maxByEst: 1.45,
+        wHardCapEstRatio: 2.2,
+        wSoftCapEstMul: 1.15
+      };
 
-  const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
-  const softMul = Number(cfg.wSoftCapEstMul || 1.15);
-  if (w > est * hardRatio) w = est * softMul;
+      const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
+      const softMul = Number(cfg.wSoftCapEstMul || 1.15);
+      if (w > est * hardRatio) w = est * softMul;
 
-  const maxByPage = viewport.width * Number(cfg.maxByPage || 0.30);
-  const maxByEst = est * Number(cfg.maxByEst || 1.45);
-  w = clamp(w, 1, Math.min(maxByPage, maxByEst));
+      const maxByPage = viewport.width * Number(cfg.maxByPage || 0.30);
+      const maxByEst = est * Number(cfg.maxByEst || 1.45);
+      w = clamp(w, 1, Math.min(maxByPage, maxByEst));
 
-  const isLongValueKey = group === "longValue";
-  const minW = isLongValueKey ? (est * 0.92) : (est * 0.80);
-  w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.38 : 0.18)));
+      const isLongValueKey = group === "longValue";
+      const minW = isLongValueKey ? (est * 0.92) : (est * 0.80);
+      w = Math.max(w, Math.min(minW, viewport.width * (isLongValueKey ? 0.38 : 0.18)));
 
-  let rx = clamp(x, 0, viewport.width);
-  let ry = clamp(y - fontH, 0, viewport.height);
-  let rw = clamp(w, 1, viewport.width - rx);
-  let rh = clamp(fontH, 6, viewport.height - ry);
+      let rx = clamp(x, 0, viewport.width);
+      let ry = clamp(y - fontH, 0, viewport.height);
+      let rw = clamp(w, 1, viewport.width - rx);
+      let rh = clamp(fontH, 6, viewport.height - ry);
 
-  return { x: rx, y: ry, w: rw, h: rh };
-}
+      return { x: rx, y: ry, w: rw, h: rh };
+    }
+
     function shrinkByLabel(key, s, ls, le) {
       if (key === "manual_term") return { ls, le };
 
@@ -2381,7 +2309,8 @@ function buildItemBoxes(pdfjsLib, viewport, textContentOrItems) {
     },
 
     getModeBOverlayStyle,
-    LANG_TUNING,
+    getLangTuning,
+    getRasterLangPacks,
     renderPdfToCanvases,
     renderImageToCanvas,
     drawRedactionsOnCanvas,
