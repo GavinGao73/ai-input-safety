@@ -288,7 +288,10 @@ function getRulesSafe() {
 
 function getMatcherCore() {
   const mc = window.__MATCHER_CORE__;
-  return mc && typeof mc.matchDocument === "function" ? mc : null;
+  if (!mc) return null;
+  if (typeof mc.match === "function") return mc;
+  if (typeof mc.matchDocument === "function") return mc;
+  return null;
 }
 
 function getCachedPdfPagesForMatcher() {
@@ -332,6 +335,74 @@ function buildMatcherCoreDoc(text) {
   }));
 
   return doc;
+}
+
+function normalizeMatchResult(result) {
+  const safe = result && typeof result === "object" ? result : {};
+
+  const hits = Array.isArray(safe.hits) ? safe.hits : [];
+  const textMasked = typeof safe.textMasked === "string" ? safe.textMasked : "";
+  const byKey =
+    safe.summary && safe.summary.byKey && typeof safe.summary.byKey === "object"
+      ? safe.summary.byKey
+      : (safe.byKey && typeof safe.byKey === "object" ? safe.byKey : {});
+
+  return {
+    version: safe.version || "match-result-v1",
+    source: safe.source || "matcher-core",
+    lang: safe.lang || getLangContent(),
+    input: safe.input || {
+      textKind: lastRunMeta.fromPdf ? "page-text" : "plain",
+      textLength: String(textMasked || "").length
+    },
+    summary: safe.summary || {
+      hitCount: hits.length,
+      categoryCounts: {},
+      maskedLength: textMasked.length,
+      total: hits.length,
+      byKey
+    },
+    hits,
+    textMasked,
+    byKey
+  };
+}
+
+function runMatcherCoreMain(text, enabledKeysArr) {
+  try {
+    const mc = getMatcherCore();
+    if (!mc) return null;
+
+    const lang = getLangContent();
+    const pack = getContentPack();
+    const policy = getPolicy();
+    const doc = buildMatcherCoreDoc(text);
+
+    const fn = typeof mc.match === "function" ? mc.match : mc.matchDocument;
+    const res = fn.call(mc, {
+      doc,
+      lang,
+      pack,
+      policy,
+      enabledKeys: Array.isArray(enabledKeysArr) ? enabledKeysArr.slice(0) : [],
+      moneyMode: moneyMode,
+      manualTerms: manualTerms.slice(0)
+    });
+
+    const matchResult = normalizeMatchResult(res);
+    window.__MatcherLast = matchResult;
+    window.__matcher_core_last = matchResult;
+    return matchResult;
+  } catch (err) {
+    window.__matcher_core_last = {
+      ok: false,
+      reason: "matcher-core-main-error",
+      error: String((err && err.message) || err || ""),
+      when: Date.now(),
+      engineVersion: ENGINE_VERSION
+    };
+    return null;
+  }
 }
 
 function runMatcherCoreProbe(text, enabledKeysArr) {
@@ -1143,19 +1214,119 @@ function applyRules(text) {
   const rules = getRulesSafe();
   const pack = getContentPack();
 
-  // ✅ PATCH P4 in action: enabledKeysArr now includes ALWAYS_ON too
   const enabledKeysArr = effectiveEnabledKeys();
   const enabledSet = new Set(enabledKeysArr);
 
-  // ✅ P7: parallel matcher-core probe (debug only; ignore result for execution)
-  const matcherProbe = runMatcherCoreProbe(out, enabledKeysArr);
+  // matcher-core is now PRIMARY path
+  const matchResult = runMatcherCoreMain(out, enabledKeysArr);
 
+  // keep old probe only as fallback comparison
+  const matcherProbe = matchResult ? null : runMatcherCoreProbe(out, enabledKeysArr);
+   
   lastRunMeta.inputLen = String(text || "").length;
   lastRunMeta.enabledCount = enabledSet.size;
   lastRunMeta.moneyMode = "m1";
   lastRunMeta.langUI = getLangUI();
   lastRunMeta.langContent = getLangContent();
 
+     if (matchResult && typeof matchResult.textMasked === "string") {
+    const byKey =
+      matchResult.summary && matchResult.summary.byKey && typeof matchResult.summary.byKey === "object"
+        ? matchResult.summary.byKey
+        : (matchResult.byKey || {});
+
+    const hitCount =
+      Number(
+        (matchResult.summary && (matchResult.summary.hitCount ?? matchResult.summary.total)) ||
+        (Array.isArray(matchResult.hits) ? matchResult.hits.length : 0)
+      ) || 0;
+
+    const report = computeRiskReport(byKey, {
+      hits: hitCount,
+      enabledCount: enabledSet.size,
+      moneyMode: "m1",
+      fromPdf: lastRunMeta.fromPdf,
+      inputLen: lastRunMeta.inputLen
+    });
+
+    window.__safe_hits = hitCount;
+    window.__safe_moneyMode = "m1";
+    window.__safe_breakdown = byKey;
+    window.__safe_score = report.score;
+    window.__safe_level = report.level;
+    window.__safe_report = {
+      hits: hitCount,
+      hitsByKey: byKey,
+      score: report.score,
+      level: report.level,
+      moneyMode: "m1",
+      enabledCount: enabledSet.size,
+      fromPdf: lastRunMeta.fromPdf,
+      langUI: getLangUI(),
+      langContent: getLangContent(),
+      source: "matcher-core"
+    };
+
+    try {
+      window.__safe_report_matcher_probe = {
+        ok: true,
+        byKey,
+        hitCount,
+        summary: matchResult.summary || {},
+        source: "matcher-core"
+      };
+    } catch (_) {}
+
+    window.__lastOutputPlain = matchResult.textMasked;
+    renderOutput(matchResult.textMasked);
+
+    renderRiskBox(report, {
+      hits: hitCount,
+      enabledCount: enabledSet.size,
+      moneyMode: "m1",
+      fromPdf: lastRunMeta.fromPdf,
+      inputLen: lastRunMeta.inputLen
+    });
+
+    try {
+      const ta2 = $("inputText");
+      const hasInput = !!(ta2 && String(ta2.value || "").trim());
+      if (hasInput) {
+        if (typeof window.expandManualArea === "function") window.expandManualArea();
+        if (typeof window.expandRiskArea === "function") window.expandRiskArea();
+        if (typeof window.syncManualRiskHeights === "function") window.syncManualRiskHeights();
+      }
+    } catch (_) {}
+
+    updateInputWatermarkVisibility();
+    const ta = $("inputText");
+    if (ta) renderInputOverlayForPdf(ta.value || "");
+
+    const _lc = getLangContent();
+    const snap = {
+      enabledKeys: enabledKeysArr,
+      moneyMode: "m1",
+      langUI: getLangUI(),
+      langContent: _lc,
+      ruleEngine: _lc,
+      ruleEngineMode: String(window.ruleEngineMode || "auto"),
+      contentLangMode: String(window.ruleEngineMode || "auto"),
+      fromPdf: !!lastRunMeta.fromPdf,
+      manualTerms: manualTerms.slice(0),
+      source: "matcher-core"
+    };
+
+    window.__export_snapshot = snap;
+    if (!window.__export_snapshot_byLang) window.__export_snapshot_byLang = {};
+    window.__export_snapshot_byLang[_lc] = snap;
+
+    try {
+      window.dispatchEvent(new Event("safe:updated"));
+    } catch (_) {}
+
+    return matchResult.textMasked;
+  }
+   
   // If packs not loaded, only manual terms
   if (!rules) {
     out = applyManualTermsMask(out, () => addHit("manual_term"));
