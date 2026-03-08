@@ -4,6 +4,11 @@
  * - PDF/image -> 600 DPI raster -> opaque redaction (pixels)
  * - Export PDF as images only (no text layer)
  * - NO OCR / NO logs / NO storage
+ *
+ * BOUNDARY
+ * - raster-export.js: render / export orchestration only
+ * - raster-core.js: text-items -> rects
+ * - matcher-core.js: match-result generation
  * ======================================================= */
 
 (function () {
@@ -15,12 +20,8 @@
   let __pdfjsLoadPromise = null;
   let __pdflibLoadPromise = null;
 
-  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
-
-  function langPlaceholder(lang) {
-    if (lang === "de") return "GESCHWÄRZT";
-    if (lang === "en") return "REDACTED";
-    return "已遮盖";
+  function clamp(n, a, b) {
+    return Math.max(a, Math.min(b, n));
   }
 
   function pdfjsBaseUrl() {
@@ -41,38 +42,7 @@
 
   function uiLang() {
     const l = String(window.currentLang || "").toLowerCase();
-    return (l === "de" || l === "en" || l === "zh") ? l : "zh";
-  }
-
-  function phaseText(lang) {
-    if (lang === "de") {
-      return {
-        phase: "Phase",
-        exporting: "Export",
-        rendering: "Rendern",
-        matching: "Treffer",
-        applying: "Schwärzen",
-        done: "Fertig"
-      };
-    }
-    if (lang === "en") {
-      return {
-        phase: "Phase",
-        exporting: "Export",
-        rendering: "Rendering",
-        matching: "Matching",
-        applying: "Redacting",
-        done: "Done"
-      };
-    }
-    return {
-      phase: "阶段",
-      exporting: "导出",
-      rendering: "渲染",
-      matching: "命中",
-      applying: "遮盖",
-      done: "完成"
-    };
+    return l === "de" || l === "en" || l === "zh" ? l : "zh";
   }
 
   function setRasterPhase(phase, phase2) {
@@ -85,30 +55,19 @@
     } catch (_) {}
 
     try {
-      const el = document.getElementById("exportStatus");
-      if (!el) return;
-      const L = phaseText(uiLang());
-      const p = (phase != null) ? String(phase) : "";
-      const p2 = (phase2 != null) ? String(phase2) : "";
-      const line = p2 ? `${L.phase}: ${p} / ${p2}` : `${L.phase}: ${p}`;
-      const prev = String(el.textContent || "");
-      if (!prev) {
-        el.textContent = line;
-      } else {
-        if (!prev.startsWith(line)) el.textContent = line + "\n" + prev;
-      }
-    } catch (_) {}
-
-    try {
       window.dispatchEvent(new CustomEvent("raster:phase", {
-        detail: { when: Date.now(), phase: String(phase || ""), phase2: String(phase2 || "") }
+        detail: {
+          when: Date.now(),
+          phase: String(phase || ""),
+          phase2: String(phase2 || "")
+        }
       }));
     } catch (_) {}
   }
 
   function getRasterDebugConfig() {
     const dbg = window.__RASTER_DEBUG__;
-    const base = (dbg && typeof dbg === "object") ? dbg : {};
+    const base = dbg && typeof dbg === "object" ? dbg : {};
     return {
       enabled: !!base.enabled,
       showRects: base.showRects !== false,
@@ -214,7 +173,7 @@
       }
 
       if (!loaded || !window.pdfjsLib) {
-        throw (lastErr || new Error("pdfjsLib not available"));
+        throw lastErr || new Error("pdfjsLib not available");
       }
 
       try {
@@ -309,11 +268,11 @@
     ctx.save();
     ctx.globalCompositeOperation = "source-over";
 
-    for (const r of (rects || [])) {
-      const x = clamp(r.x, 0, canvas.width);
-      const y = clamp(r.y, 0, canvas.height);
-      const w = clamp(r.w, 0, canvas.width - x);
-      const h = clamp(r.h, 0, canvas.height - y);
+    for (const r of rects || []) {
+      const x = clamp(Number(r && r.x) || 0, 0, canvas.width);
+      const y = clamp(Number(r && r.y) || 0, 0, canvas.height);
+      const w = clamp(Number(r && r.w) || 0, 0, canvas.width - x);
+      const h = clamp(Number(r && r.h) || 0, 0, canvas.height - y);
       if (w <= 0 || h <= 0) continue;
 
       ctx.fillStyle = "#000";
@@ -351,7 +310,7 @@
 
     setRasterPhase("renderPdfToCanvases", null);
 
-    for (let p = 1; p <= pdf.numPages; p++) {
+    for (let p = 1; p <= pdf.numPages; p += 1) {
       const page = await pdf.getPage(p);
       const viewport = page.getViewport({ scale });
 
@@ -419,15 +378,35 @@
       const a = window.lastPdfPagesItems;
       if (Array.isArray(a) && a.length) return a;
     } catch (_) {}
+
     try {
       const b = window.__pdf_pages_items;
       if (Array.isArray(b) && b.length) return b;
     } catch (_) {}
+
     return [];
+  }
+
+  function getCachedPagesTextMap() {
+    const map = new Map();
+
+    try {
+      const arr = window.__pdf_pages_text || window.lastPdfPagesText || [];
+      if (Array.isArray(arr)) {
+        for (const p of arr) {
+          const pn = Number(p && p.pageNumber);
+          if (!pn) continue;
+          map.set(pn, String((p && p.text) || ""));
+        }
+      }
+    } catch (_) {}
+
+    return map;
   }
 
   function findCachedItemsForPage(cached, pageNumber) {
     if (!Array.isArray(cached) || !cached.length) return null;
+
     for (const p of cached) {
       if (!p) continue;
       const pn = Number(p.pageNumber || p.p || 0);
@@ -452,18 +431,7 @@
 
   function buildMatcherDocFromCachedPages(cachedPages) {
     const pages = Array.isArray(cachedPages) ? cachedPages : [];
-
-    let pagesTextMap = new Map();
-    try {
-      const arr = window.__pdf_pages_text || window.lastPdfPagesText || [];
-      if (Array.isArray(arr)) {
-        for (const p of arr) {
-          const pn = Number(p && p.pageNumber);
-          if (!pn) continue;
-          pagesTextMap.set(pn, String((p && p.text) || ""));
-        }
-      }
-    } catch (_) {}
+    const pagesTextMap = getCachedPagesTextMap();
 
     const outPages = pages.map((p, idx) => {
       const pageNumber = Number(p && p.pageNumber) || (idx + 1);
@@ -496,43 +464,7 @@
     };
   }
 
-  async function autoRedactReadablePdf({ file, lang, enabledKeys, moneyMode, dpi, manualTerms }) {
-    setRasterPhase("autoRedactReadablePdf:begin", null);
-
-    const rc = getRasterCore();
-    if (!rc) throw new Error("Raster core not loaded");
-
-    const pdfjsLib = await loadPdfJsIfNeeded();
-    const { pdf, pages } = await renderPdfToCanvases(file, dpi || DEFAULT_DPI);
-
-    const matchers = rc.buildRuleMatchers(lang, enabledKeys, moneyMode, manualTerms);
-    const _placeholder = langPlaceholder(lang);
-    const dbgCfg = getRasterDebugConfig();
-
-    let usedPerPageCoreFallback = false;
-    let usedLegacyFallback = false;
-
-    try {
-      const PACKS = window.__ENGINE_LANG_PACKS__ || {};
-      const pack = PACKS[lang] || PACKS.zh || null;
-
-      window.__RasterExportLast = {
-        when: Date.now(),
-        phase: "autoRedactReadablePdf",
-        hasRules: !!(pack && pack.rules),
-        hasMatcherCore: !!window.__MATCHER_CORE__,
-        enabledKeys: Array.isArray(enabledKeys) ? enabledKeys.slice() : [],
-        moneyMode: moneyMode || "off",
-        manualTerms: Array.isArray(manualTerms) ? manualTerms.slice() : [],
-        matcherKeys: (matchers || []).map(m => m.key),
-        pages: (pages || []).length,
-        lang,
-        rasterDebug: Object.assign({}, dbgCfg)
-      };
-    } catch (_) {}
-
-    const cached = getCachedPagesItems();
-    const matcherCore = getMatcherCore();
+  function getStableMatchResult({ lang, enabledKeys, moneyMode, manualTerms, cachedPages }) {
     let unifiedMatchResult = null;
 
     try {
@@ -541,42 +473,39 @@
         last &&
         last.source === "matcher-core" &&
         String(last.lang || "") === String(lang || "") &&
-        Array.isArray(last.hits) &&
-        last.hits.length > 0
+        Array.isArray(last.hits)
       ) {
         unifiedMatchResult = last;
       }
     } catch (_) {}
 
     try {
-      if (!unifiedMatchResult && matcherCore && Array.isArray(cached) && cached.length) {
-        const doc = buildMatcherDocFromCachedPages(cached);
-        const fn = typeof matcherCore.match === "function" ? matcherCore.match : matcherCore.matchDocument;
-        unifiedMatchResult = fn.call(matcherCore, {
-          doc,
-          lang,
-          enabledKeys,
-          moneyMode,
-          manualTerms
-        });
+      if (!unifiedMatchResult) {
+        const matcherCore = getMatcherCore();
+        if (matcherCore && Array.isArray(cachedPages) && cachedPages.length) {
+          const doc = buildMatcherDocFromCachedPages(cachedPages);
+          const fn = typeof matcherCore.match === "function" ? matcherCore.match : matcherCore.matchDocument;
+          unifiedMatchResult = fn.call(matcherCore, {
+            doc,
+            lang,
+            enabledKeys,
+            moneyMode,
+            manualTerms
+          });
+        }
       }
     } catch (_) {
       unifiedMatchResult = null;
     }
 
-    try {
-      const last = window.__RasterExportLast || {};
-      window.__RasterExportLast = Object.assign({}, last, {
-        matcherCoreMain: !!unifiedMatchResult,
-        matcherCoreMainHitCount: Array.isArray(unifiedMatchResult && unifiedMatchResult.hits)
-          ? unifiedMatchResult.hits.length
-          : 0
-      });
-    } catch (_) {}
+    return unifiedMatchResult;
+  }
 
+  async function buildPageInputs({ pdf, pages, cachedPages }) {
     const pageInputs = [];
+
     for (const p of pages) {
-      const cachedItems = findCachedItemsForPage(cached, p.pageNumber);
+      const cachedItems = findCachedItemsForPage(cachedPages, p.pageNumber);
       let itemsOrTextContent = null;
 
       if (cachedItems && cachedItems.length) {
@@ -598,6 +527,63 @@
       });
     }
 
+    return pageInputs;
+  }
+
+  function writeRasterRunMeta(meta) {
+    try {
+      const last = window.__RasterExportLast || {};
+      window.__RasterExportLast = Object.assign({}, last, meta || {});
+    } catch (_) {}
+  }
+
+  async function autoRedactReadablePdf({ file, lang, enabledKeys, moneyMode, dpi, manualTerms }) {
+    setRasterPhase("autoRedactReadablePdf:begin", null);
+
+    const rc = getRasterCore();
+    if (!rc) throw new Error("Raster core not loaded");
+
+    const pdfjsLib = await loadPdfJsIfNeeded();
+    const { pdf, pages } = await renderPdfToCanvases(file, dpi || DEFAULT_DPI);
+    const dbgCfg = getRasterDebugConfig();
+
+    const matchers = rc.buildRuleMatchers(lang, enabledKeys, moneyMode, manualTerms);
+
+    writeRasterRunMeta({
+      when: Date.now(),
+      phase: "autoRedactReadablePdf",
+      hasMatcherCore: !!window.__MATCHER_CORE__,
+      enabledKeys: Array.isArray(enabledKeys) ? enabledKeys.slice() : [],
+      moneyMode: moneyMode || "off",
+      manualTerms: Array.isArray(manualTerms) ? manualTerms.slice() : [],
+      matcherKeys: (matchers || []).map((m) => m.key),
+      pages: pages.length,
+      lang,
+      rasterDebug: Object.assign({}, dbgCfg)
+    });
+
+    const cachedPages = getCachedPagesItems();
+    const unifiedMatchResult = getStableMatchResult({
+      lang,
+      enabledKeys,
+      moneyMode,
+      manualTerms,
+      cachedPages
+    });
+
+    writeRasterRunMeta({
+      matcherCoreMain: !!unifiedMatchResult,
+      matcherCoreMainHitCount: Array.isArray(unifiedMatchResult && unifiedMatchResult.hits)
+        ? unifiedMatchResult.hits.length
+        : 0
+    });
+
+    const pageInputs = await buildPageInputs({
+      pdf,
+      pages,
+      cachedPages
+    });
+
     let unifiedRectResult = null;
     try {
       if (unifiedMatchResult && typeof rc.mapMatchResultToRects === "function") {
@@ -612,6 +598,9 @@
       unifiedRectResult = null;
     }
 
+    let usedPerPageCoreFallback = false;
+    let usedLegacyFallback = false;
+
     for (let idx = 0; idx < pages.length; idx += 1) {
       const p = pages[idx];
       const prepared = pageInputs[idx];
@@ -621,7 +610,7 @@
       setRasterPhase("autoRedactReadablePdf:match", `p${p.pageNumber}`);
 
       let rects = [];
-      let rectSource = "legacy-regex";
+      let rectSource = "legacy-fallback";
       let coreHitCount = 0;
       let coreFailed = false;
       let coreError = "";
@@ -646,7 +635,7 @@
             ? rc.buildSpansFromMatchResultForPage(unifiedMatchResult, p.pageNumber)
             : [];
 
-          rectSource = "matcher-core";
+          rectSource = "matcher-core-main";
           coreHitCount = Array.isArray(coreSpans) ? coreSpans.length : 0;
           coreSummary = unifiedMatchResult && unifiedMatchResult.summary ? unifiedMatchResult.summary : null;
           coreDebug = {
@@ -694,7 +683,7 @@
         itemBoxes: Array.isArray(itemBoxes) ? itemBoxes.slice() : []
       };
 
-      try {
+      writeRasterRunMeta((() => {
         const last = window.__RasterExportLast || {};
         const prevPerPage = Array.isArray(last.perPage) ? last.perPage : [];
 
@@ -704,7 +693,7 @@
           (itemsOrTextContent && Array.isArray(itemsOrTextContent.items)) ? itemsOrTextContent.items.length :
           0;
 
-        window.__RasterExportLast = Object.assign({}, last, {
+        return {
           perPage: prevPerPage.concat([{
             pageNumber: p.pageNumber,
             items: itemCount,
@@ -742,8 +731,8 @@
               : []
           }]),
           rectsTotal: (Number(last.rectsTotal) || 0) + rectCount
-        });
-      } catch (_) {}
+        };
+      })());
 
       setRasterPhase("autoRedactReadablePdf:apply", `p${p.pageNumber}`);
       drawRedactionsOnCanvas(p.canvas, rects);
@@ -753,16 +742,13 @@
       }
     }
 
-    try {
-      const last = window.__RasterExportLast || {};
-      window.__RasterExportLast = Object.assign({}, last, {
-        usedPerPageCoreFallback,
-        usedLegacyFallback,
-        primaryRectSource: usedLegacyFallback
-          ? "legacy-fallback"
-          : (usedPerPageCoreFallback ? "matcher-core-page-fallback" : "matcher-core-main")
-      });
-    } catch (_) {}
+    writeRasterRunMeta({
+      usedPerPageCoreFallback,
+      usedLegacyFallback,
+      primaryRectSource: usedLegacyFallback
+        ? "legacy-fallback"
+        : (usedPerPageCoreFallback ? "matcher-core-page-fallback" : "matcher-core-main")
+    });
 
     setRasterPhase("autoRedactReadablePdf:done", null);
     return pages;
@@ -790,7 +776,9 @@
       dpi: dpi || DEFAULT_DPI
     }];
 
-    try { arr.pages = arr; } catch (_) {}
+    try {
+      arr.pages = arr;
+    } catch (_) {}
 
     return arr;
   }
@@ -802,7 +790,7 @@
     const { PDFDocument } = PDFLib;
     const doc = await PDFDocument.create();
 
-    for (const p of (pages || [])) {
+    for (const p of pages || []) {
       if (!p || !p.canvas) continue;
 
       const pngBytes = await canvasToPngBytes(p.canvas);
@@ -848,22 +836,16 @@
       const dpi = (opts && opts.dpi) || DEFAULT_DPI;
       const manualTerms = resolveManualTermsFromOptsOrSnapshot(opts);
 
-      try {
-        const PACKS = window.__ENGINE_LANG_PACKS__ || {};
-        const pack = PACKS[lang] || PACKS.zh || null;
-
-        window.__RasterExportLast = {
-          when: Date.now(),
-          phase: "exportRasterSecurePdfFromReadablePdf:begin",
-          hasRules: !!(pack && pack.rules),
-          enabledKeys: Array.isArray(opts && opts.enabledKeys) ? (opts.enabledKeys || []).slice() : [],
-          moneyMode: (opts && opts.moneyMode) || "off",
-          manualTerms: manualTerms.slice(),
-          lang,
-          dpi,
-          rasterDebug: getRasterDebugConfig()
-        };
-      } catch (_) {}
+      writeRasterRunMeta({
+        when: Date.now(),
+        phase: "exportRasterSecurePdfFromReadablePdf:begin",
+        enabledKeys: Array.isArray(opts && opts.enabledKeys) ? (opts.enabledKeys || []).slice() : [],
+        moneyMode: (opts && opts.moneyMode) || "off",
+        manualTerms: manualTerms.slice(),
+        lang,
+        dpi,
+        rasterDebug: getRasterDebugConfig()
+      });
 
       setRasterPhase("exportReadable:begin", null);
 
@@ -878,15 +860,12 @@
 
       const name = (opts && opts.filename) || `raster_secure_${Date.now()}.pdf`;
 
-      try {
-        const last = window.__RasterExportLast || {};
-        window.__RasterExportLast = Object.assign({}, last, {
-          when2: Date.now(),
-          phase2: "exportRasterSecurePdfFromReadablePdf:export",
-          pages: (pages || []).length,
-          filename: name
-        });
-      } catch (_) {}
+      writeRasterRunMeta({
+        when2: Date.now(),
+        phase2: "exportRasterSecurePdfFromReadablePdf:export",
+        pages: (pages || []).length,
+        filename: name
+      });
 
       setRasterPhase("exportReadable:export", null);
       await exportCanvasesToPdf(pages, dpi, name);
@@ -902,20 +881,17 @@
       if (!pages || !pages.length) return;
 
       const dpi = (result && result.dpi) ? result.dpi : DEFAULT_DPI;
-      const _placeholder = langPlaceholder((result && result.lang) || "zh");
       const dbgCfg = getRasterDebugConfig();
 
-      try {
-        window.__RasterExportLast = {
-          when: Date.now(),
-          phase: "exportRasterSecurePdfFromVisual",
-          pages: pages.length,
-          hasRectPages: !!(result && result.rectsByPage),
-          lang: (result && result.lang) || "zh",
-          dpi,
-          rasterDebug: dbgCfg
-        };
-      } catch (_) {}
+      writeRasterRunMeta({
+        when: Date.now(),
+        phase: "exportRasterSecurePdfFromVisual",
+        pages: pages.length,
+        hasRectPages: !!(result && result.rectsByPage),
+        lang: (result && result.lang) || "zh",
+        dpi,
+        rasterDebug: dbgCfg
+      });
 
       setRasterPhase("exportVisual:apply", null);
 
@@ -950,12 +926,8 @@
   };
 
   try {
-    const PACKS = window.__ENGINE_LANG_PACKS__ || {};
-    const pack = PACKS.zh || null;
-
     window.__RasterExportStatus = {
       loaded: true,
-      hasRules: !!(pack && pack.rules),
       time: Date.now()
     };
   } catch (_) {}
