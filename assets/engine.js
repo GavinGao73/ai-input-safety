@@ -8,8 +8,20 @@
 
 "use strict";
 
-const ENGINE_VERSION = "v20260308-engine-a6-slim4-no-input-hit-chain";
+const ENGINE_VERSION = "v20260308-engine-a6-slim5-shared-state-bridge";
 console.log("[engine.js] loaded " + ENGINE_VERSION);
+
+try {
+  if (typeof window.__ENGINE_PRIMARY_SOURCE !== "string") window.__ENGINE_PRIMARY_SOURCE = "";
+} catch (_) {}
+
+try {
+  if (typeof window.__overlay_source !== "string") window.__overlay_source = "";
+} catch (_) {}
+
+try {
+  if (typeof window.__lastOutputPlain !== "string") window.__lastOutputPlain = "";
+} catch (_) {}
 
 /* =========================
    DETECTION_ITEMS write-trace (BOOT EARLY)
@@ -379,10 +391,6 @@ function runMatcherCoreProbe(text, enabledKeysArr) {
     return null;
   }
 }
-
-/* =========================
-   2) Core state
-   ========================= */
 
 /* =========================
    2) Core state
@@ -1387,6 +1395,7 @@ function applyRules(text) {
 
   return out;
 }
+
 /* =========================
    7) Stability patches
    ========================= */
