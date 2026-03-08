@@ -12,7 +12,7 @@
   "use strict";
 
   const NS = "__RASTER_CORE__";
-  const VERSION = "raster-core-r4-hitrect-fallback";
+  const VERSION = "raster-core-r5-unified-main";
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
   function safeString(v) { return typeof v === "string" ? v : (v == null ? "" : String(v)); }
@@ -108,19 +108,26 @@
       similarHeightRatio: Number(m.similarHeightRatio || 0.80)
     };
   }
+
   function getItemBoxCfg(tuning) {
     const c = (tuning && tuning.itemBox) || {};
     return {
-      fontHeightMul: Number(c.fontHeightMul || 1.08), fontHeightMin: Number(c.fontHeightMin || 6),
-      fontHeightMax: Number(c.fontHeightMax || 96), widthEstMul: Number(c.widthEstMul || 0.72),
-      shortTokenCap: Number(c.shortTokenCap || 1.10), hardCap: Number(c.hardCap || 1.18)
+      fontHeightMul: Number(c.fontHeightMul || 1.08),
+      fontHeightMin: Number(c.fontHeightMin || 6),
+      fontHeightMax: Number(c.fontHeightMax || 96),
+      widthEstMul: Number(c.widthEstMul || 0.72),
+      shortTokenCap: Number(c.shortTokenCap || 1.10),
+      hardCap: Number(c.hardCap || 1.18)
     };
   }
+
   function getRectBoxCfg(tuning) {
     const c = (tuning && tuning.rectBox) || {};
     return {
-      fontHeightMul: Number(c.fontHeightMul || 1.10), fontHeightMin: Number(c.fontHeightMin || 6),
-      fontHeightMax: Number(c.fontHeightMax || 104), widthEstMul: Number(c.widthEstMul || 0.82)
+      fontHeightMul: Number(c.fontHeightMul || 1.10),
+      fontHeightMin: Number(c.fontHeightMin || 6),
+      fontHeightMax: Number(c.fontHeightMax || 104),
+      widthEstMul: Number(c.widthEstMul || 0.82)
     };
   }
 
@@ -128,6 +135,7 @@
     const PACKS = getPacks(), L = normLang(lang);
     return PACKS[L] || PACKS.zh || null;
   }
+
   function getPriorityForLang(lang) {
     const pack = getPackForLang(lang);
     if (pack && Array.isArray(pack.priority) && pack.priority.length) return pack.priority.slice(0);
@@ -135,32 +143,51 @@
     if (Array.isArray(pol.defaultPriority) && pol.defaultPriority.length) return pol.defaultPriority.slice(0);
     return ["person_name", "company", "email", "bank", "account", "phone", "money", "address_de_street", "address_de_postal", "handle", "ref", "title", "number"];
   }
+
   function getAlwaysOnSetForLang(lang) {
-    const pol = getEnginePolicy(), baseArr = Array.isArray(pol.baseAlwaysOn) ? pol.baseAlwaysOn : [];
-    const set = new Set(baseArr), pack = getPackForLang(lang), extra = pack && pack.alwaysOn ? pack.alwaysOn : null;
-    if (Array.isArray(extra)) for (const k of extra) set.add(k);
-    else if (extra && typeof extra.forEach === "function") try { extra.forEach((k) => set.add(k)); } catch (_) {}
+    const pol = getEnginePolicy();
+    const baseArr = Array.isArray(pol.baseAlwaysOn) ? pol.baseAlwaysOn : [];
+    const set = new Set(baseArr);
+    const pack = getPackForLang(lang);
+    const extra = pack && pack.alwaysOn ? pack.alwaysOn : null;
+
+    if (Array.isArray(extra)) {
+      for (const k of extra) set.add(k);
+    } else if (extra && typeof extra.forEach === "function") {
+      try { extra.forEach((k) => set.add(k)); } catch (_) {}
+    }
     return set;
   }
 
   function buildRuleMatchers(lang, enabledKeys, moneyMode, manualTerms) {
-    const PRIORITY = getPriorityForLang(lang), ALWAYS_ON = getAlwaysOnSetForLang(lang);
-    const pack = getPackForLang(lang), rules = (pack && pack.rules && typeof pack.rules === "object") ? pack.rules : {};
-    const matchers = [], enabledSet = new Set(Array.isArray(enabledKeys) ? enabledKeys : []);
+    const PRIORITY = getPriorityForLang(lang);
+    const ALWAYS_ON = getAlwaysOnSetForLang(lang);
+    const pack = getPackForLang(lang);
+    const rules = (pack && pack.rules && typeof pack.rules === "object") ? pack.rules : {};
+    const matchers = [];
+    const enabledSet = new Set(Array.isArray(enabledKeys) ? enabledKeys : []);
 
     function normalizeToRegExp(pat) {
       if (!pat) return null;
       if (pat instanceof RegExp) return pat;
+
       if (typeof pat === "string") {
-        try { return new RegExp(pat, "u"); } catch (_) { try { return new RegExp(pat); } catch (__) { return null; } }
+        try { return new RegExp(pat, "u"); } catch (_) {
+          try { return new RegExp(pat); } catch (__) { return null; }
+        }
       }
+
       if (typeof pat === "object") {
-        const src = typeof pat.source === "string" ? pat.source : (typeof pat.pattern === "string" ? pat.pattern : null);
+        const src = typeof pat.source === "string"
+          ? pat.source
+          : (typeof pat.pattern === "string" ? pat.pattern : null);
         if (!src) return null;
         try { return new RegExp(src, typeof pat.flags === "string" ? pat.flags : ""); } catch (_) { return null; }
       }
+
       return null;
     }
+
     function forceGlobal(re) {
       if (!(re instanceof RegExp)) return null;
       try { return new RegExp(re.source, re.flags.includes("g") ? re.flags : (re.flags + "g")); } catch (_) { return null; }
@@ -175,10 +202,15 @@
     }
 
     for (const k of PRIORITY) {
-      if (k === "money") { if (!moneyMode || moneyMode === "off") continue; }
-      else if (!enabledSet.has(k) && !ALWAYS_ON.has(k)) continue;
+      if (k === "money") {
+        if (!moneyMode || moneyMode === "off") continue;
+      } else if (!enabledSet.has(k) && !ALWAYS_ON.has(k)) {
+        continue;
+      }
+
       const r = rules[k];
       if (!r) continue;
+
       const raw = r.pattern != null ? r.pattern : (r.re != null ? r.re : (r.regex != null ? r.regex : null));
       const re = forceGlobal(normalizeToRegExp(raw));
       if (re) matchers.push({ key: k, re, mode: r.mode || "" });
@@ -236,9 +268,17 @@
   const BBoxEngine = {
     keyGroup(key) {
       const isLong = key === "account" || key === "phone" || key === "email" || key === "bank";
-      const isAddr = key === "address_de_street" || key === "address_de_postal" || key === "address_de_street_partial" ||
-        key === "address_de_extra_partial" || key === "address_de_inline_street" || key === "address_en_inline_street" ||
-        key === "address_en_extra_block" || key === "address_en_extra" || key === "address_cn";
+      const isAddr =
+        key === "address_de_street" ||
+        key === "address_de_postal" ||
+        key === "address_de_street_partial" ||
+        key === "address_de_extra_partial" ||
+        key === "address_de_inline_street" ||
+        key === "address_en_inline_street" ||
+        key === "address_en_extra_block" ||
+        key === "address_en_extra" ||
+        key === "address_cn";
+
       if (key === "money" || key === "money_label") return "money";
       if (key === "manual_term") return "manual_term";
       if (isLong) return "longValue";
@@ -247,52 +287,120 @@
     },
 
     itemBox(pdfjsLib, viewport, it, lang) {
-      const tuning = getLangTuning(lang), cfg = getItemBoxCfg(tuning), Util = pdfjsLib.Util;
-      const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0], tx = Util.transform(viewport.transform, tr);
-      const x = Number(tx[4] || 0), y = Number(tx[5] || 0), sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
+      const tuning = getLangTuning(lang);
+      const cfg = getItemBoxCfg(tuning);
+      const Util = pdfjsLib.Util;
+
+      const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0];
+      const tx = Util.transform(viewport.transform, tr);
+
+      const x = Number(tx[4] || 0);
+      const y = Number(tx[5] || 0);
+      const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
       const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
+
       let fontH = sy;
-      if (!Number.isFinite(fontH) || fontH <= 0) fontH = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 10;
+      if (!Number.isFinite(fontH) || fontH <= 0) {
+        fontH =
+          Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
+          Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
+          10;
+      }
+
       fontH = clamp(fontH * cfg.fontHeightMul, cfg.fontHeightMin, cfg.fontHeightMax);
-      const s = String(it.str || ""), textLen = Math.max(1, s.length);
+
+      const s = String(it.str || "");
+      const textLen = Math.max(1, s.length);
+
       let w = 0;
-      try { const iw = Number(it.width || 0); if (Number.isFinite(iw) && iw > 0) w = iw * sx; } catch (_) {}
+      try {
+        const iw = Number(it.width || 0);
+        if (Number.isFinite(iw) && iw > 0) w = iw * sx;
+      } catch (_) {}
+
       const est = Math.max(8, textLen * fontH * cfg.widthEstMul);
       if (!Number.isFinite(w) || w <= 0) w = est;
+
       const hardCap = est * cfg.hardCap;
       if (w > hardCap) w = hardCap;
       if (textLen <= 4) w = Math.min(w, est * cfg.shortTokenCap);
-      const rx = clamp(x, 0, viewport.width), ry = clamp(y - fontH, 0, viewport.height), rw = clamp(w, 1, viewport.width - rx), rh = clamp(fontH, cfg.fontHeightMin, viewport.height - ry);
+
+      const rx = clamp(x, 0, viewport.width);
+      const ry = clamp(y - fontH, 0, viewport.height);
+      const rw = clamp(w, 1, viewport.width - rx);
+      const rh = clamp(fontH, cfg.fontHeightMin, viewport.height - ry);
+
       if (!Number.isFinite(rx + ry + rw + rh) || rw <= 0 || rh <= 0) return null;
       return { x: rx, y: ry, w: rw, h: rh };
     },
 
     rectBox(pdfjsLib, viewport, it, key, lang) {
-      const tuning = getLangTuning(lang), rectCfg = getRectBoxCfg(tuning), bboxCfg = (tuning && tuning.bbox) || {}, Util = pdfjsLib.Util;
-      const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0], tx = Util.transform(viewport.transform, tr);
-      const x = Number(tx[4] || 0), y = Number(tx[5] || 0), sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
+      const tuning = getLangTuning(lang);
+      const rectCfg = getRectBoxCfg(tuning);
+      const bboxCfg = (tuning && tuning.bbox) || {};
+      const Util = pdfjsLib.Util;
+
+      const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0];
+      const tx = Util.transform(viewport.transform, tr);
+
+      const x = Number(tx[4] || 0);
+      const y = Number(tx[5] || 0);
+      const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
       const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
+
       let fontH = sy;
-      if (!Number.isFinite(fontH) || fontH <= 0) fontH = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 10;
+      if (!Number.isFinite(fontH) || fontH <= 0) {
+        fontH =
+          Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
+          Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
+          10;
+      }
+
       fontH = clamp(fontH * rectCfg.fontHeightMul, rectCfg.fontHeightMin, rectCfg.fontHeightMax);
-      const s = String(it.str || ""), textLen = Math.max(1, s.length);
+
+      const s = String(it.str || "");
+      const textLen = Math.max(1, s.length);
+
       let w = 0;
-      try { const iw = Number(it.width || 0); if (Number.isFinite(iw) && iw > 0) w = iw * sx; } catch (_) {}
+      try {
+        const iw = Number(it.width || 0);
+        if (Number.isFinite(iw) && iw > 0) w = iw * sx;
+      } catch (_) {}
+
       const est = Math.max(10, textLen * fontH * rectCfg.widthEstMul);
       if (!Number.isFinite(w) || w <= 0) w = est;
-      const group = BBoxEngine.keyGroup(key), cfg = bboxCfg[group] || bboxCfg.default || { maxByPage: 0.30, maxByEst: 1.45, wHardCapEstRatio: 2.2, wSoftCapEstMul: 1.15 };
-      const hardRatio = Number(cfg.wHardCapEstRatio || 2.2), softMul = Number(cfg.wSoftCapEstMul || 1.15);
+
+      const group = BBoxEngine.keyGroup(key);
+      const cfg = bboxCfg[group] || bboxCfg.default || {
+        maxByPage: 0.30,
+        maxByEst: 1.45,
+        wHardCapEstRatio: 2.2,
+        wSoftCapEstMul: 1.15
+      };
+
+      const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
+      const softMul = Number(cfg.wSoftCapEstMul || 1.15);
       if (w > est * hardRatio) w = est * softMul;
+
       w = clamp(w, 1, Math.min(viewport.width * Number(cfg.maxByPage || 0.30), est * Number(cfg.maxByEst || 1.45)));
-      const isLong = group === "longValue", minW = isLong ? (est * 0.92) : (est * 0.80);
+
+      const isLong = group === "longValue";
+      const minW = isLong ? (est * 0.92) : (est * 0.80);
       w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.38 : 0.18)));
-      return { x: clamp(x, 0, viewport.width), y: clamp(y - fontH, 0, viewport.height), w: clamp(w, 1, viewport.width - clamp(x, 0, viewport.width)), h: clamp(fontH, 6, viewport.height - clamp(y - fontH, 0, viewport.height)) };
+
+      return {
+        x: clamp(x, 0, viewport.width),
+        y: clamp(y - fontH, 0, viewport.height),
+        w: clamp(w, 1, viewport.width - clamp(x, 0, viewport.width)),
+        h: clamp(fontH, 6, viewport.height - clamp(y - fontH, 0, viewport.height))
+      };
     }
   };
 
   function buildItemBoxes(pdfjsLib, viewport, textContentOrItems, lang) {
     const items = getItemsArray(textContentOrItems);
     if (!items.length || !pdfjsLib || !pdfjsLib.Util || !viewport) return [];
+
     const out = [];
     for (const it of items) {
       if (!it) continue;
@@ -309,7 +417,10 @@
 
       function needSpaceBetween(line, chunk) {
         if (!line || !chunk) return false;
-        const a = line[line.length - 1], b = chunk[0], aIsCjk = /[\u4E00-\u9FFF]/.test(a), bIsCjk = /[\u4E00-\u9FFF]/.test(b);
+        const a = line[line.length - 1];
+        const b = chunk[0];
+        const aIsCjk = /[\u4E00-\u9FFF]/.test(a);
+        const bIsCjk = /[\u4E00-\u9FFF]/.test(b);
         if (aIsCjk || bIsCjk) return false;
         if (/^[\s\)\]\}\.,;:\/]/.test(chunk)) return false;
         if (/[\s\-\(\[\{\/]$/.test(line)) return false;
@@ -318,29 +429,38 @@
 
       const rows = [];
       for (let i = 0; i < items.length; i++) {
-        const it = items[i], s = String((it && it.str) || "").replace(/\s+/g, " ").trim();
+        const it = items[i];
+        const s = String((it && it.str) || "").replace(/\s+/g, " ").trim();
         if (!s) continue;
         const tr = Array.isArray(it && it.transform) ? it.transform : [];
         rows.push({ idx: i, s, x: Number(tr[4] || 0), y: Math.round(Number(tr[5] || 0) * 2) / 2 });
       }
+
       if (!rows.length) return { items, pageText: "", itemRanges: [] };
 
       rows.sort((a, b) => (b.y - a.y) || (a.x - b.x));
-      const lines = [], Y_EPS = 1.2;
+
+      const lines = [];
+      const Y_EPS = 1.2;
+
       for (const r of rows) {
         const last = lines[lines.length - 1];
         if (!last || Math.abs(last.y - r.y) > Y_EPS) lines.push({ y: r.y, parts: [r] });
         else last.parts.push(r);
       }
 
-      let pageText = "", prevY = null;
+      let pageText = "";
+      let prevY = null;
       const itemRanges = [];
+
       for (const ln of lines) {
         ln.parts.sort((a, b) => a.x - b.x);
+
         if (prevY !== null) {
           const gap = prevY - ln.y;
           pageText += gap > 12 ? "\n\n" : (pageText && !pageText.endsWith("\n") ? "\n" : "");
         }
+
         let lineText = "";
         for (const part of ln.parts) {
           const chunk = part.s;
@@ -348,129 +468,299 @@
           if (lineText && needSpaceBetween(lineText, chunk)) lineText += " ";
           const startInLine = lineText.length;
           lineText += chunk;
-          itemRanges.push({ idx: part.idx, start: pageText.length + startInLine, end: pageText.length + lineText.length });
+          itemRanges.push({
+            idx: part.idx,
+            start: pageText.length + startInLine,
+            end: pageText.length + lineText.length
+          });
         }
+
         pageText += lineText;
         prevY = ln.y;
       }
+
       return { items, pageText, itemRanges };
     },
 
     normalizeCoreHit(hit) {
       if (!hit || typeof hit !== "object") return null;
-      const key = typeof hit.key === "string" ? hit.key : (typeof hit.ruleKey === "string" ? hit.ruleKey : (typeof hit.type === "string" ? hit.type : ""));
-      const aRaw = Number.isFinite(hit.a) ? hit.a : (Number.isFinite(hit.start) ? hit.start : (Number.isFinite(hit.from) ? hit.from : (Number.isFinite(hit.index) ? hit.index : null)));
-      const bRaw = Number.isFinite(hit.b) ? hit.b : (Number.isFinite(hit.end) ? hit.end : (Number.isFinite(hit.to) ? hit.to : (Number.isFinite(aRaw) && Number.isFinite(hit.len) ? aRaw + Number(hit.len) : null)));
+
+      const key =
+        typeof hit.key === "string" ? hit.key :
+        (typeof hit.ruleKey === "string" ? hit.ruleKey :
+        (typeof hit.type === "string" ? hit.type : ""));
+
+      const aRaw =
+        Number.isFinite(hit.a) ? hit.a :
+        (Number.isFinite(hit.start) ? hit.start :
+        (Number.isFinite(hit.from) ? hit.from :
+        (Number.isFinite(hit.index) ? hit.index : null)));
+
+      const bRaw =
+        Number.isFinite(hit.b) ? hit.b :
+        (Number.isFinite(hit.end) ? hit.end :
+        (Number.isFinite(hit.to) ? hit.to :
+        (Number.isFinite(aRaw) && Number.isFinite(hit.len) ? aRaw + Number(hit.len) : null)));
+
       if (!key || !Number.isFinite(aRaw) || !Number.isFinite(bRaw) || bRaw <= aRaw) return null;
-      return { key, a: Math.max(0, Number(aRaw)), b: Math.max(0, Number(bRaw)), preferSub: hit.preferSub || null, hitId: safeString(hit.id || "") };
+
+      return {
+        key,
+        a: Math.max(0, Number(aRaw)),
+        b: Math.max(0, Number(bRaw)),
+        preferSub: hit.preferSub || null,
+        hitId: safeString(hit.id || "")
+      };
     },
 
     collectCoreHitsForPage({ lang, pageText, pageNumber, enabledKeys, moneyMode, manualTerms }) {
-      const mc = (() => { try { const x = window.__MATCHER_CORE__; return x && typeof x.matchDocument === "function" ? x : null; } catch (_) { return null; } })();
+      const mc = (() => {
+        try {
+          const x = window.__MATCHER_CORE__;
+          return x && typeof x.matchDocument === "function" ? x : null;
+        } catch (_) {
+          return null;
+        }
+      })();
+
       if (!mc) return null;
+
       const rawText = String(pageText || "");
-      if (!rawText.trim()) return { ok: true, spans: [], debug: { reason: "empty-page-text" }, summary: { total: 0, byKey: {} } };
+      if (!rawText.trim()) {
+        return { ok: true, spans: [], debug: { reason: "empty-page-text" }, summary: { total: 0, byKey: {} } };
+      }
 
       let prettyText = rawText;
       try {
         const pagesText = window.__pdf_pages_text || window.lastPdfPagesText || [];
-        const hit = Array.isArray(pagesText) ? pagesText.find((p) => Number(p && p.pageNumber) === Number(pageNumber)) : null;
+        const hit = Array.isArray(pagesText)
+          ? pagesText.find((p) => Number(p && p.pageNumber) === Number(pageNumber))
+          : null;
         if (hit && typeof hit.text === "string" && hit.text.trim()) prettyText = hit.text;
       } catch (_) {}
-      prettyText = String(prettyText || "").replace(/\u0000/g, "").replace(/\r\n?/g, "\n").trim();
-      if (!prettyText) return { ok: true, spans: [], debug: { reason: "pretty-text-empty-after-clean" }, summary: { total: 0, byKey: {} } };
 
-      const safeLang = normLang(lang), safeEnabledKeys = Array.isArray(enabledKeys) ? enabledKeys.slice() : [];
-      const safeManualTerms = Array.isArray(manualTerms) ? manualTerms.map((x) => String(x || "").trim()).filter(Boolean) : [];
+      prettyText = String(prettyText || "").replace(/\u0000/g, "").replace(/\r\n?/g, "\n").trim();
+      if (!prettyText) {
+        return { ok: true, spans: [], debug: { reason: "pretty-text-empty-after-clean" }, summary: { total: 0, byKey: {} } };
+      }
+
+      const safeLang = normLang(lang);
+      const safeEnabledKeys = Array.isArray(enabledKeys) ? enabledKeys.slice() : [];
+      const safeManualTerms = Array.isArray(manualTerms)
+        ? manualTerms.map((x) => String(x || "").trim()).filter(Boolean)
+        : [];
+
       let normalized = null;
-      try { normalized = mc.normalizeDocument ? mc.normalizeDocument({ pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }], fromPdf: true }) : null; } catch (_) { normalized = null; }
+      try {
+        normalized = mc.normalizeDocument
+          ? mc.normalizeDocument({ pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }], fromPdf: true })
+          : null;
+      } catch (_) {
+        normalized = null;
+      }
 
       const attempts = [];
       if (normalized && ((typeof normalized.text === "string" && normalized.text.trim()) || (Array.isArray(normalized.pages) && normalized.pages.length))) {
-        attempts.push({ label: "normalized-document", run: () => mc.matchDocument({ lang: safeLang, document: normalized, enabledKeys: safeEnabledKeys, manualTerms: safeManualTerms, moneyMode, fromPdf: true }) });
+        attempts.push({
+          label: "normalized-document",
+          run: () => mc.matchDocument({
+            lang: safeLang,
+            document: normalized,
+            enabledKeys: safeEnabledKeys,
+            manualTerms: safeManualTerms,
+            moneyMode,
+            fromPdf: true
+          })
+        });
       }
-      attempts.push({ label: "raw-paged-document", run: () => mc.matchDocument({ lang: safeLang, document: { pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }], fromPdf: true }, enabledKeys: safeEnabledKeys, manualTerms: safeManualTerms, moneyMode, fromPdf: true }) });
-      attempts.push({ label: "plain-text", run: () => mc.matchDocument({ lang: safeLang, text: prettyText, enabledKeys: safeEnabledKeys, manualTerms: safeManualTerms, moneyMode, fromPdf: true }) });
 
-      let res = null, lastErr = null, usedAttempt = "";
+      attempts.push({
+        label: "raw-paged-document",
+        run: () => mc.matchDocument({
+          lang: safeLang,
+          document: { pages: [{ pageNumber: Number(pageNumber) || 1, text: prettyText }], fromPdf: true },
+          enabledKeys: safeEnabledKeys,
+          manualTerms: safeManualTerms,
+          moneyMode,
+          fromPdf: true
+        })
+      });
+
+      attempts.push({
+        label: "plain-text",
+        run: () => mc.matchDocument({
+          lang: safeLang,
+          text: prettyText,
+          enabledKeys: safeEnabledKeys,
+          manualTerms: safeManualTerms,
+          moneyMode,
+          fromPdf: true
+        })
+      });
+
+      let res = null;
+      let lastErr = null;
+      let usedAttempt = "";
+
       for (const step of attempts) {
         try {
           const out = step.run();
           if (out && typeof out.then === "function") throw new Error("matcher-core-async-not-supported-here");
           if (!out) continue;
-          const total = Number(out?.summary?.total) || Number(out?.summary?.hitCount) || (Array.isArray(out?.hits) ? out.hits.length : 0) || (Array.isArray(out?.rawHits) ? out.rawHits.length : 0) || (Array.isArray(out?.finalHits) ? out.finalHits.length : 0);
-          if (total > 0) { res = out; usedAttempt = step.label; break; }
-          if (!res) { res = out; usedAttempt = step.label; }
-        } catch (e) { lastErr = e; }
-      }
-      if (!res) { if (lastErr) throw lastErr; return null; }
 
-      const rawHits = Array.isArray(res.hits) ? res.hits : (Array.isArray(res.rawHits) ? res.rawHits : (Array.isArray(res.finalHits) ? res.finalHits : []));
-      const spans = rawHits.map(SpanEngine.normalizeCoreHit).filter(Boolean).filter((sp) => sp.key && Number.isFinite(sp.a) && Number.isFinite(sp.b) && sp.b > sp.a && sp.a >= 0 && sp.b <= prettyText.length + 4).sort((x, y) => (x.a - y.a) || (x.b - y.b));
-      return { ok: true, spans, debug: Object.assign({}, res && res.debug ? res.debug : {}, { attempt: usedAttempt, pageNumber: Number(pageNumber) || 1, pageTextLength: prettyText.length }), summary: res && res.summary ? res.summary : { total: spans.length, byKey: {} } };
+          const total =
+            Number(out?.summary?.total) ||
+            Number(out?.summary?.hitCount) ||
+            (Array.isArray(out?.hits) ? out.hits.length : 0) ||
+            (Array.isArray(out?.rawHits) ? out.rawHits.length : 0) ||
+            (Array.isArray(out?.finalHits) ? out.finalHits.length : 0);
+
+          if (total > 0) {
+            res = out;
+            usedAttempt = step.label;
+            break;
+          }
+          if (!res) {
+            res = out;
+            usedAttempt = step.label;
+          }
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+
+      if (!res) {
+        if (lastErr) throw lastErr;
+        return null;
+      }
+
+      const rawHits =
+        Array.isArray(res.hits) ? res.hits :
+        (Array.isArray(res.rawHits) ? res.rawHits :
+        (Array.isArray(res.finalHits) ? res.finalHits : []));
+
+      const spans = rawHits
+        .map(SpanEngine.normalizeCoreHit)
+        .filter(Boolean)
+        .filter((sp) => sp.key && Number.isFinite(sp.a) && Number.isFinite(sp.b) && sp.b > sp.a && sp.a >= 0 && sp.b <= prettyText.length + 4)
+        .sort((x, y) => (x.a - y.a) || (x.b - y.b));
+
+      return {
+        ok: true,
+        spans,
+        debug: Object.assign({}, res && res.debug ? res.debug : {}, {
+          attempt: usedAttempt,
+          pageNumber: Number(pageNumber) || 1,
+          pageTextLength: prettyText.length
+        }),
+        summary: res && res.summary ? res.summary : { total: spans.length, byKey: {} }
+      };
     },
 
     buildLegacySpans(matchers, items, lang) {
-      const tuning = getLangTuning(lang), MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
+      const tuning = getLangTuning(lang);
+      const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
+
       function isWs(ch) { return ch === " " || ch === "\n" || ch === "\t" || ch === "\r"; }
       function shouldInsertSpace(prevChar, nextChar) {
         if (!prevChar || !nextChar || isWs(prevChar) || isWs(nextChar)) return false;
         return /[A-Za-z0-9]/.test(prevChar) && /[A-Za-z0-9]/.test(nextChar);
       }
       function getAllMatchesWithGroups(re, s) {
-        const out = []; re.lastIndex = 0; let m;
+        const out = [];
+        re.lastIndex = 0;
+        let m;
         while ((m = re.exec(s)) !== null) {
           const text = String(m[0] || "");
-          if (!text) { re.lastIndex++; continue; }
+          if (!text) {
+            re.lastIndex++;
+            continue;
+          }
           out.push({ index: m.index, len: text.length, m });
         }
         return out;
       }
+
       let pageText = "";
       const itemRanges = [];
+
       for (let i = 0; i < items.length; i++) {
-        const it = items[i], s = String(it.str || "");
+        const it = items[i];
+        const s = String(it.str || "");
         if (!s) continue;
-        const prevChar = pageText.length ? pageText[pageText.length - 1] : "", nextChar = s[0];
+
+        const prevChar = pageText.length ? pageText[pageText.length - 1] : "";
+        const nextChar = s[0];
+
         if (pageText && shouldInsertSpace(prevChar, nextChar) && !it.hasEOL) pageText += " ";
-        const start = pageText.length; pageText += s; itemRanges.push({ idx: i, start, end: pageText.length });
+
+        const start = pageText.length;
+        pageText += s;
+        itemRanges.push({ idx: i, start, end: pageText.length });
+
         if (it && it.hasEOL) pageText += "\n";
       }
-      const matchText = pageText.replace(/\n/g, "\u0000"), spans = [];
+
+      const matchText = pageText.replace(/\n/g, "\u0000");
+      const spans = [];
 
       for (const mm of matchers) {
         const re0 = mm.re;
         if (!(re0 instanceof RegExp)) continue;
+
         let re;
         try { re = new RegExp(re0.source, re0.flags.includes("g") ? re0.flags : (re0.flags + "g")); } catch (_) { continue; }
+
         for (const h of getAllMatchesWithGroups(re, matchText)) {
-          let a = h.index, b = a + h.len;
-          const key = mm.key, maxLen = MAX_MATCH_LEN[key] || 120, m = h.m || [], full = String(m[0] || "");
+          let a = h.index;
+          let b = a + h.len;
+          const key = mm.key;
+          const maxLen = MAX_MATCH_LEN[key] || 120;
+          const m = h.m || [];
+          const full = String(m[0] || "");
+
           if ((b - a) > maxLen || full.indexOf("\u0000") >= 0) continue;
+
           if (key === "manual_term") {
             const term = (m[2] != null) ? String(m[2]) : ((m[1] != null) ? String(m[1]) : "");
-            if (term) { const pos = full.indexOf(term); if (pos >= 0) { a = h.index + pos; b = a + term.length; } }
-            if ((b - a) > 0 && (b - a) <= (MAX_MATCH_LEN.manual_term || 90)) spans.push({ a, b, key, preferSub: null });
+            if (term) {
+              const pos = full.indexOf(term);
+              if (pos >= 0) {
+                a = h.index + pos;
+                b = a + term.length;
+              }
+            }
+            if ((b - a) > 0 && (b - a) <= (MAX_MATCH_LEN.manual_term || 90)) {
+              spans.push({ a, b, key, preferSub: null });
+            }
             continue;
           }
 
           function findSubOffsets(subStr) {
             if (!subStr) return null;
-            const sub = String(subStr), pos = full.indexOf(sub);
+            const sub = String(subStr);
+            const pos = full.indexOf(sub);
             return pos < 0 ? null : { offsetStart: pos, offsetEnd: pos + sub.length };
           }
+
           let preferSub = null;
+
           if (key === "company") {
-            const coreCN = m[2] && String(m[2]), coreDE = m[5] && String(m[5]), core = (coreCN && coreCN.length >= 2) ? coreCN : coreDE;
+            const coreCN = m[2] && String(m[2]);
+            const coreDE = m[5] && String(m[5]);
+            const core = (coreCN && coreCN.length >= 2) ? coreCN : coreDE;
             if (core && core.length >= 2) preferSub = findSubOffsets(core);
           } else if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
-            const cand1 = (m[1] != null) ? String(m[1]) : "", cand2 = (m[2] != null) ? String(m[2]) : "", best = (cand1 && cand1.length >= 2) ? cand1 : ((cand2 && cand2.length >= 2) ? cand2 : full);
+            const cand1 = (m[1] != null) ? String(m[1]) : "";
+            const cand2 = (m[2] != null) ? String(m[2]) : "";
+            const best = (cand1 && cand1.length >= 2) ? cand1 : ((cand2 && cand2.length >= 2) ? cand2 : full);
             preferSub = findSubOffsets(best);
           } else if (key === "account") {
             preferSub = findSubOffsets(m[2]);
           } else if (key === "phone") {
             const candidates = [m[2], m[3], m[4]].filter(Boolean).map(String);
-            let best = ""; for (const c of candidates) if (c.length > best.length) best = c;
+            let best = "";
+            for (const c of candidates) if (c.length > best.length) best = c;
             if (best) {
               const pos = full.indexOf(best);
               if (pos >= 0) {
@@ -483,27 +773,40 @@
           } else if (key === "money" || key === "money_label") {
             preferSub = findSubOffsets(m[2] || m[4] || m[5]);
           }
+
           spans.push({ a, b, key, preferSub });
         }
       }
 
       if (!spans.length) return { pageText, itemRanges, spans: [] };
+
       spans.sort((x, y) => (x.a - y.a) || (x.b - y.b));
+
       const merged = [];
       function samePreferSub(p, q) {
         if (!p && !q) return true;
         if (!p || !q) return false;
         return p.offsetStart === q.offsetStart && p.offsetEnd === q.offsetEnd;
       }
+
       for (const sp of spans) {
         const last = merged[merged.length - 1];
-        if (!last) { merged.push({ ...sp }); continue; }
+        if (!last) {
+          merged.push({ ...sp });
+          continue;
+        }
+
         const close = sp.key === last.key && sp.a <= last.b;
         if (close) {
           last.b = Math.max(last.b, sp.b);
-          last.preferSub = last.preferSub && sp.preferSub ? (samePreferSub(last.preferSub, sp.preferSub) ? last.preferSub : null) : (last.preferSub || sp.preferSub || null);
-        } else merged.push({ ...sp });
+          last.preferSub = last.preferSub && sp.preferSub
+            ? (samePreferSub(last.preferSub, sp.preferSub) ? last.preferSub : null)
+            : (last.preferSub || sp.preferSub || null);
+        } else {
+          merged.push({ ...sp });
+        }
       }
+
       return { pageText, itemRanges, spans: merged };
     }
   };
@@ -523,18 +826,32 @@
 
     shrinkByLabel(key, s, ls, le, tuning) {
       if (key === "manual_term" || le <= ls) return { ls, le };
-      const sub = s.slice(ls, le), labels = (tuning && tuning.shrinkLabels) || {};
+
+      const sub = s.slice(ls, le);
+      const labels = (tuning && tuning.shrinkLabels) || {};
       const map = {
-        phone: labels.phone, account: labels.account, email: labels.email, bank: labels.bank,
-        address_de_street: labels.address, address_de_postal: labels.address, address_de_street_partial: labels.address,
-        address_de_extra_partial: labels.address, address_de_inline_street: labels.address, address_en_inline_street: labels.address,
-        address_en_extra_block: labels.address, address_en_extra: labels.address, address_cn: labels.address
+        phone: labels.phone,
+        account: labels.account,
+        email: labels.email,
+        bank: labels.bank,
+        address_de_street: labels.address,
+        address_de_postal: labels.address,
+        address_de_street_partial: labels.address,
+        address_de_extra_partial: labels.address,
+        address_de_inline_street: labels.address,
+        address_en_inline_street: labels.address,
+        address_en_extra_block: labels.address,
+        address_en_extra: labels.address,
+        address_cn: labels.address
       };
+
       const re = RectEngine.makeLabelPrefixRe(map[key]);
       const mm = re ? sub.match(re) : null;
       if (mm && mm[0]) ls += mm[0].length;
+
       while (ls < le && RectEngine.weakTrim(s[ls])) ls++;
       while (le > ls && RectEngine.weakTrim(s[le - 1])) le--;
+
       return { ls, le };
     },
 
@@ -544,65 +861,139 @@
     },
 
     filterAndMergeSpans(spans, tuning) {
-      const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {}), merged = [];
+      const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
+      const merged = [];
+
       for (const sp of spans || []) {
         if (!sp || !sp.key) continue;
         if ((sp.b - sp.a) > (MAX_MATCH_LEN[sp.key] || 120)) continue;
+
         const last = merged[merged.length - 1];
-        if (last && last.key === sp.key && sp.a <= last.b) last.b = Math.max(last.b, sp.b);
-        else merged.push({ a: sp.a, b: sp.b, key: sp.key, preferSub: sp.preferSub || null, hitId: sp.hitId || "" });
+        if (last && last.key === sp.key && sp.a <= last.b) {
+          last.b = Math.max(last.b, sp.b);
+        } else {
+          merged.push({
+            a: sp.a,
+            b: sp.b,
+            key: sp.key,
+            preferSub: sp.preferSub || null,
+            hitId: sp.hitId || ""
+          });
+        }
       }
+
       return merged;
     },
 
     buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
-      const tuning = getLangTuning(lang), mergeCfg = getMergeCfg(tuning), rects = [];
+      const tuning = getLangTuning(lang);
+      const mergeCfg = getMergeCfg(tuning);
+      const rects = [];
+
       for (const sp of RectEngine.filterAndMergeSpans(spans, tuning)) {
-        const A = sp.a, B = sp.b, key = sp.key, preferSub = sp.preferSub, hitId = safeString(sp.hitId || "");
+        const A = sp.a;
+        const B = sp.b;
+        const key = sp.key;
+        const preferSub = sp.preferSub;
+        const hitId = safeString(sp.hitId || "");
+
         for (const r of itemRanges) {
-          const a0 = Math.max(A, r.start), b0 = Math.min(B, r.end);
+          const a0 = Math.max(A, r.start);
+          const b0 = Math.min(B, r.end);
           if (b0 <= a0) continue;
-          const it = items[r.idx], s = String(it.str || "");
+
+          const it = items[r.idx];
+          const s = String(it.str || "");
           if (!s) continue;
-          let ls = a0 - r.start, le = b0 - r.start;
+
+          let ls = a0 - r.start;
+          let le = b0 - r.start;
+
           if (preferSub) {
-            const subA = A + Number(preferSub.offsetStart || 0), subB = A + Number(preferSub.offsetEnd || 0);
-            const a1 = Math.max(subA, r.start), b1 = Math.min(subB, r.end);
-            if (b1 > a1) { ls = a1 - r.start; le = b1 - r.start; } else continue;
+            const subA = A + Number(preferSub.offsetStart || 0);
+            const subB = A + Number(preferSub.offsetEnd || 0);
+            const a1 = Math.max(subA, r.start);
+            const b1 = Math.min(subB, r.end);
+            if (b1 > a1) {
+              ls = a1 - r.start;
+              le = b1 - r.start;
+            } else {
+              continue;
+            }
           } else {
             const shr = RectEngine.shrinkByLabel(key, s, ls, le, tuning);
-            ls = shr.ls; le = shr.le;
+            ls = shr.ls;
+            le = shr.le;
             if (le <= ls) continue;
           }
+
           if (le - ls <= 0) continue;
-          const bb = BBoxEngine.rectBox(pdfjsLib, viewport, it, key, lang), len = Math.max(1, s.length);
-          const x1 = bb.x + bb.w * (ls / len), x2 = bb.x + bb.w * (le / len), pcfg = RectEngine.padForKey(key, tuning);
-          const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0)), padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
-          let rx = clamp(x1 - padX, 0, viewport.width), ry = clamp(bb.y - padY, 0, viewport.height), rw = clamp((x2 - x1) + padX * 2, 1, viewport.width - clamp(x1 - padX, 0, viewport.width)), rh = clamp(bb.h + padY * 2, 6, viewport.height - clamp(bb.y - padY, 0, viewport.height));
-          if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") { if (rw > Math.min(viewport.width * 0.22, bb.w * 0.55)) continue; }
-          if (key === "company") { if (rw > Math.min(viewport.width * 0.18, bb.w * 0.45)) continue; }
-          if (key === "manual_term") { if (rw > Math.min(viewport.width * 0.28, bb.w * 0.70)) continue; }
+
+          const bb = BBoxEngine.rectBox(pdfjsLib, viewport, it, key, lang);
+          const len = Math.max(1, s.length);
+
+          const x1 = bb.x + bb.w * (ls / len);
+          const x2 = bb.x + bb.w * (le / len);
+
+          const pcfg = RectEngine.padForKey(key, tuning);
+          const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
+          const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
+
+          let rx = clamp(x1 - padX, 0, viewport.width);
+          let ry = clamp(bb.y - padY, 0, viewport.height);
+          let rw = clamp((x2 - x1) + padX * 2, 1, viewport.width - clamp(x1 - padX, 0, viewport.width));
+          let rh = clamp(bb.h + padY * 2, 6, viewport.height - clamp(bb.y - padY, 0, viewport.height));
+
+          if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
+            if (rw > Math.min(viewport.width * 0.22, bb.w * 0.55)) continue;
+          }
+          if (key === "company") {
+            if (rw > Math.min(viewport.width * 0.18, bb.w * 0.45)) continue;
+          }
+          if (key === "manual_term") {
+            if (rw > Math.min(viewport.width * 0.28, bb.w * 0.70)) continue;
+          }
           if (rw > viewport.width * 0.92 || rh > viewport.height * 0.35 || (rw > viewport.width * 0.85 && rh > viewport.height * 0.20)) continue;
+
           rects.push({ x: rx, y: ry, w: rw, h: rh, key, hitId });
         }
       }
+
       if (!rects.length) return [];
+
       rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+
       const out = [];
       for (const r of rects) {
         if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
+
         const last = out[out.length - 1];
-        if (!last) { out.push({ x: r.x, y: r.y, w: r.w, h: r.h, key: r.key, hitId: r.hitId }); continue; }
+        if (!last) {
+          out.push({ x: r.x, y: r.y, w: r.w, h: r.h, key: r.key, hitId: r.hitId });
+          continue;
+        }
+
         const overlap = Math.max(0, Math.min(last.y + last.h, r.y + r.h) - Math.max(last.y, r.y));
         const minH = Math.max(1, Math.min(last.h, r.h));
         const sameLine = (overlap / minH) > mergeCfg.sameLineOverlapRatio;
         const similarHeight = (Math.min(last.h, r.h) / Math.max(last.h, r.h)) > mergeCfg.similarHeightRatio;
-        const gap = r.x - (last.x + last.w), near = gap >= 0 && gap <= nearGap;
+        const gap = r.x - (last.x + last.w);
+        const near = gap >= 0 && gap <= nearGap;
+
         if (r.key === last.key && r.hitId === last.hitId && sameLine && similarHeight && near) {
-          const nx = Math.min(last.x, r.x), ny = Math.min(last.y, r.y), nr = Math.max(last.x + last.w, r.x + r.w), nb = Math.max(last.y + last.h, r.y + r.h);
-          last.x = nx; last.y = ny; last.w = nr - nx; last.h = nb - ny;
-        } else out.push({ x: r.x, y: r.y, w: r.w, h: r.h, key: r.key, hitId: r.hitId });
+          const nx = Math.min(last.x, r.x);
+          const ny = Math.min(last.y, r.y);
+          const nr = Math.max(last.x + last.w, r.x + r.w);
+          const nb = Math.max(last.y + last.h, r.y + r.h);
+          last.x = nx;
+          last.y = ny;
+          last.w = nr - nx;
+          last.h = nb - ny;
+        } else {
+          out.push({ x: r.x, y: r.y, w: r.w, h: r.h, key: r.key, hitId: r.hitId });
+        }
       }
+
       return out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId }));
     }
   };
@@ -617,7 +1008,7 @@
     return RectEngine.buildRects(pdfjsLib, viewport, built.items, built.itemRanges, spans, lang, getMergeCfg(getLangTuning(lang)).nearGapCore);
   }
 
-    function buildSpansFromMatchResultForPage(matchResult, pageNumber) {
+  function buildSpansFromMatchResultForPage(matchResult, pageNumber) {
     const mr = normalizeMatchResult(matchResult);
     const targetPage = Number(pageNumber);
 
@@ -638,7 +1029,6 @@
     const targetPage = Number(pageNumber);
 
     const pageHits = mr.hits.filter((h) => Number(h.page) === targetPage && h.end > h.start);
-
     const spans = pageHits.map((h) => ({
       a: Number(h.start),
       b: Number(h.end),
@@ -653,7 +1043,6 @@
       asArray(rects).map((r) => safeString(r && r.hitId)).filter(Boolean)
     );
 
-    // fallback: if a hit already carries rects from matcher-core, reuse them
     for (const h of pageHits) {
       const hitId = safeString(h && h.id);
       if (!hitId) continue;
@@ -676,10 +1065,7 @@
       }
     }
 
-    return {
-      rects,
-      spans
-    };
+    return { rects, spans };
   }
 
   function buildRasterRectResult({ pageEntries, matchResult, lang }) {
@@ -744,6 +1130,7 @@
     return {
       version: "raster-rect-result-v1",
       source: "matcher-core",
+      lang: normLang(lang || mr.lang),
       pageCount: pages.length,
       summary: {
         coreHitCount: mr.hits.length,
@@ -802,18 +1189,35 @@
       lang: normLang(lang || mr.lang)
     });
 
-    try {
-      window.__RasterCoreLast = result;
-    } catch (_) {}
-
+    try { window.__RasterCoreLast = result; } catch (_) {}
     return result;
   }
-  
+
+  /* =========================
+     LEGACY / TRANSITION FALLBACKS
+     - retained only for transition safety
+     - not the primary rect pipeline anymore
+     ========================= */
+
   function tryMatcherCoreRectsForPage({ pdfjsLib, viewport, itemsOrTextContent, pageNumber, lang, enabledKeys, moneyMode, manualTerms }) {
-    const built = SpanEngine.buildPageTextAndRangesFromItems(itemsOrTextContent), pageText = String(built.pageText || "");
-    if (!pageText.trim()) return { ok: true, rects: [], spans: [], source: "matcher-core", hitCount: 0, debug: { reason: "empty-page-text" }, summary: { total: 0, byKey: {} } };
+    const built = SpanEngine.buildPageTextAndRangesFromItems(itemsOrTextContent);
+    const pageText = String(built.pageText || "");
+
+    if (!pageText.trim()) {
+      return {
+        ok: true,
+        rects: [],
+        spans: [],
+        source: "matcher-core",
+        hitCount: 0,
+        debug: { reason: "empty-page-text" },
+        summary: { total: 0, byKey: {} }
+      };
+    }
+
     const coreRes = SpanEngine.collectCoreHitsForPage({ lang, pageText, pageNumber, enabledKeys, moneyMode, manualTerms });
     if (!coreRes || !coreRes.ok) return null;
+
     return {
       ok: true,
       rects: textItemsToRectsFromSpans(pdfjsLib, viewport, itemsOrTextContent, coreRes.spans || [], lang),
@@ -828,8 +1232,17 @@
   function textItemsToRects(pdfjsLib, viewport, textContentOrItems, matchers, lang) {
     const items = getItemsArray(textContentOrItems);
     if (!items.length || !matchers || !matchers.length) return [];
+
     const legacy = SpanEngine.buildLegacySpans(matchers, items, lang);
-    return RectEngine.buildRects(pdfjsLib, viewport, items, legacy.itemRanges, legacy.spans, lang, getMergeCfg(getLangTuning(lang)).nearGapLegacy);
+    return RectEngine.buildRects(
+      pdfjsLib,
+      viewport,
+      items,
+      legacy.itemRanges,
+      legacy.spans,
+      lang,
+      getMergeCfg(getLangTuning(lang)).nearGapLegacy
+    );
   }
 
   window[NS] = {
