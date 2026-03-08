@@ -1,5 +1,5 @@
 // =========================
-// assets/engine.js (FULL)  ✅ SLIMMED / STABLE
+// assets/engine.js (FULL) ✅ SLIMMED / STABLE / NO INPUT-HL
 // ROUTER + STABLE CORE (no lang rules/priority/alwaysOn/formatters inside)
 // - UI language: window.currentLang (UI only)
 // - Content strategy language: window.ruleEngine (+ window.ruleEngineMode)
@@ -7,7 +7,7 @@
 
 "use strict";
 
-const ENGINE_VERSION = "v20260304a2-engine-a6-langstate-fix-slim1";
+const ENGINE_VERSION = "v20260308-engine-a6-slim2-no-input-highlight";
 console.log("[engine.js] loaded " + ENGINE_VERSION);
 
 /* =========================
@@ -669,7 +669,9 @@ function phoneGuardOk({ label, value, match }) {
 }
 
 /* =========================
-   4) PDF overlay highlight
+   4) PDF input overlay
+   - no highlight logic anymore
+   - keep only raw text mirror for PDF mode
    ========================= */
 
 function renderInputOverlayForPdf(originalText) {
@@ -687,192 +689,15 @@ function renderInputOverlayForPdf(originalText) {
     return;
   }
 
-  let marked = null;
-  let source = "legacy";
-
-  try {
-    marked = markHitsInOriginalFromMatchResult(originalText);
-    if (marked) source = "matcher-core";
-  } catch (_) {
-    marked = null;
-  }
-
-  if (!marked) {
-    try {
-      marked = markHitsInOriginal(originalText);
-      source = "legacy";
-    } catch (_) {
-      marked = null;
-    }
-  }
-
-  try {
-    window.__overlay_source = source;
-  } catch (_) {}
-
-  overlay.innerHTML = marked || escapeHTML(String(originalText || ""));
+  overlay.innerHTML = escapeHTML(String(originalText || ""));
   wrap.classList.add("pdf-overlay-on");
+
+  try {
+    window.__overlay_source = "plain-text";
+  } catch (_) {}
 
   overlay.scrollTop = ta.scrollTop;
   overlay.scrollLeft = ta.scrollLeft;
-}
-
-function escapeHtmlPreserve(s) {
-  return String(s || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function markHitsInOriginalFromMatchResult(text) {
-  const src = String(text || "");
-  const mr = window.__MatcherLast;
-
-  if (!mr || mr.source !== "matcher-core" || !Array.isArray(mr.hits) || !mr.hits.length) {
-    return null;
-  }
-
-  const ordered = mr.hits
-    .filter((h) => {
-      const a = Number(h && h.start);
-      const b = Number(h && h.end);
-      return Number.isFinite(a) && Number.isFinite(b) && b > a && a >= 0 && b <= src.length;
-    })
-    .slice()
-    .sort((a, b) => {
-      const da = Number(a.start) - Number(b.start);
-      if (da !== 0) return da;
-      return Number(a.end) - Number(b.end);
-    });
-
-  if (!ordered.length) return null;
-
-  let out = "";
-  let cursor = 0;
-
-  for (const h of ordered) {
-    const a = Number(h.start);
-    const b = Number(h.end);
-    if (a < cursor) continue;
-
-    out += escapeHtmlPreserve(src.slice(cursor, a));
-    out += `<span class="hit">` + escapeHtmlPreserve(src.slice(a, b)) + `</span>`;
-    cursor = b;
-  }
-
-  out += escapeHtmlPreserve(src.slice(cursor));
-  return out;
-}
-
-function markHitsInOriginal(text) {
-  let s = String(text || "");
-  const S1 = "⟦HIT⟧";
-  const S2 = "⟦/HIT⟧";
-
-  const snap = window.__export_snapshot || null;
-  const enabledKeysArr = snap && Array.isArray(snap.enabledKeys) ? snap.enabledKeys : Array.from(enabled || []);
-  const enabledSet = new Set(enabledKeysArr);
-
-  if (manualTerms && manualTerms.length) {
-    for (const tm of manualTerms) {
-      const hasCjk = /[\u4E00-\u9FFF]/.test(tm);
-      if (hasCjk) {
-        const re = makeCjkTermRegex(tm);
-        s = s.replace(re, (m, p1, p2) => `${p1}${S1}${p2}${S2}`);
-      } else {
-        const re = makeLatinTermRegex(tm);
-        s = s.replace(re, (m) => `${S1}${m}${S2}`);
-      }
-    }
-  }
-
-  const rules = getRulesSafe();
-  const PRIORITY = getPriority();
-  const ALWAYS_ON = getAlwaysOnSet();
-  const pack = getContentPack();
-
-  for (const key of PRIORITY) {
-    if (key !== "money" && !enabledSet.has(key) && !ALWAYS_ON.has(key)) continue;
-
-    const r = rules && rules[key];
-    if (!r || !r.pattern) continue;
-
-    if (r.mode === "prefix") {
-      s = s.replace(r.pattern, (m, p1, p2) => {
-        const label = p1 || "";
-        const val = p2 || "";
-        return `${label}${S1}${val}${S2}`;
-      });
-      continue;
-    }
-
-    if (r.mode === "prefix_keep_tail") {
-      s = s.replace(r.pattern, (m, p1, p2, p3) => {
-        const label = p1 || "";
-        const toMask = p2 || "";
-        const tail = p3 || "";
-        return `${label}${S1}${toMask}${S2}${tail}`;
-      });
-      continue;
-    }
-
-    if (r.mode === "address_cn_partial") {
-      s = s.replace(r.pattern, (m, p1, p2) => {
-        const label = p1 || "";
-        const val = p2 || "";
-        if (pack && typeof pack.highlightAddressCnPartial === "function") {
-          try {
-            const res = pack.highlightAddressCnPartial({ label, val, S1, S2, match: m });
-            if (typeof res === "string" && res) return res;
-          } catch (_) {}
-        }
-        return `${label}${S1}${val}${S2}`;
-      });
-      continue;
-    }
-
-    if (r.mode === "phone") {
-      s = s.replace(r.pattern, (m, p1, p2, p3, p4) => {
-        const label = p1 || "";
-        const value = p2 || p3 || p4 || m;
-        if (!phoneGuardOk({ label, value, match: m })) return m;
-
-        if (label) return `${label}${S1}${m.slice(label.length)}${S2}`;
-        return `${S1}${m}${S2}`;
-      });
-      continue;
-    }
-
-    if (r.mode === "company") {
-      s = s.replace(r.pattern, (...args) => {
-        const match = String(args[0] || "");
-        const punctMatch = match.match(/[。．.，,;；!！?？)）】\]\s]+$/u);
-        const punct = punctMatch ? punctMatch[0] : "";
-        const coreStr = punct ? match.slice(0, -punct.length) : match;
-
-        const groups = args[args.length - 1];
-        const legal = groups && typeof groups === "object" && groups.legal ? String(groups.legal) : "";
-        const name = groups && typeof groups === "object" && groups.name ? String(groups.name) : coreStr;
-
-        if (pack && typeof pack.highlightCompany === "function") {
-          try {
-            const res = pack.highlightCompany({ match, coreStr, punct, groups, name, legal, S1, S2 });
-            if (typeof res === "string" && res) return res;
-          } catch (_) {}
-        }
-
-        return `${S1}${match}${S2}`;
-      });
-      continue;
-    }
-
-    s = s.replace(r.pattern, (m) => `${S1}${m}${S2}`);
-  }
-
-  const esc = escapeHTML(s);
-  return esc.replaceAll(S1, `<span class="hit">`).replaceAll(S2, `</span>`);
 }
 
 /* =========================
@@ -1188,7 +1013,6 @@ function applyRules(text) {
   lastRunMeta.langUI = getLangUI();
   lastRunMeta.langContent = getLangContent();
 
-  // -------- matcher-core primary --------
   if (matchResult && typeof matchResult.textMasked === "string") {
     const byKey =
       matchResult.summary && matchResult.summary.byKey && typeof matchResult.summary.byKey === "object"
@@ -1253,7 +1077,6 @@ function applyRules(text) {
     return matchResult.textMasked;
   }
 
-  // -------- no rules loaded --------
   if (!rules) {
     out = applyManualTermsMask(out, () => addHit("manual_term"));
 
@@ -1289,7 +1112,6 @@ function applyRules(text) {
     return out;
   }
 
-  // -------- legacy fallback path --------
   out = applyManualTermsMask(out, () => addHit("manual_term"));
   const p0 = protectPlaceholders(out);
   out = p0.t;
