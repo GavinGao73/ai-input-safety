@@ -28,7 +28,7 @@
   "use strict";
 
   const NS = "__MATCHER_CORE__";
-  const VERSION = "v20260306-phase1-compatible";
+  const VERSION = "v20260308-matchresult-v1";
 
   function normLang(l) {
     const s = String(l || "").toLowerCase();
@@ -133,7 +133,7 @@
   }
 
   function getRules(pack) {
-    return (pack && pack.rules && typeof pack.rules === "object") ? pack.rules : {};
+    return pack && pack.rules && typeof pack.rules === "object" ? pack.rules : {};
   }
 
   function getPlaceholder(pack, tagOrKey) {
@@ -173,6 +173,133 @@
     return "unknown";
   }
 
+  function inferCategoryFromKey(key) {
+    const k = safeString(key);
+
+    if (
+      [
+        "phone",
+        "email",
+        "url",
+        "address_cn",
+        "address_de_street",
+        "address_de_street_partial",
+        "address_de_inline_street",
+        "address_de_extra_partial",
+        "address_en_inline_street",
+        "address_en_extra_block",
+        "address_en_extra",
+        "handle",
+        "handle_label",
+        "person_name",
+        "person_name_keep_title"
+      ].includes(k)
+    ) return "contact";
+
+    if (
+      [
+        "dob",
+        "place_of_birth",
+        "passport",
+        "driver_license",
+        "ssn",
+        "ein",
+        "national_id",
+        "tax_id",
+        "insurance_id",
+        "insurance_id2",
+        "intl_itin",
+        "intl_nino",
+        "intl_nhs",
+        "intl_sin",
+        "intl_tfn",
+        "intl_abn",
+        "secret",
+        "api_key_token",
+        "bearer_token",
+        "security_answer",
+        "otp",
+        "pin",
+        "2fa"
+      ].includes(k)
+    ) return "identity";
+
+    if (
+      [
+        "account",
+        "bank",
+        "bank_routing_ids",
+        "card_expiry",
+        "card_expiry_de",
+        "card_security",
+        "card_security_de",
+        "money",
+        "money_label",
+        "ref",
+        "ref_label_tail",
+        "ref_generic_tail",
+        "legal_ref_tail",
+        "company"
+      ].includes(k)
+    ) return "business";
+
+    if (
+      [
+        "ip_label",
+        "ip_address",
+        "mac_label",
+        "mac_address",
+        "imei",
+        "imei2",
+        "uuid",
+        "uuid2",
+        "device_fingerprint",
+        "wallet_id",
+        "tx_hash",
+        "crypto_wallet"
+      ].includes(k)
+    ) return "tracking";
+
+    if (k === "manual_term") return "manual";
+
+    return "other";
+  }
+
+  function standardizeHit(hit, lang, pack) {
+    const h = hit && typeof hit === "object" ? hit : {};
+    const key = safeString(h.key);
+    const category = inferCategoryFromKey(key);
+    const masked = safeString(h.replacement || "");
+    const matchedText = safeString(h.matchedText || "");
+
+    return {
+      id: safeString(h.id),
+      key,
+      type: category === "business" ? "business" : "pii",
+      category,
+      page: Number.isFinite(h.page) ? h.page : null,
+      start: Number(h.start) || 0,
+      end: Number(h.end) || 0,
+      text: matchedText,
+      masked,
+      confidence: 1,
+      rule: {
+        lang: normLang(lang) || "unknown",
+        pack: pack && pack.lang ? `engine.${pack.lang}` : "engine.unknown",
+        ruleId: safeString(h.ruleId || key)
+      },
+      meta: {
+        label: "",
+        matchMode: safeString(h && h.meta && h.meta.mode),
+        source: safeString(h.source || ""),
+        tag: safeString(h && h.meta && h.meta.tag),
+        manualTerm: safeString(h && h.meta && h.meta.manualTerm),
+        fullMatch: safeString(h && h.meta && h.meta.fullMatch)
+      },
+      rects: Array.isArray(h.rects) ? h.rects.slice(0) : []
+    };
+  }
+
   function effectiveEnabledSet(enabledKeys, pack, policy) {
     const out = new Set();
     const user = asSet(enabledKeys);
@@ -188,50 +315,51 @@
   }
 
   function normalizeDocument(input) {
-  const d = input && typeof input === "object" ? input : {};
+    const d = input && typeof input === "object" ? input : {};
 
-  // 兼容三种入口：
-  // 1) { text: "..." }
-  // 2) { document: {...} } -> 外层已经拆掉的话也没关系
-  // 3) { pages: [{ pageNumber, text, items }] }
-  const text = safeString(d.text);
+    // 兼容三种入口：
+    // 1) { text: "..." }
+    // 2) { document: {...} } -> 外层已经拆掉的话也没关系
+    // 3) { pages: [{ pageNumber, text, items }] }
+    const text = safeString(d.text);
 
-  const rawPages = asArray(d.pages);
-  const pages = rawPages.map((page, idx) => {
-    const pageNumber = Number(page && page.pageNumber) || (idx + 1);
+    const rawPages = asArray(d.pages);
+    const pages = rawPages.map((page, idx) => {
+      const pageNumber = Number(page && page.pageNumber) || idx + 1;
 
-    const pageText = safeString(page && page.text);
+      const pageText = safeString(page && page.text);
 
-    const items = asArray(page && page.items).map((it) => ({
-      str: safeString(it && it.str),
-      transform: Array.isArray(it && it.transform) ? it.transform.slice(0, 6) : [],
-      width: Number(it && it.width) || 0,
-      height: Number(it && it.height) || 0,
-      hasEOL: !!(it && it.hasEOL)
-    }));
+      const items = asArray(page && page.items).map((it) => ({
+        str: safeString(it && it.str),
+        transform: Array.isArray(it && it.transform) ? it.transform.slice(0, 6) : [],
+        width: Number(it && it.width) || 0,
+        height: Number(it && it.height) || 0,
+        hasEOL: !!(it && it.hasEOL)
+      }));
+
+      return {
+        pageNumber,
+        text: pageText,
+        items
+      };
+    });
+
+    // 如果顶层 text 为空，但 pages 里有 text，就拼起来
+    let mergedText = text;
+    if (!mergedText && pages.length) {
+      mergedText = pages
+        .map((p) => safeString(p.text))
+        .filter(Boolean)
+        .join("\n\n");
+    }
 
     return {
-      pageNumber,
-      text: pageText,
-      items
+      text: mergedText,
+      pages,
+      meta: cloneSimple(d.meta || {})
     };
-  });
-
-  // 如果顶层 text 为空，但 pages 里有 text，就拼起来
-  let mergedText = text;
-  if (!mergedText && pages.length) {
-    mergedText = pages
-      .map((p) => safeString(p.text))
-      .filter(Boolean)
-      .join("\n\n");
   }
 
-  return {
-    text: mergedText,
-    pages,
-    meta: cloneSimple(d.meta || {})
-  };
-}
   function buildManualMatchers(manualTerms) {
     const out = [];
     const seen = new Set();
@@ -434,80 +562,81 @@
     return true;
   }
 
-function collectRawHits(opts) {
-  const lang = normLang(opts && opts.lang) || "zh";
-  const pack = (opts && opts.pack) || getPack(lang);
-  const policy = (opts && opts.policy) || getPolicy();
+  function collectRawHits(opts) {
+    const lang = normLang(opts && opts.lang) || "zh";
+    const pack = (opts && opts.pack) || getPack(lang);
+    const policy = (opts && opts.policy) || getPolicy();
 
-  // ✅ 兼容 doc / document / text 三种调用方式
-  let docInput = {};
-  if (opts && opts.doc && typeof opts.doc === "object") {
-    docInput = opts.doc;
-  } else if (opts && opts.document && typeof opts.document === "object") {
-    docInput = opts.document;
-  } else if (opts && typeof opts.text === "string") {
-    docInput = { text: opts.text };
-  }
-
-  const doc = normalizeDocument(docInput);
-  const text = safeString(doc.text);
-
-  const matchers = buildRuleMatchers({
-    lang,
-    pack,
-    policy,
-    enabledKeys: opts && opts.enabledKeys,
-    moneyMode: opts && opts.moneyMode,
-    manualTerms: opts && opts.manualTerms
-  });
-
-  const rawHits = [];
-
-  for (const matcher of matchers) {
-    const list = execRegexAll(matcher.re, text);
-
-    for (const h of list) {
-      const full = safeString(h.full);
-      const groups = h.groups || [];
-
-      if (!applyPhoneGuardIfNeeded(pack, policy, matcher, groups, full)) continue;
-
-      const sub = chooseValueSubrange(matcher, h);
-      const a = Number(h.index) + Number(sub.offsetStart || 0);
-      const b = Number(h.index) + Number(sub.offsetEnd || 0);
-
-      if (!(b > a)) continue;
-
-      const matchedText = text.slice(a, b);
-      if (!matchedText) continue;
-
-      rawHits.push({
-        id: "",
-        key: matcher.key,
-        ruleId: matcher.ruleKey,
-        source: matcher.source,
-        orderIndex: matcher.orderIndex,
-        priority: matcher.orderIndex,
-        riskLevel: getRiskLevel(policy, matcher.key),
-        placeholder: matcher.key === "manual_term" ? getPlaceholder(pack, "TERM") : matcher.placeholder,
-        matchedText,
-        replacement: matcher.key === "manual_term" ? getPlaceholder(pack, "TERM") : matcher.placeholder,
-        start: a,
-        end: b,
-        page: null,
-        rects: [],
-        meta: {
-          mode: matcher.mode || "",
-          tag: matcher.tag || "",
-          manualTerm: matcher.manualTerm || "",
-          fullMatch: full
-        }
-      });
+    // ✅ 兼容 doc / document / text 三种调用方式
+    let docInput = {};
+    if (opts && opts.doc && typeof opts.doc === "object") {
+      docInput = opts.doc;
+    } else if (opts && opts.document && typeof opts.document === "object") {
+      docInput = opts.document;
+    } else if (opts && typeof opts.text === "string") {
+      docInput = { text: opts.text };
     }
+
+    const doc = normalizeDocument(docInput);
+    const text = safeString(doc.text);
+
+    const matchers = buildRuleMatchers({
+      lang,
+      pack,
+      policy,
+      enabledKeys: opts && opts.enabledKeys,
+      moneyMode: opts && opts.moneyMode,
+      manualTerms: opts && opts.manualTerms
+    });
+
+    const rawHits = [];
+
+    for (const matcher of matchers) {
+      const list = execRegexAll(matcher.re, text);
+
+      for (const h of list) {
+        const full = safeString(h.full);
+        const groups = h.groups || [];
+
+        if (!applyPhoneGuardIfNeeded(pack, policy, matcher, groups, full)) continue;
+
+        const sub = chooseValueSubrange(matcher, h);
+        const a = Number(h.index) + Number(sub.offsetStart || 0);
+        const b = Number(h.index) + Number(sub.offsetEnd || 0);
+
+        if (!(b > a)) continue;
+
+        const matchedText = text.slice(a, b);
+        if (!matchedText) continue;
+
+        rawHits.push({
+          id: "",
+          key: matcher.key,
+          ruleId: matcher.ruleKey,
+          source: matcher.source,
+          orderIndex: matcher.orderIndex,
+          priority: matcher.orderIndex,
+          riskLevel: getRiskLevel(policy, matcher.key),
+          placeholder: matcher.key === "manual_term" ? getPlaceholder(pack, "TERM") : matcher.placeholder,
+          matchedText,
+          replacement: matcher.key === "manual_term" ? getPlaceholder(pack, "TERM") : matcher.placeholder,
+          start: a,
+          end: b,
+          page: null,
+          rects: [],
+          meta: {
+            mode: matcher.mode || "",
+            tag: matcher.tag || "",
+            manualTerm: matcher.manualTerm || "",
+            fullMatch: full
+          }
+        });
+      }
+    }
+
+    return rawHits;
   }
 
-  return rawHits;
-}
   function rangesOverlap(a, b) {
     return a.start < b.end && b.start < a.end;
   }
@@ -582,7 +711,6 @@ function collectRawHits(opts) {
   }
 
   function mergeRects(rects) {
-
     if (!Array.isArray(rects) || rects.length <= 1) {
       return rects || [];
     }
@@ -595,7 +723,6 @@ function collectRawHits(opts) {
     const merged = [];
 
     for (const r of sorted) {
-
       if (!merged.length) {
         merged.push({ ...r });
         continue;
@@ -604,20 +731,15 @@ function collectRawHits(opts) {
       const last = merged[merged.length - 1];
 
       const sameLine = Math.abs(last.y - r.y) < 3;
-      const close = r.x <= (last.x + last.w + 4);
+      const close = r.x <= last.x + last.w + 4;
 
       if (sameLine && close) {
-
         const newRight = Math.max(last.x + last.w, r.x + r.w);
         last.w = newRight - last.x;
         last.h = Math.max(last.h, r.h);
-
       } else {
-
         merged.push({ ...r });
-
       }
-
     }
 
     return merged;
@@ -627,115 +749,104 @@ function collectRawHits(opts) {
   // current pdf.js data does not carry reliable text offsets/rect alignment.
   // keep rect mapping empty for now to avoid fake precision.
   function mapHitsToPdfRects(doc, hits) {
+    const d = normalizeDocument(doc);
+    const pages = Array.isArray(d.pages) ? d.pages : [];
 
-  const d = normalizeDocument(doc);
-  const pages = Array.isArray(d.pages) ? d.pages : [];
+    if (!pages.length) return hits;
 
-  if (!pages.length) return hits;
+    // -----------------------------
+    // Build char stream → item map
+    // -----------------------------
 
-  // -----------------------------
-  // Build char stream → item map
-  // -----------------------------
+    const charMap = [];
+    let stream = "";
 
-  const charMap = [];
-  let stream = "";
+    for (const page of pages) {
+      const items = Array.isArray(page.items) ? page.items : [];
 
-  for (const page of pages) {
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        const str = safeString(it.str);
 
-    const items = Array.isArray(page.items) ? page.items : [];
+        if (!str) continue;
 
-    for (let i = 0; i < items.length; i++) {
+        for (let c = 0; c < str.length; c++) {
+          charMap.push({
+            pageNumber: page.pageNumber,
+            itemIndex: i,
+            charIndex: stream.length
+          });
 
-      const it = items[i];
-      const str = safeString(it.str);
+          stream += str[c];
+        }
 
-      if (!str) continue;
-
-      for (let c = 0; c < str.length; c++) {
-
+        // preserve spaces between items
+        stream += " ";
         charMap.push({
           pageNumber: page.pageNumber,
           itemIndex: i,
-          charIndex: stream.length
+          charIndex: stream.length - 1
         });
-
-        stream += str[c];
       }
 
-      // preserve spaces between items
-      stream += " ";
-      charMap.push({
-        pageNumber: page.pageNumber,
-        itemIndex: i,
-        charIndex: stream.length - 1
-      });
-
+      stream += "\n";
     }
 
-    stream += "\n";
+    // -----------------------------
+    // Map hits
+    // -----------------------------
+
+    return hits.map((h) => {
+      const start = Number(h.start);
+      const end = Number(h.end);
+
+      if (!(end > start)) {
+        return { ...h, page: null, rects: [] };
+      }
+
+      const itemsHit = new Map();
+
+      for (let i = start; i < end && i < charMap.length; i++) {
+        const m = charMap[i];
+        if (!m) continue;
+
+        const key = m.pageNumber + "_" + m.itemIndex;
+        itemsHit.set(key, m);
+      }
+
+      if (!itemsHit.size) {
+        return { ...h, page: null, rects: [] };
+      }
+
+      const rects = [];
+
+      itemsHit.forEach((m) => {
+        const page = pages.find((p) => p.pageNumber === m.pageNumber);
+        if (!page) return;
+
+        const item = page.items[m.itemIndex];
+        if (!item) return;
+
+        const tr = Array.isArray(item.transform) ? item.transform : [];
+
+        rects.push({
+          x: Number(tr[4]) || 0,
+          y: Number(tr[5]) || 0,
+          w: Number(item.width) || 0,
+          h: Number(item.height) || 0
+        });
+      });
+
+      const pageNumber = rects.length ? (charMap[start] ? charMap[start].pageNumber : null) : null;
+
+      return {
+        ...h,
+        page: pageNumber,
+        rects: mergeRects(rects)
+      };
+    });
   }
 
-  // -----------------------------
-  // Map hits
-  // -----------------------------
-
-  return hits.map((h) => {
-
-    const start = Number(h.start);
-    const end = Number(h.end);
-
-    if (!(end > start)) {
-      return { ...h, page: null, rects: [] };
-    }
-
-    const itemsHit = new Map();
-
-    for (let i = start; i < end && i < charMap.length; i++) {
-
-      const m = charMap[i];
-      if (!m) continue;
-
-      const key = m.pageNumber + "_" + m.itemIndex;
-      itemsHit.set(key, m);
-    }
-
-    if (!itemsHit.size) {
-      return { ...h, page: null, rects: [] };
-    }
-
-    const rects = [];
-
-    itemsHit.forEach((m) => {
-
-      const page = pages.find(p => p.pageNumber === m.pageNumber);
-      if (!page) return;
-
-      const item = page.items[m.itemIndex];
-      if (!item) return;
-
-      const tr = Array.isArray(item.transform) ? item.transform : [];
-
-      rects.push({
-        x: Number(tr[4]) || 0,
-        y: Number(tr[5]) || 0,
-        w: Number(item.width) || 0,
-        h: Number(item.height) || 0
-      });
-
-    });
-
-    const pageNumber = rects.length ? charMap[start]?.pageNumber : null;
-
-    return {
-      ...h,
-      page: pageNumber,
-      rects: mergeRects(rects)
-    };
-
-  });
-
-}
-  
   function applyHitsToText(text, hits) {
     const src = safeString(text);
     const ordered = hits.slice().sort((a, b) => a.start - b.start);
@@ -754,68 +865,92 @@ function collectRawHits(opts) {
     return out;
   }
 
-  function summarizeHits(hits) {
+  function summarizeHits(hits, textMasked) {
     const byKey = {};
+    const categoryCounts = {};
+
     for (const h of hits) {
-      byKey[h.key] = (byKey[h.key] || 0) + 1;
+      const key = safeString(h.key);
+      const cat = safeString(h.category || inferCategoryFromKey(key));
+
+      if (key) byKey[key] = (byKey[key] || 0) + 1;
+      if (cat) categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
     }
 
     return {
+      hitCount: hits.length,
+      categoryCounts,
+      maskedLength: safeString(textMasked).length,
+
+      // compat
       total: hits.length,
       byKey
     };
   }
 
   function matchDocument(opts) {
-  const lang = normLang(opts && opts.lang) || "zh";
-  const pack = (opts && opts.pack) || getPack(lang);
-  const policy = (opts && opts.policy) || getPolicy();
+    const lang = normLang(opts && opts.lang) || "zh";
+    const pack = (opts && opts.pack) || getPack(lang);
+    const policy = (opts && opts.policy) || getPolicy();
 
-  // ✅ 兼容三种入口：
-  // - matchDocument({ doc: {...} })
-  // - matchDocument({ document: {...} })
-  // - matchDocument({ text: "..." })
-  let docInput = {};
-  if (opts && opts.doc && typeof opts.doc === "object") {
-    docInput = opts.doc;
-  } else if (opts && opts.document && typeof opts.document === "object") {
-    docInput = opts.document;
-  } else if (opts && typeof opts.text === "string") {
-    docInput = { text: opts.text };
+    // ✅ 兼容三种入口：
+    // - matchDocument({ doc: {...} })
+    // - matchDocument({ document: {...} })
+    // - matchDocument({ text: "..." })
+    let docInput = {};
+    if (opts && opts.doc && typeof opts.doc === "object") {
+      docInput = opts.doc;
+    } else if (opts && opts.document && typeof opts.document === "object") {
+      docInput = opts.document;
+    } else if (opts && typeof opts.text === "string") {
+      docInput = { text: opts.text };
+    }
+
+    const doc = normalizeDocument(docInput);
+
+    const rawHits = collectRawHits({
+      lang,
+      pack,
+      policy,
+      doc,
+      enabledKeys: opts && opts.enabledKeys,
+      moneyMode: opts && opts.moneyMode,
+      manualTerms: opts && opts.manualTerms
+    });
+
+    const stableHits = assignIds(resolveConflicts(rawHits));
+    const mappedHits = mapHitsToPdfRects(doc, stableHits);
+    const protocolHits = mappedHits.map((h) => standardizeHit(h, lang, pack));
+    const textMasked = applyHitsToText(doc.text, mappedHits);
+    const summary = summarizeHits(protocolHits, textMasked);
+
+    return {
+      version: "match-result-v1",
+      source: "matcher-core",
+      lang: normLang(lang) || "unknown",
+
+      input: {
+        textKind: doc.pages && doc.pages.length ? "page-text" : "plain",
+        textLength: safeString(doc.text).length
+      },
+
+      summary,
+      hits: protocolHits,
+      textMasked,
+
+      // compat
+      byKey: summary.byKey,
+
+      debug: {
+        version: VERSION,
+        lang,
+        rawHitCount: rawHits.length,
+        finalHitCount: protocolHits.length,
+        hasPdfPages: Array.isArray(doc.pages) && doc.pages.length > 0
+      }
+    };
   }
 
-  const doc = normalizeDocument(docInput);
-
-  const rawHits = collectRawHits({
-    lang,
-    pack,
-    policy,
-    doc,
-    enabledKeys: opts && opts.enabledKeys,
-    moneyMode: opts && opts.moneyMode,
-    manualTerms: opts && opts.manualTerms
-  });
-
-  const stableHits = assignIds(resolveConflicts(rawHits));
-  const hits = mapHitsToPdfRects(doc, stableHits);
-  const textMasked = applyHitsToText(doc.text, hits);
-  const summary = summarizeHits(hits);
-
-  return {
-    hits,
-    byKey: summary.byKey,
-    textMasked,
-    summary,
-    debug: {
-      version: VERSION,
-      lang,
-      rawHitCount: rawHits.length,
-      finalHitCount: hits.length,
-      hasPdfPages: Array.isArray(doc.pages) && doc.pages.length > 0
-    }
-  };
-}
-  
   window[NS] = {
     version: VERSION,
     normLang,
@@ -823,6 +958,7 @@ function collectRawHits(opts) {
     buildRuleMatchers,
     collectRawHits,
     matchDocument,
+    match: matchDocument,
     applyHitsToText
   };
 })();
