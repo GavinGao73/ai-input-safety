@@ -170,6 +170,38 @@
     };
   }
 
+  function getMergeCfg(tuning) {
+    const m = (tuning && tuning.merge) || {};
+    return {
+      nearGapLegacy: Number(m.nearGapLegacy || 1.2),
+      nearGapCore: Number(m.nearGapCore || 1.2),
+      sameLineOverlapRatio: Number(m.sameLineOverlapRatio || 0.88),
+      similarHeightRatio: Number(m.similarHeightRatio || 0.80)
+    };
+  }
+
+  function getItemBoxCfg(tuning) {
+    const cfg = (tuning && tuning.itemBox) || {};
+    return {
+      fontHeightMul: Number(cfg.fontHeightMul || 1.08),
+      fontHeightMin: Number(cfg.fontHeightMin || 6),
+      fontHeightMax: Number(cfg.fontHeightMax || 96),
+      widthEstMul: Number(cfg.widthEstMul || 0.72),
+      shortTokenCap: Number(cfg.shortTokenCap || 1.10),
+      hardCap: Number(cfg.hardCap || 1.18)
+    };
+  }
+
+  function getRectBoxCfg(tuning) {
+    const cfg = (tuning && tuning.rectBox) || {};
+    return {
+      fontHeightMul: Number(cfg.fontHeightMul || 1.10),
+      fontHeightMin: Number(cfg.fontHeightMin || 6),
+      fontHeightMax: Number(cfg.fontHeightMax || 104),
+      widthEstMul: Number(cfg.widthEstMul || 0.82)
+    };
+  }
+
   function uiLang() {
     const l = String(window.currentLang || "").toLowerCase();
     return (l === "de" || l === "en" || l === "zh") ? l : "zh";
@@ -744,9 +776,12 @@
     return [];
   }
 
-  function buildItemBoxes(pdfjsLib, viewport, textContentOrItems) {
+  function buildItemBoxes(pdfjsLib, viewport, textContentOrItems, lang) {
     const items = getItemsArray(textContentOrItems);
     if (!items.length || !pdfjsLib || !pdfjsLib.Util || !viewport) return [];
+
+    const tuning = getLangTuning(lang);
+    const itemBoxCfg = getItemBoxCfg(tuning);
 
     const Util = pdfjsLib.Util;
     const out = [];
@@ -770,7 +805,11 @@
           Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
           10;
       }
-      fontH = clamp(fontH * 1.08, 6, 96);
+      fontH = clamp(
+        fontH * itemBoxCfg.fontHeightMul,
+        itemBoxCfg.fontHeightMin,
+        itemBoxCfg.fontHeightMax
+      );
 
       const s = String(it.str || "");
       const textLen = Math.max(1, s.length);
@@ -781,26 +820,23 @@
         if (Number.isFinite(iw) && iw > 0) w = iw * sx;
       } catch (_) {}
 
-      const est = Math.max(8, textLen * fontH * 0.72);
+      const est = Math.max(8, textLen * fontH * itemBoxCfg.widthEstMul);
 
       if (!Number.isFinite(w) || w <= 0) {
         w = est;
       }
 
-      // ✅ 收紧 item bbox：不要像 redaction bbox 那样保守
-      // 目标：蓝框更接近真实字宽，而不是“可能宽度”
-      const hardCap = est * 1.18;
+      const hardCap = est * itemBoxCfg.hardCap;
       if (w > hardCap) w = hardCap;
 
-      // 对非常短的 token 再保守一点
       if (textLen <= 4) {
-        w = Math.min(w, est * 1.10);
+        w = Math.min(w, est * itemBoxCfg.shortTokenCap);
       }
 
       let rx = clamp(x, 0, viewport.width);
       let ry = clamp(y - fontH, 0, viewport.height);
       let rw = clamp(w, 1, viewport.width - rx);
-      let rh = clamp(fontH, 6, viewport.height - ry);
+      let rh = clamp(fontH, itemBoxCfg.fontHeightMin, viewport.height - ry);
 
       if (!Number.isFinite(rx + ry + rw + rh)) continue;
       if (rw <= 0 || rh <= 0) continue;
@@ -1165,6 +1201,8 @@
   function textItemsToRectsFromSpans(pdfjsLib, viewport, textContentOrItems, spans, lang) {
     const Util = pdfjsLib.Util;
     const tuning = getLangTuning(lang);
+    const mergeCfg = getMergeCfg(tuning);
+    const rectBoxCfg = getRectBoxCfg(tuning);
 
     const { items, itemRanges } = buildPageTextAndRangesFromItems(textContentOrItems);
     if (!items.length || !Array.isArray(spans) || !spans.length) return [];
@@ -1204,7 +1242,11 @@
           Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
           10;
       }
-      fontH = clamp(fontH * 1.10, 6, 104);
+      fontH = clamp(
+        fontH * rectBoxCfg.fontHeightMul,
+        rectBoxCfg.fontHeightMin,
+        rectBoxCfg.fontHeightMax
+      );
 
       const s = String(it.str || "");
       const textLen = Math.max(1, s.length);
@@ -1215,7 +1257,7 @@
         if (Number.isFinite(iw) && iw > 0) w = iw * sx;
       } catch (_) {}
 
-      const est = Math.max(10, textLen * fontH * 0.82);
+      const est = Math.max(10, textLen * fontH * rectBoxCfg.widthEstMul);
 
       if (!Number.isFinite(w) || w <= 0) {
         w = est;
@@ -1443,13 +1485,13 @@
 
       const overlap = Math.max(0, Math.min(lBot, rBot) - Math.max(lTop, rTop));
       const minH = Math.max(1, Math.min(last.h, r.h));
-      const sameLine = (overlap / minH) > 0.88;
+      const sameLine = (overlap / minH) > mergeCfg.sameLineOverlapRatio;
 
       const heightRatio = Math.min(last.h, r.h) / Math.max(last.h, r.h);
-      const similarHeight = heightRatio > 0.80;
+      const similarHeight = heightRatio > mergeCfg.similarHeightRatio;
 
       const gap = r.x - (last.x + last.w);
-      const near = gap >= 0 && gap <= 1.2;
+      const near = gap >= 0 && gap <= mergeCfg.nearGapCore;
 
       if (sameKey && sameLine && similarHeight && near) {
         const nx = Math.min(last.x, r.x);
@@ -1519,6 +1561,8 @@
   function textItemsToRects(pdfjsLib, viewport, textContentOrItems, matchers, lang) {
     const Util = pdfjsLib.Util;
     const tuning = getLangTuning(lang);
+    const mergeCfg = getMergeCfg(tuning);
+    const rectBoxCfg = getRectBoxCfg(tuning);
 
     const items =
       Array.isArray(textContentOrItems) ? textContentOrItems :
@@ -1586,7 +1630,11 @@
           Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
           10;
       }
-      fontH = clamp(fontH * 1.10, 6, 104);
+      fontH = clamp(
+        fontH * rectBoxCfg.fontHeightMul,
+        rectBoxCfg.fontHeightMin,
+        rectBoxCfg.fontHeightMax
+      );
 
       const s = String(it.str || "");
       const textLen = Math.max(1, s.length);
@@ -1597,7 +1645,7 @@
         if (Number.isFinite(iw) && iw > 0) w = iw * sx;
       } catch (_) {}
 
-      const est = Math.max(10, textLen * fontH * 0.82);
+      const est = Math.max(10, textLen * fontH * rectBoxCfg.widthEstMul);
 
       if (!Number.isFinite(w) || w <= 0) {
         w = est;
@@ -1950,13 +1998,13 @@
 
       const overlap = Math.max(0, Math.min(lBot, rBot) - Math.max(lTop, rTop));
       const minH = Math.max(1, Math.min(last.h, r.h));
-      const sameLine = (overlap / minH) > 0.88;
+      const sameLine = (overlap / minH) > mergeCfg.sameLineOverlapRatio;
 
       const heightRatio = Math.min(last.h, r.h) / Math.max(last.h, r.h);
-      const similarHeight = heightRatio > 0.80;
+      const similarHeight = heightRatio > mergeCfg.similarHeightRatio;
 
       const gap = r.x - (last.x + last.w);
-      const near = gap >= 0 && gap <= 1.2;
+      const near = gap >= 0 && gap <= mergeCfg.nearGapLegacy;
 
       if (sameKey && sameLine && similarHeight && near) {
         const nx = Math.min(last.x, r.x);
@@ -2064,7 +2112,7 @@
         rectSource = "legacy-regex";
       }
 
-      const itemBoxes = buildItemBoxes(pdfjsLib, p.viewport, itemsOrTextContent);
+      const itemBoxes = buildItemBoxes(pdfjsLib, p.viewport, itemsOrTextContent, lang);
       const pageDebug = {
         pageNumber: p.pageNumber,
         rects: Array.isArray(rects) ? rects.slice() : [],
