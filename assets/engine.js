@@ -1184,8 +1184,10 @@ function applyRules(text) {
       };
     } catch (_) {}
 
+    window.__ENGINE_PRIMARY_SOURCE = "matcher-core";
     window.__ENGINE_PRIMARY_SOURCE__ = "matcher-core";
     window.__lastOutputPlain = matchResult.textMasked;
+    window.lastOutputPlain = matchResult.textMasked;
     renderOutput(matchResult.textMasked);
     renderRiskBox(report, {
       hits: hitCount,
@@ -1219,8 +1221,10 @@ function applyRules(text) {
       };
     } catch (_) {}
 
+    window.__ENGINE_PRIMARY_SOURCE = "legacy-fallback";
     window.__ENGINE_PRIMARY_SOURCE__ = "legacy-fallback";
     window.__lastOutputPlain = out;
+    window.lastOutputPlain = out;
     renderOutput(out);
     renderRiskBox(report, {
       hits,
@@ -1379,8 +1383,10 @@ function applyRules(text) {
     };
   } catch (_) {}
 
+  window.__ENGINE_PRIMARY_SOURCE = "legacy-fallback";
   window.__ENGINE_PRIMARY_SOURCE__ = "legacy-fallback";
   window.__lastOutputPlain = out;
+  window.lastOutputPlain = out;
   renderOutput(out);
   renderRiskBox(report, {
     hits,
