@@ -1,34 +1,25 @@
 // =========================
 // assets/matcher-core.js
-// PHASE 1 — MINIMAL SAFE MATCH CORE
+// v20260308-matchresult-v2-slim-page-only
 //
-// GOAL
-// - Extract matching into a pure core module
-// - Reuse current pack/policy structures WITHOUT changing existing engine/export logic
-// - NO DOM / NO UI / NO export / NO file handling side effects
+// PURE MATCH CORE
+// - text hits
+// - masked text
+// - byKey summary
+// - page assignment
+// - NO authoritative rect geometry
 //
-// IMPORTANT
-// - Compatible with current project reality:
-//   - pack.rules is an OBJECT MAP, not an array
-//   - pack.priority is an ORDER ARRAY
-//   - pack.alwaysOn + policy.baseAlwaysOn both matter
-//   - pdf.js pagesItems currently contain only:
-//       { pageNumber, items:[ { str, transform, width, height } ] }
-//   - NO stable text start/end mapping exists yet between pretty text and PDF items
-//
-// CURRENT PHASE LIMIT
-// - text hits: YES
-// - masked text: YES
-// - byKey summary: YES
-// - rect mapping: NOT authoritative yet (returns empty rects for now)
-// - this file is for parallel verification first
+// BOUNDARY
+// - matcher-core: hit generation / conflict resolution / text masking / page mapping
+// - raster-core: hit -> rect mapping
+// - raster-export: render/export pipeline
 // =========================
 
 (function () {
   "use strict";
 
   const NS = "__MATCHER_CORE__";
-  const VERSION = "v20260308-matchresult-v1";
+  const VERSION = "v20260308-matchresult-v2-slim-page-only";
 
   function normLang(l) {
     const s = String(l || "").toLowerCase();
@@ -40,20 +31,11 @@
   }
 
   function asSet(v) {
-    if (v instanceof Set) return v;
-    return new Set(asArray(v));
+    return v instanceof Set ? v : new Set(asArray(v));
   }
 
   function safeString(v) {
     return typeof v === "string" ? v : (v == null ? "" : String(v));
-  }
-
-  function cloneSimple(obj) {
-    try {
-      return JSON.parse(JSON.stringify(obj));
-    } catch (_) {
-      return {};
-    }
   }
 
   function escapeRegExp(s) {
@@ -296,7 +278,7 @@
         manualTerm: safeString(h && h.meta && h.meta.manualTerm),
         fullMatch: safeString(h && h.meta && h.meta.fullMatch)
       },
-      rects: Array.isArray(h.rects) ? h.rects.slice(0) : []
+      rects: []
     };
   }
 
@@ -308,25 +290,17 @@
     const alwaysOn = getAlwaysOnSet(pack, policy);
     alwaysOn.forEach((k) => out.add(k));
 
-    // keep current product behavior compatibility
     out.add("company");
-
     return out;
   }
 
   function normalizeDocument(input) {
     const d = input && typeof input === "object" ? input : {};
-
-    // 兼容三种入口：
-    // 1) { text: "..." }
-    // 2) { document: {...} } -> 外层已经拆掉的话也没关系
-    // 3) { pages: [{ pageNumber, text, items }] }
     const text = safeString(d.text);
 
     const rawPages = asArray(d.pages);
     const pages = rawPages.map((page, idx) => {
       const pageNumber = Number(page && page.pageNumber) || idx + 1;
-
       const pageText = safeString(page && page.text);
 
       const items = asArray(page && page.items).map((it) => ({
@@ -344,19 +318,15 @@
       };
     });
 
-    // 如果顶层 text 为空，但 pages 里有 text，就拼起来
     let mergedText = text;
     if (!mergedText && pages.length) {
-      mergedText = pages
-        .map((p) => safeString(p.text))
-        .filter(Boolean)
-        .join("\n\n");
+      mergedText = pages.map((p) => safeString(p.text)).filter(Boolean).join("\n\n");
     }
 
     return {
       text: mergedText,
       pages,
-      meta: cloneSimple(d.meta || {})
+      meta: d && typeof d.meta === "object" ? d.meta : {}
     };
   }
 
@@ -366,13 +336,11 @@
 
     for (const raw of asArray(manualTerms)) {
       const term = safeString(raw).trim();
-      if (!term) continue;
+      if (!term || term.length > 80) continue;
 
       const k = term.toLowerCase();
       if (seen.has(k)) continue;
       seen.add(k);
-
-      if (term.length > 80) continue;
 
       const hasCjk = /[\u4E00-\u9FFF]/.test(term);
       const re0 = hasCjk ? makeCjkLooseRegex(term) : makeLatinExactRegex(term);
@@ -407,8 +375,6 @@
     const manualTerms = asArray(opts && opts.manualTerms);
 
     const matchers = [];
-
-    // manual terms first
     matchers.push(...buildManualMatchers(manualTerms));
 
     for (let i = 0; i < priority.length; i += 1) {
@@ -417,8 +383,8 @@
 
       if (key === "money") {
         if (moneyMode === "off") continue;
-      } else {
-        if (!enabled.has(key)) continue;
+      } else if (!enabled.has(key)) {
+        continue;
       }
 
       const rule = rules[key];
@@ -477,7 +443,6 @@
 
     if (!full) return { offsetStart: 0, offsetEnd: 0 };
 
-    // manual term:
     if (key === "manual_term") {
       const g2 = groups[2] != null ? String(groups[2]) : "";
       const g1 = groups[1] != null ? String(groups[1]) : "";
@@ -487,15 +452,11 @@
       return { offsetStart: 0, offsetEnd: full.length };
     }
 
-    // prefix-like modes: keep label, mask value
     if (mode === "prefix") {
       const label = groups[1] != null ? String(groups[1]) : "";
       const val = groups[2] != null ? String(groups[2]) : "";
       if (label || val) {
-        return {
-          offsetStart: label.length,
-          offsetEnd: label.length + val.length
-        };
+        return { offsetStart: label.length, offsetEnd: label.length + val.length };
       }
     }
 
@@ -503,10 +464,7 @@
       const label = groups[1] != null ? String(groups[1]) : "";
       const toMask = groups[2] != null ? String(groups[2]) : "";
       if (label || toMask) {
-        return {
-          offsetStart: label.length,
-          offsetEnd: label.length + toMask.length
-        };
+        return { offsetStart: label.length, offsetEnd: label.length + toMask.length };
       }
     }
 
@@ -530,7 +488,6 @@
       }
     }
 
-    // default: whole match
     return { offsetStart: 0, offsetEnd: full.length };
   }
 
@@ -567,15 +524,10 @@
     const pack = (opts && opts.pack) || getPack(lang);
     const policy = (opts && opts.policy) || getPolicy();
 
-    // ✅ 兼容 doc / document / text 三种调用方式
     let docInput = {};
-    if (opts && opts.doc && typeof opts.doc === "object") {
-      docInput = opts.doc;
-    } else if (opts && opts.document && typeof opts.document === "object") {
-      docInput = opts.document;
-    } else if (opts && typeof opts.text === "string") {
-      docInput = { text: opts.text };
-    }
+    if (opts && opts.doc && typeof opts.doc === "object") docInput = opts.doc;
+    else if (opts && opts.document && typeof opts.document === "object") docInput = opts.document;
+    else if (opts && typeof opts.text === "string") docInput = { text: opts.text };
 
     const doc = normalizeDocument(docInput);
     const text = safeString(doc.text);
@@ -642,27 +594,20 @@
   }
 
   function choosePreferred(a, b) {
-    // FIX: email 优先级高于 domain/url，避免 example.com 被重复命中
     if (a.key === "email" && (b.key === "domain" || b.key === "url")) return a;
     if (b.key === "email" && (a.key === "domain" || a.key === "url")) return b;
 
-    // manual term always wins
     if (a.source === "manual" && b.source !== "manual") return a;
     if (b.source === "manual" && a.source !== "manual") return b;
 
-    // lower orderIndex = earlier in priority list = higher precedence
     if (a.orderIndex !== b.orderIndex) {
       return a.orderIndex < b.orderIndex ? a : b;
     }
 
-    // shorter span preferred when conflict remains (more precise)
     const lenA = a.end - a.start;
     const lenB = b.end - b.start;
     if (lenA !== lenB) return lenA < lenB ? a : b;
-
-    // earlier start wins for stability
     if (a.start !== b.start) return a.start < b.start ? a : b;
-
     return a;
   }
 
@@ -710,139 +655,57 @@
     }));
   }
 
-  function mergeRects(rects) {
-    if (!Array.isArray(rects) || rects.length <= 1) {
-      return rects || [];
-    }
-
-    const sorted = rects.slice().sort((a, b) => {
-      if (Math.abs(a.y - b.y) > 2) return a.y - b.y;
-      return a.x - b.x;
-    });
-
-    const merged = [];
-
-    for (const r of sorted) {
-      if (!merged.length) {
-        merged.push({ ...r });
-        continue;
-      }
-
-      const last = merged[merged.length - 1];
-
-      const sameLine = Math.abs(last.y - r.y) < 3;
-      const close = r.x <= last.x + last.w + 4;
-
-      if (sameLine && close) {
-        const newRight = Math.max(last.x + last.w, r.x + r.w);
-        last.w = newRight - last.x;
-        last.h = Math.max(last.h, r.h);
-      } else {
-        merged.push({ ...r });
-      }
-    }
-
-    return merged;
+  function buildPageTextFromItems(items) {
+    return asArray(items)
+      .map((it) => safeString(it && it.str))
+      .filter(Boolean)
+      .join(" ");
   }
 
-  // PHASE 1:
-  // current pdf.js data does not carry reliable text offsets/rect alignment.
-  // keep rect mapping empty for now to avoid fake precision.
-  function mapHitsToPdfRects(doc, hits) {
+  function assignPagesFromDoc(doc, hits) {
     const d = normalizeDocument(doc);
     const pages = Array.isArray(d.pages) ? d.pages : [];
-
-    if (!pages.length) return hits;
-
-    // -----------------------------
-    // Build char stream → item map
-    // -----------------------------
-
-    const charMap = [];
-    let stream = "";
-
-    for (const page of pages) {
-      const items = Array.isArray(page.items) ? page.items : [];
-
-      for (let i = 0; i < items.length; i++) {
-        const it = items[i];
-        const str = safeString(it.str);
-
-        if (!str) continue;
-
-        for (let c = 0; c < str.length; c++) {
-          charMap.push({
-            pageNumber: page.pageNumber,
-            itemIndex: i,
-            charIndex: stream.length
-          });
-
-          stream += str[c];
-        }
-
-        // preserve spaces between items
-        stream += " ";
-        charMap.push({
-          pageNumber: page.pageNumber,
-          itemIndex: i,
-          charIndex: stream.length - 1
-        });
-      }
-
-      stream += "\n";
+    if (!pages.length) {
+      return hits.map((h) => ({ ...h, page: null, rects: [] }));
     }
 
-    // -----------------------------
-    // Map hits
-    // -----------------------------
+    const segments = [];
+    let cursor = 0;
 
-    return hits.map((h) => {
-      const start = Number(h.start);
-      const end = Number(h.end);
+    for (let i = 0; i < pages.length; i += 1) {
+      const p = pages[i];
+      let pageText = safeString(p && p.text);
+      if (!pageText) pageText = buildPageTextFromItems(p && p.items);
 
-      if (!(end > start)) {
-        return { ...h, page: null, rects: [] };
-      }
+      const start = cursor;
+      const end = start + pageText.length;
 
-      const itemsHit = new Map();
-
-      for (let i = start; i < end && i < charMap.length; i++) {
-        const m = charMap[i];
-        if (!m) continue;
-
-        const key = m.pageNumber + "_" + m.itemIndex;
-        itemsHit.set(key, m);
-      }
-
-      if (!itemsHit.size) {
-        return { ...h, page: null, rects: [] };
-      }
-
-      const rects = [];
-
-      itemsHit.forEach((m) => {
-        const page = pages.find((p) => p.pageNumber === m.pageNumber);
-        if (!page) return;
-
-        const item = page.items[m.itemIndex];
-        if (!item) return;
-
-        const tr = Array.isArray(item.transform) ? item.transform : [];
-
-        rects.push({
-          x: Number(tr[4]) || 0,
-          y: Number(tr[5]) || 0,
-          w: Number(item.width) || 0,
-          h: Number(item.height) || 0
-        });
+      segments.push({
+        pageNumber: Number(p && p.pageNumber) || i + 1,
+        start,
+        end
       });
 
-      const pageNumber = rects.length ? (charMap[start] ? charMap[start].pageNumber : null) : null;
+      cursor = end;
+      if (i < pages.length - 1) cursor += 2;
+    }
+
+    return hits.map((h) => {
+      const hs = Number(h.start) || 0;
+      const he = Number(h.end) || 0;
+
+      let page = null;
+      for (const seg of segments) {
+        if (hs < seg.end && he > seg.start) {
+          page = seg.pageNumber;
+          break;
+        }
+      }
 
       return {
         ...h,
-        page: pageNumber,
-        rects: mergeRects(rects)
+        page,
+        rects: []
       };
     });
   }
@@ -881,8 +744,6 @@
       hitCount: hits.length,
       categoryCounts,
       maskedLength: safeString(textMasked).length,
-
-      // compat
       total: hits.length,
       byKey
     };
@@ -893,21 +754,12 @@
     const pack = (opts && opts.pack) || getPack(lang);
     const policy = (opts && opts.policy) || getPolicy();
 
-    // ✅ 兼容三种入口：
-    // - matchDocument({ doc: {...} })
-    // - matchDocument({ document: {...} })
-    // - matchDocument({ text: "..." })
     let docInput = {};
-    if (opts && opts.doc && typeof opts.doc === "object") {
-      docInput = opts.doc;
-    } else if (opts && opts.document && typeof opts.document === "object") {
-      docInput = opts.document;
-    } else if (opts && typeof opts.text === "string") {
-      docInput = { text: opts.text };
-    }
+    if (opts && opts.doc && typeof opts.doc === "object") docInput = opts.doc;
+    else if (opts && opts.document && typeof opts.document === "object") docInput = opts.document;
+    else if (opts && typeof opts.text === "string") docInput = { text: opts.text };
 
     const doc = normalizeDocument(docInput);
-
     const rawHits = collectRawHits({
       lang,
       pack,
@@ -919,28 +771,23 @@
     });
 
     const stableHits = assignIds(resolveConflicts(rawHits));
-    const mappedHits = mapHitsToPdfRects(doc, stableHits);
-    const protocolHits = mappedHits.map((h) => standardizeHit(h, lang, pack));
-    const textMasked = applyHitsToText(doc.text, mappedHits);
+    const pagedHits = assignPagesFromDoc(doc, stableHits);
+    const protocolHits = pagedHits.map((h) => standardizeHit(h, lang, pack));
+    const textMasked = applyHitsToText(doc.text, pagedHits);
     const summary = summarizeHits(protocolHits, textMasked);
 
     return {
       version: "match-result-v1",
       source: "matcher-core",
       lang: normLang(lang) || "unknown",
-
       input: {
         textKind: doc.pages && doc.pages.length ? "page-text" : "plain",
         textLength: safeString(doc.text).length
       },
-
       summary,
       hits: protocolHits,
       textMasked,
-
-      // compat
       byKey: summary.byKey,
-
       debug: {
         version: VERSION,
         lang,
