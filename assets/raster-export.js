@@ -31,6 +31,14 @@
     return window.__RASTER_CORE__ || null;
   }
 
+  function getMatcherCore() {
+    const mc = window.__MATCHER_CORE__ || null;
+    if (!mc) return null;
+    if (typeof mc.match === "function") return mc;
+    if (typeof mc.matchDocument === "function") return mc;
+    return null;
+  }
+  
   function uiLang() {
     const l = String(window.currentLang || "").toLowerCase();
     return (l === "de" || l === "en" || l === "zh") ? l : "zh";
@@ -443,6 +451,25 @@
     }));
   }
 
+  function buildMatcherDocFromCachedPages(cachedPages) {
+    const pages = Array.isArray(cachedPages) ? cachedPages : [];
+    return {
+      pages: pages.map((p, idx) => ({
+        pageNumber: Number(p && p.pageNumber) || (idx + 1),
+        items: Array.isArray(p && p.items)
+          ? p.items.map((it) => ({
+              str: it && it.str != null ? String(it.str) : "",
+              transform: Array.isArray(it && it.transform) ? it.transform.slice(0, 6) : [1, 0, 0, 1, 0, 0],
+              width: Number(it && it.width) || 0,
+              height: Number(it && it.height) || 0,
+              hasEOL: !!(it && it.hasEOL)
+            }))
+          : []
+      })),
+      meta: { fromPdf: true }
+    };
+  }
+  
   async function autoRedactReadablePdf({ file, lang, enabledKeys, moneyMode, dpi, manualTerms }) {
     setRasterPhase("autoRedactReadablePdf:begin", null);
 
@@ -477,6 +504,35 @@
 
     const cached = getCachedPagesItems();
 
+    const matcherCore = getMatcherCore();
+    let unifiedMatchResult = null;
+
+    try {
+      if (matcherCore && Array.isArray(cached) && cached.length) {
+        const doc = buildMatcherDocFromCachedPages(cached);
+        const fn = typeof matcherCore.match === "function" ? matcherCore.match : matcherCore.matchDocument;
+        unifiedMatchResult = fn.call(matcherCore, {
+          doc,
+          lang,
+          enabledKeys,
+          moneyMode,
+          manualTerms
+        });
+      }
+    } catch (e) {
+      unifiedMatchResult = null;
+    }
+
+    try {
+      const last = window.__RasterExportLast || {};
+      window.__RasterExportLast = Object.assign({}, last, {
+        matcherCoreMain: !!unifiedMatchResult,
+        matcherCoreMainHitCount: Array.isArray(unifiedMatchResult && unifiedMatchResult.hits)
+          ? unifiedMatchResult.hits.length
+          : 0
+      });
+    } catch (_) {}
+    
     for (const p of pages) {
       setRasterPhase("autoRedactReadablePdf:page", `p${p.pageNumber}`);
 
@@ -495,7 +551,7 @@
 
       setRasterPhase("autoRedactReadablePdf:match", `p${p.pageNumber}`);
 
-      let rects = [];
+            let rects = [];
       let rectSource = "legacy-regex";
       let coreHitCount = 0;
       let coreFailed = false;
@@ -505,35 +561,56 @@
       let coreSummary = null;
 
       try {
-        const coreRes = rc.tryMatcherCoreRectsForPage({
-          pdfjsLib,
-          viewport: p.viewport,
-          itemsOrTextContent,
-          pageNumber: p.pageNumber,
-          lang,
-          enabledKeys,
-          moneyMode,
-          manualTerms
-        });
+        if (unifiedMatchResult && typeof rc.mapMatchResultPageToRects === "function") {
+          const mapped = rc.mapMatchResultPageToRects({
+            pdfjsLib,
+            viewport: p.viewport,
+            itemsOrTextContent,
+            matchResult: unifiedMatchResult,
+            pageNumber: p.pageNumber,
+            lang
+          });
 
-        if (coreRes && coreRes.ok) {
-          rects = Array.isArray(coreRes.rects) ? coreRes.rects : [];
-          rectSource = coreRes.source || "matcher-core";
-          coreHitCount = Number(coreRes.hitCount || 0);
-          coreSpans = Array.isArray(coreRes.spans) ? coreRes.spans : [];
-          coreDebug = coreRes.debug || null;
-          coreSummary = coreRes.summary || null;
+          rects = Array.isArray(mapped && mapped.rects) ? mapped.rects : [];
+          coreSpans = Array.isArray(mapped && mapped.spans) ? mapped.spans : [];
+          rectSource = "matcher-core";
+          coreHitCount = coreSpans.length;
+          coreSummary = unifiedMatchResult && unifiedMatchResult.summary ? unifiedMatchResult.summary : null;
+          coreDebug = {
+            mode: "match-result-main",
+            pageNumber: p.pageNumber
+          };
         } else {
-          rects = rc.textItemsToRects(pdfjsLib, p.viewport, itemsOrTextContent, matchers, lang);
-          rectSource = "legacy-regex";
+          const coreRes = rc.tryMatcherCoreRectsForPage({
+            pdfjsLib,
+            viewport: p.viewport,
+            itemsOrTextContent,
+            pageNumber: p.pageNumber,
+            lang,
+            enabledKeys,
+            moneyMode,
+            manualTerms
+          });
+
+          if (coreRes && coreRes.ok) {
+            rects = Array.isArray(coreRes.rects) ? coreRes.rects : [];
+            rectSource = coreRes.source || "matcher-core";
+            coreHitCount = Number(coreRes.hitCount || 0);
+            coreSpans = Array.isArray(coreRes.spans) ? coreRes.spans : [];
+            coreDebug = coreRes.debug || null;
+            coreSummary = coreRes.summary || null;
+          } else {
+            rects = rc.textItemsToRects(pdfjsLib, p.viewport, itemsOrTextContent, matchers, lang);
+            rectSource = "legacy-fallback";
+          }
         }
       } catch (e) {
         coreFailed = true;
         coreError = e && e.message ? String(e.message) : "matcher-core-error";
         rects = rc.textItemsToRects(pdfjsLib, p.viewport, itemsOrTextContent, matchers, lang);
-        rectSource = "legacy-regex";
+        rectSource = "legacy-fallback";
       }
-
+      
       const itemBoxes = rc.buildItemBoxes(pdfjsLib, p.viewport, itemsOrTextContent, lang);
       const pageDebug = {
         pageNumber: p.pageNumber,
