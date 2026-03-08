@@ -581,6 +581,48 @@ function collectRawHits(opts) {
     }));
   }
 
+  function mergeRects(rects) {
+
+    if (!Array.isArray(rects) || rects.length <= 1) {
+      return rects || [];
+    }
+
+    const sorted = rects.slice().sort((a, b) => {
+      if (Math.abs(a.y - b.y) > 2) return a.y - b.y;
+      return a.x - b.x;
+    });
+
+    const merged = [];
+
+    for (const r of sorted) {
+
+      if (!merged.length) {
+        merged.push({ ...r });
+        continue;
+      }
+
+      const last = merged[merged.length - 1];
+
+      const sameLine = Math.abs(last.y - r.y) < 3;
+      const close = r.x <= (last.x + last.w + 4);
+
+      if (sameLine && close) {
+
+        const newRight = Math.max(last.x + last.w, r.x + r.w);
+        last.w = newRight - last.x;
+        last.h = Math.max(last.h, r.h);
+
+      } else {
+
+        merged.push({ ...r });
+
+      }
+
+    }
+
+    return merged;
+  }
+
   // PHASE 1:
   // current pdf.js data does not carry reliable text offsets/rect alignment.
   // keep rect mapping empty for now to avoid fake precision.
@@ -687,7 +729,7 @@ function collectRawHits(opts) {
     return {
       ...h,
       page: pageNumber,
-      rects
+      rects: mergeRects(rects)
     };
 
   });
