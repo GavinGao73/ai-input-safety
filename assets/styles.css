@@ -239,76 +239,6 @@ textarea{
 }
 
 /* ===== overlay layer: align to textarea content box ===== */
-.input-overlay{
-  position:absolute;
-
-  /* 和 textarea 的 padding 完全一致，不再用 inset:0 */
-  left:12px;
-  right:12px;
-  top:12px;
-  bottom:12px;
-
-  padding:0;
-  border-radius:0;
-
-  pointer-events:none;
-
-  overflow-x:auto;
-  overflow-y:auto;
-
-  white-space:pre;
-  overflow-wrap:normal;
-  word-break:normal;
-
-  /* 和 textarea 保持一致 */
-  font:inherit;
-  line-height:inherit;
-  letter-spacing:inherit;
-
-  /* overlay 文字透明，只显示命中背景 */
-  color:transparent;
-  -webkit-text-fill-color:transparent;
-
-  background:transparent;
-}
-
-.output{
-  width:100%;
-  height:320px;
-  max-height:320px;
-  background:var(--box-bg);
-  border:1px solid var(--box-bd);
-  border-radius:12px;
-  padding:12px;
-
-  white-space:pre-wrap;
-  overflow:auto;
-  min-width:0;
-}
-
-.hl{
-  background: rgba(255, 92, 92, 0.14);
-  border: 1px solid rgba(255, 92, 92, 0.35);
-  color: rgba(255,255,255,.96);
-  padding: 1px 6px;
-  border-radius: 999px;
-}
-
-/* ✅ 命中高亮：不改变布局尺寸 */
-.hit{
-  background: rgba(255, 92, 92, 0.18);
-  outline: 1px solid rgba(255, 92, 92, 0.40);
-  outline-offset: 0;
-  border: 0 !important;
-  padding: 0 !important;
-  border-radius: 6px;
-
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
-}
 
 .tiny{ font-size:11px; line-height:1.45; }
 .muted{ color:var(--muted); }
@@ -336,13 +266,16 @@ textarea{
 }
 #inputWrap.has-content .input-watermark{ display:none; }
 
-/* Overlay: visible only as highlight layer, text itself stays transparent */
+/* Overlay: highlight layer only; must align exactly with textarea text flow */
 .input-overlay{
   display:none;
   position:absolute;
-  left:12px; right:12px; top:12px; bottom:12px;
+  left:12px;
+  right:12px;
+  top:12px;
+  bottom:12px;
   padding:0;
-  border-radius:10px;
+  border-radius:0;
 
   overflow:auto;
   scrollbar-width:none;
@@ -354,14 +287,23 @@ textarea{
 
   pointer-events:none;
 
-  /* ✅ overlay text invisible, so no ghosting */
+  /* keep layout identical to textarea */
+  font: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+
+  /* overlay text invisible; only highlight boxes should be visible */
   color: transparent;
   -webkit-text-fill-color: transparent;
   background: transparent;
 }
-.input-overlay::-webkit-scrollbar{ width:0; height:0; }
 
-/* ✅ when PDF overlay mode is on, show overlay highlight layer */
+.input-overlay::-webkit-scrollbar{
+  width:0;
+  height:0;
+}
+
+/* PDF overlay mode ON */
 #inputWrap.pdf-overlay-on .input-overlay{
   display:block;
 }
@@ -377,22 +319,21 @@ textarea{
   color: inherit;
 }
 
-/* ✅ only highlight boxes are visible */
+/* highlight boxes: visible, but must NOT change layout */
 .hit{
+  display:inline;
   background: rgba(255, 92, 92, 0.18);
-  border-radius: 6px;
-
-  /* ✅ 不改变文字布局 */
-  padding: 0 !important;
-  border: 0 !important;
   outline: 1px solid rgba(255, 92, 92, 0.40);
   outline-offset: 0;
 
-  /* ✅ 只显示底色，不显示 overlay 文字 */
+  padding: 0 !important;
+  border: 0 !important;
+  margin: 0 !important;
+  border-radius: 4px;
+
   color: transparent;
   -webkit-text-fill-color: transparent;
 
-  /* ✅ 多行/断行时更稳定 */
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
