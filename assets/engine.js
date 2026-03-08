@@ -384,22 +384,131 @@ function runMatcherCoreProbe(text, enabledKeysArr) {
    2) Core state
    ========================= */
 
+/* =========================
+   2) Core state
+   ========================= */
+
 const enabled = new Set();
 let moneyMode = "m1";
 window.__safe_moneyMode = moneyMode;
 
-let lastOutputPlain = "";
+let lastOutputPlain =
+  typeof window.__lastOutputPlain === "string" ? window.__lastOutputPlain : "";
 
-let lastUploadedFile = null;
-let lastFileKind = "";
-let lastProbe = null;
-let lastPdfOriginalText = "";
-let lastStage3Mode = "none";
+let lastUploadedFile =
+  typeof window.lastUploadedFile !== "undefined" ? window.lastUploadedFile : null;
 
-let __manualRedactSession = null;
-let __manualRedactResult = null;
+let lastFileKind =
+  typeof window.lastFileKind === "string" ? window.lastFileKind : "";
 
-let manualTerms = [];
+let lastProbe =
+  typeof window.lastProbe !== "undefined" ? window.lastProbe : null;
+
+let lastPdfOriginalText =
+  typeof window.lastPdfOriginalText === "string" ? window.lastPdfOriginalText : "";
+
+let lastStage3Mode =
+  typeof window.lastStage3Mode === "string" ? window.lastStage3Mode : "none";
+
+let __manualRedactSession =
+  typeof window.__manualRedactSession !== "undefined" ? window.__manualRedactSession : null;
+
+let __manualRedactResult =
+  typeof window.__manualRedactResult !== "undefined" ? window.__manualRedactResult : null;
+
+let manualTerms =
+  Array.isArray(window.manualTerms) ? window.manualTerms.slice(0) : [];
+
+/* shared-state bridge: keep engine / stage3 / main on the same source of truth */
+(function bridgeEngineSharedState() {
+  try {
+    Object.defineProperty(window, "lastUploadedFile", {
+      configurable: true,
+      enumerable: true,
+      get() { return lastUploadedFile; },
+      set(v) { lastUploadedFile = v; }
+    });
+  } catch (_) {}
+
+  try {
+    Object.defineProperty(window, "lastFileKind", {
+      configurable: true,
+      enumerable: true,
+      get() { return lastFileKind; },
+      set(v) { lastFileKind = String(v || ""); }
+    });
+  } catch (_) {}
+
+  try {
+    Object.defineProperty(window, "lastProbe", {
+      configurable: true,
+      enumerable: true,
+      get() { return lastProbe; },
+      set(v) { lastProbe = v; }
+    });
+  } catch (_) {}
+
+  try {
+    Object.defineProperty(window, "lastPdfOriginalText", {
+      configurable: true,
+      enumerable: true,
+      get() { return lastPdfOriginalText; },
+      set(v) { lastPdfOriginalText = String(v || ""); }
+    });
+  } catch (_) {}
+
+  try {
+    Object.defineProperty(window, "lastStage3Mode", {
+      configurable: true,
+      enumerable: true,
+      get() { return lastStage3Mode; },
+      set(v) { lastStage3Mode = String(v || "none"); }
+    });
+  } catch (_) {}
+
+  try {
+    Object.defineProperty(window, "__manualRedactSession", {
+      configurable: true,
+      enumerable: false,
+      get() { return __manualRedactSession; },
+      set(v) { __manualRedactSession = v; }
+    });
+  } catch (_) {}
+
+  try {
+    Object.defineProperty(window, "__manualRedactResult", {
+      configurable: true,
+      enumerable: false,
+      get() { return __manualRedactResult; },
+      set(v) { __manualRedactResult = v; }
+    });
+  } catch (_) {}
+
+  try {
+    Object.defineProperty(window, "manualTerms", {
+      configurable: true,
+      enumerable: true,
+      get() { return manualTerms; },
+      set(v) { manualTerms = Array.isArray(v) ? v : []; }
+    });
+  } catch (_) {}
+
+  try {
+    Object.defineProperty(window, "lastOutputPlain", {
+      configurable: true,
+      enumerable: true,
+      get() { return lastOutputPlain; },
+      set(v) {
+        lastOutputPlain = String(v || "");
+        window.__lastOutputPlain = lastOutputPlain;
+      }
+    });
+  } catch (_) {}
+
+  try {
+    window.__lastOutputPlain = lastOutputPlain;
+  } catch (_) {}
+})();
 
 function normalizeTerm(s) {
   return String(s || "").trim();
@@ -420,7 +529,12 @@ function setManualTermsFromText(raw) {
     seen.add(key);
     out.push(p);
   }
+
   manualTerms = out.slice(0, 24);
+
+  try {
+    window.manualTerms = manualTerms;
+  } catch (_) {}
 }
 
 function show(el, yes) {
@@ -504,6 +618,8 @@ function placeholder(key) {
 function renderOutput(outPlain) {
   lastOutputPlain = String(outPlain || "");
   window.__lastOutputPlain = lastOutputPlain;
+  window.lastOutputPlain = lastOutputPlain;
+
   const host = $("outputText");
   if (!host) return;
 
