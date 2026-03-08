@@ -238,13 +238,18 @@ textarea{
   min-width:0;
 }
 
-/* ===== overlay layer (highlight only) ===== */
+/* ===== overlay layer: align to textarea content box ===== */
 .input-overlay{
   position:absolute;
-  inset:0;
 
-  padding:12px;
-  border-radius:12px;
+  /* 和 textarea 的 padding 完全一致，不再用 inset:0 */
+  left:12px;
+  right:12px;
+  top:12px;
+  bottom:12px;
+
+  padding:0;
+  border-radius:0;
 
   pointer-events:none;
 
@@ -255,14 +260,16 @@ textarea{
   overflow-wrap:normal;
   word-break:normal;
 
-  /* 保证和 textarea 字体完全一致 */
+  /* 和 textarea 保持一致 */
   font:inherit;
   line-height:inherit;
   letter-spacing:inherit;
 
-  /* overlay 文字透明，只显示高亮背景 */
+  /* overlay 文字透明，只显示命中背景 */
   color:transparent;
   -webkit-text-fill-color:transparent;
+
+  background:transparent;
 }
 
 .output{
@@ -279,13 +286,28 @@ textarea{
   min-width:0;
 }
 
-/* ===== highlight ===== */
 .hl{
   background: rgba(255, 92, 92, 0.14);
   border: 1px solid rgba(255, 92, 92, 0.35);
   color: rgba(255,255,255,.96);
   padding: 1px 6px;
   border-radius: 999px;
+}
+
+/* ✅ 命中高亮：不改变布局尺寸 */
+.hit{
+  background: rgba(255, 92, 92, 0.18);
+  outline: 1px solid rgba(255, 92, 92, 0.40);
+  outline-offset: 0;
+  border: 0 !important;
+  padding: 0 !important;
+  border-radius: 6px;
+
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .tiny{ font-size:11px; line-height:1.45; }
