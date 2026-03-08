@@ -632,15 +632,55 @@
       .sort((a, b) => (a.a - b.a) || (a.b - b.b));
   }
 
-  function mapMatchResultPageToRects({ pdfjsLib, viewport, itemsOrTextContent, matchResult, pageNumber, lang }) {
-    const spans = buildSpansFromMatchResultForPage(matchResult, pageNumber);
-    const rects = textItemsToRectsFromSpans(pdfjsLib, viewport, itemsOrTextContent, spans, lang);
+   function mapMatchResultPageToRects({ pdfjsLib, viewport, itemsOrTextContent, matchResult, pageNumber, lang }) {
+    const mr = normalizeMatchResult(matchResult);
+    const targetPage = Number(pageNumber);
+
+    const pageHits = mr.hits.filter((h) => Number(h.page) === targetPage && h.end > h.start);
+
+    const spans = pageHits.map((h) => ({
+      a: Number(h.start),
+      b: Number(h.end),
+      key: h.key,
+      preferSub: null,
+      hitId: h.id
+    }));
+
+    let rects = textItemsToRectsFromSpans(pdfjsLib, viewport, itemsOrTextContent, spans, lang);
+
+    const mappedHitIds = new Set(
+      asArray(rects).map((r) => safeString(r && r.hitId)).filter(Boolean)
+    );
+
+    // fallback: if a hit already carries rects from matcher-core, reuse them
+    for (const h of pageHits) {
+      const hitId = safeString(h && h.id);
+      if (!hitId) continue;
+      if (mappedHitIds.has(hitId)) continue;
+
+      const fallbackRects = asArray(h && h.rects)
+        .map((r) => ({
+          x: Number(r && r.x) || 0,
+          y: Number(r && r.y) || 0,
+          w: Number(r && r.w) || 0,
+          h: Number(r && r.h) || 0,
+          key: safeString(h && h.key),
+          hitId
+        }))
+        .filter((r) => Number.isFinite(r.x + r.y + r.w + r.h) && r.w > 0 && r.h > 0);
+
+      if (fallbackRects.length) {
+        rects = rects.concat(fallbackRects);
+        mappedHitIds.add(hitId);
+      }
+    }
+
     return {
       rects,
       spans
     };
   }
-
+  
   function buildRasterRectResult({ pageEntries, matchResult, lang }) {
     const mr = normalizeMatchResult(matchResult);
     const pages = [];
