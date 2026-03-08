@@ -247,9 +247,7 @@ function bind() {
       if (inTxt) {
         if (!ensureLangBeforeApply(inTxt)) return;
         applyRules(inTxt);
-      } else window.dispatchEvent(new Event("safe:updated"));
-
-      if (ta) renderInputOverlayForPdf(ta.value || "");
+      } else window.dispatchEvent(new Event("safe:updated"))
 
       requestAnimationFrame(syncManualRiskHeights);
 
@@ -290,8 +288,6 @@ function bind() {
         if (!ensureLangBeforeApply(inTxt)) return;
         applyRules(inTxt);
       } else window.dispatchEvent(new Event("safe:updated"));
-
-      renderInputOverlayForPdf((($("inputText") && $("inputText").value) || ""));
 
       requestAnimationFrame(syncManualRiskHeights);
 
@@ -478,8 +474,6 @@ function bind() {
   if (ta) {
     ta.addEventListener("input", () => {
       updateInputWatermarkVisibility();
-
-      if (lastRunMeta.fromPdf) renderInputOverlayForPdf(ta.value || "");
 
       const v = String(ta.value || "");
       clearTimeout(autoTimer);
