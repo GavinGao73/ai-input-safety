@@ -17,7 +17,7 @@
 (function () {
   "use strict";
 
-  const DPI = 600;
+  const DPI = 300;
 
   function $(sel, root) { return (root || document).querySelector(sel); }
 
