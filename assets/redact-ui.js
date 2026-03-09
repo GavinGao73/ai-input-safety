@@ -12,6 +12,10 @@
  * - True pinch zoom (two-finger with pointer map)
  * - Delete single rect by tap
  * - Undo last rect
+ *
+ * PATCH
+ * - Scheme A: render pages first, then create/show overlay
+ *   to avoid white blank canvas flash before page appears
  * ======================================================= */
 
 (function () {
@@ -231,6 +235,26 @@
 
     const filename = `raster_secure_${Date.now()}.pdf`;
 
+    /* =========================================
+       Scheme A:
+       render first, then create/show overlay
+       to eliminate white blank flash
+       ========================================= */
+    let pages = [];
+    try {
+      if (fileKind === "image") {
+        const rendered = await window.RasterExport.renderImageToCanvas(file, DPI);
+        pages = normalizePages(rendered);
+      } else {
+        const rendered = await window.RasterExport.renderPdfToCanvases(file, DPI);
+        pages = normalizePages(rendered);
+      }
+    } catch (e) {
+      throw e;
+    }
+
+    if (!pages.length) return null;
+
     const ui = createOverlay(lang);
     const canvasWrap = $(".rui-canvas-wrap", ui);
     const canvas = $(".rui-canvas", ui);
@@ -247,25 +271,6 @@
     const btnDone = $(".rui-done", ui);
     const btnCancel = $(".rui-cancel", ui);
     const L = langText(lang);
-
-    let pages = [];
-    try {
-      if (fileKind === "image") {
-        const rendered = await window.RasterExport.renderImageToCanvas(file, DPI);
-        pages = normalizePages(rendered);
-      } else {
-        const rendered = await window.RasterExport.renderPdfToCanvases(file, DPI);
-        pages = normalizePages(rendered);
-      }
-    } catch (e) {
-      try { ui.remove(); } catch (_) {}
-      throw e;
-    }
-
-    if (!pages.length) {
-      try { ui.remove(); } catch (_) {}
-      return null;
-    }
 
     const rectsByPage = {};
     pages.forEach((p) => {
