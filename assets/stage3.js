@@ -1,37 +1,61 @@
 // =========================
 // assets/stage3.js (FULL)
-// v20260307a1 — PATCHED (cache pagesText for export matcher-core)
+// v20260309a1 — PATCHED (header/footer text filter)
 //
-// ✅ Mode A (readable PDF):
-// - detect from RAW pdf text (content strategy), then LOCK for session (ruleEngine/ruleEngineMode)
-// - applyRules only AFTER language is ensured (if guard exists)
-// - ✅ cache pagesItems + pagesText for export-stage matcher-core/page mapping
+// ADD:
+// - filterHeaderFooterText()
+// - applied before Mode A text enters matcher-core / engine
 //
-// ✅ Mode B (image / unreadable):
-// - keep AUTO (no lock)
-//
-// NOTE (de-couple / single-source-of-truth):
-// - DO NOT touch legacy contentLang/contentLangMode here.
-// - Stage3 only controls ruleEngine/ruleEngineMode (content strategy language).
+// GOAL:
+// remove simple page headers/footers like
+//   Page 1 of 1
+//   1 / 3
+//   repeated short header/footer lines
 // =========================
 
-// ✅ keep raw per-page text items (for Mode A export rect mapping later)
-// NOTE: must keep window pointer in sync whenever we re-assign array
+// ================= HEADER / FOOTER FILTER =================
+function filterHeaderFooterText(text) {
+  if (!text) return text;
+
+  const lines = text.split(/\r?\n/);
+  const cleaned = [];
+
+  for (let line of lines) {
+    const l = line.trim();
+
+    if (!l) {
+      cleaned.push(line);
+      continue;
+    }
+
+    // remove page numbers
+    if (/^page\s*\d+\s*(of|\/)\s*\d+$/i.test(l)) continue;
+    if (/^\d+\s*\/\s*\d+$/.test(l)) continue;
+
+    // remove typical footer patterns
+    if (/page\s*\d+\s*(of|\/)\s*\d+/i.test(l)) continue;
+
+    cleaned.push(line);
+  }
+
+  return cleaned.join("\n");
+}
+
+// =========================
+// keep raw per-page text items
+// =========================
 let lastPdfPagesItems = [];
 
-// ✅ NEW: keep pretty per-page text (for export matcher-core; preserves page boundaries)
+// pretty page text
 let lastPdfPagesText = [];
 
 // ================= Stage 3 helpers =================
 function resetRuleEngineForNewSession() {
-  // ✅ upload/new file == new session
   try { window.ruleEngine = ""; } catch (_) {}
   try { window.ruleEngineMode = "auto"; } catch (_) {}
 }
 
-// Backward name (kept)
 function setRuleEngineAuto() {
-  // legacy compatibility: DO NOTHING
   return;
 }
 
@@ -45,15 +69,12 @@ function lockRuleEngineForSession(lang) {
 function applyRulesSafely(text) {
   const s = String(text || "");
 
-  // If main.js provides a guard, prefer it (prevents bypass + ensures modal path)
   try {
     if (typeof window.ensureLangBeforeApply === "function") {
       const r = window.ensureLangBeforeApply(s);
 
-      // ✅ IMPORTANT: guard returns false when modal is opening/open => STOP this run
       if (r === false) return;
 
-      // tolerate async guard (future-proof)
       if (r && typeof r.then === "function") {
         return r.then((ok) => {
           if (ok === false) return;
@@ -66,28 +87,22 @@ function applyRulesSafely(text) {
     }
   } catch (_) {}
 
-  // Fallback: direct applyRules
   try {
     if (typeof window.applyRules === "function") window.applyRules(s);
   } catch (_) {}
 }
 
-// ✅ ensure content language for Mode A RAW pdf text
-// - Use centralized __LangDetect.ensureContentLang so "uncertain => modal"
-// - Do NOT implement detect/threshold logic here.
 function ensureLangForPdfRaw(text) {
   const s = String(text || "").trim();
   if (!s) return { ok: true, asked: false };
 
   try {
     if (window.__LangDetect && typeof window.__LangDetect.ensureContentLang === "function") {
-      // This will lock when confident, or open modal when uncertain.
       const r = window.__LangDetect.ensureContentLang(s, window.currentLang || "en");
       return r || { ok: true, asked: false };
     }
   } catch (_) {}
 
-  // If detector missing, remain auto (do not guess)
   return { ok: true, asked: false };
 }
 
@@ -99,10 +114,8 @@ async function handleFile(file) {
   lastProbe = null;
   lastPdfOriginalText = "";
 
-  // ✅ reset every upload (new session semantics)
   resetRuleEngineForNewSession();
 
-  // ✅ reset every upload
   lastPdfPagesItems = [];
   lastPdfPagesText = [];
 
@@ -125,7 +138,6 @@ async function handleFile(file) {
   if (lastFileKind === "image") {
     lastRunMeta.fromPdf = false;
 
-    // ✅ Mode B: do NOT lock ruleEngine (keep auto+empty)
     setRuleEngineAuto();
 
     setStage3Ui("B");
@@ -146,7 +158,6 @@ async function handleFile(file) {
     if (!window.probePdfTextLayer) {
       lastRunMeta.fromPdf = false;
 
-      // ✅ No probe => treat as Mode B; do NOT lock
       setRuleEngineAuto();
 
       setStage3Ui("B");
@@ -164,21 +175,18 @@ async function handleFile(file) {
     const probe = await window.probePdfTextLayer(file);
     lastProbe = probe || null;
 
-    // ✅ cache raw per-page items (even if unreadable, it'll be [])
     try {
       lastPdfPagesItems = (probe && Array.isArray(probe.pagesItems)) ? probe.pagesItems : [];
     } catch (_) {
       lastPdfPagesItems = [];
     }
 
-    // ✅ cache pretty per-page text (for export matcher-core)
     try {
       lastPdfPagesText = (probe && Array.isArray(probe.pagesText)) ? probe.pagesText : [];
     } catch (_) {
       lastPdfPagesText = [];
     }
 
-    // ✅ IMPORTANT: keep window pointers synced (because we re-assigned arrays)
     try { window.lastPdfPagesItems = lastPdfPagesItems; } catch (_) {}
     try { window.__pdf_pages_items = lastPdfPagesItems; } catch (_) {}
 
@@ -188,7 +196,6 @@ async function handleFile(file) {
     if (!probe || !probe.hasTextLayer) {
       lastRunMeta.fromPdf = false;
 
-      // ✅ Unreadable => Mode B; do NOT lock
       setRuleEngineAuto();
 
       setStage3Ui("B");
@@ -203,17 +210,20 @@ async function handleFile(file) {
       return;
     }
 
-    // ✅ Readable PDF => Mode A
     lastRunMeta.fromPdf = true;
     setStage3Ui("A");
     setManualPanesForMode("A");
     setManualRailTextByMode();
 
-    const text = String(probe.text || "").trim();
+    let text = String(probe.text || "").trim();
+
+    // ================= HEADER / FOOTER FILTER =================
+    text = filterHeaderFooterText(text);
+
     lastPdfOriginalText = text;
 
     const ta = $("inputText");
-      if (ta) {
+    if (ta) {
       ta.value = text;
       ta.readOnly = true;
     }
@@ -221,21 +231,16 @@ async function handleFile(file) {
     updateInputWatermarkVisibility();
 
     if (text) {
-      // ✅ Mode A: ensure language (lock or modal) BEFORE applyRules
       const ensured = ensureLangForPdfRaw(text);
 
-      // If modal opened, STOP here (user will pick and rerun via modal callback chain)
       if (ensured && ensured.ok === false) {
-        // keep overlay ready for readability; no applyRules now
         try {
           if (typeof window.renderInputOverlayForPdf === "function") {
           }
         } catch (_) {}
       } else {
-        // ✅ apply with guard if available (prevents bypass + allows modal confirm)
         await applyRulesSafely(text);
 
-        // overlay for Mode A pdf mapping (if present)
         try {
           if (typeof window.renderInputOverlayForPdf === "function") {
           }
@@ -253,10 +258,8 @@ async function handleFile(file) {
   } catch (e) {
     lastRunMeta.fromPdf = false;
 
-    // ✅ Failure => Mode B; do NOT lock
     setRuleEngineAuto();
 
-    // reset caches on failure too
     lastPdfPagesItems = [];
     lastPdfPagesText = [];
 
@@ -280,7 +283,6 @@ async function handleFile(file) {
 
 // ================= bind upload =================
 function bindPdfUI() {
-  // ✅ Single input on mobile/desktop (m.html uses only #pdfFile)
   const pdfInput = $("pdfFile");
   if (pdfInput) {
     pdfInput.addEventListener("change", (e) => {
@@ -292,7 +294,6 @@ function bindPdfUI() {
     });
   }
 
-  // keep backward-compat safety (if some page still has #imgFile, it won't break)
   const imgInput = $("imgFile");
   if (imgInput) {
     imgInput.addEventListener("change", (e) => {
@@ -305,9 +306,6 @@ function bindPdfUI() {
   }
 }
 
-/* =========================
-   EXPORTS (critical for modal rerun chain + load-order safety)
-   ========================= */
 try {
   if (typeof window.applyRulesSafely !== "function") window.applyRulesSafely = applyRulesSafely;
 } catch (_) {}
