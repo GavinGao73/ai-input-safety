@@ -5,10 +5,9 @@
  * - NO file reading
  * - NO PDF exporting
  * - NO DOM side effects
- * - Pure-ish rect building layer for raster-export.js
  *
  * BOUNDARY
- * - PRIMARY: matchResult -> spans -> rects
+ * - PRIMARY: matchResult -> page-local spans -> rects
  * - LEGACY: regex/span fallback retained only for transition safety
  * ======================================================= */
 
@@ -16,7 +15,7 @@
   "use strict";
 
   const NS = "__RASTER_CORE__";
-  const VERSION = "raster-core-r6-matchresult-primary";
+  const VERSION = "raster-core-r7-page-local-main";
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
   function safeString(v) { return typeof v === "string" ? v : (v == null ? "" : String(v)); }
@@ -320,19 +319,79 @@
     return `rect_${String(n).padStart(6, "0")}`;
   }
 
-  function extractPageHitsFromMatchResult(matchResult, pageNumber) {
+  function buildPageLocator(pages) {
+    const arr = asArray(pages);
+    const byPage = new Map();
+    let cursor = 0;
+
+    for (let i = 0; i < arr.length; i += 1) {
+      const p = arr[i];
+      const pageNumber = Number(p && p.pageNumber) || (i + 1);
+
+      let pageText = safeString(p && p.pageText);
+      if (!pageText) {
+        const built = SpanEngine.buildPageTextAndRangesFromItems(p && p.itemsOrTextContent);
+        pageText = safeString(built.pageText);
+      }
+
+      const start = cursor;
+      const end = start + pageText.length;
+
+      const info = {
+        pageNumber,
+        start,
+        end,
+        textLength: pageText.length
+      };
+
+      byPage.set(pageNumber, info);
+      cursor = end;
+
+      if (i < arr.length - 1) cursor += 2;
+    }
+
+    return { byPage };
+  }
+
+  function localizeHitToPage(hit, pageInfo) {
+    if (!hit || !pageInfo) return null;
+
+    const hs = Number(hit.start);
+    const he = Number(hit.end);
+    if (!Number.isFinite(hs) || !Number.isFinite(he) || he <= hs) return null;
+
+    const localStart = Math.max(0, hs - pageInfo.start);
+    const localEnd = Math.min(pageInfo.textLength, he - pageInfo.start);
+
+    if (!(localEnd > localStart)) return null;
+
+    return {
+      id: safeString(hit.id),
+      key: safeString(hit.key),
+      start: localStart,
+      end: localEnd,
+      rects: asArray(hit.rects)
+    };
+  }
+
+  function extractPageHitsFromMatchResult(matchResult, pageNumber, pageLocator) {
     const mr = normalizeMatchResult(matchResult);
     const targetPage = Number(pageNumber);
+    const pageInfo = pageLocator && pageLocator.byPage ? pageLocator.byPage.get(targetPage) : null;
 
     return mr.hits
       .filter((h) => Number(h.page) === targetPage && Number(h.end) > Number(h.start))
-      .map((h) => ({
-        id: safeString(h.id),
-        key: safeString(h.key),
-        start: Number(h.start) || 0,
-        end: Number(h.end) || 0,
-        rects: asArray(h.rects)
-      }))
+      .map((h) => {
+        if (pageInfo) return localizeHitToPage(h, pageInfo);
+        return {
+          id: safeString(h.id),
+          key: safeString(h.key),
+          start: Number(h.start) || 0,
+          end: Number(h.end) || 0,
+          rects: asArray(h.rects)
+        };
+      })
+      .filter(Boolean)
       .sort((a, b) => (a.start - b.start) || (a.end - b.end));
   }
 
@@ -1088,8 +1147,8 @@
     );
   }
 
-  function buildSpansFromMatchResultForPage(matchResult, pageNumber) {
-    const pageHits = extractPageHitsFromMatchResult(matchResult, pageNumber);
+  function buildSpansFromMatchResultForPage(matchResult, pageNumber, pageLocator) {
+    const pageHits = extractPageHitsFromMatchResult(matchResult, pageNumber, pageLocator);
 
     return pageHits.map((h) => ({
       a: Number(h.start),
@@ -1100,8 +1159,8 @@
     }));
   }
 
-  function mapMatchResultPageToRects({ pdfjsLib, viewport, itemsOrTextContent, matchResult, pageNumber, lang }) {
-    const pageHits = extractPageHitsFromMatchResult(matchResult, pageNumber);
+  function mapMatchResultPageToRects({ pdfjsLib, viewport, itemsOrTextContent, matchResult, pageNumber, lang, pageLocator }) {
+    const pageHits = extractPageHitsFromMatchResult(matchResult, pageNumber, pageLocator);
 
     const spans = pageHits.map((h) => ({
       a: Number(h.start),
@@ -1221,10 +1280,12 @@
 
   function mapMatchResultToRects({ pdfjsLib, pages, matchResult, lang }) {
     const mr = normalizeMatchResult(matchResult);
+    const pageArr = asArray(pages);
+    const pageLocator = buildPageLocator(pageArr);
     const pageEntries = [];
 
-    for (let i = 0; i < asArray(pages).length; i += 1) {
-      const p = pages[i];
+    for (let i = 0; i < pageArr.length; i += 1) {
+      const p = pageArr[i];
       const pageNumber = Number(p && p.pageNumber) || (i + 1);
       const viewport = p && p.viewport;
       const itemsOrTextContent = p && p.itemsOrTextContent;
@@ -1245,7 +1306,8 @@
         itemsOrTextContent,
         matchResult: mr,
         pageNumber,
-        lang: normLang(lang || mr.lang)
+        lang: normLang(lang || mr.lang),
+        pageLocator
       });
 
       pageEntries.push({
@@ -1262,7 +1324,14 @@
       lang: normLang(lang || mr.lang)
     });
 
-    try { window.__RasterCoreLast = result; } catch (_) {}
+    try {
+      window.__RasterCoreLast = Object.assign({}, result, {
+        debug: {
+          pageLocator: Array.from(pageLocator.byPage.values())
+        }
+      });
+    } catch (_) {}
+
     return result;
   }
 
