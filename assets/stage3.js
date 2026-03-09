@@ -1,13 +1,13 @@
 // =========================
 // assets/stage3.js (FULL)
-// v20260309a7 — CONSOLIDATED CLEAN VERSION
+// v20260309a8 — CONSOLIDATED CLEAN VERSION
 //
 // Goals:
 // - Keep original structure and behavior style
+// - Mode A requires BOTH text layer AND usable semantic reading order
 // - Use pagesText objects as the primary Mode A text source
 // - Remove repeated multi-page edge lines deterministically
 // - Keep input box editable unless readable PDF Mode A is active
-// - Avoid patch stacking and keep logic centralized
 // =========================
 
 // ================= HEADER / FOOTER FILTER =================
@@ -56,7 +56,7 @@ function filterHeaderFooterText(text, pagesText) {
   function isProtectedBodyLine(s) {
     if (!s) return false;
 
-    return /^(?:customer|account|reference|order|invoice|section|date|bill to|ship to|payment details)\s*:/i.test(s);
+    return /^(?:customer|account|reference|order|invoice|section|date|bill to|ship to|payment details|statement period)\s*:/i.test(s);
   }
 
   function collectRepeatedEdgeLines(pages) {
@@ -108,10 +108,8 @@ function filterHeaderFooterText(text, pagesText) {
 
       if (isPageLine(s)) continue;
 
-      // remove repeated edge lines only near top/bottom of each page
       if (!isProtectedBodyLine(s) && repeatedEdgeLines.has(s) && (i <= 4 || i >= lastIndex - 4)) continue;
 
-      // remove explicit footer-like lines near page end
       if (!isProtectedBodyLine(s) && i >= lastIndex - 2 && isLikelyFooterLine(s)) continue;
 
       out.push(raw);
@@ -130,6 +128,75 @@ function filterHeaderFooterText(text, pagesText) {
   }
 
   return String(text || "").trim();
+}
+
+// ================= SEMANTIC USABILITY CHECK =================
+
+function isSemanticReadingUsable(text, pagesText) {
+  function normLine(s) {
+    return String(s || "").replace(/\s+/g, " ").trim();
+  }
+
+  function getPageText(page) {
+    if (typeof page === "string") return page;
+    if (page && typeof page.text === "string") return page.text;
+    return "";
+  }
+
+  function countMatches(s, re) {
+    const m = String(s || "").match(re);
+    return m ? m.length : 0;
+  }
+
+  function hasRepeatedPhrase(line) {
+    return /\b([A-Za-z]{3,}(?:\s+[A-Za-z]{3,}){2,6})\b.*\b\1\b/i.test(line);
+  }
+
+  function isSuspiciousMergedLine(line) {
+    const s = normLine(line);
+    if (!s || s.length < 40) return false;
+
+    const labelRepeats =
+      countMatches(s, /ticket\s*no\.?/gi) +
+      countMatches(s, /case\s*id/gi) +
+      countMatches(s, /email\s*:/gi) +
+      countMatches(s, /phone\s*:/gi) +
+      countMatches(s, /contact\s*:/gi) +
+      countMatches(s, /ref\s*:/gi) +
+      countMatches(s, /amount\s*:/gi);
+
+    if (labelRepeats >= 2) return true;
+    if (hasRepeatedPhrase(s)) return true;
+
+    const sepCount = countMatches(s, /[·|]/g);
+    if (sepCount >= 4 && labelRepeats >= 1) return true;
+
+    return false;
+  }
+
+  const pages = Array.isArray(pagesText) && pagesText.length
+    ? pagesText.map(getPageText)
+    : [String(text || "")];
+
+  let suspiciousPages = 0;
+
+  for (const pageText of pages) {
+    const lines = String(pageText || "")
+      .split(/\r?\n/)
+      .map(normLine)
+      .filter(Boolean);
+
+    if (!lines.length) continue;
+
+    let suspiciousLines = 0;
+    for (const line of lines) {
+      if (isSuspiciousMergedLine(line)) suspiciousLines++;
+    }
+
+    if (suspiciousLines >= 3) suspiciousPages++;
+  }
+
+  return suspiciousPages === 0;
 }
 
 // ================= INPUT EDIT STATE =================
@@ -205,6 +272,28 @@ function ensureLangForPdfRaw(text) {
   return { ok: true, asked: false };
 }
 
+function enterModeBFromPdf(rawText) {
+  lastRunMeta.fromPdf = false;
+
+  setRuleEngineAuto();
+  setInputEditable(true);
+
+  const ta = $("inputText");
+  if (ta && rawText) ta.value = rawText;
+
+  updateInputWatermarkVisibility();
+
+  setStage3Ui("B");
+  setManualPanesForMode("B");
+  setManualRailTextByMode();
+
+  requestAnimationFrame(() => {
+    expandManualArea();
+    expandRiskArea();
+    syncManualRiskHeights();
+  });
+}
+
 // ================= Stage 3 file handler =================
 async function handleFile(file) {
   if (!file) {
@@ -262,20 +351,7 @@ async function handleFile(file) {
 
   try {
     if (!window.probePdfTextLayer) {
-      lastRunMeta.fromPdf = false;
-
-      setRuleEngineAuto();
-      setInputEditable(true);
-
-      setStage3Ui("B");
-      setManualPanesForMode("B");
-      setManualRailTextByMode();
-
-      requestAnimationFrame(() => {
-        expandManualArea();
-        expandRiskArea();
-        syncManualRiskHeights();
-      });
+      enterModeBFromPdf("");
       return;
     }
 
@@ -301,20 +377,15 @@ async function handleFile(file) {
     try { window.__pdf_pages_text = lastPdfPagesText; } catch (_) {}
 
     if (!probe || !probe.hasTextLayer) {
-      lastRunMeta.fromPdf = false;
+      enterModeBFromPdf("");
+      return;
+    }
 
-      setRuleEngineAuto();
-      setInputEditable(true);
+    const rawText = String(probe.text || "").trim();
+    const semanticOk = isSemanticReadingUsable(rawText, lastPdfPagesText);
 
-      setStage3Ui("B");
-      setManualPanesForMode("B");
-      setManualRailTextByMode();
-
-      requestAnimationFrame(() => {
-        expandManualArea();
-        expandRiskArea();
-        syncManualRiskHeights();
-      });
+    if (!semanticOk) {
+      enterModeBFromPdf(rawText);
       return;
     }
 
@@ -326,7 +397,7 @@ async function handleFile(file) {
     let text = filterHeaderFooterText("", lastPdfPagesText);
 
     if (!text) {
-      text = String(probe.text || "").trim();
+      text = rawText;
     }
 
     lastPdfOriginalText = text;
@@ -365,29 +436,7 @@ async function handleFile(file) {
 
     try { window.dispatchEvent(new Event("safe:updated")); } catch (_) {}
   } catch (e) {
-    lastRunMeta.fromPdf = false;
-
-    setRuleEngineAuto();
-    setInputEditable(true);
-
-    lastPdfPagesItems = [];
-    lastPdfPagesText = [];
-
-    try { window.lastPdfPagesItems = lastPdfPagesItems; } catch (_) {}
-    try { window.__pdf_pages_items = lastPdfPagesItems; } catch (_) {}
-
-    try { window.lastPdfPagesText = lastPdfPagesText; } catch (_) {}
-    try { window.__pdf_pages_text = lastPdfPagesText; } catch (_) {}
-
-    setStage3Ui("B");
-    setManualPanesForMode("B");
-    setManualRailTextByMode();
-
-    requestAnimationFrame(() => {
-      expandManualArea();
-      expandRiskArea();
-      syncManualRiskHeights();
-    });
+    enterModeBFromPdf("");
   }
 }
 
