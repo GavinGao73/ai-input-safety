@@ -519,47 +519,72 @@
   }
 
   async function buildPageInputs({ pdf, pages, cachedPages }) {
-  const pageInputs = [];
-  const pagesTextMap = getCachedPagesTextMap();
+    const pageInputs = [];
+    const pagesTextMap = getCachedPagesTextMap();
 
-  for (const p of pages) {
-    const cachedItems = findCachedItemsForPage(cachedPages, p.pageNumber);
-    let itemsOrTextContent = null;
+    for (const p of pages) {
+      const cachedItems = findCachedItemsForPage(cachedPages, p.pageNumber);
+      let itemsOrTextContent = null;
 
-    if (cachedItems && cachedItems.length) {
-      itemsOrTextContent = normalizeCachedItems(cachedItems);
-    } else {
-      const page = await pdf.getPage(p.pageNumber);
-      itemsOrTextContent = await page.getTextContent({
-        normalizeWhitespace: true,
-        disableCombineTextItems: false
+      if (cachedItems && cachedItems.length) {
+        itemsOrTextContent = normalizeCachedItems(cachedItems);
+      } else {
+        const page = await pdf.getPage(p.pageNumber);
+        itemsOrTextContent = await page.getTextContent({
+          normalizeWhitespace: true,
+          disableCombineTextItems: false
+        });
+      }
+
+      let pageText = pagesTextMap.get(Number(p.pageNumber)) || "";
+      if (!pageText) {
+        try {
+          const rc = getRasterCore();
+          if (rc && typeof rc.buildPageTextAndRangesFromItems === "function") {
+            const built = rc.buildPageTextAndRangesFromItems(itemsOrTextContent);
+            pageText = String((built && built.pageText) || "");
+          }
+        } catch (_) {}
+      }
+
+      pageInputs.push({
+        pageNumber: p.pageNumber,
+        width: p.width,
+        height: p.height,
+        viewport: p.viewport,
+        itemsOrTextContent,
+        pageText
       });
     }
 
-    let pageText = pagesTextMap.get(Number(p.pageNumber)) || "";
-    if (!pageText) {
-      try {
-        const rc = getRasterCore();
-        if (rc && typeof rc.buildPageTextAndRangesFromItems === "function") {
-          const built = rc.buildPageTextAndRangesFromItems(itemsOrTextContent);
-          pageText = String((built && built.pageText) || "");
-        }
-      } catch (_) {}
-    }
-
-    pageInputs.push({
-      pageNumber: p.pageNumber,
-      width: p.width,
-      height: p.height,
-      viewport: p.viewport,
-      itemsOrTextContent,
-      pageText
-    });
+    return pageInputs;
   }
 
-  return pageInputs;
-}
-  
+  function buildPageLocalContext(pageInputs) {
+    const byPage = new Map();
+    let cursor = 0;
+
+    for (let i = 0; i < (pageInputs || []).length; i += 1) {
+      const p = pageInputs[i] || {};
+      const pageNumber = Number(p.pageNumber) || (i + 1);
+      const pageText = String(p.pageText || "");
+      const start = cursor;
+      const end = start + pageText.length;
+
+      byPage.set(pageNumber, {
+        pageNumber,
+        start,
+        end,
+        textLength: pageText.length
+      });
+
+      cursor = end;
+      if (i < pageInputs.length - 1) cursor += 2;
+    }
+
+    return { byPage };
+  }
+
   function writeRasterRunMeta(meta) {
     try {
       const last = window.__RasterExportLast || {};
@@ -614,27 +639,29 @@
       cachedPages
     });
 
+    const pageLocalContext = buildPageLocalContext(pageInputs);
+
     let unifiedRectResult = null;
     try {
       if (unifiedMatchResult && typeof rc.mapMatchResultToRects === "function") {
-         unifiedRectResult = rc.mapMatchResultToRects({
-         pdfjsLib,
-         pages: pageInputs.map((x) => ({
-         pageNumber: x.pageNumber,
-         width: x.width,
-         height: x.height,
-         viewport: x.viewport,
-         itemsOrTextContent: x.itemsOrTextContent,
-         pageText: x.pageText || ""
-         })),
-         matchResult: unifiedMatchResult,
-         lang
-         });
-       }
-      } catch (_) {
+        unifiedRectResult = rc.mapMatchResultToRects({
+          pdfjsLib,
+          pages: pageInputs.map((x) => ({
+            pageNumber: x.pageNumber,
+            width: x.width,
+            height: x.height,
+            viewport: x.viewport,
+            itemsOrTextContent: x.itemsOrTextContent,
+            pageText: x.pageText || ""
+          })),
+          matchResult: unifiedMatchResult,
+          lang
+        });
+      }
+    } catch (_) {
       unifiedRectResult = null;
     }
-    
+
     let usedPerPageCoreFallback = false;
     let usedLegacyFallback = false;
 
@@ -669,7 +696,7 @@
           }));
 
           coreSpans = typeof rc.buildSpansFromMatchResultForPage === "function"
-            ? rc.buildSpansFromMatchResultForPage(unifiedMatchResult, p.pageNumber)
+            ? rc.buildSpansFromMatchResultForPage(unifiedMatchResult, p.pageNumber, pageLocalContext)
             : [];
 
           rectSource = "matcher-core-main";
@@ -731,6 +758,7 @@
           0;
 
         const pageTextLen = Number((prepared && prepared.pageText && prepared.pageText.length) || 0);
+
         return {
           perPage: prevPerPage.concat([{
             pageNumber: p.pageNumber,
