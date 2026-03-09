@@ -7,7 +7,7 @@
        Mode B order: note -> "手工涂抹" button -> Mode B rail text
      - Output fixed: Risk card + Progress card (always)
      - ✅ FIX (2026-02-23): make ALL scripts defer + add cache-bust for i18n/catalog/rules
-     - ✅ PATCH (2026-03-06): add matcher-core.js before engine.js
+     - ✅ PATCH (2026-03-09): unify latest cache-bust for pdf/stage3/engine/matcher/raster/main
      ========================= -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -16,7 +16,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ai input safety Filter</title>
   <meta name="robots" content="noindex" />
-  <link rel="stylesheet" href="./assets/styles.css" />
+  <link rel="stylesheet" href="./assets/styles.css?v=20260309a1" />
 
   <script>
   (function () {
@@ -64,7 +64,7 @@
             <input id="pdfFile" type="file" accept="application/pdf" />
             <label class="btn primary btn-s" for="pdfFile" id="ui-upload-btn"></label>
 
-            <!-- Image (mobile-only label; desktop can still drag/drop or use dev tools if needed) -->
+            <!-- Image (mobile-only label; desktop can still use unreadable PDF / fallback path) -->
             <input id="imgFile" type="file" accept="image/*" />
             <label class="btn secondary btn-s only-mobile" for="imgFile" id="ui-upload-img-btn"></label>
 
@@ -195,42 +195,42 @@
     </div>
   </div>
 
-<!-- UI copy / lang -->
-<script src="./assets/i18n.js?v=20260305a2" defer></script>
+  <!-- UI copy / lang -->
+  <script src="./assets/i18n.js?v=20260309a1" defer></script>
 
-<!-- core libs -->
-<script src="./assets/catalog.js?v=20260305a2" defer></script>
-<script src="./assets/pdf.js?v=20260305a2" defer></script>
+  <!-- core libs -->
+  <script src="./assets/catalog.js?v=20260309a1" defer></script>
+  <script src="./assets/pdf.js?v=20260309a1" defer></script>
 
-<!-- raster language packs -->
-<script src="./assets/raster.zh.js?v=20260308a1" defer></script>
-<script src="./assets/raster.en.js?v=20260308a1" defer></script>
-<script src="./assets/raster.de.js?v=20260308a1" defer></script>
+  <!-- raster language packs -->
+  <script src="./assets/raster.zh.js?v=20260309a1" defer></script>
+  <script src="./assets/raster.en.js?v=20260309a1" defer></script>
+  <script src="./assets/raster.de.js?v=20260309a1" defer></script>
 
-<!-- raster core (NEW) -->
-<script src="./assets/raster-core.js?v=20260308a1" defer></script>
+  <!-- raster core -->
+  <script src="./assets/raster-core.js?v=20260309a1" defer></script>
 
-<!-- raster export pipeline -->
-<script src="./assets/raster-export.js?v=20260308a1" defer></script>
+  <!-- raster export pipeline -->
+  <script src="./assets/raster-export.js?v=20260309a1" defer></script>
 
-<script src="./assets/redact-ui.js?v=20260305a2" defer></script>
+  <script src="./assets/redact-ui.js?v=20260309a1" defer></script>
 
-<!-- language detection -->
-<script src="./assets/vendor/franc-all.min.js?v=20260305a2" defer></script>
-<script src="./assets/lang-modal.js?v=20260305a2" defer></script>
-<script src="./assets/lang-detect.js?v=20260305a2" defer></script>
+  <!-- language detection -->
+  <script src="./assets/vendor/franc-all.min.js?v=20260309a1" defer></script>
+  <script src="./assets/lang-modal.js?v=20260309a1" defer></script>
+  <script src="./assets/lang-detect.js?v=20260309a1" defer></script>
 
-<!-- engine packs + policy + core -->
-<script src="./assets/engine.zh.js?v=20260305a2" defer></script>
-<script src="./assets/engine.en.js?v=20260305a2" defer></script>
-<script src="./assets/engine.de.js?v=20260305a2" defer></script>
-<script src="./assets/engine.policy.js?v=20260305a2" defer></script>
-<script src="./assets/matcher-core.js?v=20260306a1" defer></script>
-<script src="./assets/engine.js?v=20260305a2" defer></script>
+  <!-- engine packs + policy + core -->
+  <script src="./assets/engine.zh.js?v=20260309a1" defer></script>
+  <script src="./assets/engine.en.js?v=20260309a1" defer></script>
+  <script src="./assets/engine.de.js?v=20260309a1" defer></script>
+  <script src="./assets/engine.policy.js?v=20260309a1" defer></script>
+  <script src="./assets/matcher-core.js?v=20260309a1" defer></script>
+  <script src="./assets/engine.js?v=20260309a1" defer></script>
 
-<!-- UI wiring -->
-<script src="./assets/ui.js?v=20260305a2" defer></script>
-<script src="./assets/stage3.js?v=20260305a2" defer></script>
-<script src="./assets/main.js?v=20260305a2" defer></script>
+  <!-- UI wiring -->
+  <script src="./assets/ui.js?v=20260309a1" defer></script>
+  <script src="./assets/stage3.js?v=20260309a1" defer></script>
+  <script src="./assets/main.js?v=20260309a1" defer></script>
 </body>
 </html>
