@@ -18,9 +18,12 @@ function filterHeaderFooterText(text) {
   if (!text) return text;
 
   const lines = text.split(/\r?\n/);
+
   const cleaned = [];
 
-  for (let line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+
+    const line = lines[i];
     const l = line.trim();
 
     if (!l) {
@@ -32,15 +35,24 @@ function filterHeaderFooterText(text) {
     if (/^page\s*\d+\s*(of|\/)\s*\d+$/i.test(l)) continue;
     if (/^\d+\s*\/\s*\d+$/.test(l)) continue;
 
-    // remove typical footer patterns
+    // remove footer page references
     if (/page\s*\d+\s*(of|\/)\s*\d+/i.test(l)) continue;
+
+    // remove typical header titles (single short title line at top)
+    if (
+      i < 2 &&
+      l.length < 80 &&
+      /^[A-Z][A-Za-z\s]{4,}$/.test(l) &&
+      !/[:.]/.test(l)
+    ) {
+      continue;
+    }
 
     cleaned.push(line);
   }
 
   return cleaned.join("\n");
 }
-
 // =========================
 // keep raw per-page text items
 // =========================
