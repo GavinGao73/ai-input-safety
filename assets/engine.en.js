@@ -1,13 +1,12 @@
 // =========================
 // assets/engine.en.js
-// UPGRADE v6.3.5 (money_label VAT-percent patch)
+// CONSOLIDATED CLEAN VERSION
 //
-// - Keep v6.3.4 behavior and structure
-// - FIX: money_label supports optional percent segment:
-//        "VAT 19% € 560.53"
-//        "Tax 7% $123.45"
-//        "VAT 19% 560.53 EUR"
-// - Everything else unchanged
+// Goals:
+// - Keep original structure and behavior style
+// - Merge add-on patches into one clean pack
+// - Reduce false positives without expanding complexity
+// - Preserve labels / line structure / replacement stability
 // =========================
 
 (function () {
@@ -68,8 +67,15 @@
       "ein",
       "national_id",
       "tax_id",
-
       "insurance_id",
+
+      "intl_itin",
+      "intl_nino",
+      "intl_nhs",
+      "intl_sin",
+      "intl_tfn",
+      "intl_abn",
+      "uuid",
 
       "ip_label",
       "ip_address",
@@ -77,16 +83,24 @@
       "mac_address",
       "imei",
 
+      "device_fingerprint",
+
       "account",
       "bank",
+      "bank_routing_ids",
       "card_expiry",
       "card_security",
+      "avs_data",
+      "three_ds_status",
+      "eci",
+      "security_answer",
 
       "email",
       "url",
 
       "ref_label_tail",
       "ref_generic_tail",
+      "legal_ref_tail",
 
       "money_label",
       "money",
@@ -96,11 +110,18 @@
       "person_name",
       "company",
 
+      "address_de_street",
+      "address_de_postal",
       "address_en_inline_street",
       "address_en_extra_block",
       "address_en_extra",
 
       "handle",
+
+      "wallet_id",
+      "tx_hash",
+      "crypto_wallet",
+
       "number"
     ],
 
@@ -119,8 +140,15 @@
       "ein",
       "national_id",
       "tax_id",
-
       "insurance_id",
+
+      "intl_itin",
+      "intl_nino",
+      "intl_nhs",
+      "intl_sin",
+      "intl_tfn",
+      "intl_abn",
+      "uuid",
 
       "ip_label",
       "ip_address",
@@ -128,12 +156,19 @@
       "mac_address",
       "imei",
 
+      "device_fingerprint",
+
       "money_label",
       "money",
       "account",
       "bank",
+      "bank_routing_ids",
       "card_expiry",
       "card_security",
+      "avs_data",
+      "three_ds_status",
+      "eci",
+      "security_answer",
 
       "person_name",
 
@@ -142,7 +177,12 @@
       "address_en_extra",
 
       "ref_label_tail",
-      "ref_generic_tail"
+      "ref_generic_tail",
+      "legal_ref_tail",
+
+      "wallet_id",
+      "tx_hash",
+      "crypto_wallet"
     ],
 
     phoneGuard: function ({ label, value }) {
@@ -191,11 +231,6 @@
         tag: "URL"
       },
 
-      // ✅ PATCH:
-      // allow optional percentage segment after strong money labels:
-      // - VAT 19% € 560.53
-      // - Tax 7% $123.45
-      // - VAT 19% 560.53 EUR
       money_label: {
         pattern:
           /((?:amount|total|subtotal|grand[ \t]*total|price|fee|fees|charge|charges|balance|paid|payment|refund|due|total[ \t]*due|net|gross|tax|vat)(?:[ \t]+\d{1,3}(?:[.,]\d{1,2})?[ \t]*%)?(?:[ \t]*[:：=][ \t]*|[ \t]+))((?:[€$£¥￥][ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?|\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?|[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[-+−]?(?:\d{1,3}(?:[., \t]\d{3})+|\d{4,}|\d{1,3})(?:[.,]\d{2})))(?![\dA-Za-z])/giu,
@@ -294,6 +329,47 @@
         mode: "prefix"
       },
 
+      intl_itin: {
+        pattern: /((?:us[ \t]*)?itin[ \t]*[:：=][ \t]*)(9\d{2}[- \t]?\d{2}[- \t]?\d{4})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      intl_nino: {
+        pattern: /((?:uk[ \t]*)?nino[ \t]*[:：=][ \t]*)([A-Z]{2}[ \t]?\d{2}[ \t]?\d{2}[ \t]?\d{2}[ \t]?[A-D])/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      intl_nhs: {
+        pattern: /((?:uk[ \t]*)?nhs[ \t]*number[ \t]*[:：=][ \t]*)(\d{3}[ \t]?\d{3}[ \t]?\d{4})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      intl_sin: {
+        pattern: /((?:ca[ \t]*)?sin[ \t]*[:：=][ \t]*)(\d{3}[ \t]?\d{3}[ \t]?\d{3})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      intl_tfn: {
+        pattern: /((?:au[ \t]*)?tfn[ \t]*[:：=][ \t]*)(\d{3}[ \t]?\d{3}[ \t]?\d{3})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      intl_abn: {
+        pattern: /((?:au[ \t]*)?abn[ \t]*[:：=][ \t]*)(\d{2}[ \t]?\d{3}[ \t]?\d{3}[ \t]?\d{3})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      uuid: {
+        pattern: /\b([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\b/giu,
+        tag: "SECRET"
+      },
+
       ip_label: {
         pattern:
           /((?:ip[ \t]*address|ipv4|ipv6)[ \t]*[:：=][ \t]*)((?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)|(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{1,4})/giu,
@@ -324,9 +400,15 @@
         mode: "prefix"
       },
 
+      device_fingerprint: {
+        pattern: /((?:device[ \t]*id|session[ \t]*id|fingerprint|user[ \t]*agent)[ \t]*[:：=][ \t]*)([^\n\r]{1,200})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
       account: {
         pattern:
-          /((?:account(?:[ \t]*number)?(?![ \t]*holder\b)|routing[ \t]*number|sort[ \t]*code|iban|credit[ \t]*card|debit[ \t]*card|card[ \t]*number|name[ \t]*on[ \t]*card)(?:[ \t]*[:：=][ \t]*|[ \t]+))([^\n\r]{2,80})/giu,
+          /((?:account[ \t]*number|routing[ \t]*number|sort[ \t]*code|iban|card[ \t]*number)(?:[ \t]*[:：=][ \t]*|[ \t]+))([^\n\r]{2,80})/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -334,6 +416,13 @@
       bank: {
         pattern:
           /((?:swift|swift[ \t]*code|bic|swift\/bic)\b(?:[ \t]*[:：=][ \t]*|[ \t]+))([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
+        tag: "ACCOUNT",
+        mode: "prefix"
+      },
+
+      bank_routing_ids: {
+        pattern:
+          /((?:bank[ \t]*name|branch[ \t]*code|clearing[ \t]*(?:number|no\.?)|transit[ \t]*number|bsb|aba[ \t]*(?:number|routing[ \t]*number)?|aba)[ \t]*[:：=][ \t]*)([0-9][0-9 \t-]{2,24}[0-9])/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -351,25 +440,63 @@
         mode: "prefix"
       },
 
+      avs_data: {
+        pattern: /((?:avs[ \t]*data)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{1,40})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      three_ds_status: {
+        pattern: /((?:3-?d[ \t]*secure|3ds)[ \t]*(?:status)?[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{1,40})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      eci: {
+        pattern: /((?:eci)[ \t]*[:：=][ \t]*)(\d{2})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      security_answer: {
+        pattern: /((?:security[ \t]*answer)[ \t]*[:：=][ \t]*)([^\n\r]{1,160})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
       phone: {
         pattern:
-          /((?:phone|mobile|contact|tel|whatsapp|telegram|signal|fax)[ \t]*[:：=]?[ \t]*)([+＋]?[ \t]*\d[\d \t().-]{5,}\d)\b|(?<![A-Za-z0-9_-])(\b(?:[+＋][ \t]*\d{1,3}|00[ \t]*\d{1,3})[\d \t().-]{6,}\d\b)/giu,
+          /((?:phone|mobile|tel|whatsapp|telegram|signal|fax)[ \t]*[:：=]?[ \t]*)([+＋]?[ \t]*\d[\d \t().-]{5,}\d)\b|(?<![A-Za-z0-9_-])(\b(?:[+＋][ \t]*\d{1,3}|00[ \t]*\d{1,3})[\d \t().-]{6,}\d\b)/giu,
         tag: "PHONE",
         mode: "phone"
       },
 
       person_name: {
         pattern:
-          /^(?:contact[ \t]*details[ \t]+)?((?:name|customer[ \t]*name|account[ \t]*holder|recipient|name[ \t]*on[ \t]*card|from|to|attn\.?|attention)(?:[ \t]*[:：=][ \t]*|[ \t]+)(?:(?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+          /^(?:contact[ \t]*details[ \t]+)?((?:name|customer[ \t]*name|account[ \t]*holder|recipient|name[ \t]*on[ \t]*card|attn\.?|attention)(?:[ \t]*[:：=][ \t]*|[ \t]+)(?:(?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
 
       company: {
         pattern:
-          /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)[ \t]+(?<legal>LLC|L\.?L\.?C\.?|Ltd\.?|Limited|Inc\.?|Incorporated|Corp\.?|Corporation|PLC|LLP|Co\.?|Company)\b/giu,
+          /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)[ \t]+(?<legal>LLC|L\.?L\.?C\.?|Ltd\.?|Limited|Inc\.?|Incorporated|Corp\.?|Corporation|PLC|LLP)\b/giu,
         tag: "COMPANY",
         mode: "company"
+      },
+
+      address_de_street: {
+        pattern:
+          /((?:address|shipping[ \t]*address|billing[ \t]*address|street[ \t]*address|mailing[ \t]*address)[ \t]*[:：=][ \t]*)([^,\n\r]{4,160}?)(?=[ \t]*,)/giu,
+        tag: "ADDRESS",
+        mode: "prefix"
+      },
+
+      address_de_postal: {
+        pattern:
+          /((?:zip(?:[ \t]*code)?|postal[ \t]*code|postcode)[ \t]*[:：=][ \t]*)(\d{5}(?:-\d{4})?|[A-Z]\d[A-Z][ \t]?\d[A-Z]\d|[A-Z]{1,2}\d[A-Z\d]?[ \t]?\d[A-Z]{2}|\d{4}|[A-Z0-9][A-Z0-9\- ]{2,9}[A-Z0-9])/giu,
+        tag: "ADDRESS",
+        mode: "prefix"
       },
 
       address_en_inline_street: {
@@ -403,9 +530,34 @@
         mode: "prefix"
       },
 
+      legal_ref_tail: {
+        pattern:
+          /((?:(?:contract[ \t]*number|claim[ \t]*reference|legal[ \t]*case[ \t]*ref)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})\b/giu,
+        tag: "REF",
+        mode: "prefix"
+      },
+
       handle: {
         pattern: /@[A-Za-z0-9_]{2,32}\b/g,
         tag: "HANDLE"
+      },
+
+      wallet_id: {
+        pattern: /((?:wallet[ \t]*id)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{3,80})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      tx_hash: {
+        pattern: /((?:transaction[ \t]*hash|tx[ \t]*hash|txn[ \t]*hash)[ \t]*[:：=][ \t]*)(0x[0-9a-f]{16,128})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      crypto_wallet: {
+        pattern: /((?:btc|eth)[ \t]*[:：=][ \t]*)((?:bc1)[0-9a-z]{25,90}|[13][A-HJ-NP-Za-km-z1-9]{25,34}|0x[a-f0-9]{40})/giu,
+        tag: "SECRET",
+        mode: "prefix"
       },
 
       number: {
@@ -414,231 +566,4 @@
       }
     }
   };
-})();
-
-// =========================
-// International ADD-ONLY Patch (UK/US/CA/AU common fields)
-// - SAFE: append priority/alwaysOn; add rules only
-// - DOES NOT modify existing rules
-// =========================
-(function () {
-  "use strict";
-
-  const PACKS = (window.__ENGINE_LANG_PACKS__ = window.__ENGINE_LANG_PACKS__ || {});
-  const EN = PACKS.en;
-  if (!EN) return;
-
-  const addPrio = ["intl_itin", "intl_nino", "intl_nhs", "intl_sin", "intl_tfn", "intl_abn", "uuid"];
-  EN.priority = (EN.priority || []).concat(addPrio);
-
-  const addAlways = ["intl_itin", "intl_nino", "intl_nhs", "intl_sin", "intl_tfn", "intl_abn", "uuid"];
-  EN.alwaysOn = (EN.alwaysOn || []).concat(addAlways);
-
-  Object.assign(EN.rules, {
-    intl_itin: {
-      pattern: /((?:us[ \t]*)?itin[ \t]*[:：=][ \t]*)(9\d{2}[- \t]?\d{2}[- \t]?\d{4})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    intl_nino: {
-      pattern: /((?:uk[ \t]*)?nino[ \t]*[:：=][ \t]*)([A-Z]{2}[ \t]?\d{2}[ \t]?\d{2}[ \t]?\d{2}[ \t]?[A-D])/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    intl_nhs: {
-      pattern: /((?:uk[ \t]*)?nhs[ \t]*number[ \t]*[:：=][ \t]*)(\d{3}[ \t]?\d{3}[ \t]?\d{4})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    intl_sin: {
-      pattern: /((?:ca[ \t]*)?sin[ \t]*[:：=][ \t]*)(\d{3}[ \t]?\d{3}[ \t]?\d{3})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    intl_tfn: {
-      pattern: /((?:au[ \t]*)?tfn[ \t]*[:：=][ \t]*)(\d{3}[ \t]?\d{3}[ \t]?\d{3})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    intl_abn: {
-      pattern: /((?:au[ \t]*)?abn[ \t]*[:：=][ \t]*)(\d{2}[ \t]?\d{3}[ \t]?\d{3}[ \t]?\d{3})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    uuid: {
-      pattern: /\b([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\b/giu,
-      tag: "SECRET"
-    }
-  });
-})();
-
-// =========================
-// High-Risk ADD-ONLY Patch (2–7)
-// - SAFE: no deletions; only inserts keys before "number" + adds new rules
-// =========================
-(function () {
-  "use strict";
-
-  const PACKS = (window.__ENGINE_LANG_PACKS__ = window.__ENGINE_LANG_PACKS__ || {});
-  const EN = PACKS.en;
-  if (!EN) return;
-
-  function uniqPush(arr, key) {
-    if (!arr.includes(key)) arr.push(key);
-  }
-
-  function insertBefore(arr, beforeKey, keys) {
-    const out = Array.isArray(arr) ? arr.slice() : [];
-    const idx = out.indexOf(beforeKey);
-    const insertAt = idx >= 0 ? idx : out.length;
-    const toInsert = [];
-    (keys || []).forEach((k) => {
-      if (!out.includes(k) && !toInsert.includes(k)) toInsert.push(k);
-    });
-    out.splice(insertAt, 0, ...toInsert);
-    return out;
-  }
-
-  const NEW_KEYS = [
-    "device_fingerprint",
-    "bank_routing_ids",
-    "avs_data",
-    "three_ds_status",
-    "eci",
-    "security_answer",
-    "legal_ref_tail",
-    "wallet_id",
-    "tx_hash",
-    "crypto_wallet"
-  ];
-
-  EN.priority = insertBefore(EN.priority || [], "account", ["device_fingerprint"]);
-  EN.priority = insertBefore(EN.priority || [], "number", NEW_KEYS);
-
-  EN.alwaysOn = EN.alwaysOn || [];
-  NEW_KEYS.forEach((k) => uniqPush(EN.alwaysOn, k));
-
-  EN.rules = EN.rules || {};
-
-  Object.assign(EN.rules, {
-    bank_routing_ids: {
-      pattern:
-        /((?:bank[ \t]*name|branch[ \t]*code|clearing[ \t]*(?:number|no\.?)|transit[ \t]*number|bsb|aba[ \t]*(?:number|routing[ \t]*number)?|aba)[ \t]*[:：=][ \t]*)([0-9][0-9 \t-]{2,24}[0-9])/giu,
-      tag: "ACCOUNT",
-      mode: "prefix"
-    },
-
-    avs_data: {
-      pattern: /((?:avs[ \t]*data)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{1,40})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    three_ds_status: {
-      pattern: /((?:3-?d[ \t]*secure|3ds)[ \t]*(?:status)?[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{1,40})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    eci: {
-      pattern: /((?:eci)[ \t]*[:：=][ \t]*)(\d{2})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    security_answer: {
-      pattern: /((?:answer|security[ \t]*answer)[ \t]*[:：=][ \t]*)([^\n\r]{1,160})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    legal_ref_tail: {
-      pattern:
-        /((?:(?:contract[ \t]*number|claim[ \t]*reference|legal[ \t]*case[ \t]*ref)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})\b/giu,
-      tag: "REF",
-      mode: "prefix"
-    },
-
-    device_fingerprint: {
-      pattern: /((?:device[ \t]*id|session[ \t]*id|fingerprint|user[ \t]*agent)[ \t]*[:：=][ \t]*)([^\n\r]{1,200})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    wallet_id: {
-      pattern: /((?:wallet[ \t]*id)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{3,80})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    tx_hash: {
-      pattern: /((?:transaction[ \t]*hash|tx[ \t]*hash|txn[ \t]*hash)[ \t]*[:：=][ \t]*)(0x[0-9a-f]{16,128})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    crypto_wallet: {
-      pattern: /((?:btc|eth)[ \t]*[:：=][ \t]*)((?:bc1)[0-9a-z]{25,90}|[13][A-HJ-NP-Za-km-z1-9]{25,34}|0x[a-f0-9]{40})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    }
-  });
-
-  ["device_fingerprint"].forEach((k) => {
-    const r = EN.rules[k];
-    if (r && r.pattern) {
-      r.mode = "prefix";
-      r.tag = "SECRET";
-    }
-  });
-})();
-
-// =========================
-// EN Compat Patch (Whitelist alignment)
-// - SAFE: add rules + insert into priority only (NOT alwaysOn)
-// =========================
-(function () {
-  "use strict";
-
-  const PACKS = (window.__ENGINE_LANG_PACKS__ = window.__ENGINE_LANG_PACKS__ || {});
-  const EN = PACKS.en;
-  if (!EN) return;
-
-  function insertBefore(arr, beforeKey, keys) {
-    const out = Array.isArray(arr) ? arr.slice() : [];
-    const idx = out.indexOf(beforeKey);
-    const insertAt = idx >= 0 ? idx : out.length;
-    const toInsert = [];
-    (keys || []).forEach((k) => {
-      if (!out.includes(k) && !toInsert.includes(k)) toInsert.push(k);
-    });
-    out.splice(insertAt, 0, ...toInsert);
-    return out;
-  }
-
-  const KEYS = ["address_de_street", "address_de_postal"];
-  EN.priority = insertBefore(EN.priority || [], "address_en_inline_street", KEYS);
-
-  EN.rules = EN.rules || {};
-  Object.assign(EN.rules, {
-    address_de_street: {
-      pattern:
-        /((?:address|shipping[ \t]*address|billing[ \t]*address|street[ \t]*address|mailing[ \t]*address)[ \t]*[:：=][ \t]*)([^,\n\r]{4,160}?)(?=[ \t]*,)/giu,
-      tag: "ADDRESS",
-      mode: "prefix"
-    },
-
-    address_de_postal: {
-      pattern:
-        /((?:zip(?:[ \t]*code)?|postal[ \t]*code|postcode)[ \t]*[:：=][ \t]*)(\d{5}(?:-\d{4})?|[A-Z]\d[A-Z][ \t]?\d[A-Z]\d|[A-Z]{1,2}\d[A-Z\d]?[ \t]?\d[A-Z]{2}|\d{4}|[A-Z0-9][A-Z0-9\- ]{2,9}[A-Z0-9])/giu,
-      tag: "ADDRESS",
-      mode: "prefix"
-    }
-  });
 })();
