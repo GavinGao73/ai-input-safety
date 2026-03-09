@@ -1,11 +1,11 @@
 // =========================
 // assets/stage3.js (FULL)
-// v20260309a5 — CONSOLIDATED CLEAN VERSION
+// v20260309a6 — CONSOLIDATED CLEAN VERSION
 //
 // Goals:
 // - Keep original structure and behavior style
 // - Use pagesText as the primary Mode A text source
-// - Filter repeated multi-page headers / footers per page
+// - Remove repeated multi-page edge lines deterministically
 // - Keep input box editable unless readable PDF Mode A is active
 // - Avoid patch stacking and keep logic centralized
 // =========================
@@ -21,25 +21,6 @@ function filterHeaderFooterText(text, pagesText) {
     return /^page\s*\d+\s*(of|\/)\s*\d+$/i.test(s) ||
            /^\d+\s*\/\s*\d+$/.test(s) ||
            /page\s*\d+\s*(of|\/)\s*\d+/i.test(s);
-  }
-
-  function isLikelyHeaderLine(s) {
-    if (!s) return false;
-    if (s.length > 120) return false;
-
-    if (/\b(confidential|invoice|statement|receipt|quotation|quote|report|summary)\b/i.test(s)) {
-      return true;
-    }
-
-    if (/^[A-Z][A-Za-z\s&\-]{4,}$/.test(s) && !/:/.test(s)) {
-      return true;
-    }
-
-    if (/^[A-Z0-9\s&\-]{4,}$/.test(s) && !/:/.test(s)) {
-      return true;
-    }
-
-    return false;
   }
 
   function isLikelyFooterLine(s) {
@@ -66,12 +47,11 @@ function filterHeaderFooterText(text, pagesText) {
     return false;
   }
 
-  function collectRepeats(pages) {
-    const headCount = new Map();
-    const footCount = new Map();
+  function collectRepeatedEdgeLines(pages) {
+    const edgeCount = new Map();
 
     if (!Array.isArray(pages) || pages.length < 2) {
-      return { repeatedHeads: new Set(), repeatedFoots: new Set() };
+      return new Set();
     }
 
     for (const pageText of pages) {
@@ -82,33 +62,27 @@ function filterHeaderFooterText(text, pagesText) {
 
       if (!pageLines.length) continue;
 
-      const heads = pageLines.slice(0, 3);
-      const foots = pageLines.slice(Math.max(0, pageLines.length - 3));
+      const edgeLines = [
+        ...pageLines.slice(0, 5),
+        ...pageLines.slice(Math.max(0, pageLines.length - 5))
+      ];
 
-      for (const h of heads) {
-        headCount.set(h, (headCount.get(h) || 0) + 1);
+      for (const line of edgeLines) {
+        edgeCount.set(line, (edgeCount.get(line) || 0) + 1);
       }
-      for (const f of foots) {
-        footCount.set(f, (footCount.get(f) || 0) + 1);
-      }
     }
 
-    const repeatedHeads = new Set();
-    const repeatedFoots = new Set();
-
-    for (const [k, v] of headCount.entries()) {
-      if (v >= 2) repeatedHeads.add(k);
+    const repeated = new Set();
+    for (const [line, count] of edgeCount.entries()) {
+      if (count >= 2) repeated.add(line);
     }
-    for (const [k, v] of footCount.entries()) {
-      if (v >= 2) repeatedFoots.add(k);
-    }
-
-    return { repeatedHeads, repeatedFoots };
+    return repeated;
   }
 
-  function cleanOnePage(pageText, repeatedHeads, repeatedFoots) {
+  function cleanOnePage(pageText, repeatedEdgeLines) {
     const rawLines = String(pageText || "").split(/\r?\n/);
     const out = [];
+    const lastIndex = rawLines.length - 1;
 
     for (let i = 0; i < rawLines.length; i++) {
       const raw = rawLines[i];
@@ -120,10 +94,13 @@ function filterHeaderFooterText(text, pagesText) {
       }
 
       if (isPageLine(s)) continue;
-      if (repeatedHeads.has(s)) continue;
-      if (repeatedFoots.has(s)) continue;
-      if (i < 2 && isLikelyHeaderLine(s)) continue;
-      if (i >= rawLines.length - 2 && isLikelyFooterLine(s)) continue;
+
+      // deterministic multi-page edge removal:
+      // only remove repeated lines when they appear near the top or bottom of a page
+      if (repeatedEdgeLines.has(s) && (i <= 4 || i >= lastIndex - 4)) continue;
+
+      // explicit footer cleanup near page end
+      if (i >= lastIndex - 2 && isLikelyFooterLine(s)) continue;
 
       out.push(raw);
     }
@@ -132,10 +109,10 @@ function filterHeaderFooterText(text, pagesText) {
   }
 
   if (Array.isArray(pagesText) && pagesText.length) {
-    const { repeatedHeads, repeatedFoots } = collectRepeats(pagesText);
+    const repeatedEdgeLines = collectRepeatedEdgeLines(pagesText);
 
     return pagesText
-      .map((p) => cleanOnePage(p, repeatedHeads, repeatedFoots))
+      .map((page) => cleanOnePage(page, repeatedEdgeLines))
       .filter(Boolean)
       .join("\n\n");
   }
