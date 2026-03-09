@@ -510,7 +510,7 @@
       },
 
       address_en_street_line: {
-        pattern: /\b(?:[A-Za-z0-9.'’\-]+\s+){1,5}(?:street|st\.?|road|rd\.?|avenue|ave\.?|lane|ln\.?|drive|dr\.?|way|boulevard|blvd\.?|court|ct\.?|place|pl\.?)\s+\d{1,5}[A-Za-z]?\b/giu,
+        pattern: /^(?:[A-Za-z0-9.'’\-]+\s+){1,5}(?:street|st\.?|road|rd\.?|avenue|ave\.?|lane|ln\.?|drive|dr\.?|way|boulevard|blvd\.?|court|ct\.?|place|pl\.?)\s+\d{1,5}[A-Za-z]?[ \t]*$/gmiu,
         tag: "ADDRESS"
       },
 
