@@ -1,16 +1,19 @@
 // =========================
 // assets/stage3.js (FULL)
-// v20260309a1 — PATCHED (header/footer text filter)
+// v20260309a2 — PATCHED (header/footer filter + input editable state)
 //
 // ADD:
 // - filterHeaderFooterText()
-// - applied before Mode A text enters matcher-core / engine
+// - setInputEditable()
+// - Mode A readable PDF => readOnly
+// - Mode B / image / non-pdf / failure => editable
 //
 // GOAL:
-// remove simple page headers/footers like
+// - remove simple page headers/footers like
 //   Page 1 of 1
 //   1 / 3
 //   repeated short header/footer lines
+// - keep input box editable unless readable PDF Mode A is active
 // =========================
 
 // ================= HEADER / FOOTER FILTER =================
@@ -60,6 +63,14 @@ function filterHeaderFooterText(text) {
   }
 
   return cleaned.join("\n");
+}
+
+// ================= INPUT EDIT STATE =================
+
+function setInputEditable(isEditable) {
+  const ta = $("inputText");
+  if (!ta) return;
+  ta.readOnly = !isEditable;
 }
 
 // =========================
@@ -129,7 +140,10 @@ function ensureLangForPdfRaw(text) {
 
 // ================= Stage 3 file handler =================
 async function handleFile(file) {
-  if (!file) return;
+  if (!file) {
+    setInputEditable(true);
+    return;
+  }
 
   lastUploadedFile = file;
   lastProbe = null;
@@ -160,6 +174,7 @@ async function handleFile(file) {
     lastRunMeta.fromPdf = false;
 
     setRuleEngineAuto();
+    setInputEditable(true);
 
     setStage3Ui("B");
     setManualPanesForMode("B");
@@ -173,13 +188,17 @@ async function handleFile(file) {
     return;
   }
 
-  if (lastFileKind !== "pdf") return;
+  if (lastFileKind !== "pdf") {
+    setInputEditable(true);
+    return;
+  }
 
   try {
     if (!window.probePdfTextLayer) {
       lastRunMeta.fromPdf = false;
 
       setRuleEngineAuto();
+      setInputEditable(true);
 
       setStage3Ui("B");
       setManualPanesForMode("B");
@@ -218,6 +237,7 @@ async function handleFile(file) {
       lastRunMeta.fromPdf = false;
 
       setRuleEngineAuto();
+      setInputEditable(true);
 
       setStage3Ui("B");
       setManualPanesForMode("B");
@@ -246,8 +266,8 @@ async function handleFile(file) {
     const ta = $("inputText");
     if (ta) {
       ta.value = text;
-      ta.readOnly = true;
     }
+    setInputEditable(false);
 
     updateInputWatermarkVisibility();
 
@@ -280,6 +300,7 @@ async function handleFile(file) {
     lastRunMeta.fromPdf = false;
 
     setRuleEngineAuto();
+    setInputEditable(true);
 
     lastPdfPagesItems = [];
     lastPdfPagesText = [];
