@@ -1,9 +1,10 @@
 // =========================
 // assets/stage3.js (FULL)
-// v20260309a3 — PATCHED (stronger header/footer filter + input editable state)
+// v20260309a4 — PATCHED (per-page repeated header/footer filter + input editable state)
 //
 // ADD:
-// - stronger filterHeaderFooterText()
+// - stronger filterHeaderFooterText(text, pagesText)
+// - repeated first/last line detection across pages
 // - setInputEditable()
 // - Mode A readable PDF => readOnly
 // - Mode B / image / non-pdf / failure => editable
@@ -15,16 +16,21 @@
 //   CONFIDENTIAL
 //   INVOICE
 //   company/address footer lines
+//   repeated multi-page first/last lines
 // - keep input box editable unless readable PDF Mode A is active
 // =========================
 
 // ================= HEADER / FOOTER FILTER =================
 
-function filterHeaderFooterText(text) {
+function filterHeaderFooterText(text, pagesText) {
 
   if (!text) return text;
 
   let lines = text.split(/\r?\n/);
+
+  function normLine(s) {
+    return String(s || "").replace(/\s+/g, " ").trim();
+  }
 
   function isPageLine(s) {
     return /^page\s*\d+\s*(of|\/)\s*\d+$/i.test(s) ||
@@ -34,20 +40,17 @@ function filterHeaderFooterText(text) {
 
   function isLikelyHeaderLine(s) {
     if (!s) return false;
-    if (s.length > 80) return false;
-    if (/:/.test(s)) return false;
+    if (s.length > 100) return false;
+    if (/:/.test(s) && !/\bcustomer\s*:|\baccount\s*:|\breference\s*:/i.test(s)) return false;
 
-    // common document header words
     if (/\b(confidential|invoice|statement|receipt|quotation|quote|report|summary)\b/i.test(s)) {
       return true;
     }
 
-    // short title-like lines
     if (/^[A-Z][A-Za-z\s&\-]{4,}$/.test(s)) {
       return true;
     }
 
-    // all-caps short lines
     if (/^[A-Z0-9\s&\-]{4,}$/.test(s)) {
       return true;
     }
@@ -60,7 +63,6 @@ function filterHeaderFooterText(text) {
 
     if (isPageLine(s)) return true;
 
-    // company + address style footer
     if (
       /(?:GmbH|LLC|L\.?L\.?C\.?|Ltd\.?|Limited|Inc\.?|Incorporated|Corp\.?|Corporation|PLC|LLP)\b/.test(s) &&
       /(?:street|st\.?|road|rd\.?|avenue|ave\.?|lane|ln\.?|drive|dr\.?|way|boulevard|blvd\.?|court|ct\.?|place|pl\.?|square|sq\.?)\b/i.test(s)
@@ -68,7 +70,6 @@ function filterHeaderFooterText(text) {
       return true;
     }
 
-    // company/address line with separators
     if (
       /[·|]/.test(s) &&
       (
@@ -82,7 +83,49 @@ function filterHeaderFooterText(text) {
     return false;
   }
 
-  // ===== remove top header-like lines (only first non-empty block) =====
+  function getPageEdgeRepeats(pages) {
+    const headCount = new Map();
+    const footCount = new Map();
+
+    if (!Array.isArray(pages) || pages.length < 2) {
+      return { repeatedHeads: new Set(), repeatedFoots: new Set() };
+    }
+
+    for (const pageText of pages) {
+      const pageLines = String(pageText || "")
+        .split(/\r?\n/)
+        .map(normLine)
+        .filter(Boolean);
+
+      if (!pageLines.length) continue;
+
+      const heads = pageLines.slice(0, 2);
+      const foots = pageLines.slice(Math.max(0, pageLines.length - 2));
+
+      for (const h of heads) {
+        headCount.set(h, (headCount.get(h) || 0) + 1);
+      }
+      for (const f of foots) {
+        footCount.set(f, (footCount.get(f) || 0) + 1);
+      }
+    }
+
+    const repeatedHeads = new Set();
+    const repeatedFoots = new Set();
+
+    for (const [k, v] of headCount.entries()) {
+      if (v >= 2) repeatedHeads.add(k);
+    }
+    for (const [k, v] of footCount.entries()) {
+      if (v >= 2) repeatedFoots.add(k);
+    }
+
+    return { repeatedHeads, repeatedFoots };
+  }
+
+  const { repeatedHeads, repeatedFoots } = getPageEdgeRepeats(pagesText);
+
+  // ===== remove top header-like lines (first non-empty block) =====
   let firstNonEmpty = -1;
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].trim()) {
@@ -94,9 +137,9 @@ function filterHeaderFooterText(text) {
   if (firstNonEmpty >= 0) {
     let removeCount = 0;
     for (let i = firstNonEmpty; i < Math.min(lines.length, firstNonEmpty + 3); i++) {
-      const s = lines[i].trim();
+      const s = normLine(lines[i]);
       if (!s) break;
-      if (isLikelyHeaderLine(s)) {
+      if (isLikelyHeaderLine(s) || repeatedHeads.has(s)) {
         removeCount++;
       } else {
         break;
@@ -110,7 +153,7 @@ function filterHeaderFooterText(text) {
   const cleaned = [];
 
   for (let line of lines) {
-    const l = line.trim();
+    const l = normLine(line);
 
     if (!l) {
       cleaned.push(line);
@@ -119,6 +162,8 @@ function filterHeaderFooterText(text) {
 
     if (isPageLine(l)) continue;
     if (isLikelyFooterLine(l)) continue;
+    if (repeatedHeads.has(l) && isLikelyHeaderLine(l)) continue;
+    if (repeatedFoots.has(l)) continue;
 
     cleaned.push(line);
   }
@@ -321,7 +366,7 @@ async function handleFile(file) {
 
     // ================= HEADER / FOOTER FILTER =================
     // only for readable PDF Mode A
-    text = filterHeaderFooterText(text);
+    text = filterHeaderFooterText(text, lastPdfPagesText);
 
     lastPdfOriginalText = text;
 
