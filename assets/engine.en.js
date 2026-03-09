@@ -108,6 +108,7 @@
       "phone",
 
       "person_name",
+      "person_name_title_line",
       "company",
 
       "address_de_street",
@@ -172,8 +173,10 @@
       "security_answer",
 
       "person_name",
+      "person_name_title_line",
 
       "address_en_inline_street",
+      "address_en_street_line",
       "address_en_extra_block",
       "address_en_extra",
 
@@ -475,6 +478,12 @@
       person_name: {
         pattern:
           /^(?:contact[ \t]*details[ \t]+)?((?:name|customer[ \t]*name|account[ \t]*holder|recipient|name[ \t]*on[ \t]*card|to|attn\.?|attention)(?:[ \t]*[:：=][ \t]*|[ \t]+)(?:(?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+        tag: "NAME",
+        mode: "prefix"
+      },
+
+      person_name_title_line: {
+        pattern: /^((?:mr|mrs|ms|miss|dr|prof)\.?\s+)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
