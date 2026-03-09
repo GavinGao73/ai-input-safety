@@ -499,6 +499,11 @@
         mode: "prefix"
       },
 
+      address_en_street_line: {
+        pattern: /\b(?:[A-Za-z0-9.'’\-]+\s+){1,5}(?:street|st\.?|road|rd\.?|avenue|ave\.?|lane|ln\.?|drive|dr\.?|way|boulevard|blvd\.?|court|ct\.?|place|pl\.?)\s+\d{1,5}[A-Za-z]?\b/giu,
+        tag: "ADDRESS"
+      },
+
       address_en_inline_street: {
         pattern:
           /\b\d{1,5}[A-Za-z]?(?:-\d{1,5})?[ \t]+(?:[A-Za-z0-9.'’\-]+[ \t]+){0,6}(?:street|st\.?|avenue|ave\.?|road|rd\.?|boulevard|blvd\.?|lane|ln\.?|drive|dr\.?|way|parkway|pkwy\.?|court|ct\.?|place|pl\.?|square|sq\.?|highway|hwy\.?|terrace|ter\.?|crescent|cres\.?|close|cl\.?|gardens?|gdns?\.?|mews|row|alley|aly\.?)\b/giu,
