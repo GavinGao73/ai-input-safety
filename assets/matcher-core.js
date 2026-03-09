@@ -661,56 +661,126 @@
   }
 
   function assignPagesFromDoc(doc, hits) {
-    const d = normalizeDocument(doc);
-    const pages = Array.isArray(d.pages) ? d.pages : [];
-    if (!pages.length) {
-      return hits.map((h) => ({ ...h, page: null, rects: [] }));
+  const d = normalizeDocument(doc);
+  const pages = Array.isArray(d.pages) ? d.pages : [];
+  const fullText = safeString(d.text);
+
+  if (!pages.length) {
+    return hits.map((h) => ({ ...h, page: null, rects: [] }));
+  }
+
+  function getPageText(p) {
+    let pageText = safeString(p && p.text);
+    if (!pageText) pageText = buildPageTextFromItems(p && p.items);
+    return pageText;
+  }
+
+  function buildSegmentsFromFullText() {
+    const segments = [];
+    let searchFrom = 0;
+
+    for (let i = 0; i < pages.length; i += 1) {
+      const p = pages[i];
+      const pageNumber = Number(p && p.pageNumber) || i + 1;
+      const pageText = getPageText(p);
+
+      if (!pageText) {
+        segments.push({
+          pageNumber,
+          start: searchFrom,
+          end: searchFrom,
+          textLength: 0
+        });
+        continue;
+      }
+
+      const foundAt = fullText.indexOf(pageText, searchFrom);
+
+      if (foundAt >= 0) {
+        const start = foundAt;
+        const end = start + pageText.length;
+
+        segments.push({
+          pageNumber,
+          start,
+          end,
+          textLength: pageText.length
+        });
+
+        searchFrom = end;
+      } else {
+        return null;
+      }
     }
 
+    return segments;
+  }
+
+  function buildSegmentsBySequentialFallback() {
     const segments = [];
     let cursor = 0;
 
     for (let i = 0; i < pages.length; i += 1) {
       const p = pages[i];
-      let pageText = safeString(p && p.text);
-      if (!pageText) pageText = buildPageTextFromItems(p && p.items);
+      const pageNumber = Number(p && p.pageNumber) || i + 1;
+      const pageText = getPageText(p);
 
       const start = cursor;
       const end = start + pageText.length;
 
       segments.push({
-        pageNumber: Number(p && p.pageNumber) || i + 1,
+        pageNumber,
         start,
-        end
+        end,
+        textLength: pageText.length
       });
 
       cursor = end;
       if (i < pages.length - 1) cursor += 2;
     }
 
-    return hits.map((h) => {
-      const hs = Number(h.start) || 0;
-      const he = Number(h.end) || 0;
+    return segments;
+  }
 
-      let page = null;
+  const segments =
+    fullText && fullText.length
+      ? (buildSegmentsFromFullText() || buildSegmentsBySequentialFallback())
+      : buildSegmentsBySequentialFallback();
+
+  return hits.map((h) => {
+    const hs = Number(h.start) || 0;
+    const he = Number(h.end) || 0;
+
+    let page = null;
+
+    for (const seg of segments) {
+      if (hs < seg.end && he > seg.start) {
+        page = seg.pageNumber;
+        break;
+      }
+
+      if (hs === he && seg.textLength === 0 && hs === seg.start) {
+        page = seg.pageNumber;
+        break;
+      }
+    }
+
+    if (page == null && segments.length) {
       for (const seg of segments) {
-        if (hs < seg.end && he > seg.start) {
-          page = seg.pageNumber;
-          break;
-        }
-        if (hs === seg.start && hs === he && seg.start === seg.end) {
+        if (hs >= seg.start && hs <= seg.end) {
           page = seg.pageNumber;
           break;
         }
       }
+    }
 
-      return {
-        ...h,
-        page,
-        rects: []
-      };
-    });
-  }
+    return {
+      ...h,
+      page,
+      rects: []
+    };
+  });
+}  
 
   function applyHitsToText(text, hits) {
     const src = safeString(text);
