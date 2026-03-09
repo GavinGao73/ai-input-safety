@@ -3,13 +3,13 @@
  * Minimal manual redaction UI (in-memory only)
  * - Fullscreen overlay with canvas preview (PDF multi-page / image single page)
  * - Drag to create rectangles per page
- * - ✅ NO export button here (export MUST happen via main "红删PDF" button)
+ * - NO export button here (export MUST happen via main "红删PDF" button)
  * - Stores latest result in memory for app.js to export
  *
  * ENHANCED
  * - Zoom in / zoom out / fit
  * - Mobile-safe fit + scroll
- * - Pinch zoom (two-finger)
+ * - True pinch zoom (two-finger with pointer map)
  * - Delete single rect by tap
  * - Undo last rect
  * ======================================================= */
@@ -233,7 +233,6 @@
 
     const ui = createOverlay(lang);
     const canvasWrap = $(".rui-canvas-wrap", ui);
-    const canvasStage = $(".rui-canvas-stage", ui);
     const canvas = $(".rui-canvas", ui);
     const pageLabel = $(".rui-page", ui);
 
@@ -282,18 +281,23 @@
     const MIN_ZOOM_ABS = 0.08;
     const MAX_ZOOM = 8;
 
-    let isDown = false;
-    let sx = 0;
-    let sy = 0;
-    let activePointerId = null;
+    let drawState = {
+      active: false,
+      pointerId: null,
+      startX: 0,
+      startY: 0,
+      moved: false
+    };
 
-    let pinchMode = false;
-    let pinchPointerA = null;
-    let pinchPointerB = null;
-    let pinchStartDist = 0;
-    let pinchStartZoom = 1;
-
-    let movedDuringPointer = false;
+    const activePointers = new Map();
+    let pinchState = {
+      active: false,
+      ids: [],
+      startDist: 0,
+      startZoom: 1,
+      anchorClientX: 0,
+      anchorClientY: 0
+    };
 
     function currentPage() {
       return pages[idx] || null;
@@ -325,42 +329,44 @@
       return Math.max(MIN_ZOOM_ABS, Math.min(1, z || 1));
     }
 
-    function applyCanvasScale(keepCenter) {
+    function applyCanvasScale(keepVisualAnchor, anchorClientX, anchorClientY) {
       const p = currentPage();
       if (!p || !p.canvas) return;
 
-      const prevScrollLeft = canvasWrap.scrollLeft;
-      const prevScrollTop = canvasWrap.scrollTop;
-      const prevClientW = canvasWrap.clientWidth;
-      const prevClientH = canvasWrap.clientHeight;
+      const wrapRect = canvasWrap.getBoundingClientRect();
 
-      const centerX = prevScrollLeft + prevClientW / 2;
-      const centerY = prevScrollTop + prevClientH / 2;
+      let contentXBefore = canvasWrap.scrollLeft + wrapRect.width / 2;
+      let contentYBefore = canvasWrap.scrollTop + wrapRect.height / 2;
+
+      if (keepVisualAnchor && Number.isFinite(anchorClientX) && Number.isFinite(anchorClientY)) {
+        contentXBefore = canvasWrap.scrollLeft + (anchorClientX - wrapRect.left);
+        contentYBefore = canvasWrap.scrollTop + (anchorClientY - wrapRect.top);
+      }
+
+      const prevZoom = Number(canvas.dataset.zoom || 1) || 1;
+      const ratioX = contentXBefore / Math.max(1, p.canvas.width * prevZoom);
+      const ratioY = contentYBefore / Math.max(1, p.canvas.height * prevZoom);
 
       canvas.style.width = `${Math.round(p.canvas.width * zoom)}px`;
       canvas.style.height = `${Math.round(p.canvas.height * zoom)}px`;
+      canvas.dataset.zoom = String(zoom);
 
-      if (keepCenter) {
-        requestAnimationFrame(() => {
-          const newW = p.canvas.width * zoom;
-          const newH = p.canvas.height * zoom;
+      requestAnimationFrame(() => {
+        if (keepVisualAnchor) {
+          const nextContentX = ratioX * (p.canvas.width * zoom);
+          const nextContentY = ratioY * (p.canvas.height * zoom);
+          const nextScrollLeft = nextContentX - (Number.isFinite(anchorClientX) ? (anchorClientX - wrapRect.left) : wrapRect.width / 2);
+          const nextScrollTop = nextContentY - (Number.isFinite(anchorClientY) ? (anchorClientY - wrapRect.top) : wrapRect.height / 2);
 
-          const ratioX = p.canvas.width > 0 ? centerX / Math.max(1, p.canvas.width * (zoom || 1)) : 0;
-          const ratioY = p.canvas.height > 0 ? centerY / Math.max(1, p.canvas.height * (zoom || 1)) : 0;
-
-          const nextX = ratioX * newW - canvasWrap.clientWidth / 2;
-          const nextY = ratioY * newH - canvasWrap.clientHeight / 2;
-
-          canvasWrap.scrollLeft = Math.max(0, nextX);
-          canvasWrap.scrollTop = Math.max(0, nextY);
-        });
-      }
+          canvasWrap.scrollLeft = Math.max(0, nextScrollLeft);
+          canvasWrap.scrollTop = Math.max(0, nextScrollTop);
+        }
+      });
     }
 
-    function setZoom(nextZoom, keepCenter) {
-      const z = Math.max(MIN_ZOOM_ABS, Math.min(MAX_ZOOM, Number(nextZoom) || 1));
-      zoom = z;
-      applyCanvasScale(!!keepCenter);
+    function setZoom(nextZoom, keepVisualAnchor, anchorClientX, anchorClientY) {
+      zoom = Math.max(MIN_ZOOM_ABS, Math.min(MAX_ZOOM, Number(nextZoom) || 1));
+      applyCanvasScale(!!keepVisualAnchor, anchorClientX, anchorClientY);
     }
 
     function fitToPage() {
@@ -407,11 +413,15 @@
       }
     }
 
-    function getPos(ev) {
+    function getCanvasPosFromClient(clientX, clientY) {
       const rect = canvas.getBoundingClientRect();
-      const x = (ev.clientX - rect.left) * (canvas.width / rect.width);
-      const y = (ev.clientY - rect.top) * (canvas.height / rect.height);
+      const x = (clientX - rect.left) * (canvas.width / rect.width);
+      const y = (clientY - rect.top) * (canvas.height / rect.height);
       return { x, y };
+    }
+
+    function getPos(ev) {
+      return getCanvasPosFromClient(ev.clientX, ev.clientY);
     }
 
     function distance(a, b) {
@@ -420,110 +430,133 @@
       return Math.sqrt(dx * dx + dy * dy);
     }
 
+    function midpoint(a, b) {
+      return {
+        clientX: (a.clientX + b.clientX) / 2,
+        clientY: (a.clientY + b.clientY) / 2
+      };
+    }
+
     function findRectAtPoint(x, y) {
       const rects = getCurrentRects();
       for (let i = rects.length - 1; i >= 0; i--) {
         const r = rects[i];
-        if (
-          x >= r.x &&
-          y >= r.y &&
-          x <= r.x + r.w &&
-          y <= r.y + r.h
-        ) {
+        if (x >= r.x && y >= r.y && x <= r.x + r.w && y <= r.y + r.h) {
           return i;
         }
       }
       return -1;
     }
 
-    function startPinchIfNeeded(ev) {
-      if (pinchMode) return;
-      if (activePointerId == null) return;
-
-      pinchPointerA = { id: activePointerId, clientX: sx, clientY: sy };
-      pinchPointerB = { id: ev.pointerId, clientX: ev.clientX, clientY: ev.clientY };
-
-      pinchStartDist = distance(pinchPointerA, pinchPointerB);
-      pinchStartZoom = zoom;
-
-      if (pinchStartDist > 0) {
-        pinchMode = true;
-        isDown = false;
-        try { canvas.releasePointerCapture(activePointerId); } catch (_) {}
-        activePointerId = null;
-      }
+    function resetDrawState() {
+      drawState.active = false;
+      drawState.pointerId = null;
+      drawState.startX = 0;
+      drawState.startY = 0;
+      drawState.moved = false;
     }
 
-    function updatePinchPointer(ev) {
-      if (!pinchMode) return;
-      if (pinchPointerA && ev.pointerId === pinchPointerA.id) {
-        pinchPointerA.clientX = ev.clientX;
-        pinchPointerA.clientY = ev.clientY;
-      } else if (pinchPointerB && ev.pointerId === pinchPointerB.id) {
-        pinchPointerB.clientX = ev.clientX;
-        pinchPointerB.clientY = ev.clientY;
-      }
+    function startPinchIfPossible() {
+      if (activePointers.size < 2) return;
+      const ids = Array.from(activePointers.keys()).slice(0, 2);
+      const p1 = activePointers.get(ids[0]);
+      const p2 = activePointers.get(ids[1]);
+      if (!p1 || !p2) return;
 
-      if (!pinchPointerA || !pinchPointerB) return;
+      pinchState.active = true;
+      pinchState.ids = ids;
+      pinchState.startDist = distance(p1, p2);
+      pinchState.startZoom = zoom;
 
-      const d = distance(pinchPointerA, pinchPointerB);
-      if (!d || !pinchStartDist) return;
+      const mid = midpoint(p1, p2);
+      pinchState.anchorClientX = mid.clientX;
+      pinchState.anchorClientY = mid.clientY;
 
-      const nextZoom = pinchStartZoom * (d / pinchStartDist);
-      setZoom(nextZoom, true);
+      resetDrawState();
     }
 
-    function stopPinchPointer(pointerId) {
-      if (!pinchMode) return;
+    function stopPinch() {
+      pinchState.active = false;
+      pinchState.ids = [];
+      pinchState.startDist = 0;
+      pinchState.startZoom = zoom;
+      pinchState.anchorClientX = 0;
+      pinchState.anchorClientY = 0;
+    }
 
-      if (pinchPointerA && pointerId === pinchPointerA.id) pinchPointerA = null;
-      if (pinchPointerB && pointerId === pinchPointerB.id) pinchPointerB = null;
+    function updatePinch() {
+      if (!pinchState.active) return;
+      if (pinchState.ids.length < 2) return;
 
-      if (!pinchPointerA || !pinchPointerB) {
-        pinchMode = false;
-        pinchStartDist = 0;
+      const p1 = activePointers.get(pinchState.ids[0]);
+      const p2 = activePointers.get(pinchState.ids[1]);
+      if (!p1 || !p2) {
+        stopPinch();
+        return;
       }
+
+      const d = distance(p1, p2);
+      if (!d || !pinchState.startDist) return;
+
+      const mid = midpoint(p1, p2);
+      const nextZoom = pinchState.startZoom * (d / pinchState.startDist);
+
+      setZoom(nextZoom, true, mid.clientX, mid.clientY);
     }
 
     function onDown(ev) {
       try { ev.preventDefault(); } catch (_) {}
 
-      if (pinchMode) return;
+      activePointers.set(ev.pointerId, {
+        pointerId: ev.pointerId,
+        clientX: ev.clientX,
+        clientY: ev.clientY
+      });
 
-      if (activePointerId != null && activePointerId !== ev.pointerId) {
-        startPinchIfNeeded(ev);
+      if (activePointers.size >= 2) {
+        startPinchIfPossible();
         return;
       }
 
-      isDown = true;
-      movedDuringPointer = false;
-      activePointerId = ev.pointerId;
-
-      try { canvas.setPointerCapture(ev.pointerId); } catch (_) {}
+      if (pinchState.active) return;
 
       const p = getPos(ev);
-      sx = p.x;
-      sy = p.y;
+      drawState.active = true;
+      drawState.pointerId = ev.pointerId;
+      drawState.startX = p.x;
+      drawState.startY = p.y;
+      drawState.moved = false;
+
+      try { canvas.setPointerCapture(ev.pointerId); } catch (_) {}
     }
 
     function onMove(ev) {
-      if (pinchMode) {
-        updatePinchPointer(ev);
+      if (activePointers.has(ev.pointerId)) {
+        activePointers.set(ev.pointerId, {
+          pointerId: ev.pointerId,
+          clientX: ev.clientX,
+          clientY: ev.clientY
+        });
+      }
+
+      if (pinchState.active || activePointers.size >= 2) {
+        if (!pinchState.active) startPinchIfPossible();
+        updatePinch();
         return;
       }
 
-      if (!isDown) return;
-      if (activePointerId != null && ev.pointerId !== activePointerId) return;
+      if (!drawState.active) return;
+      if (drawState.pointerId !== ev.pointerId) return;
 
       try { ev.preventDefault(); } catch (_) {}
 
       const p = getPos(ev);
-      const x = Math.min(sx, p.x);
-      const y = Math.min(sy, p.y);
-      const w = Math.abs(p.x - sx);
-      const h = Math.abs(p.y - sy);
+      const x = Math.min(drawState.startX, p.x);
+      const y = Math.min(drawState.startY, p.y);
+      const w = Math.abs(p.x - drawState.startX);
+      const h = Math.abs(p.y - drawState.startY);
 
-      if (w > 3 || h > 3) movedDuringPointer = true;
+      if (w > 3 || h > 3) drawState.moved = true;
 
       const page = currentPage();
       if (!page) return;
@@ -534,27 +567,22 @@
       canvas.getContext("2d").drawImage(overlayCanvas, 0, 0);
     }
 
-    function finishUp(ev) {
-      if (!isDown) return;
-      if (activePointerId != null && ev && ev.pointerId != null && ev.pointerId !== activePointerId) return;
+    function finishDraw(ev) {
+      if (!drawState.active) return;
+      if (drawState.pointerId !== ev.pointerId) return;
 
-      try { if (ev) ev.preventDefault(); } catch (_) {}
+      try { ev.preventDefault(); } catch (_) {}
 
-      isDown = false;
+      try { canvas.releasePointerCapture(ev.pointerId); } catch (_) {}
 
-      try {
-        if (activePointerId != null) canvas.releasePointerCapture(activePointerId);
-      } catch (_) {}
+      const p = getPos(ev);
+      const x = Math.min(drawState.startX, p.x);
+      const y = Math.min(drawState.startY, p.y);
+      const w = Math.abs(p.x - drawState.startX);
+      const h = Math.abs(p.y - drawState.startY);
 
-      const p = ev ? getPos(ev) : { x: sx, y: sy };
-      const x = Math.min(sx, p.x);
-      const y = Math.min(sy, p.y);
-      const w = Math.abs(p.x - sx);
-      const h = Math.abs(p.y - sy);
-
-      const tapLike = w < 6 && h < 6 && !movedDuringPointer;
-
-      activePointerId = null;
+      const tapLike = w < 6 && h < 6 && !drawState.moved;
+      resetDrawState();
 
       const page = currentPage();
       if (!page) {
@@ -590,24 +618,37 @@
     }
 
     function onUp(ev) {
-      if (pinchMode) {
-        stopPinchPointer(ev.pointerId);
+      if (pinchState.active) {
+        activePointers.delete(ev.pointerId);
+        if (activePointers.size < 2) {
+          stopPinch();
+        }
         return;
       }
-      finishUp(ev);
+
+      finishDraw(ev);
+      activePointers.delete(ev.pointerId);
     }
 
     function onCancel(ev) {
-      if (pinchMode) {
-        stopPinchPointer(ev.pointerId);
+      if (pinchState.active) {
+        activePointers.delete(ev.pointerId);
+        if (activePointers.size < 2) stopPinch();
         return;
       }
-      finishUp(ev);
+
+      if (drawState.active && drawState.pointerId === ev.pointerId) {
+        resetDrawState();
+        updatePageUI(false);
+      }
+      activePointers.delete(ev.pointerId);
     }
 
-    function onLeave() {
-      if (pinchMode) return;
-      if (isDown) finishUp(null);
+    function onLeave(ev) {
+      if (pinchState.active) return;
+      if (drawState.active && drawState.pointerId === ev.pointerId) {
+        finishDraw(ev);
+      }
     }
 
     canvas.addEventListener("pointerdown", onDown, { passive: false });
@@ -619,6 +660,9 @@
     btnPrev.onclick = () => {
       if (idx > 0) {
         idx--;
+        stopPinch();
+        resetDrawState();
+        activePointers.clear();
         updatePageUI(true);
       }
     };
@@ -626,16 +670,21 @@
     btnNext.onclick = () => {
       if (idx < pages.length - 1) {
         idx++;
+        stopPinch();
+        resetDrawState();
+        activePointers.clear();
         updatePageUI(true);
       }
     };
 
     btnZoomIn.onclick = () => {
-      setZoom(zoom * 1.2, true);
+      const rect = canvasWrap.getBoundingClientRect();
+      setZoom(zoom * 1.2, true, rect.left + rect.width / 2, rect.top + rect.height / 2);
     };
 
     btnZoomOut.onclick = () => {
-      setZoom(zoom / 1.2, true);
+      const rect = canvasWrap.getBoundingClientRect();
+      setZoom(zoom / 1.2, true, rect.left + rect.width / 2, rect.top + rect.height / 2);
     };
 
     btnFit.onclick = () => {
