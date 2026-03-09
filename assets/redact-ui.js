@@ -6,9 +6,11 @@
  * - ✅ NO export button here (export MUST happen via main "红删PDF" button)
  * - Stores latest result in memory for app.js to export
  *
- * PATCH:
- * - web 端手工涂抹界面可滚动查看整页
- * - canvas 区域自适应容器，不再出现显示不全/无法查看完整页面的问题
+ * PATCH (web Mode B stability)
+ * - ✅ canvas area is truly scrollable on web
+ * - ✅ page switch resets scroll position
+ * - ✅ keep one-canvas/page workflow (no zoom yet)
+ * - ✅ preserve original rect coordinate system
  * ======================================================= */
 
 (function () {
@@ -60,9 +62,12 @@
 
     const root = document.createElement("div");
     root.style.cssText = `
-      position:fixed; inset:0; z-index:999999;
+      position:fixed;
+      inset:0;
+      z-index:999999;
       background:rgba(10,12,16,.92);
-      display:flex; flex-direction:column;
+      display:flex;
+      flex-direction:column;
       font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
       color:#fff;
       overflow:hidden;
@@ -70,7 +75,9 @@
 
     root.innerHTML = `
       <div class="rui-top" style="
-        display:flex; align-items:center; gap:12px;
+        display:flex;
+        align-items:center;
+        gap:12px;
         padding:12px 14px;
         border-bottom:1px solid rgba(255,255,255,.12);
         flex:0 0 auto;
@@ -96,28 +103,40 @@
         display:flex;
         flex-direction:column;
         gap:10px;
-        padding:10px 14px 14px;
+        padding:10px 14px;
         overflow:hidden;
       ">
         <div class="rui-canvas-wrap" style="
           flex:1 1 auto;
           min-height:0;
-          display:flex;
-          justify-content:center;
-          align-items:flex-start;
+          min-width:0;
+          display:block;
           background:rgba(255,255,255,.04);
           border:1px solid rgba(255,255,255,.10);
           border-radius:14px;
           overflow:auto;
-          padding:10px;
+          overscroll-behavior:contain;
+          -webkit-overflow-scrolling:touch;
+          padding:12px;
         ">
-          <canvas class="rui-canvas" style="
-            display:block;
-            touch-action:none;
-            background:#fff;
-            box-shadow:0 6px 20px rgba(0,0,0,.35);
-            margin:auto;
-          "></canvas>
+          <div class="rui-stage" style="
+            position:relative;
+            width:max-content;
+            min-width:100%;
+            min-height:100%;
+            display:flex;
+            align-items:flex-start;
+            justify-content:center;
+          ">
+            <canvas class="rui-canvas" style="
+              display:block;
+              touch-action:none;
+              user-select:none;
+              -webkit-user-drag:none;
+              box-shadow:0 8px 28px rgba(0,0,0,.35);
+              background:#fff;
+            "></canvas>
+          </div>
         </div>
 
         <div class="rui-bar" style="
@@ -125,12 +144,11 @@
           align-items:center;
           gap:10px;
           flex:0 0 auto;
-          flex-wrap:wrap;
         ">
           <button class="rui-btn rui-prev" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.prev}</button>
           <button class="rui-btn rui-next" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.next}</button>
 
-          <div style="margin-left:auto; display:flex; gap:10px; flex-wrap:wrap;">
+          <div style="margin-left:auto; display:flex; gap:10px;">
             <button class="rui-btn rui-clear-page" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.clearPage}</button>
             <button class="rui-btn rui-clear-all" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.clearAll}</button>
           </div>
@@ -213,6 +231,7 @@
     const ui = createOverlay(lang);
     const canvas = $(".rui-canvas", ui);
     const canvasWrap = $(".rui-canvas-wrap", ui);
+    const stage = $(".rui-stage", ui);
     const pageLabel = $(".rui-page", ui);
     const btnPrev = $(".rui-prev", ui);
     const btnNext = $(".rui-next", ui);
@@ -250,24 +269,26 @@
     let idx = 0;
     const overlayCanvas = document.createElement("canvas");
 
-    function fitCanvasToWrap() {
+    function resetViewportScroll() {
+      if (!canvasWrap) return;
+      canvasWrap.scrollTop = 0;
+      canvasWrap.scrollLeft = 0;
+    }
+
+    function syncCanvasDisplaySize() {
       const p = pages[idx];
-      if (!p || !p.canvas || !canvasWrap || !canvas) return;
+      if (!p || !p.canvas) return;
 
-      const wrapRect = canvasWrap.getBoundingClientRect();
-      const maxW = Math.max(100, Math.floor(wrapRect.width - 20));
-      const maxH = Math.max(100, Math.floor(wrapRect.height - 20));
+      canvas.width = overlayCanvas.width;
+      canvas.height = overlayCanvas.height;
 
-      const srcW = Math.max(1, overlayCanvas.width || p.canvas.width || p.width || 1);
-      const srcH = Math.max(1, overlayCanvas.height || p.canvas.height || p.height || 1);
+      canvas.style.width = `${overlayCanvas.width}px`;
+      canvas.style.height = `${overlayCanvas.height}px`;
 
-      const scale = Math.min(maxW / srcW, maxH / srcH, 1);
-
-      const cssW = Math.max(1, Math.floor(srcW * scale));
-      const cssH = Math.max(1, Math.floor(srcH * scale));
-
-      canvas.style.width = cssW + "px";
-      canvas.style.height = cssH + "px";
+      if (stage) {
+        stage.style.width = `${Math.max(overlayCanvas.width, canvasWrap ? canvasWrap.clientWidth - 24 : overlayCanvas.width)}px`;
+        stage.style.height = `${Math.max(overlayCanvas.height, canvasWrap ? canvasWrap.clientHeight - 24 : overlayCanvas.height)}px`;
+      }
     }
 
     function updatePageUI(resetScroll) {
@@ -276,17 +297,11 @@
 
       const rects = rectsByPage[p.pageNumber] || [];
       drawPreview(p.canvas, overlayCanvas, rects);
+      syncCanvasDisplaySize();
 
-      canvas.width = overlayCanvas.width;
-      canvas.height = overlayCanvas.height;
-      canvas.getContext("2d").drawImage(overlayCanvas, 0, 0);
-
-      fitCanvasToWrap();
-
-      if (resetScroll !== false && canvasWrap) {
-        canvasWrap.scrollTop = 0;
-        canvasWrap.scrollLeft = 0;
-      }
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(overlayCanvas, 0, 0);
 
       if (pageLabel) pageLabel.textContent = L.page(idx + 1, pages.length);
 
@@ -295,6 +310,8 @@
       btnNext.disabled = !multi || idx >= pages.length - 1;
       btnPrev.style.opacity = btnPrev.disabled ? 0.4 : 1;
       btnNext.style.opacity = btnNext.disabled ? 0.4 : 1;
+
+      if (resetScroll !== false) resetViewportScroll();
     }
 
     let isDown = false;
@@ -336,9 +353,12 @@
 
       const rects = rectsByPage[page.pageNumber] || [];
       const tmp = rects.concat([{ x, y, w, h }]);
+
       drawPreview(page.canvas, overlayCanvas, tmp);
-      canvas.getContext("2d").drawImage(overlayCanvas, 0, 0);
-      fitCanvasToWrap();
+
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(overlayCanvas, 0, 0);
     }
 
     function finishUp(ev) {
@@ -414,14 +434,6 @@
       updatePageUI(false);
     };
 
-    function onResize() {
-      fitCanvasToWrap();
-    }
-
-    try {
-      window.addEventListener("resize", onResize);
-    } catch (_) {}
-
     let closed = false;
     function close() {
       if (closed) return;
@@ -471,6 +483,14 @@
         filename
       };
     }
+
+    function onResize() {
+      updatePageUI(false);
+    }
+
+    try {
+      window.addEventListener("resize", onResize);
+    } catch (_) {}
 
     btnDone.onclick = () => {
       try { window.__manual_redact_last = buildResult(); } catch (_) {}
