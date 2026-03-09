@@ -14,7 +14,7 @@
 (function () {
   "use strict";
 
-  const DEFAULT_DPI = 300;
+  const DEFAULT_DPI = 450;
   const PDFJS_VERSION = "3.11.174";
 
   let __pdfjsLoadPromise = null;
