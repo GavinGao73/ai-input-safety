@@ -5,6 +5,10 @@
  * - Drag to create rectangles per page
  * - ✅ NO export button here (export MUST happen via main "红删PDF" button)
  * - Stores latest result in memory for app.js to export
+ *
+ * PATCH:
+ * - web 端手工涂抹界面可滚动查看整页
+ * - canvas 区域自适应容器，不再出现显示不全/无法查看完整页面的问题
  * ======================================================= */
 
 (function () {
@@ -61,30 +65,72 @@
       display:flex; flex-direction:column;
       font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
       color:#fff;
+      overflow:hidden;
     `;
 
     root.innerHTML = `
-      <div class="rui-top" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.12);">
+      <div class="rui-top" style="
+        display:flex; align-items:center; gap:12px;
+        padding:12px 14px;
+        border-bottom:1px solid rgba(255,255,255,.12);
+        flex:0 0 auto;
+      ">
         <div style="font-weight:800; font-size:14px; opacity:.95;">${L.title}</div>
         <div class="rui-page" style="margin-left:auto; font-size:12px; opacity:.70;"></div>
         <button class="rui-btn rui-done" style="border:0; padding:8px 10px; border-radius:10px; background:#2f7cff; color:#fff; font-weight:700; cursor:pointer;">${L.done}</button>
         <button class="rui-btn rui-cancel" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.cancel}</button>
       </div>
 
-      <div class="rui-tip" style="padding:10px 14px; font-size:12px; opacity:.72;">
+      <div class="rui-tip" style="
+        padding:10px 14px;
+        font-size:12px;
+        opacity:.72;
+        flex:0 0 auto;
+      ">
         ${L.tip}
       </div>
 
-      <div class="rui-body" style="flex:1; display:flex; flex-direction:column; gap:10px; padding:10px 14px;">
-        <div class="rui-canvas-wrap" style="flex:1; display:flex; justify-content:center; align-items:center; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.10); border-radius:14px; overflow:hidden;">
-          <canvas class="rui-canvas" style="max-width:100%; max-height:100%; touch-action:none;"></canvas>
+      <div class="rui-body" style="
+        flex:1 1 auto;
+        min-height:0;
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+        padding:10px 14px 14px;
+        overflow:hidden;
+      ">
+        <div class="rui-canvas-wrap" style="
+          flex:1 1 auto;
+          min-height:0;
+          display:flex;
+          justify-content:center;
+          align-items:flex-start;
+          background:rgba(255,255,255,.04);
+          border:1px solid rgba(255,255,255,.10);
+          border-radius:14px;
+          overflow:auto;
+          padding:10px;
+        ">
+          <canvas class="rui-canvas" style="
+            display:block;
+            touch-action:none;
+            background:#fff;
+            box-shadow:0 6px 20px rgba(0,0,0,.35);
+            margin:auto;
+          "></canvas>
         </div>
 
-        <div class="rui-bar" style="display:flex; align-items:center; gap:10px;">
+        <div class="rui-bar" style="
+          display:flex;
+          align-items:center;
+          gap:10px;
+          flex:0 0 auto;
+          flex-wrap:wrap;
+        ">
           <button class="rui-btn rui-prev" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.prev}</button>
           <button class="rui-btn rui-next" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.next}</button>
 
-          <div style="margin-left:auto; display:flex; gap:10px;">
+          <div style="margin-left:auto; display:flex; gap:10px; flex-wrap:wrap;">
             <button class="rui-btn rui-clear-page" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.clearPage}</button>
             <button class="rui-btn rui-clear-all" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.clearAll}</button>
           </div>
@@ -103,10 +149,6 @@
 
     ctx.drawImage(baseCanvas, 0, 0);
 
-    // ✅ High-contrast selection box (works on white PDFs)
-    // - cyan translucent fill
-    // - dark outer stroke
-    // - cyan dashed inner stroke
     const outerW = Math.max(3, Math.round(baseCanvas.width / 520));
     const innerW = Math.max(2, Math.round(baseCanvas.width / 780));
 
@@ -115,19 +157,16 @@
     for (const r of (rects || [])) {
       const x = r.x, y = r.y, w = r.w, h = r.h;
 
-      // 1) fill
       ctx.globalAlpha = 0.12;
       ctx.fillStyle = "#00E5FF";
       ctx.fillRect(x, y, w, h);
 
-      // 2) outer stroke
       ctx.globalAlpha = 0.95;
       ctx.setLineDash([]);
       ctx.lineWidth = outerW;
       ctx.strokeStyle = "rgba(0,0,0,0.85)";
       ctx.strokeRect(x, y, w, h);
 
-      // 3) inner dashed stroke
       ctx.setLineDash([6, 4]);
       ctx.lineWidth = innerW;
       ctx.strokeStyle = "rgba(0,229,255,0.95)";
@@ -137,14 +176,12 @@
     ctx.restore();
   }
 
-  // ✅ Normalize pages from multiple return shapes
   function normalizePages(rendered) {
     let pages =
       Array.isArray(rendered) ? rendered :
       (rendered && Array.isArray(rendered.pages)) ? rendered.pages :
       [];
 
-    // sanitize minimal shape (pageNumber/canvas/width/height)
     const out = [];
     for (let i = 0; i < pages.length; i++) {
       const p = pages[i];
@@ -171,11 +208,11 @@
     if (!file) return null;
     if (!window.RasterExport) throw new Error("RasterExport missing");
 
-    // ✅ stable filename per session (do NOT change on repeated done())
     const filename = `raster_secure_${Date.now()}.pdf`;
 
     const ui = createOverlay(lang);
     const canvas = $(".rui-canvas", ui);
+    const canvasWrap = $(".rui-canvas-wrap", ui);
     const pageLabel = $(".rui-page", ui);
     const btnPrev = $(".rui-prev", ui);
     const btnNext = $(".rui-next", ui);
@@ -205,7 +242,7 @@
     }
 
     const rectsByPage = {};
-    pages.forEach(p => {
+    pages.forEach((p) => {
       const pn = p.pageNumber || 1;
       rectsByPage[pn] = rectsByPage[pn] || [];
     });
@@ -213,7 +250,27 @@
     let idx = 0;
     const overlayCanvas = document.createElement("canvas");
 
-    function updatePageUI() {
+    function fitCanvasToWrap() {
+      const p = pages[idx];
+      if (!p || !p.canvas || !canvasWrap || !canvas) return;
+
+      const wrapRect = canvasWrap.getBoundingClientRect();
+      const maxW = Math.max(100, Math.floor(wrapRect.width - 20));
+      const maxH = Math.max(100, Math.floor(wrapRect.height - 20));
+
+      const srcW = Math.max(1, overlayCanvas.width || p.canvas.width || p.width || 1);
+      const srcH = Math.max(1, overlayCanvas.height || p.canvas.height || p.height || 1);
+
+      const scale = Math.min(maxW / srcW, maxH / srcH, 1);
+
+      const cssW = Math.max(1, Math.floor(srcW * scale));
+      const cssH = Math.max(1, Math.floor(srcH * scale));
+
+      canvas.style.width = cssW + "px";
+      canvas.style.height = cssH + "px";
+    }
+
+    function updatePageUI(resetScroll) {
       const p = pages[idx];
       if (!p || !p.canvas) return;
 
@@ -223,6 +280,13 @@
       canvas.width = overlayCanvas.width;
       canvas.height = overlayCanvas.height;
       canvas.getContext("2d").drawImage(overlayCanvas, 0, 0);
+
+      fitCanvasToWrap();
+
+      if (resetScroll !== false && canvasWrap) {
+        canvasWrap.scrollTop = 0;
+        canvasWrap.scrollLeft = 0;
+      }
 
       if (pageLabel) pageLabel.textContent = L.page(idx + 1, pages.length);
 
@@ -251,7 +315,8 @@
       try { canvas.setPointerCapture(ev.pointerId); } catch (_) {}
 
       const p = getPos(ev);
-      sx = p.x; sy = p.y;
+      sx = p.x;
+      sy = p.y;
     }
 
     function onMove(ev) {
@@ -273,6 +338,7 @@
       const tmp = rects.concat([{ x, y, w, h }]);
       drawPreview(page.canvas, overlayCanvas, tmp);
       canvas.getContext("2d").drawImage(overlayCanvas, 0, 0);
+      fitCanvasToWrap();
     }
 
     function finishUp(ev) {
@@ -282,7 +348,9 @@
       try { if (ev) ev.preventDefault(); } catch (_) {}
       isDown = false;
 
-      try { if (activePointerId != null) canvas.releasePointerCapture(activePointerId); } catch (_) {}
+      try {
+        if (activePointerId != null) canvas.releasePointerCapture(activePointerId);
+      } catch (_) {}
 
       const p = ev ? getPos(ev) : { x: sx, y: sy };
       const x = Math.min(sx, p.x);
@@ -292,7 +360,10 @@
 
       activePointerId = null;
 
-      if (w < 6 || h < 6) { updatePageUI(); return; }
+      if (w < 6 || h < 6) {
+        updatePageUI(false);
+        return;
+      }
 
       const page = pages[idx];
       if (!page) return;
@@ -303,7 +374,8 @@
         w: Math.round(w),
         h: Math.round(h)
       });
-      updatePageUI();
+
+      updatePageUI(false);
     }
 
     function onUp(ev) { finishUp(ev); }
@@ -316,25 +388,45 @@
     canvas.addEventListener("pointercancel", onCancel);
     canvas.addEventListener("pointerleave", onLeave);
 
-    btnPrev.onclick = () => { if (idx > 0) { idx--; updatePageUI(); } };
-    btnNext.onclick = () => { if (idx < pages.length - 1) { idx++; updatePageUI(); } };
+    btnPrev.onclick = () => {
+      if (idx > 0) {
+        idx--;
+        updatePageUI(true);
+      }
+    };
+
+    btnNext.onclick = () => {
+      if (idx < pages.length - 1) {
+        idx++;
+        updatePageUI(true);
+      }
+    };
 
     btnClearPage.onclick = () => {
       const page = pages[idx];
       if (!page) return;
       rectsByPage[page.pageNumber] = [];
-      updatePageUI();
+      updatePageUI(false);
     };
 
     btnClearAll.onclick = () => {
       for (const p of pages) rectsByPage[p.pageNumber] = [];
-      updatePageUI();
+      updatePageUI(false);
     };
+
+    function onResize() {
+      fitCanvasToWrap();
+    }
+
+    try {
+      window.addEventListener("resize", onResize);
+    } catch (_) {}
 
     let closed = false;
     function close() {
       if (closed) return;
       closed = true;
+
       try {
         canvas.removeEventListener("pointerdown", onDown);
         canvas.removeEventListener("pointermove", onMove);
@@ -342,6 +434,11 @@
         canvas.removeEventListener("pointercancel", onCancel);
         canvas.removeEventListener("pointerleave", onLeave);
       } catch (_) {}
+
+      try {
+        window.removeEventListener("resize", onResize);
+      } catch (_) {}
+
       ui.remove();
     }
 
@@ -350,7 +447,7 @@
       const keys = Object.keys(src || {});
       for (const k of keys) {
         const arr = Array.isArray(src[k]) ? src[k] : [];
-        out[k] = arr.map(r => ({
+        out[k] = arr.map((r) => ({
           x: Number(r.x || 0),
           y: Number(r.y || 0),
           w: Number(r.w || 0),
@@ -362,13 +459,12 @@
 
     function buildResult() {
       return {
-        pages: pages.map(p => ({
+        pages: pages.map((p) => ({
           pageNumber: p.pageNumber,
           canvas: p.canvas,
           width: p.width || (p.canvas ? p.canvas.width : 1),
           height: p.height || (p.canvas ? p.canvas.height : 1)
         })),
-        // ✅ freeze snapshot (avoid mutable reference)
         rectsByPage: cloneRectsByPage(rectsByPage),
         lang,
         dpi: DPI,
@@ -376,7 +472,6 @@
       };
     }
 
-    // ✅ Done = save to memory and close
     btnDone.onclick = () => {
       try { window.__manual_redact_last = buildResult(); } catch (_) {}
       close();
@@ -384,9 +479,8 @@
 
     btnCancel.onclick = () => close();
 
-    updatePageUI();
+    updatePageUI(true);
 
-    // Return a session for app.js to pull result later
     return {
       done() { return buildResult(); },
       close
