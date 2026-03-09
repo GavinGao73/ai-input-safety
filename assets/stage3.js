@@ -278,8 +278,13 @@ function enterModeBFromPdf(rawText) {
   setRuleEngineAuto();
   setInputEditable(true);
 
+  // ✅ 语义不可读的 PDF 不再把混乱文本写进输入框
+  lastPdfOriginalText = "";
+
   const ta = $("inputText");
-  if (ta && rawText) ta.value = rawText;
+  if (ta) {
+    ta.value = "";
+  }
 
   updateInputWatermarkVisibility();
 
