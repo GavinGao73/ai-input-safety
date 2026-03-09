@@ -6,25 +6,29 @@
  * - ✅ NO export button here (export MUST happen via main "红删PDF" button)
  * - Stores latest result in memory for app.js to export
  *
- * PATCH
- * - ✅ web scrollable canvas area
- * - ✅ page switch resets scroll position
- * - ✅ zoom in / zoom out / fit to viewport
- * - ✅ rect coordinates remain in ORIGINAL canvas space
+ * PATCH (2026-03-09)
+ * - ✅ add zoom in / zoom out / fit controls
+ * - ✅ desktop: scroll large pages inside viewport
+ * - ✅ mobile: fit button works, can zoom out, can see full page
+ * - ✅ selection rects stay accurate after zoom / scroll
  * ======================================================= */
 
 (function () {
   "use strict";
 
   const DPI = 600;
-  const ZOOM_MIN = 0.2;
-  const ZOOM_MAX = 3.0;
-  const ZOOM_STEP = 1.2;
+  const MIN_ZOOM = 0.20;
+  const MAX_ZOOM = 4.00;
+  const ZOOM_STEP = 1.25;
 
   function $(sel, root) { return (root || document).querySelector(sel); }
 
   function clamp(n, a, b) {
     return Math.max(a, Math.min(b, n));
+  }
+
+  function roundZoom(z) {
+    return Math.round(Number(z || 1) * 100) / 100;
   }
 
   function langText(lang) {
@@ -38,10 +42,10 @@
       zoomOut: "缩小",
       zoomIn: "放大",
       fit: "适应",
+      zoom: (z) => `${Math.round(z * 100)}%`,
       done: "完成",
       cancel: "关闭",
-      page: (i, n) => `第 ${i}/${n} 页`,
-      zoom: (z) => `${Math.round(z * 100)}%`
+      page: (i, n) => `第 ${i}/${n} 页`
     };
     const de = {
       title: "Manuell (Bereiche markieren)",
@@ -52,11 +56,11 @@
       clearAll: "Alles löschen",
       zoomOut: "−",
       zoomIn: "+",
-      fit: "Einpassen",
+      fit: "Anpassen",
+      zoom: (z) => `${Math.round(z * 100)}%`,
       done: "Fertig",
       cancel: "Schließen",
-      page: (i, n) => `Seite ${i}/${n}`,
-      zoom: (z) => `${Math.round(z * 100)}%`
+      page: (i, n) => `Seite ${i}/${n}`
     };
     const en = {
       title: "Manual redaction",
@@ -68,10 +72,10 @@
       zoomOut: "−",
       zoomIn: "+",
       fit: "Fit",
+      zoom: (z) => `${Math.round(z * 100)}%`,
       done: "Done",
       cancel: "Close",
-      page: (i, n) => `Page ${i}/${n}`,
-      zoom: (z) => `${Math.round(z * 100)}%`
+      page: (i, n) => `Page ${i}/${n}`
     };
     return lang === "de" ? de : lang === "en" ? en : zh;
   }
@@ -89,7 +93,6 @@
       flex-direction:column;
       font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
       color:#fff;
-      overflow:hidden;
     `;
 
     root.innerHTML = `
@@ -107,12 +110,7 @@
         <button class="rui-btn rui-cancel" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.cancel}</button>
       </div>
 
-      <div class="rui-tip" style="
-        padding:10px 14px;
-        font-size:12px;
-        opacity:.72;
-        flex:0 0 auto;
-      ">
+      <div class="rui-tip" style="padding:10px 14px; font-size:12px; opacity:.72; flex:0 0 auto;">
         ${L.tip}
       </div>
 
@@ -122,63 +120,58 @@
         display:flex;
         flex-direction:column;
         gap:10px;
-        padding:10px 14px;
-        overflow:hidden;
+        padding:10px 14px 14px;
       ">
-        <div class="rui-canvas-wrap" style="
-          flex:1 1 auto;
-          min-height:0;
-          min-width:0;
-          display:block;
-          background:rgba(255,255,255,.04);
-          border:1px solid rgba(255,255,255,.10);
-          border-radius:14px;
-          overflow:auto;
-          overscroll-behavior:contain;
-          -webkit-overflow-scrolling:touch;
-          padding:12px;
-        ">
-          <div class="rui-stage" style="
-            position:relative;
-            width:max-content;
-            min-width:100%;
-            min-height:100%;
-            display:flex;
-            align-items:flex-start;
-            justify-content:center;
-          ">
-            <canvas class="rui-canvas" style="
-              display:block;
-              touch-action:none;
-              user-select:none;
-              -webkit-user-drag:none;
-              box-shadow:0 8px 28px rgba(0,0,0,.35);
-              background:#fff;
-              transform-origin:top left;
-            "></canvas>
-          </div>
-        </div>
-
-        <div class="rui-bar" style="
+        <div class="rui-toolbar" style="
           display:flex;
           align-items:center;
-          gap:10px;
-          flex:0 0 auto;
+          gap:8px;
           flex-wrap:wrap;
+          flex:0 0 auto;
         ">
           <button class="rui-btn rui-prev" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.prev}</button>
           <button class="rui-btn rui-next" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.next}</button>
 
-          <div style="display:flex; gap:10px; align-items:center;">
-            <button class="rui-btn rui-zoom-out" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.zoomOut}</button>
-            <div class="rui-zoom-label" style="font-size:12px; opacity:.78; min-width:52px; text-align:center;">100%</div>
-            <button class="rui-btn rui-zoom-in" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.zoomIn}</button>
-            <button class="rui-btn rui-fit" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.fit}</button>
-          </div>
+          <div style="width:1px; height:24px; background:rgba(255,255,255,.12); margin:0 2px;"></div>
+
+          <button class="rui-btn rui-zoom-out" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.zoomOut}</button>
+          <div class="rui-zoom-label" style="min-width:62px; text-align:center; font-size:12px; opacity:.82;">${L.zoom(1)}</div>
+          <button class="rui-btn rui-zoom-in" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.zoomIn}</button>
+          <button class="rui-btn rui-fit" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.fit}</button>
 
           <div style="margin-left:auto; display:flex; gap:10px;">
             <button class="rui-btn rui-clear-page" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.clearPage}</button>
             <button class="rui-btn rui-clear-all" style="border:1px solid rgba(255,255,255,.18); padding:8px 10px; border-radius:10px; background:transparent; color:#fff; font-weight:700; cursor:pointer;">${L.clearAll}</button>
+          </div>
+        </div>
+
+        <div class="rui-canvas-wrap" style="
+          flex:1 1 auto;
+          min-height:0;
+          min-width:0;
+          overflow:auto;
+          display:block;
+          background:rgba(255,255,255,.04);
+          border:1px solid rgba(255,255,255,.10);
+          border-radius:14px;
+          padding:12px;
+          touch-action:pan-x pan-y;
+          overscroll-behavior:contain;
+          -webkit-overflow-scrolling:touch;
+        ">
+          <div class="rui-stage" style="
+            position:relative;
+            display:block;
+            width:max-content;
+            height:max-content;
+            margin:0 auto;
+          ">
+            <canvas class="rui-canvas" style="
+              display:block;
+              background:#fff;
+              transform-origin:top left;
+              touch-action:none;
+            "></canvas>
           </div>
         </div>
       </div>
@@ -257,11 +250,12 @@
     const filename = `raster_secure_${Date.now()}.pdf`;
 
     const ui = createOverlay(lang);
-    const canvas = $(".rui-canvas", ui);
     const canvasWrap = $(".rui-canvas-wrap", ui);
     const stage = $(".rui-stage", ui);
+    const canvas = $(".rui-canvas", ui);
     const pageLabel = $(".rui-page", ui);
     const zoomLabel = $(".rui-zoom-label", ui);
+
     const btnPrev = $(".rui-prev", ui);
     const btnNext = $(".rui-next", ui);
     const btnZoomOut = $(".rui-zoom-out", ui);
@@ -271,6 +265,7 @@
     const btnClearAll = $(".rui-clear-all", ui);
     const btnDone = $(".rui-done", ui);
     const btnCancel = $(".rui-cancel", ui);
+
     const L = langText(lang);
 
     let pages = [];
@@ -301,91 +296,89 @@
     let idx = 0;
     let zoom = 1;
     let fitZoom = 1;
-    const overlayCanvas = document.createElement("canvas");
+    let isDown = false;
+    let sx = 0;
+    let sy = 0;
+    let activePointerId = null;
+    let overlayCanvas = document.createElement("canvas");
 
     function getCurrentPage() {
       return pages[idx] || null;
     }
 
-    function computeFitZoom() {
-      const p = getCurrentPage();
-      if (!p || !canvasWrap) return 1;
+    function computeFitZoom(page) {
+      if (!page || !canvasWrap) return 1;
 
       const wrapW = Math.max(1, canvasWrap.clientWidth - 24);
       const wrapH = Math.max(1, canvasWrap.clientHeight - 24);
 
-      const zw = wrapW / Math.max(1, p.width);
-      const zh = wrapH / Math.max(1, p.height);
+      const zW = wrapW / Math.max(1, page.width || 1);
+      const zH = wrapH / Math.max(1, page.height || 1);
 
-      return clamp(Math.min(zw, zh, 1), ZOOM_MIN, ZOOM_MAX);
+      const z = Math.min(zW, zH, 1);
+      return clamp(roundZoom(z), MIN_ZOOM, MAX_ZOOM);
     }
 
     function updateZoomLabel() {
       if (zoomLabel) zoomLabel.textContent = L.zoom(zoom);
     }
 
-    function resetViewportScroll() {
-      if (!canvasWrap) return;
-      canvasWrap.scrollTop = 0;
-      canvasWrap.scrollLeft = 0;
+    function applyZoom(keepCenter) {
+      const page = getCurrentPage();
+      if (!page) return;
+
+      const prevScrollLeft = canvasWrap.scrollLeft;
+      const prevScrollTop = canvasWrap.scrollTop;
+      const prevClientW = canvasWrap.clientWidth;
+      const prevClientH = canvasWrap.clientHeight;
+      const centerX = prevScrollLeft + prevClientW / 2;
+      const centerY = prevScrollTop + prevClientH / 2;
+      const oldZoom = Number(stage.dataset.zoom || zoom || 1) || 1;
+
+      canvas.style.width = `${Math.round(page.width * zoom)}px`;
+      canvas.style.height = `${Math.round(page.height * zoom)}px`;
+      stage.style.width = `${Math.round(page.width * zoom)}px`;
+      stage.style.height = `${Math.round(page.height * zoom)}px`;
+      stage.dataset.zoom = String(zoom);
+
+      updateZoomLabel();
+
+      btnZoomOut.disabled = zoom <= MIN_ZOOM + 0.0001;
+      btnZoomIn.disabled = zoom >= MAX_ZOOM - 0.0001;
+      btnZoomOut.style.opacity = btnZoomOut.disabled ? 0.4 : 1;
+      btnZoomIn.style.opacity = btnZoomIn.disabled ? 0.4 : 1;
+
+      if (keepCenter) {
+        const ratio = zoom / oldZoom;
+        const newCenterX = centerX * ratio;
+        const newCenterY = centerY * ratio;
+        canvasWrap.scrollLeft = Math.max(0, newCenterX - prevClientW / 2);
+        canvasWrap.scrollTop = Math.max(0, newCenterY - prevClientH / 2);
+      } else {
+        canvasWrap.scrollLeft = 0;
+        canvasWrap.scrollTop = 0;
+      }
     }
 
-    function keepViewportCenter(prevZoom, nextZoom) {
-      if (!canvasWrap || !canvas) return;
+    function redrawCurrentPage() {
+      const page = getCurrentPage();
+      if (!page || !page.canvas) return;
 
-      const centerX = canvasWrap.scrollLeft + canvasWrap.clientWidth / 2;
-      const centerY = canvasWrap.scrollTop + canvasWrap.clientHeight / 2;
-
-      const scale = nextZoom / Math.max(0.0001, prevZoom);
-      const nextCenterX = centerX * scale;
-      const nextCenterY = centerY * scale;
-
-      canvasWrap.scrollLeft = Math.max(0, nextCenterX - canvasWrap.clientWidth / 2);
-      canvasWrap.scrollTop = Math.max(0, nextCenterY - canvasWrap.clientHeight / 2);
-    }
-
-    function syncCanvasDisplaySize() {
-      const p = getCurrentPage();
-      if (!p || !p.canvas) return;
+      const rects = rectsByPage[page.pageNumber] || [];
+      drawPreview(page.canvas, overlayCanvas, rects);
 
       canvas.width = overlayCanvas.width;
       canvas.height = overlayCanvas.height;
-
-      const displayW = Math.max(1, Math.round(overlayCanvas.width * zoom));
-      const displayH = Math.max(1, Math.round(overlayCanvas.height * zoom));
-
-      canvas.style.width = `${displayW}px`;
-      canvas.style.height = `${displayH}px`;
-
-      if (stage) {
-        stage.style.width = `${Math.max(displayW, canvasWrap ? canvasWrap.clientWidth - 24 : displayW)}px`;
-        stage.style.height = `${Math.max(displayH, canvasWrap ? canvasWrap.clientHeight - 24 : displayH)}px`;
-      }
-
-      updateZoomLabel();
-    }
-
-    function redrawCurrentPreview() {
-      const p = getCurrentPage();
-      if (!p || !p.canvas) return;
-
-      const rects = rectsByPage[p.pageNumber] || [];
-      drawPreview(p.canvas, overlayCanvas, rects);
-      syncCanvasDisplaySize();
-
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(overlayCanvas, 0, 0);
     }
 
-    function updatePageUI(resetScroll) {
+    function updatePageUI(resetZoomMode) {
       const p = getCurrentPage();
       if (!p || !p.canvas) return;
 
-      fitZoom = computeFitZoom();
-      if (!Number.isFinite(zoom) || zoom <= 0) zoom = fitZoom;
-
-      redrawCurrentPreview();
+      redrawCurrentPage();
 
       if (pageLabel) pageLabel.textContent = L.page(idx + 1, pages.length);
 
@@ -395,31 +388,34 @@
       btnPrev.style.opacity = btnPrev.disabled ? 0.4 : 1;
       btnNext.style.opacity = btnNext.disabled ? 0.4 : 1;
 
-      if (resetScroll !== false) resetViewportScroll();
+      fitZoom = computeFitZoom(p);
+
+      if (resetZoomMode !== false) {
+        zoom = fitZoom;
+        applyZoom(false);
+      } else {
+        zoom = clamp(roundZoom(zoom), MIN_ZOOM, MAX_ZOOM);
+        applyZoom(false);
+      }
     }
 
     function setZoom(nextZoom, keepCenter) {
-      const prev = zoom;
-      zoom = clamp(nextZoom, ZOOM_MIN, ZOOM_MAX);
-      redrawCurrentPreview();
-      if (keepCenter) keepViewportCenter(prev, zoom);
+      zoom = clamp(roundZoom(nextZoom), MIN_ZOOM, MAX_ZOOM);
+      applyZoom(keepCenter !== false);
     }
-
-    function fitToViewport() {
-      fitZoom = computeFitZoom();
-      setZoom(fitZoom, false);
-      resetViewportScroll();
-    }
-
-    let isDown = false;
-    let sx = 0, sy = 0;
-    let activePointerId = null;
 
     function getPos(ev) {
       const rect = canvas.getBoundingClientRect();
-      const x = (ev.clientX - rect.left) * (canvas.width / rect.width);
-      const y = (ev.clientY - rect.top) * (canvas.height / rect.height);
-      return { x, y };
+      const scaleX = canvas.width / Math.max(1, rect.width);
+      const scaleY = canvas.height / Math.max(1, rect.height);
+
+      const x = (ev.clientX - rect.left) * scaleX;
+      const y = (ev.clientY - rect.top) * scaleY;
+
+      return {
+        x: clamp(x, 0, canvas.width),
+        y: clamp(y, 0, canvas.height)
+      };
     }
 
     function onDown(ev) {
@@ -452,7 +448,6 @@
       const tmp = rects.concat([{ x, y, w, h }]);
 
       drawPreview(page.canvas, overlayCanvas, tmp);
-
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(overlayCanvas, 0, 0);
@@ -478,7 +473,7 @@
       activePointerId = null;
 
       if (w < 6 || h < 6) {
-        updatePageUI(false);
+        redrawCurrentPage();
         return;
       }
 
@@ -492,7 +487,7 @@
         h: Math.round(h)
       });
 
-      updatePageUI(false);
+      redrawCurrentPage();
     }
 
     function onUp(ev) { finishUp(ev); }
@@ -507,18 +502,14 @@
 
     btnPrev.onclick = () => {
       if (idx > 0) {
-        idx--;
-        fitZoom = computeFitZoom();
-        if (Math.abs(zoom - fitZoom) < 0.001) zoom = fitZoom;
+        idx -= 1;
         updatePageUI(true);
       }
     };
 
     btnNext.onclick = () => {
       if (idx < pages.length - 1) {
-        idx++;
-        fitZoom = computeFitZoom();
-        if (Math.abs(zoom - fitZoom) < 0.001) zoom = fitZoom;
+        idx += 1;
         updatePageUI(true);
       }
     };
@@ -532,20 +523,42 @@
     };
 
     btnFit.onclick = () => {
-      fitToViewport();
+      const page = getCurrentPage();
+      if (!page) return;
+      fitZoom = computeFitZoom(page);
+      setZoom(fitZoom, false);
     };
 
     btnClearPage.onclick = () => {
       const page = getCurrentPage();
       if (!page) return;
       rectsByPage[page.pageNumber] = [];
-      updatePageUI(false);
+      redrawCurrentPage();
     };
 
     btnClearAll.onclick = () => {
       for (const p of pages) rectsByPage[p.pageNumber] = [];
-      updatePageUI(false);
+      redrawCurrentPage();
     };
+
+    let resizeTimer = null;
+    function onResize() {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const page = getCurrentPage();
+        if (!page) return;
+
+        const oldFit = fitZoom;
+        fitZoom = computeFitZoom(page);
+
+        const wasAtFit = Math.abs(zoom - oldFit) < 0.02 || Math.abs(zoom - fitZoom) < 0.02;
+        if (wasAtFit) zoom = fitZoom;
+
+        applyZoom(false);
+      }, 80);
+    }
+
+    window.addEventListener("resize", onResize);
 
     let closed = false;
     function close() {
@@ -562,6 +575,10 @@
 
       try {
         window.removeEventListener("resize", onResize);
+      } catch (_) {}
+
+      try {
+        clearTimeout(resizeTimer);
       } catch (_) {}
 
       ui.remove();
@@ -597,23 +614,6 @@
       };
     }
 
-    function onResize() {
-      const prevFit = fitZoom;
-      fitZoom = computeFitZoom();
-
-      if (Math.abs(zoom - prevFit) < 0.001) {
-        zoom = fitZoom;
-        updatePageUI(false);
-        resetViewportScroll();
-      } else {
-        redrawCurrentPreview();
-      }
-    }
-
-    try {
-      window.addEventListener("resize", onResize);
-    } catch (_) {}
-
     btnDone.onclick = () => {
       try { window.__manual_redact_last = buildResult(); } catch (_) {}
       close();
@@ -621,8 +621,6 @@
 
     btnCancel.onclick = () => close();
 
-    fitZoom = computeFitZoom();
-    zoom = fitZoom;
     updatePageUI(true);
 
     return {
