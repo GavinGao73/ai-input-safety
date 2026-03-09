@@ -1,18 +1,20 @@
 // =========================
 // assets/stage3.js (FULL)
-// v20260309a2 — PATCHED (header/footer filter + input editable state)
+// v20260309a3 — PATCHED (stronger header/footer filter + input editable state)
 //
 // ADD:
-// - filterHeaderFooterText()
+// - stronger filterHeaderFooterText()
 // - setInputEditable()
 // - Mode A readable PDF => readOnly
 // - Mode B / image / non-pdf / failure => editable
 //
 // GOAL:
-// - remove simple page headers/footers like
+// - remove common PDF headers/footers like
 //   Page 1 of 1
 //   1 / 3
-//   repeated short header/footer lines
+//   CONFIDENTIAL
+//   INVOICE
+//   company/address footer lines
 // - keep input box editable unless readable PDF Mode A is active
 // =========================
 
@@ -24,25 +26,90 @@ function filterHeaderFooterText(text) {
 
   let lines = text.split(/\r?\n/);
 
-  // ===== 删除顶部标题页眉 =====
-  if (lines.length > 0) {
+  function isPageLine(s) {
+    return /^page\s*\d+\s*(of|\/)\s*\d+$/i.test(s) ||
+           /^\d+\s*\/\s*\d+$/.test(s) ||
+           /page\s*\d+\s*(of|\/)\s*\d+/i.test(s);
+  }
 
-    const first = lines[0].trim();
+  function isLikelyHeaderLine(s) {
+    if (!s) return false;
+    if (s.length > 80) return false;
+    if (/:/.test(s)) return false;
 
+    // common document header words
+    if (/\b(confidential|invoice|statement|receipt|quotation|quote|report|summary)\b/i.test(s)) {
+      return true;
+    }
+
+    // short title-like lines
+    if (/^[A-Z][A-Za-z\s&\-]{4,}$/.test(s)) {
+      return true;
+    }
+
+    // all-caps short lines
+    if (/^[A-Z0-9\s&\-]{4,}$/.test(s)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function isLikelyFooterLine(s) {
+    if (!s) return false;
+
+    if (isPageLine(s)) return true;
+
+    // company + address style footer
     if (
-      first &&
-      first.length < 80 &&
-      /^[A-Z][A-Za-z\s]+$/.test(first) &&
-      !/:/.test(first)
+      /(?:GmbH|LLC|L\.?L\.?C\.?|Ltd\.?|Limited|Inc\.?|Incorporated|Corp\.?|Corporation|PLC|LLP)\b/.test(s) &&
+      /(?:street|st\.?|road|rd\.?|avenue|ave\.?|lane|ln\.?|drive|dr\.?|way|boulevard|blvd\.?|court|ct\.?|place|pl\.?|square|sq\.?)\b/i.test(s)
     ) {
-      lines.shift();
+      return true;
+    }
+
+    // company/address line with separators
+    if (
+      /[·|]/.test(s) &&
+      (
+        /(?:GmbH|LLC|L\.?L\.?C\.?|Ltd\.?|Limited|Inc\.?|Incorporated|Corp\.?|Corporation|PLC|LLP)\b/.test(s) ||
+        /\b\d{4,6}\s+[A-Za-zÀ-ÖØ-öø-ÿ'’.\- ]+\b/.test(s)
+      )
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // ===== remove top header-like lines (only first non-empty block) =====
+  let firstNonEmpty = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim()) {
+      firstNonEmpty = i;
+      break;
+    }
+  }
+
+  if (firstNonEmpty >= 0) {
+    let removeCount = 0;
+    for (let i = firstNonEmpty; i < Math.min(lines.length, firstNonEmpty + 3); i++) {
+      const s = lines[i].trim();
+      if (!s) break;
+      if (isLikelyHeaderLine(s)) {
+        removeCount++;
+      } else {
+        break;
+      }
+    }
+    if (removeCount > 0) {
+      lines.splice(firstNonEmpty, removeCount);
     }
   }
 
   const cleaned = [];
 
   for (let line of lines) {
-
     const l = line.trim();
 
     if (!l) {
@@ -50,14 +117,8 @@ function filterHeaderFooterText(text) {
       continue;
     }
 
-    // Page 1 of 3
-    if (/^page\s*\d+\s*(of|\/)\s*\d+$/i.test(l)) continue;
-
-    // 1 / 3
-    if (/^\d+\s*\/\s*\d+$/.test(l)) continue;
-
-    // footer page reference
-    if (/page\s*\d+\s*(of|\/)\s*\d+/i.test(l)) continue;
+    if (isPageLine(l)) continue;
+    if (isLikelyFooterLine(l)) continue;
 
     cleaned.push(line);
   }
@@ -259,6 +320,7 @@ async function handleFile(file) {
     let text = String(probe.text || "").trim();
 
     // ================= HEADER / FOOTER FILTER =================
+    // only for readable PDF Mode A
     text = filterHeaderFooterText(text);
 
     lastPdfOriginalText = text;
