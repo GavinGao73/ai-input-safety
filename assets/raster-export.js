@@ -519,34 +519,47 @@
   }
 
   async function buildPageInputs({ pdf, pages, cachedPages }) {
-    const pageInputs = [];
+  const pageInputs = [];
+  const pagesTextMap = getCachedPagesTextMap();
 
-    for (const p of pages) {
-      const cachedItems = findCachedItemsForPage(cachedPages, p.pageNumber);
-      let itemsOrTextContent = null;
+  for (const p of pages) {
+    const cachedItems = findCachedItemsForPage(cachedPages, p.pageNumber);
+    let itemsOrTextContent = null;
 
-      if (cachedItems && cachedItems.length) {
-        itemsOrTextContent = normalizeCachedItems(cachedItems);
-      } else {
-        const page = await pdf.getPage(p.pageNumber);
-        itemsOrTextContent = await page.getTextContent({
-          normalizeWhitespace: true,
-          disableCombineTextItems: false
-        });
-      }
-
-      pageInputs.push({
-        pageNumber: p.pageNumber,
-        width: p.width,
-        height: p.height,
-        viewport: p.viewport,
-        itemsOrTextContent
+    if (cachedItems && cachedItems.length) {
+      itemsOrTextContent = normalizeCachedItems(cachedItems);
+    } else {
+      const page = await pdf.getPage(p.pageNumber);
+      itemsOrTextContent = await page.getTextContent({
+        normalizeWhitespace: true,
+        disableCombineTextItems: false
       });
     }
 
-    return pageInputs;
+    let pageText = pagesTextMap.get(Number(p.pageNumber)) || "";
+    if (!pageText) {
+      try {
+        const rc = getRasterCore();
+        if (rc && typeof rc.buildPageTextAndRangesFromItems === "function") {
+          const built = rc.buildPageTextAndRangesFromItems(itemsOrTextContent);
+          pageText = String((built && built.pageText) || "");
+        }
+      } catch (_) {}
+    }
+
+    pageInputs.push({
+      pageNumber: p.pageNumber,
+      width: p.width,
+      height: p.height,
+      viewport: p.viewport,
+      itemsOrTextContent,
+      pageText
+    });
   }
 
+  return pageInputs;
+}
+  
   function writeRasterRunMeta(meta) {
     try {
       const last = window.__RasterExportLast || {};
@@ -604,17 +617,24 @@
     let unifiedRectResult = null;
     try {
       if (unifiedMatchResult && typeof rc.mapMatchResultToRects === "function") {
-        unifiedRectResult = rc.mapMatchResultToRects({
-          pdfjsLib,
-          pages: pageInputs,
-          matchResult: unifiedMatchResult,
-          lang
-        });
-      }
-    } catch (_) {
+         unifiedRectResult = rc.mapMatchResultToRects({
+         pdfjsLib,
+         pages: pageInputs.map((x) => ({
+         pageNumber: x.pageNumber,
+         width: x.width,
+         height: x.height,
+         viewport: x.viewport,
+         itemsOrTextContent: x.itemsOrTextContent,
+         pageText: x.pageText || ""
+         })),
+         matchResult: unifiedMatchResult,
+         lang
+         });
+       }
+      } catch (_) {
       unifiedRectResult = null;
     }
-
+    
     let usedPerPageCoreFallback = false;
     let usedLegacyFallback = false;
 
@@ -710,10 +730,12 @@
           (itemsOrTextContent && Array.isArray(itemsOrTextContent.items)) ? itemsOrTextContent.items.length :
           0;
 
+        const pageTextLen = Number((prepared && prepared.pageText && prepared.pageText.length) || 0);
         return {
           perPage: prevPerPage.concat([{
             pageNumber: p.pageNumber,
             items: itemCount,
+            pageTextLen,
             rectCount,
             rectSource,
             coreHitCount,
