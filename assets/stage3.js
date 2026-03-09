@@ -1,10 +1,10 @@
 // =========================
 // assets/stage3.js (FULL)
-// v20260309a6 — CONSOLIDATED CLEAN VERSION
+// v20260309a7 — CONSOLIDATED CLEAN VERSION
 //
 // Goals:
 // - Keep original structure and behavior style
-// - Use pagesText as the primary Mode A text source
+// - Use pagesText objects as the primary Mode A text source
 // - Remove repeated multi-page edge lines deterministically
 // - Keep input box editable unless readable PDF Mode A is active
 // - Avoid patch stacking and keep logic centralized
@@ -15,6 +15,12 @@
 function filterHeaderFooterText(text, pagesText) {
   function normLine(s) {
     return String(s || "").replace(/\s+/g, " ").trim();
+  }
+
+  function getPageText(page) {
+    if (typeof page === "string") return page;
+    if (page && typeof page.text === "string") return page.text;
+    return "";
   }
 
   function isPageLine(s) {
@@ -54,7 +60,8 @@ function filterHeaderFooterText(text, pagesText) {
       return new Set();
     }
 
-    for (const pageText of pages) {
+    for (const page of pages) {
+      const pageText = getPageText(page);
       const pageLines = String(pageText || "")
         .split(/\r?\n/)
         .map(normLine)
@@ -95,11 +102,10 @@ function filterHeaderFooterText(text, pagesText) {
 
       if (isPageLine(s)) continue;
 
-      // deterministic multi-page edge removal:
-      // only remove repeated lines when they appear near the top or bottom of a page
+      // remove repeated edge lines only near top/bottom of each page
       if (repeatedEdgeLines.has(s) && (i <= 4 || i >= lastIndex - 4)) continue;
 
-      // explicit footer cleanup near page end
+      // remove explicit footer-like lines near page end
       if (i >= lastIndex - 2 && isLikelyFooterLine(s)) continue;
 
       out.push(raw);
@@ -112,7 +118,7 @@ function filterHeaderFooterText(text, pagesText) {
     const repeatedEdgeLines = collectRepeatedEdgeLines(pagesText);
 
     return pagesText
-      .map((page) => cleanOnePage(page, repeatedEdgeLines))
+      .map((page) => cleanOnePage(getPageText(page), repeatedEdgeLines))
       .filter(Boolean)
       .join("\n\n");
   }
@@ -133,7 +139,7 @@ function setInputEditable(isEditable) {
 // =========================
 let lastPdfPagesItems = [];
 
-// pretty page text
+// pretty page text objects
 let lastPdfPagesText = [];
 
 // ================= Stage 3 helpers =================
