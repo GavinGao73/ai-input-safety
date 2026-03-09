@@ -19,7 +19,7 @@
   "use strict";
 
   const NS = "__MATCHER_CORE__";
-  const VERSION = "v20260308-matchresult-v2-slim-page-only";
+  const VERSION = "v20260309-matchresult-v3-stable-conflict";
 
   function normLang(l) {
     const s = String(l || "").toLowerCase();
@@ -527,6 +527,7 @@
     let docInput = {};
     if (opts && opts.doc && typeof opts.doc === "object") docInput = opts.doc;
     else if (opts && opts.document && typeof opts.document === "object") docInput = opts.document;
+    else if (opts && Array.isArray(opts.pages)) docInput = { pages: opts.pages };
     else if (opts && typeof opts.text === "string") docInput = { text: opts.text };
 
     const doc = normalizeDocument(docInput);
@@ -611,34 +612,31 @@
     return a;
   }
 
-  function resolveConflicts(rawHits) {
-    const ordered = rawHits.slice().sort((a, b) => {
-      if (a.start !== b.start) return a.start - b.start;
-      if (a.end !== b.end) return a.end - b.end;
-      return a.orderIndex - b.orderIndex;
-    });
+  function hitPreferenceCompare(a, b) {
+    const winner = choosePreferred(a, b);
+    if (winner === a && winner !== b) return -1;
+    if (winner === b && winner !== a) return 1;
 
+    if (a.start !== b.start) return a.start - b.start;
+    if (a.end !== b.end) return a.end - b.end;
+    return 0;
+  }
+
+  function resolveConflicts(rawHits) {
+    const preferred = rawHits.slice().sort(hitPreferenceCompare);
     const kept = [];
 
-    for (const hit of ordered) {
-      let blocked = false;
+    for (const hit of preferred) {
+      let overlaps = false;
 
       for (let i = 0; i < kept.length; i += 1) {
-        const prev = kept[i];
-        if (!rangesOverlap(hit, prev)) continue;
-
-        const winner = choosePreferred(prev, hit);
-        if (winner === prev) {
-          blocked = true;
-          break;
-        } else {
-          kept[i] = hit;
-          blocked = true;
+        if (rangesOverlap(hit, kept[i])) {
+          overlaps = true;
           break;
         }
       }
 
-      if (!blocked) kept.push(hit);
+      if (!overlaps) kept.push(hit);
     }
 
     return kept.sort((a, b) => {
@@ -700,6 +698,10 @@
           page = seg.pageNumber;
           break;
         }
+        if (hs === seg.start && hs === he && seg.start === seg.end) {
+          page = seg.pageNumber;
+          break;
+        }
       }
 
       return {
@@ -757,6 +759,7 @@
     let docInput = {};
     if (opts && opts.doc && typeof opts.doc === "object") docInput = opts.doc;
     else if (opts && opts.document && typeof opts.document === "object") docInput = opts.document;
+    else if (opts && Array.isArray(opts.pages)) docInput = { pages: opts.pages };
     else if (opts && typeof opts.text === "string") docInput = { text: opts.text };
 
     const doc = normalizeDocument(docInput);
