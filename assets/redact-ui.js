@@ -17,7 +17,7 @@
   "use strict";
 
   const DPI = 600;
-  const MIN_ZOOM = 0.20;
+  const MIN_ZOOM = 0.05;
   const MAX_ZOOM = 4.00;
   const ZOOM_STEP = 1.25;
 
