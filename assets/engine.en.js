@@ -113,6 +113,7 @@
       "address_de_street",
       "address_de_postal",
       "address_en_inline_street",
+      "address_en_street_line",
       "address_en_extra_block",
       "address_en_extra",
 
