@@ -14,16 +14,32 @@
 // =========================
 
 // ================= HEADER / FOOTER FILTER =================
+
 function filterHeaderFooterText(text) {
+
   if (!text) return text;
 
-  const lines = text.split(/\r?\n/);
+  let lines = text.split(/\r?\n/);
+
+  // ===== 删除顶部标题页眉 =====
+  if (lines.length > 0) {
+
+    const first = lines[0].trim();
+
+    if (
+      first &&
+      first.length < 80 &&
+      /^[A-Z][A-Za-z\s]+$/.test(first) &&
+      !/:/.test(first)
+    ) {
+      lines.shift();
+    }
+  }
 
   const cleaned = [];
 
-  for (let i = 0; i < lines.length; i++) {
+  for (let line of lines) {
 
-    const line = lines[i];
     const l = line.trim();
 
     if (!l) {
@@ -31,28 +47,21 @@ function filterHeaderFooterText(text) {
       continue;
     }
 
-    // remove page numbers
+    // Page 1 of 3
     if (/^page\s*\d+\s*(of|\/)\s*\d+$/i.test(l)) continue;
+
+    // 1 / 3
     if (/^\d+\s*\/\s*\d+$/.test(l)) continue;
 
-    // remove footer page references
+    // footer page reference
     if (/page\s*\d+\s*(of|\/)\s*\d+/i.test(l)) continue;
-
-    // remove typical header titles (single short title line at top)
-    if (
-      i < 2 &&
-      l.length < 80 &&
-      /^[A-Z][A-Za-z\s]{4,}$/.test(l) &&
-      !/[:.]/.test(l)
-    ) {
-      continue;
-    }
 
     cleaned.push(line);
   }
 
   return cleaned.join("\n");
 }
+
 // =========================
 // keep raw per-page text items
 // =========================
