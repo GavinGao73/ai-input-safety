@@ -53,6 +53,12 @@ function filterHeaderFooterText(text, pagesText) {
     return false;
   }
 
+  function isProtectedBodyLine(s) {
+    if (!s) return false;
+
+    return /^(?:customer|account|reference|order|invoice|section|date|bill to|ship to|payment details)\s*:/i.test(s);
+  }
+
   function collectRepeatedEdgeLines(pages) {
     const edgeCount = new Map();
 
@@ -103,10 +109,10 @@ function filterHeaderFooterText(text, pagesText) {
       if (isPageLine(s)) continue;
 
       // remove repeated edge lines only near top/bottom of each page
-      if (repeatedEdgeLines.has(s) && (i <= 4 || i >= lastIndex - 4)) continue;
+      if (!isProtectedBodyLine(s) && repeatedEdgeLines.has(s) && (i <= 4 || i >= lastIndex - 4)) continue;
 
       // remove explicit footer-like lines near page end
-      if (i >= lastIndex - 2 && isLikelyFooterLine(s)) continue;
+      if (!isProtectedBodyLine(s) && i >= lastIndex - 2 && isLikelyFooterLine(s)) continue;
 
       out.push(raw);
     }
