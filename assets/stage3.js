@@ -1,10 +1,13 @@
 // =========================
 // assets/stage3.js (FULL)
-// v20260309a8 — CONSOLIDATED CLEAN VERSION
+// v20260309a9 — CONSOLIDATED CLEAN VERSION
 //
 // Goals:
 // - Keep original structure and behavior style
-// - Mode A requires BOTH text layer AND usable semantic reading order
+// - Mode A requires:
+//   1) text layer exists
+//   2) text coverage is usable
+//   3) semantic reading order is usable
 // - Use pagesText objects as the primary Mode A text source
 // - Remove repeated multi-page edge lines deterministically
 // - Keep input box editable unless readable PDF Mode A is active
@@ -128,6 +131,43 @@ function filterHeaderFooterText(text, pagesText) {
   }
 
   return String(text || "").trim();
+}
+
+// ================= TEXT COVERAGE CHECK =================
+
+function isTextCoverageUsable(text, pagesText) {
+  function getPageText(page) {
+    if (typeof page === "string") return page;
+    if (page && typeof page.text === "string") return page.text;
+    return "";
+  }
+
+  const pages = Array.isArray(pagesText) && pagesText.length
+    ? pagesText
+    : [{ pageNumber: 1, text: String(text || "") }];
+
+  const cleanedPages = pages
+    .map((page) => filterHeaderFooterText("", [page]))
+    .map((s) => String(s || "").trim());
+
+  const totalLen = cleanedPages.reduce((sum, s) => sum + s.length, 0);
+  const avgLen = cleanedPages.length ? (totalLen / cleanedPages.length) : 0;
+  const weakPages = cleanedPages.filter((s) => s.length < 50).length;
+
+  if (totalLen < 120) return false;
+  if (avgLen < 80) return false;
+  if (weakPages > Math.floor(cleanedPages.length / 2)) return false;
+
+  // extra guard: if raw extracted text exists but almost all useful text disappears after cleaning,
+  // it usually means only marginal header/footer text was extractable
+  const rawTotal = pages
+    .map(getPageText)
+    .map((s) => String(s || ""))
+    .reduce((sum, s) => sum + s.length, 0);
+
+  if (rawTotal > 0 && totalLen / Math.max(1, rawTotal) < 0.15) return false;
+
+  return true;
 }
 
 // ================= SEMANTIC USABILITY CHECK =================
@@ -275,10 +315,13 @@ function ensureLangForPdfRaw(text) {
 function enterModeBFromPdf(rawText) {
   lastRunMeta.fromPdf = false;
 
-  setRuleEngineAuto();
+  // Mode B does not need language detection
+  try { window.ruleEngine = ""; } catch (_) {}
+  try { window.ruleEngineMode = "lock"; } catch (_) {}
+
   setInputEditable(true);
 
-  // ✅ 语义不可读的 PDF 不再把混乱文本写进输入框
+  // 语义不可读 / 覆盖不足的 PDF 不再把混乱文本写进输入框
   lastPdfOriginalText = "";
 
   const ta = $("inputText");
@@ -334,7 +377,8 @@ async function handleFile(file) {
   if (lastFileKind === "image") {
     lastRunMeta.fromPdf = false;
 
-    setRuleEngineAuto();
+    try { window.ruleEngine = ""; } catch (_) {}
+    try { window.ruleEngineMode = "lock"; } catch (_) {}
     setInputEditable(true);
 
     setStage3Ui("B");
@@ -387,6 +431,13 @@ async function handleFile(file) {
     }
 
     const rawText = String(probe.text || "").trim();
+    const coverageOk = isTextCoverageUsable(rawText, lastPdfPagesText);
+
+    if (!coverageOk) {
+      enterModeBFromPdf(rawText);
+      return;
+    }
+
     const semanticOk = isSemanticReadingUsable(rawText, lastPdfPagesText);
 
     if (!semanticOk) {
