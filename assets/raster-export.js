@@ -1,7 +1,7 @@
 /* =========================================================
  * raster-export.js
  * Raster Secure PDF export pipeline (in-memory only)
- * - PDF/image -> 600 DPI raster -> opaque redaction (pixels)
+ * - PDF/image -> 300 DPI raster -> opaque redaction (pixels)
  * - Export PDF as images only (no text layer)
  * - NO OCR / NO logs / NO storage
  *
@@ -14,7 +14,7 @@
 (function () {
   "use strict";
 
-  const DEFAULT_DPI =300;
+  const DEFAULT_DPI = 300;
   const PDFJS_VERSION = "3.11.174";
 
   let __pdfjsLoadPromise = null;
@@ -38,11 +38,6 @@
     if (typeof mc.match === "function") return mc;
     if (typeof mc.matchDocument === "function") return mc;
     return null;
-  }
-
-  function uiLang() {
-    const l = String(window.currentLang || "").toLowerCase();
-    return l === "de" || l === "en" || l === "zh" ? l : "zh";
   }
 
   function setRasterPhase(phase, phase2) {
