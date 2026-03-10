@@ -4,23 +4,18 @@
 // - placeholders + detect + rules
 // - high-sensitivity German document model
 //
-// LOCKED (latest candidate):
+// FINAL RELEASE:
 // - Keep Herr/Frau/Dr./Prof. in output; mask only the person name
 // - Address: only mask street + house number; keep PLZ+City/Country
-// - Zusatz: only mask Gebäude/OG/Zimmer-like fragment; keep Klingel tail
+// - Zusatz: mask Gebäude/OG/Zimmer-like fragment; keep Klingel tail structure
 // - ID policy: keep prefix/body, mask ONLY the LAST numeric segment
 //
-// PATCH v20260310-de-stable-candidate:
-// - Expanded German person-name labels for real-world docs
-// - Added person_name_inline for inline CRM/support patterns
-// - Expanded German company legal suffix coverage
-// - Added money_negative for negative amounts in statements/invoices
-// - Removed "kontakt" from phone labels to reduce false positives
-// - Kept patch structure but consolidated obvious risk fixes
-//
-// PATCH v20260310-de-audit-fix:
-// - FIX 1: exclude IBAN/DE IBAN values from phoneGuard
-// - FIX 2: allow api_key_token matches without colon, e.g. "API Key abc123"
+// FINAL FIXES INCLUDED:
+// - Geburtsort restored to alwaysOn
+// - Klingel name masking added
+// - API key rule supports both "API Key: xxx" and "API Key xxx"
+// - phoneGuard excludes IBAN / DE IBAN values
+// - company rule tightened to reduce swallowing leading transaction words
 // =========================
 
 (function () {
@@ -103,6 +98,7 @@
       "address_de_inline_street",
       "address_de_extra_partial",
       "address_de_street_partial",
+      "klingel_name",
 
       "handle",
       "number"
@@ -123,6 +119,7 @@
       "passport",
       "driver_license",
       "birthdate",
+      "birthplace",
 
       "account",
       "bank",
@@ -142,7 +139,8 @@
       "company",
       "address_de_inline_street",
       "address_de_extra_partial",
-      "address_de_street_partial"
+      "address_de_street_partial",
+      "klingel_name"
     ],
 
     phoneGuard: function ({ label, value }) {
@@ -355,7 +353,7 @@
 
       company: {
         pattern:
-          /\b(?<name>[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9&.\- ]{1,80}?)[ \t]+(?<legal>GmbH(?:[ \t]*&[ \t]*Co\.[ \t]*KG)?|UG(?:[ \t]*\([^)]+\))?|KGaA|OHG|PartG|eG|AG|KG|GbR|e\.K\.?)\b/giu,
+          /\b(?<name>(?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9&.\-]*)(?:[ \t]+(?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9&.\-]*)){0,6})[ \t]+(?<legal>GmbH(?:[ \t]*&[ \t]*Co\.[ \t]*KG)?|UG(?:[ \t]*\([^)]+\))?|KGaA|OHG|PartG|eG|AG|KG|GbR|e\.K\.?)\b/giu,
         tag: "COMPANY",
         mode: "company"
       },
@@ -391,6 +389,13 @@
         pattern:
           /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)[ \t]*[:：=][ \t]*)((?=[^\n\r]{4,140}$)(?=[^\n\r]{0,140}(?:\d{1,4}[ \t]*[A-Za-z]?\b|straße\b|strasse\b|str\.\b|weg\b|platz\b|allee\b|gasse\b|ring\b|ufer\b|damm\b|chaussee\b|promenade\b|markt\b|hof\b|kai\b))[^\n\r]{4,140})/giu,
         tag: "ADDRESS",
+        mode: "prefix"
+      },
+
+      klingel_name: {
+        pattern:
+          /((?:Klingel)[ \t]*[„"'']?[ \t]*)([A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?=[”"'']?)/giu,
+        tag: "NAME",
         mode: "prefix"
       },
 
@@ -641,8 +646,7 @@
   uniqPush(DE.alwaysOn, "blz_paren");
   uniqPush(DE.alwaysOn, "card_expiry_de");
   uniqPush(DE.alwaysOn, "card_security_de");
-
-  DE.alwaysOn = DE.alwaysOn.filter((k) => k !== "birthplace" && k !== "birthplace_secret");
+  uniqPush(DE.alwaysOn, "birthplace_optional_secret");
 
   Object.assign(DE.rules, {
     account_holder_name_keep_title: {
