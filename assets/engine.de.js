@@ -17,6 +17,10 @@
 // - Added money_negative for negative amounts in statements/invoices
 // - Removed "kontakt" from phone labels to reduce false positives
 // - Kept patch structure but consolidated obvious risk fixes
+//
+// PATCH v20260310-de-audit-fix:
+// - FIX 1: exclude IBAN/DE IBAN values from phoneGuard
+// - FIX 2: allow api_key_token matches without colon, e.g. "API Key abc123"
 // =========================
 
 (function () {
@@ -147,6 +151,9 @@
       const digits = val.replace(/\D+/g, "");
 
       if (digits.length >= 16) return false;
+
+      if (/^DE\d{2}/i.test(val.trim())) return false;
+      if (/\biban\b/i.test(lbl)) return false;
 
       if (
         /\b(?:aktenzeichen|geschäftszeichen|kundennummer|rechnungsnummer|rechnungsnr|vorgangs-?id|referenz|ticketnummer|bestellnummer|antragsnummer)\b/i.test(
@@ -469,7 +476,7 @@
   Object.assign(DE.rules, {
     api_key_token: {
       pattern:
-        /((?:api[ \t]*key|x-api-key|access[ \t]*token|refresh[ \t]*token|token|auth[ \t]*token|client[ \t]*secret|secret[ \t]*key|schlüssel|schluessel)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{8,300})/giu,
+        /((?:api[ \t]*key|x-api-key|access[ \t]*token|refresh[ \t]*token|token|auth[ \t]*token|client[ \t]*secret|secret[ \t]*key|schlüssel|schluessel)[ \t]*[:：=]?[ \t]+)([A-Za-z0-9._\-]{8,300})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
