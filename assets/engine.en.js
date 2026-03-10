@@ -198,7 +198,9 @@
       const val = String(value || "");
       const digits = val.replace(/\D+/g, "");
 
-      if (digits.length >= 16) return false;
+      if (digits.length >= 14) return false;
+
+      if (/^[A-Z]{2}\d{2}(?:[ \t]?[A-Z0-9]{3,5}){2,9}$/i.test(val.trim())) return false;
 
       if (
         /\b(?:case|ticket|order|invoice|reference|ref|customer|application|request|account)\b/.test(lbl) &&
@@ -416,7 +418,7 @@
 
       account: {
         pattern:
-          /((?:account(?:[ \t]*number)?(?![ \t]*holder\b)|routing[ \t]*number|sort[ \t]*code|iban|credit[ \t]*card|debit[ \t]*card|card[ \t]*number|name[ \t]*on[ \t]*card)(?:[ \t]*[:：=][ \t]*|[ \t]+))([A-Z]{2}\d{2}(?:[ \t]?[A-Z0-9]{3,5}){2,9}|(?:\d[ \t-]?){8,24}\d|[A-Za-z][A-Za-z \-'.]{3,60})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
+        /((?:account(?:[ \t]*number)?(?![ \t]*holder\b)|routing[ \t]*number|sort[ \t]*code|iban|credit[ \t]*card|debit[ \t]*card|card[ \t]*number|name[ \t]*on[ \t]*card)(?:[ \t]*[:：=][ \t]*|[ \t]+))([A-Z]{2}\d{2}(?:[ \t]?[A-Z0-9]{2,5}){3,10}|(?:\d[ \t-]?){8,24}\d|[A-Za-z][A-Za-z \-'.]{3,60})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
