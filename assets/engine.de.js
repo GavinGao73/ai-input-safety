@@ -4,7 +4,7 @@
 // - placeholders + detect + rules
 // - high-sensitivity German document model
 //
-// FINAL RELEASE:
+// FINAL-2 RELEASE:
 // - Keep Herr/Frau/Dr./Prof. in output; mask only the person name
 // - Address: only mask street + house number; keep PLZ+City/Country
 // - Zusatz: mask Gebäude/OG/Zimmer-like fragment; keep Klingel tail structure
@@ -16,6 +16,12 @@
 // - API key rule supports both "API Key: xxx" and "API Key xxx"
 // - phoneGuard excludes IBAN / DE IBAN values
 // - company rule tightened to reduce swallowing leading transaction words
+//
+// FINAL-2 FIXES:
+// - FIX A: strengthen German name matching for umlauts/ß and OCR-broken text
+// - FIX B: add next-line recipient name rules for Rechnungsadresse/Lieferadresse/Empfänger blocks
+// - FIX C: preserve transfer/action words before company names in transaction lines
+// - FIX D: add bare long-text rules for Geburtsdatum/Geburtsort/Personalausweis/Reisepass/Führerschein/IBAN/Access Token/Session ID
 // =========================
 
 (function () {
@@ -75,8 +81,14 @@
 
       "birthdate",
       "birthplace",
+      "birthdate_bare",
+      "birthplace_bare",
+      "id_card_bare",
+      "passport_bare",
+      "driver_license_bare",
 
       "account",
+      "account_bare_iban",
       "bank",
       "blz",
       "creditcard",
@@ -92,8 +104,10 @@
       "person_name_keep_title",
       "person_name_inline",
       "person_name",
+      "recipient_name_nextline",
 
       "company",
+      "company_tx_line",
 
       "address_de_inline_street",
       "address_de_extra_partial",
@@ -120,8 +134,14 @@
       "driver_license",
       "birthdate",
       "birthplace",
+      "birthdate_bare",
+      "birthplace_bare",
+      "id_card_bare",
+      "passport_bare",
+      "driver_license_bare",
 
       "account",
+      "account_bare_iban",
       "bank",
       "blz",
       "creditcard",
@@ -135,8 +155,10 @@
       "person_name_keep_title",
       "person_name_inline",
       "person_name",
+      "recipient_name_nextline",
 
       "company",
+      "company_tx_line",
       "address_de_inline_street",
       "address_de_extra_partial",
       "address_de_street_partial",
@@ -275,9 +297,45 @@
         mode: "prefix"
       },
 
+      birthdate_bare: {
+        pattern: /(\bGeburtsdatum[ \t]+)(\d{1,2}\.\d{1,2}\.\d{2,4}|\d{4}-\d{2}-\d{2})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      birthplace_bare: {
+        pattern: /(\bGeburtsort[ \t]+)([A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,2})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      id_card_bare: {
+        pattern: /(\bPersonalausweisnummer[ \t]+)([A-Za-z0-9][A-Za-z0-9\-]{4,24})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      passport_bare: {
+        pattern: /(\bReisepassnummer[ \t]+)([A-Za-z0-9][A-Za-z0-9\-]{4,24})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      driver_license_bare: {
+        pattern: /(\bFührerschein(?:-Nr\.?|nummer)?[ \t]+)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
       account: {
         pattern:
           /((?:IBAN|Kontonummer|Account(?:[ \t]*Number)?)[ \t]*[:：=][ \t]*)([A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
+        tag: "ACCOUNT",
+        mode: "prefix"
+      },
+
+      account_bare_iban: {
+        pattern: /(\bIBAN[ \t]+)(DE\d{2}(?:[ \t]?[A-Z0-9]{3,5}){2,9})/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -346,8 +404,22 @@
 
       person_name: {
         pattern:
-          /((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner|Ansprechperson|Empfänger|Rechnungsempfänger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
+          /((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner|Ansprechperson|Empfänger|Rechnungsempfänger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){1,3})/gu,
         tag: "NAME",
+        mode: "prefix"
+      },
+
+      recipient_name_nextline: {
+        pattern:
+          /((?:Rechnungsadresse|Lieferadresse|Empfänger|Rechnungsempfänger)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,3})((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?=[ \t]*(?:\r?\n))/gmu,
+        tag: "NAME",
+        mode: "prefix"
+      },
+
+      company_tx_line: {
+        pattern:
+          /((?:Lastschrift|Überweisung|Ueberweisung|Gutschrift|Zahlung|Abbuchung)[ \t]+)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9&.\-]*)(?:[ \t]+(?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9&.\-]*)){0,6}[ \t]+(?:GmbH(?:[ \t]*&[ \t]*Co\.[ \t]*KG)?|UG(?:[ \t]*\([^)]+\))?|KGaA|OHG|PartG|eG|AG|KG|GbR|e\.K\.?))/giu,
+        tag: "COMPANY",
         mode: "prefix"
       },
 
@@ -402,11 +474,6 @@
       handle: {
         pattern: /@[A-Za-z0-9_]{2,32}\b/g,
         tag: "HANDLE"
-      },
-
-      ref: {
-        pattern: /\b[A-Z]{2,6}-?\d{4,14}\b/g,
-        tag: "REF"
       },
 
       number: {
@@ -467,12 +534,12 @@
     "wallet_id",
     "tx_hash",
     "crypto_wallet",
-    "insurance_id2"
+    "insurance_id2",
+    "access_token_bare",
+    "session_id_bare"
   ];
 
-  // insurance_id2 must run BEFORE generic tail refs
   DE.priority = insertBefore(DE.priority || [], "ref_generic_tail_de", ["insurance_id2"]);
-
   DE.priority = insertBefore(DE.priority || [], "number", NEW_KEYS);
 
   DE.alwaysOn = DE.alwaysOn || [];
@@ -482,6 +549,12 @@
     api_key_token: {
       pattern:
         /((?:api[ \t]*key|x-api-key|access[ \t]*token|refresh[ \t]*token|token|auth[ \t]*token|client[ \t]*secret|secret[ \t]*key|schlüssel|schluessel)[ \t]*[:：=]?[ \t]+)([A-Za-z0-9._\-]{8,300})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    access_token_bare: {
+      pattern: /(\bAccess[ \t]*Token[ \t]+)([A-Za-z0-9._\-]{8,300})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
@@ -532,6 +605,12 @@
     device_fingerprint: {
       pattern:
         /((?:Geräte-?ID|Geraete-?ID|Device[ \t]*ID|Session[ \t]*ID|Sitzungs-?ID|Fingerprint|Browser-?Fingerprint|User-?Agent)[ \t]*[:：=][ \t]*)([^\n\r]{1,220})/giu,
+      tag: "SECRET",
+      mode: "prefix"
+    },
+
+    session_id_bare: {
+      pattern: /(\bSession[ \t]*ID[ \t]+)([A-Za-z0-9._\-]{6,220})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
@@ -635,7 +714,6 @@
     "card_security_de"
   ];
 
-  // dedicated rule must run BEFORE account
   DE.priority = insertBefore(DE.priority || [], "account", ["account_holder_name_keep_title"]);
   DE.priority = insertBefore(DE.priority || [], "birthplace", ["birthplace_optional_secret"]);
   DE.priority = insertBefore(DE.priority || [], "blz", ["blz_paren"]);
