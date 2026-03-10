@@ -104,7 +104,7 @@
       "ref_generic_multi_tail",
       "ref_generic_tail",
       "legal_ref_tail",
-      
+
       "money_label",
       "money_negative",
       "money",
@@ -113,6 +113,7 @@
 
       "person_name",
       "person_name_inline",
+      "person_name_plain_label",
       "person_name_title_line",
       "company",
 
@@ -168,7 +169,7 @@
       "money_label",
       "money_negative",
       "money",
-      
+
       "account",
       "bank",
       "bank_routing_ids",
@@ -181,6 +182,7 @@
 
       "person_name",
       "person_name_inline",
+      "person_name_plain_label",
       "person_name_title_line",
 
       "address_en_inline_street",
@@ -257,13 +259,13 @@
 
       money_negative: {
         pattern:
-        /(?:[€$£¥￥][ \t]*[-−]\s*\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?(?![\dA-Za-z])|[-−]\s*\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b(?![\dA-Za-z])|\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*[-−]\s*\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?(?![\dA-Za-z]))/giu,
+          /(?:[€$£¥￥][ \t]*[-−]\s*\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?(?![\dA-Za-z])|[-−]\s*\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b(?![\dA-Za-z])|\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*[-−]\s*\d{1,3}(?:[., \t]\d{3})*(?:[.,]\d{2})?(?![\dA-Za-z]))/giu,
         tag: "MONEY"
       },
 
       money: {
         pattern:
-        /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})*|\d{4,})(?:[.,]\d{2})?(?![\dA-Za-z])|[-+−]?(?:\d{1,3}(?:[., \t]\d{3})*|\d{4,})(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b(?![\dA-Za-z])|[€$£¥￥][ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})*|\d{4,})(?:[.,]\d{2})?(?![\dA-Za-z]))/giu,
+          /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})*|\d{4,})(?:[.,]\d{2})?(?![\dA-Za-z])|[-+−]?(?:\d{1,3}(?:[., \t]\d{3})*|\d{4,})(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b(?![\dA-Za-z])|[€$£¥￥][ \t]*[-+−]?(?:\d{1,3}(?:[., \t]\d{3})*|\d{4,})(?:[.,]\d{2})?(?![\dA-Za-z]))/giu,
         tag: "MONEY"
       },
 
@@ -431,7 +433,7 @@
 
       account: {
         pattern:
-        /((?:account(?:[ \t]*number)?(?![ \t]*holder\b)(?![ \t]*statement\b)|routing[ \t]*number|sort[ \t]*code|iban|credit[ \t]*card|debit[ \t]*card|card[ \t]*number|name[ \t]*on[ \t]*card)(?:[ \t]*[:：=][ \t]*|[ \t]+))([A-Z]{2}\d{2}(?:[ \t]?[A-Z0-9]{2,5}){3,10}|(?:\d[ \t-]?){8,24}\d|[A-Za-z][A-Za-z \-'.]{3,60})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
+          /((?:account(?:[ \t]*number)?(?![ \t]*holder\b)(?![ \t]*statement\b)|routing[ \t]*number|sort[ \t]*code|iban|credit[ \t]*card|debit[ \t]*card|card[ \t]*number|name[ \t]*on[ \t]*card)(?:[ \t]*[:：=][ \t]*|[ \t]+))([A-Z]{2}\d{2}(?:[ \t]?[A-Z0-9]{2,5}){3,10}|(?:\d[ \t-]?){8,24}\d|[A-Za-z][A-Za-z \-'.]{3,60})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -489,7 +491,7 @@
 
       phone: {
         pattern:
-          /((?:phone|mobile|tel|whatsapp|telegram|signal|fax)[ \t]*[:：=]?[ \t]*)([+＋]?[ \t]*\d[\d \t().-]{5,}\d)\b|(?<![A-Za-z0-9_-])(\b(?:[+＋][ \t]*\d{1,3}|00[ \t]*\d{1,3})[\d \t().-]{6,}\d\b)/giu,
+          /((?:phone|mobile|tel|whatsapp|telegram|signal|fax)[ \t]*[:：=]?[ \t]*)([+＋]?[ \t]*\d[\d \t().-]{5,}\d)\b|(?<![A-Za-z0-9_-])((?:[+＋][ \t]*\d{1,3}|00[ \t]*\d{1,3})[\d \t().-]{6,}\d\b)/giu,
         tag: "PHONE",
         mode: "phone"
       },
@@ -504,6 +506,13 @@
       person_name_inline: {
         pattern:
           /((?:customer[ \t]*name|account[ \t]*holder|account[ \t]*manager|manager|agent|contact(?:[ \t]*person)?|support[ \t]*agent|sales[ \t]*manager|recipient|name[ \t]*on[ \t]*card|to|attn\.?|attention)(?:[ \t]*[:：=][ \t]*)(?:(?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
+        tag: "NAME",
+        mode: "prefix"
+      },
+
+      person_name_plain_label: {
+        pattern:
+          /((?<!bank[ \t])(?<!company[ \t])(?<!product[ \t])(?<!system[ \t])(?<!service[ \t])(?:name)(?:[ \t]*[:：=][ \t]*)(?:(?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
         tag: "NAME",
         mode: "prefix"
       },
@@ -571,7 +580,7 @@
         tag: "REF",
         mode: "prefix"
       },
-      
+
       ref_label_nextline: {
         pattern:
           /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*[:：=][ \t]*[\r]?\n[ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
