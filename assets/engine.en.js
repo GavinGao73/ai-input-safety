@@ -98,11 +98,13 @@
       "email",
       "url",
 
+      "ref_label_multi_tail",
       "ref_label_nextline",
       "ref_label_tail",
+      "ref_generic_multi_tail",
       "ref_generic_tail",
       "legal_ref_tail",
-
+      
       "money_label",
       "money",
 
@@ -183,8 +185,10 @@
       "address_en_extra_block",
       "address_en_extra",
 
+      "ref_label_multi_tail",
       "ref_label_nextline",
       "ref_label_tail",
+      "ref_generic_multi_tail",
       "ref_generic_tail",
       "legal_ref_tail",
 
@@ -545,6 +549,20 @@
         tag: "ADDRESS"
       },
 
+      ref_label_multi_tail: {
+        pattern:
+          /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*(?:[:：=]|-)[ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}?[-_.]))(\d{4,}(?:[-_.]\d{4,})+)/giu,
+        tag: "REF",
+        mode: "prefix"
+      },
+
+      ref_generic_multi_tail: {
+        pattern:
+          /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-))(\d{4,}(?:-\d{4,})+)\b/gu,
+        tag: "REF",
+        mode: "prefix"
+      },
+      
       ref_label_nextline: {
         pattern:
           /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*[:：=][ \t]*[\r]?\n[ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
