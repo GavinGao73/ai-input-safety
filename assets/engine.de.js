@@ -4,18 +4,19 @@
 // - placeholders + detect + rules
 // - high-sensitivity German document model
 //
-// LOCKED (latest):
+// LOCKED (latest candidate):
 // - Keep Herr/Frau/Dr./Prof. in output; mask only the person name
 // - Address: only mask street + house number; keep PLZ+City/Country
 // - Zusatz: only mask Gebäude/OG/Zimmer-like fragment; keep Klingel tail
 // - ID policy: keep prefix/body, mask ONLY the LAST numeric segment
 //
-// PATCH v20260306-de-a2:
-// - FIX 1: dedicated account_holder_name_keep_title rule for
-//          "Kontoinhaber: Prof. David Müller" => "Kontoinhaber: Prof. [Name]"
-// - FIX 2: insurance_id2 must run BEFORE ref_generic_tail_de, so
-//          "Versicherungsnummer: POL-2026-991772" => [Geheim], not tail-only
-// - Everything else unchanged
+// PATCH v20260310-de-stable-candidate:
+// - Expanded German person-name labels for real-world docs
+// - Added person_name_inline for inline CRM/support patterns
+// - Expanded German company legal suffix coverage
+// - Added money_negative for negative amounts in statements/invoices
+// - Removed "kontakt" from phone labels to reduce false positives
+// - Kept patch structure but consolidated obvious risk fixes
 // =========================
 
 (function () {
@@ -48,7 +49,7 @@
       if (!s.trim()) return "";
 
       if (
-        /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Kontoinhaber|Ansprechpartner|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Zusatz|Geburtsdatum|Geburtsort|USt-IdNr)\b/i.test(
+        /\b(Straße|Strasse|Herr|Frau|GmbH|Kontonummer|Kontoinhaber|Ansprechpartner|Ansprechperson|Kontaktperson|Kundename|Rechnung|Aktenzeichen|Rechnungsadresse|Lieferadresse|Zusatz|Geburtsdatum|Geburtsort|USt-IdNr|Sachbearbeiter|Bearbeiter|Rechnungsempfänger)\b/i.test(
           s
         )
       ) {
@@ -84,11 +85,13 @@
       "email",
       "url",
 
+      "money_negative",
       "money",
 
       "phone",
 
       "person_name_keep_title",
+      "person_name_inline",
       "person_name",
 
       "company",
@@ -124,10 +127,12 @@
 
       "email",
       "url",
+      "money_negative",
       "money",
       "phone",
 
       "person_name_keep_title",
+      "person_name_inline",
       "person_name",
 
       "company",
@@ -151,6 +156,8 @@
         return false;
 
       if (/\b(?:knd|re|ord|ab|ref|v|vg|js)[ \t]*[-/:][ \t]*/i.test(val)) return false;
+
+      if (/^[A-Z]{2}\d{2}(?:[ \t]?[A-Z0-9]{3,5}){2,9}$/i.test(val.trim())) return false;
 
       return true;
     },
@@ -289,6 +296,12 @@
         mode: "prefix"
       },
 
+      money_negative: {
+        pattern:
+          /(?:[€$£¥￥][ \t]*[-−]\s*\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?(?![\dA-Za-z])|[-−]\s*\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b(?![\dA-Za-z])|\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*[-−]\s*\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?(?![\dA-Za-z])|[-−]\s*\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?[ \t]*[€$£¥￥](?![\dA-Za-z]))/giu,
+        tag: "MONEY"
+      },
+
       money: {
         pattern:
           /(?:\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b[ \t]*(?:[€$£¥￥][ \t]*)?\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?[ \t]*\b(?:EUR|USD|GBP|CHF|RMB|CNY|HKD)\b|[€$£¥￥][ \t]*\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?|\b\d{1,3}(?:[.,' \t]\d{3})*(?:[.,]\d{2})?[ \t]*[€$£¥￥])/giu,
@@ -307,27 +320,35 @@
 
       phone: {
         pattern:
-          /((?:tel|telefon|handy|kontakt|phone|mobile|mobil|whatsapp|telegram|signal|fax)(?:[ \t]*\([^)]+\))?[ \t]*[:：=]?[ \t]*)([+＋]?[ \t]*\d[\d \t().-]{5,}\d)\b|(?<![A-Za-z0-9_-])((?:[+＋][ \t]*\d{1,3}|00[ \t]*[1-9]\d{0,2})[\d \t().-]{6,}\d)\b/giu,
+          /((?:tel|telefon|handy|phone|mobile|mobil|whatsapp|telegram|signal|fax)(?:[ \t]*\([^)]+\))?[ \t]*[:：=]?[ \t]*)([+＋]?[ \t]*\d[\d \t().-]{5,}\d)\b|(?<![A-Za-z0-9_-])((?:[+＋][ \t]*\d{1,3}|00[ \t]*[1-9]\d{0,2})[\d \t().-]{6,}\d)\b/giu,
         tag: "PHONE",
         mode: "phone"
       },
 
       person_name_keep_title: {
         pattern:
-          /^((?:Name|Kontakt|Ansprechpartner|Empfänger)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+          /^((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner|Ansprechperson|Empfänger|Rechnungsempfänger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+        tag: "NAME",
+        mode: "prefix"
+      },
+
+      person_name_inline: {
+        pattern:
+          /((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner|Ansprechperson|Empfänger|Rechnungsempfänger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
         tag: "NAME",
         mode: "prefix"
       },
 
       person_name: {
         pattern:
-          /((?:Name|Kontakt|Ansprechpartner|Empfänger)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
+          /((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner|Ansprechperson|Empfänger|Rechnungsempfänger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]{1,40}){1,3})/gu,
         tag: "NAME",
         mode: "prefix"
       },
 
       company: {
-        pattern: /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)[ \t]+(?<legal>GmbH|AG|UG|KG|GbR|e\.K\.)\b/gu,
+        pattern:
+          /\b(?<name>[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9&.\- ]{1,80}?)[ \t]+(?<legal>GmbH(?:[ \t]*&[ \t]*Co\.[ \t]*KG)?|UG(?:[ \t]*\([^)]+\))?|KGaA|OHG|PartG|eG|AG|KG|GbR|e\.K\.?)\b/giu,
         tag: "COMPANY",
         mode: "company"
       },
