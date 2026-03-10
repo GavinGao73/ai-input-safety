@@ -29,7 +29,7 @@
   API.__state.ver = "v20260305a3-p-franc-first-single-bridge";
 
   // ---- Config (conservative) ----
-  const MIN_LEN_FRANC = 40;      // shorter than this: franc is noisy
+  const MIN_LEN_FRANC = 24;      // shorter than this: franc is noisy
   const HAN_RATIO_ZH = 0.02;     // Han chars ratio >= 2% => strong zh
 
   // Confidence thresholds
