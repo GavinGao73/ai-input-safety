@@ -98,6 +98,7 @@
       "email",
       "url",
 
+      "ref_label_nextline",
       "ref_label_tail",
       "ref_generic_tail",
       "legal_ref_tail",
@@ -108,6 +109,7 @@
       "phone",
 
       "person_name",
+      "person_name_inline",
       "person_name_title_line",
       "company",
 
@@ -173,6 +175,7 @@
       "security_answer",
 
       "person_name",
+      "person_name_inline",
       "person_name_title_line",
 
       "address_en_inline_street",
@@ -180,6 +183,7 @@
       "address_en_extra_block",
       "address_en_extra",
 
+      "ref_label_nextline",
       "ref_label_tail",
       "ref_generic_tail",
       "legal_ref_tail",
@@ -412,14 +416,14 @@
 
       account: {
         pattern:
-          /((?:account[ \t]*number|routing[ \t]*number|sort[ \t]*code|iban|card[ \t]*number)(?:[ \t]*[:：=][ \t]*|[ \t]+))([^\n\r]{2,80})/giu,
+          /((?:account(?:[ \t]*number)?(?![ \t]*holder\b)|routing[ \t]*number|sort[ \t]*code|iban|credit[ \t]*card|debit[ \t]*card|card[ \t]*number|name[ \t]*on[ \t]*card)(?:[ \t]*[:：=][ \t]*|[ \t]+))([A-Z]{2}\d{2}(?:[ \t]?[A-Z0-9]{3,5}){2,9}|(?:\d[ \t-]?){8,24}\d|[A-Za-z][A-Za-z \-'.]{3,60})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
 
       bank: {
         pattern:
-          /((?:swift|swift[ \t]*code|bic|swift\/bic)\b(?:[ \t]*[:：=][ \t]*|[ \t]+))([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/giu,
+          /((?:swift|swift[ \t]*code|bic|swift\/bic)\b(?:[ \t]*[:：=][ \t]*|[ \t]+))([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -477,7 +481,14 @@
 
       person_name: {
         pattern:
-          /^(?:contact[ \t]*details[ \t]+)?((?:name|customer[ \t]*name|account[ \t]*holder|recipient|name[ \t]*on[ \t]*card|to|attn\.?|attention)(?:[ \t]*[:：=][ \t]*|[ \t]+)(?:(?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+          /^(?:contact[ \t]*details[ \t]+)?((?:name|customer|customer[ \t]*name|account[ \t]*holder|recipient|name[ \t]*on[ \t]*card|to|attn\.?|attention)(?:[ \t]*[:：=][ \t]*|[ \t]+)(?:(?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+        tag: "NAME",
+        mode: "prefix"
+      },
+
+      person_name_inline: {
+        pattern:
+          /((?:name|customer|customer[ \t]*name|account[ \t]*holder|recipient|name[ \t]*on[ \t]*card|to|attn\.?|attention)(?:[ \t]*[:：=][ \t]*|[ \t]+)(?:(?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
         tag: "NAME",
         mode: "prefix"
       },
@@ -530,6 +541,13 @@
         pattern:
           /\b(?:apt|apartment|unit|suite|ste\.?|floor|fl\.?|room|rm\.?|flat|level|building|bldg\.?|dept|department)\b(?:[ \t]+#?[ \t]*|#[ \t]*)(?=[A-Za-z0-9.\-]{1,12}\b)(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9.\-]{1,12}\b/giu,
         tag: "ADDRESS"
+      },
+
+      ref_label_nextline: {
+        pattern:
+          /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*[:：=][ \t]*[\r]?\n[ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
+        tag: "REF",
+        mode: "prefix"
       },
 
       ref_label_tail: {
