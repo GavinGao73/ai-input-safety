@@ -422,7 +422,7 @@
 
       account: {
         pattern:
-        /((?:account(?:[ \t]*number)?(?![ \t]*holder\b)|routing[ \t]*number|sort[ \t]*code|iban|credit[ \t]*card|debit[ \t]*card|card[ \t]*number|name[ \t]*on[ \t]*card)(?:[ \t]*[:：=][ \t]*|[ \t]+))([A-Z]{2}\d{2}(?:[ \t]?[A-Z0-9]{2,5}){3,10}|(?:\d[ \t-]?){8,24}\d|[A-Za-z][A-Za-z \-'.]{3,60})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
+        /((?:account(?:[ \t]*number)?(?![ \t]*holder\b)(?![ \t]*statement\b)|routing[ \t]*number|sort[ \t]*code|iban|credit[ \t]*card|debit[ \t]*card|card[ \t]*number|name[ \t]*on[ \t]*card)(?:[ \t]*[:：=][ \t]*|[ \t]+))([A-Z]{2}\d{2}(?:[ \t]?[A-Z0-9]{2,5}){3,10}|(?:\d[ \t-]?){8,24}\d|[A-Za-z][A-Za-z \-'.]{3,60})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
