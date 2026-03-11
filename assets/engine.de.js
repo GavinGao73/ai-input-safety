@@ -4,7 +4,7 @@
 // - placeholders + detect + rules
 // - high-sensitivity German document model
 //
-// FINAL-3.2 MINIMAL PATCH PRODUCTION
+// FINAL-3.3 MINIMAL PATCH PRODUCTION
 // - Keep Herr/Frau/Dr./Prof. in output; mask only the person name
 // - Address: only mask street + house number; keep PLZ+City/Country
 // - Zusatz: mask Gebäude/OG/Zimmer-like fragment; keep Klingel tail structure
@@ -15,14 +15,10 @@
 // - NO structural shrink
 // - ONLY minimal fixes for confirmed issues
 //
-// FINAL-3.2 FIXES
-// - FIX A: expand Führerschein matching to reliably cover "Führerschein-Nr." / "Führerschein Nr." / "Führerscheinnummer"
-// - FIX B: access_token_bare supports inline + next-line token forms more robustly
-// - FIX C: session_id_bare supports inline + next-line token forms more robustly
-// - FIX D: add multiline bare IBAN support
-// - FIX E: add titled bare-name masking for Herr/Frau/Dr./Prof. in long text
-// - FIX F: add OCR-broken transaction verb support for "Ü berweisung ..."
-// - FIX G: expand person-name labels to cover "Ansprechpartner Dienstleister" and OCR-broken Empfänger/Rechnungsempfänger labels
+// FINAL-3.3 FIXES
+// - FIX A: long-text Access Token bare matching strengthened for OCR/newline extraction
+// - FIX B: multiline bare IBAN matching strengthened to consume full token across line breaks
+// - FIX C: titled person-name matching strengthened for split surname / OCR-broken surname in long text
 // =========================
 
 (function () {
@@ -113,6 +109,7 @@
       "recipient_name_nextline_broken_ocr",
       "titled_name_bare",
       "titled_name_bare_broken_ocr",
+      "titled_name_bare_multiline",
 
       "company_tx_line",
       "company_tx_line_broken_ocr",
@@ -172,6 +169,7 @@
       "recipient_name_nextline_broken_ocr",
       "titled_name_bare",
       "titled_name_bare_broken_ocr",
+      "titled_name_bare_multiline",
 
       "company_tx_line",
       "company_tx_line_broken_ocr",
@@ -372,7 +370,7 @@
       },
 
       account_bare_iban_multiline: {
-        pattern: /(\bIBAN(?:[ \t]*[:：=])?(?:[ \t]*\r?\n[ \t]*|[ \t]+))(DE\d{2}(?:[ \t\r\n]?[A-Z0-9]{2,5}){3,10})/giu,
+        pattern: /(\bIBAN(?:[ \t]*[:：=])?(?:[ \t]*\r?\n[ \t]*|[ \t]+))((?:DE\d{2}(?:[ \t]*\r?\n?[ \t]*|[ \t]+)?[A-Z0-9]{2,5}){3,10})/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -476,6 +474,13 @@
       titled_name_bare_broken_ocr: {
         pattern:
           /\b((?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)([A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,20}(?:[ \t]+(?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,20}|[äöüÄÖÜß][A-Za-zÄÖÜäöüß'’\-]{1,20})){0,2})(?=[ \t]*(?:[.,;:)\]]|\n|\r|$))/gu,
+        tag: "NAME",
+        mode: "prefix"
+      },
+
+      titled_name_bare_multiline: {
+        pattern:
+          /\b((?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)([A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,30})(?:[ \t]*\r?\n[ \t]*|[ \t]+)([A-ZÄÖÜäöüÄÖÜß][A-Za-zÄÖÜäöüß'’\-]{1,30})(?=[ \t]*(?:[.,;:)\]]|\n|\r|$))/gu,
         tag: "NAME",
         mode: "prefix"
       },
@@ -625,7 +630,7 @@
     },
 
     access_token_bare: {
-      pattern: /(\bAccess[ \t]*Token(?:[ \t]*[:：=])?(?:[ \t]*\r?\n[ \t]*|[ \t]+))([A-Za-z0-9._\-]{8,300})/giu,
+      pattern: /(\bAccess[ \t]*Token(?:[ \t]*[:：=])?(?:[ \t]*(?:\r?\n[ \t]*){1,3}|[ \t]+))([A-Za-z0-9._\-]{8,300})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
@@ -681,7 +686,7 @@
     },
 
     session_id_bare: {
-      pattern: /(\bSession[ \t]*ID(?:[ \t]*[:：=])?(?:[ \t]*\r?\n[ \t]*|[ \t]+))([A-Za-z0-9._\-]{6,220})/giu,
+      pattern: /(\bSession[ \t]*ID(?:[ \t]*[:：=])?(?:[ \t]*(?:\r?\n[ \t]*){1,3}|[ \t]+))([A-Za-z0-9._\-]{6,220})/giu,
       tag: "SECRET",
       mode: "prefix"
     },
