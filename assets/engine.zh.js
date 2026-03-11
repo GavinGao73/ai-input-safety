@@ -51,6 +51,11 @@
 // - FIX 21: 新增长段落裸值规则：id_card_inline_zh / passport_inline_zh / driver_license_inline_zh / license_plate_inline_zh
 // - NO unrelated deletions
 // - NO structural shrink
+//
+// PATCH-7 (final minimal confirmed fix):
+// - FIX 22: 新增 address_inline_zh，覆盖长段落中的裸中文地址
+// - NO unrelated deletions
+// - NO structural shrink
 // =========================
 
 (function () {
@@ -154,6 +159,7 @@
       "person_name_address_block",
 
       "address_cn_block_multiline",
+      "address_inline_zh",
       "address_cn",
       "address_cn_block",
 
@@ -173,6 +179,7 @@
       "ref_inline_zh",
 
       "address_cn_block_multiline",
+      "address_inline_zh",
       "address_cn",
       "address_cn_block",
 
@@ -511,6 +518,12 @@
 
       address_cn_block_multiline: {
         pattern: /((?:账单地址|帳單地址|收货地址|收貨地址|收件地址|办公地址|辦公地址|通信地址|聯系地址|联系地址|公司地址|注册地址|签署地址|履约地址|地址)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,3}(?:(?:【姓名】|[\u4E00-\u9FFF]{2,6})[ \t]*(?:\r?\n[ \t]*){1,3})?)([^\n\r]{2,200}(?:(?:路|街|道|大道|巷|弄|里|坊|胡同)[^\n\r]{0,40}\d{1,6}(?:-\d{1,4})?[ \t]*号[^\n\r]{0,80}))/giu,
+        tag: "ADDRESS",
+        mode: "address_cn_partial"
+      },
+
+      address_inline_zh: {
+        pattern: /((?:上海市|北京市|天津市|重庆市|香港特别行政区|澳门特别行政区|[\u4E00-\u9FFF]{2,8}省[\u4E00-\u9FFF]{2,20}市|[\u4E00-\u9FFF]{2,20}市[\u4E00-\u9FFF]{2,20}(?:区|县|镇))[\u4E00-\u9FFF0-9A-Za-z\-]{0,80}?(?:路|街|道|大道|巷|弄|里|坊|胡同)[^\n\r]{0,40}?\d{1,6}(?:-\d{1,4})?[ \t]*号[^\n\r]{0,80})/giu,
         tag: "ADDRESS",
         mode: "address_cn_partial"
       },
