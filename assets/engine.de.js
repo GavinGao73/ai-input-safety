@@ -1,33 +1,26 @@
 // =========================
 // assets/engine.de.js
-// Content-strategy pack: de (FULL – extended conservative German policy)
-// - placeholders + detect + rules
-// - high-sensitivity German document model
+// PRODUCTION FREEZE VERSION
+// - German content-strategy pack
+// - Stable for text-layer PDF / pasted text
+// - No OCR-specific logic
+// - No form-specific logic
 //
-// FINAL-3 RELEASE:
+// FREEZE POLICY
 // - Keep Herr/Frau/Dr./Prof. in output; mask only the person name
-// - Address: only mask street + house number; keep PLZ+City/Country
-// - Zusatz: mask Gebäude/OG/Zimmer-like fragment; keep Klingel tail structure
-// - ID policy: keep prefix/body, mask ONLY the LAST numeric segment
+// - Address: only mask street + house number; keep PLZ + City + Country
+// - Zusatz: mask Gebäude/OG/Zimmer-like fragment; keep Klingel structure
+// - ID policy: keep prefix/body, mask ONLY the last numeric segment
+// - Prefer conservative masking over broad semantic guessing
 //
-// FINAL FIXES INCLUDED:
-// - Geburtsort restored to alwaysOn
-// - Klingel name masking added
-// - API key rule supports both "API Key: xxx" and "API Key xxx"
-// - phoneGuard excludes IBAN / DE IBAN values
-// - company rule tightened to reduce swallowing leading transaction words
-//
-// FINAL-2 FIXES:
-// - strengthen German name matching for umlauts/ß and OCR-broken text
-// - add next-line recipient name rules for Rechnungsadresse/Lieferadresse/Empfänger blocks
-// - preserve transfer/action words before company names in transaction lines
-// - add bare long-text rules for Geburtsdatum/Geburtsort/Personalausweis/Reisepass/Führerschein/IBAN/Access Token/Session ID
-//
-// FINAL-3 FIXES:
-// - FIX A: add explicit OCR-tolerant name rules for Schäfer/König-style broken extraction
-// - FIX B: expand Führerschein matching to D-771882-2025 style bare/id-label formats
-// - FIX C: preserve full transaction verbs (Überweisung / Lastschrift / Gutschrift / Zahlung / Abbuchung)
-// - FIX D: bare IBAN / bare Access Token now consume full token, not partial
+// VERIFIED FIXES INCLUDED
+// - Geburtsort always masked
+// - Klingel name masked
+// - IBAN excluded from phone false positives
+// - API Key / Access Token support ":" / inline / next-line forms
+// - Next-line recipient names supported
+// - Driver license supports "Führerschein-Nr."
+// - Transaction verbs preserved before company names
 // =========================
 
 (function () {
@@ -97,6 +90,7 @@
       "account",
       "account_bare_iban",
       "bank",
+      "blz_paren",
       "blz",
       "creditcard",
 
@@ -109,11 +103,13 @@
       "phone",
 
       "person_name_keep_title",
+      "account_holder_name_keep_title",
       "person_name_inline",
       "person_name",
       "person_name_broken_ocr",
       "recipient_name_nextline",
       "recipient_name_nextline_broken_ocr",
+      "klingel_name",
 
       "company_tx_line",
       "company",
@@ -121,9 +117,36 @@
       "address_de_inline_street",
       "address_de_extra_partial",
       "address_de_street_partial",
-      "klingel_name",
+      "address_de_extra",
+      "address_de_street",
 
+      "handle_label",
       "handle",
+
+      "api_key_token",
+      "access_token_bare",
+      "bearer_token",
+      "security_answer",
+      "ip_label",
+      "ip_address",
+      "mac_label",
+      "mac_address",
+      "imei2",
+      "device_fingerprint",
+      "session_id_bare",
+      "uuid2",
+      "bank_routing_ids",
+      "card_expiry_de",
+      "card_security_de",
+      "avs_data",
+      "three_ds_status",
+      "eci",
+      "legal_ref_tail",
+      "insurance_id2",
+      "wallet_id",
+      "tx_hash",
+      "crypto_wallet",
+
       "number"
     ],
 
@@ -142,6 +165,7 @@
       "passport",
       "driver_license",
       "driver_license_bare_short",
+
       "birthdate",
       "birthplace",
       "birthdate_bare",
@@ -153,6 +177,7 @@
       "account",
       "account_bare_iban",
       "bank",
+      "blz_paren",
       "blz",
       "creditcard",
 
@@ -163,18 +188,46 @@
       "phone",
 
       "person_name_keep_title",
+      "account_holder_name_keep_title",
       "person_name_inline",
       "person_name",
       "person_name_broken_ocr",
       "recipient_name_nextline",
       "recipient_name_nextline_broken_ocr",
+      "klingel_name",
 
       "company_tx_line",
       "company",
+
       "address_de_inline_street",
       "address_de_extra_partial",
       "address_de_street_partial",
-      "klingel_name"
+
+      "handle_label",
+
+      "api_key_token",
+      "access_token_bare",
+      "bearer_token",
+      "security_answer",
+      "ip_label",
+      "ip_address",
+      "mac_label",
+      "mac_address",
+      "imei2",
+      "device_fingerprint",
+      "session_id_bare",
+      "uuid2",
+      "bank_routing_ids",
+      "card_expiry_de",
+      "card_security_de",
+      "avs_data",
+      "three_ds_status",
+      "eci",
+      "legal_ref_tail",
+      "insurance_id2",
+      "wallet_id",
+      "tx_hash",
+      "crypto_wallet"
     ],
 
     phoneGuard: function ({ label, value }) {
@@ -183,7 +236,6 @@
       const digits = val.replace(/\D+/g, "");
 
       if (digits.length >= 16) return false;
-
       if (/^DE\d{2}/i.test(val.trim())) return false;
       if (/\biban\b/i.test(lbl)) return false;
 
@@ -191,8 +243,7 @@
         /\b(?:aktenzeichen|geschäftszeichen|kundennummer|rechnungsnummer|rechnungsnr|vorgangs-?id|referenz|ticketnummer|bestellnummer|antragsnummer)\b/i.test(
           lbl
         )
-      )
-        return false;
+      ) return false;
 
       if (/\b(?:knd|re|ord|ab|ref|v|vg|js)[ \t]*[-/:][ \t]*/i.test(val)) return false;
 
@@ -233,12 +284,6 @@
         mode: "prefix"
       },
 
-      aktenzeichen: {
-        pattern: /((?:Aktenzeichen|Geschäftszeichen)[ \t]*[:：=][ \t]*)([A-Za-z0-9\-\/\.]{6,80})/giu,
-        tag: "REF",
-        mode: "prefix"
-      },
-
       id_label_tail: {
         pattern:
           /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)[ \t]*[:：=][ \t]*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.\/:][A-Za-z0-9\[\]]+){0,10}[-_.\/:]))(\d{4,})/giu,
@@ -246,15 +291,15 @@
         mode: "prefix"
       },
 
-      id_label: {
-        pattern:
-          /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-_\/:.]{3,80})/giu,
+      ref_generic_tail_de: {
+        pattern: /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-))(\d{5,})\b/gu,
         tag: "REF",
         mode: "prefix"
       },
 
-      ref_generic_tail_de: {
-        pattern: /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-))(\d{5,})\b/gu,
+      legal_ref_tail: {
+        pattern:
+          /((?:(?:Vertragsnummer|Vertrag[ \t]*Nr\.?|Schadensnummer|Schaden[ \t]*Nr\.?|Rechtsfall[ \t]*Ref|Legal[ \t]*Case[ \t]*Ref|Claim[ \t]*Reference|Contract[ \t]*Number)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
         tag: "REF",
         mode: "prefix"
       },
@@ -278,6 +323,13 @@
         mode: "prefix"
       },
 
+      insurance_id2: {
+        pattern:
+          /((?:Versicherungs(?:nummer|nr\.?)|Police(?:n)?nummer|Policen(?:nr\.?)|Policy[ \t]*(?:ID|No\.?|Number)|Member[ \t]*(?:ID|No\.?|Number))[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,60})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
       id_card: {
         pattern: /((?:Personalausweis(?:nummer|[- \t]?Nr\.?))[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-]{4,24})/giu,
         tag: "SECRET",
@@ -292,14 +344,14 @@
 
       driver_license: {
         pattern:
-          /((?:Führerschein(?:nummer|[- \t]?Nr\.?)|Fuehrerschein(?:nummer|[- \t]?Nr\.?)|Führerscheinnummer)[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32})/giu,
+          /((?:Führerschein(?:-?[ \t]*Nr\.?|nummer)?|Fuehrerschein(?:-?[ \t]*Nr\.?|nummer)?|Führerscheinnummer)[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32}|[A-Z]-\d{4,}-\d{2,4})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       driver_license_bare_short: {
         pattern:
-          /((?:Führerschein(?:-Nr\.?|nummer)?|Fuehrerschein(?:-Nr\.?|nummer)?)[ \t]*[:：=]?[ \t]*)([A-Z]-\d{4,}-\d{2,4})/giu,
+          /((?:Führerschein(?:-?[ \t]*Nr\.?|nummer)?|Fuehrerschein(?:-?[ \t]*Nr\.?|nummer)?)[ \t]*[:：=]?[ \t]*)([A-Z]-\d{4,}-\d{2,4})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -323,7 +375,7 @@
       },
 
       birthplace_bare: {
-        pattern: /(\bGeburtsort[ \t]+)([A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,2})/giu,
+        pattern: /(\bGeburtsort[ \t]+)([A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,2})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -341,7 +393,7 @@
       },
 
       driver_license_bare: {
-        pattern: /(\b(?:Führerschein(?:-Nr\.?|nummer)?|Fuehrerschein(?:-Nr\.?|nummer)?)[ \t]+)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32})/giu,
+        pattern: /(\b(?:Führerschein(?:-?[ \t]*Nr\.?|nummer)?|Fuehrerschein(?:-?[ \t]*Nr\.?|nummer)?)[ \t]+)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32}|[A-Z]-\d{4,}-\d{2,4})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -367,6 +419,19 @@
 
       blz: {
         pattern: /((?:Bankleitzahl|BLZ)[ \t]*[:：=][ \t]*)(\d{5,12})/giu,
+        tag: "ACCOUNT",
+        mode: "prefix"
+      },
+
+      blz_paren: {
+        pattern: /((?:Bankleitzahl)[ \t]*(?:\([ \t]*BLZ[ \t]*\))?[ \t]*[:：=][ \t]*)(\d{5,12})/giu,
+        tag: "ACCOUNT",
+        mode: "prefix"
+      },
+
+      bank_routing_ids: {
+        pattern:
+          /((?:Clearing[ \t]*(?:nummer|number|no\.?)|Clearing|Zentralbank-?Nr\.?|Filial-?Code|Filialnummer|Branch[ \t]*Code|Transit[ \t]*Number|BSB|ABA(?:[ \t]*(?:Number|Routing[ \t]*Number))?)[ \t]*[:：=][ \t]*)([0-9][0-9 \t-]{2,24}[0-9])/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -414,6 +479,13 @@
         mode: "prefix"
       },
 
+      account_holder_name_keep_title: {
+        pattern:
+          /^((?:Kontoinhaber)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+        tag: "NAME",
+        mode: "prefix"
+      },
+
       person_name_inline: {
         pattern:
           /((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner|Ansprechperson|Empfänger|Rechnungsempfänger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
@@ -446,6 +518,13 @@
         pattern:
           /((?:Rechnungsadresse|Lieferadresse|Empfänger|Rechnungsempfänger)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,3}(?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,20})[ \t]+([äöüÄÖÜß][A-Za-zÄÖÜäöüß'’\-]{1,20})(?=[ \t]*(?:\r?\n))/gmu,
         tag: "NAME"
+      },
+
+      klingel_name: {
+        pattern:
+          /((?:Klingel)[ \t]*[„"'']?[ \t]*)([A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?=[”"'']?)/giu,
+        tag: "NAME",
+        mode: "prefix"
       },
 
       company_tx_line: {
@@ -496,10 +575,10 @@
         mode: "prefix"
       },
 
-      klingel_name: {
+      handle_label: {
         pattern:
-          /((?:Klingel)[ \t]*[„"'']?[ \t]*)([A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?=[”"'']?)/giu,
-        tag: "NAME",
+          /((?:Benutzername|Login-?ID|User-?ID|Account-?ID|Handle)[ \t]*[:：=][ \t]*)([A-Za-z0-9_@.\-]{3,80})/giu,
+        tag: "HANDLE",
         mode: "prefix"
       },
 
@@ -508,287 +587,134 @@
         tag: "HANDLE"
       },
 
+      api_key_token: {
+        pattern:
+          /((?:api[ \t]*key|x-api-key|access[ \t]*token|refresh[ \t]*token|token|auth[ \t]*token|client[ \t]*secret|secret[ \t]*key|schlüssel|schluessel)[ \t]*[:：=]?[ \t]+)([A-Za-z0-9._\-]{8,300})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      access_token_bare: {
+        pattern: /(\bAccess[ \t]*Token(?:[ \t]*[:：=])?(?:[ \t]*\r?\n[ \t]*|[ \t]+))([A-Za-z0-9._\-]{8,300})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      bearer_token: {
+        pattern: /(\bauthorization[ \t]*[:：=][ \t]*bearer[ \t]+)([A-Za-z0-9._\-]{8,400})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      security_answer: {
+        pattern:
+          /((?:Sicherheitsantwort|Antwort|security[ \t]*answer|answer)[ \t]*[:：=][ \t]*)([^\n\r]{1,160})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      ip_label: {
+        pattern:
+          /((?:IP(?:[ \t]*Adresse|Address)?|IPv4|IPv6)[ \t]*[:：=][ \t]*)((?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)|(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{1,4})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      ip_address: {
+        pattern:
+          /\b((?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)|(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{1,4})\b/giu,
+        tag: "SECRET"
+      },
+
+      mac_label: {
+        pattern: /((?:MAC(?:[ \t]*Adresse|Address)?)[ \t]*[:：=][ \t]*)(\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b)/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      mac_address: {
+        pattern: /\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b/giu,
+        tag: "SECRET"
+      },
+
+      imei2: {
+        pattern: /((?:IMEI)[ \t]*[:：=][ \t]*)(\d{14,16})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      device_fingerprint: {
+        pattern:
+          /((?:Geräte-?ID|Geraete-?ID|Device[ \t]*ID|Session[ \t]*ID|Sitzungs-?ID|Fingerprint|Browser-?Fingerprint|User-?Agent)[ \t]*[:：=][ \t]*)([^\n\r]{1,220})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      session_id_bare: {
+        pattern: /(\bSession[ \t]*ID(?:[ \t]*[:：=])?(?:[ \t]*\r?\n[ \t]*|[ \t]+))([A-Za-z0-9._\-]{6,220})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      uuid2: {
+        pattern: /\b([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\b/giu,
+        tag: "SECRET"
+      },
+
+      wallet_id: {
+        pattern: /((?:Wallet[ \t]*ID)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{3,80})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      tx_hash: {
+        pattern: /((?:Transaction[ \t]*Hash|TX[ \t]*Hash|Txn[ \t]*Hash)[ \t]*[:：=][ \t]*)(0x[0-9a-f]{16,128})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      crypto_wallet: {
+        pattern:
+          /((?:BTC|ETH)[ \t]*[:：=][ \t]*)((?:bc1)[0-9a-z]{25,90}|[13][A-HJ-NP-Za-km-z1-9]{25,34}|0x[a-f0-9]{40})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      card_expiry_de: {
+        pattern:
+          /((?:Gültig[ \t]*bis|Gueltig[ \t]*bis|Ablaufdatum|Expiry|Expiration|Exp(?:iry|iration)?(?:[ \t]*Date)?|Valid[ \t]*Thru|Valid[ \t]*Through)[ \t]*[:：=][ \t]*)(\d{2}[ \t]*\/[ \t]*\d{2,4}|\d{2}[ \t]*-[ \t]*\d{2,4}|\d{4}[ \t]*-[ \t]*\d{2})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      card_security_de: {
+        pattern: /((?:CVC|CVV|CVC2|CAV2)[ \t]*[:：=][ \t]*)(\d{3,4})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      avs_data: {
+        pattern: /((?:AVS[ \t]*Data)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{1,40})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      three_ds_status: {
+        pattern: /((?:3-?D[ \t]*Secure|3DS)(?:[ \t]*Status)?[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{1,40})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      eci: {
+        pattern: /((?:ECI)[ \t]*[:：=][ \t]*)(\d{2})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
       number: {
         pattern: /\b\d[\d \t\-]{6,30}\d\b/g,
         tag: "NUMBER"
-      },
-
-      title: {
-        pattern: /\b(Herr|Frau|Dr\.?|Prof\.?)\b/g,
-        tag: "TITLE"
       }
     }
   };
-})();
-
-// =========================
-// DE High-Risk ADD-ONLY Patch
-// =========================
-(function () {
-  "use strict";
-
-  const PACKS = (window.__ENGINE_LANG_PACKS__ = window.__ENGINE_LANG_PACKS__ || {});
-  const DE = PACKS.de;
-  if (!DE) return;
-
-  function uniqPush(arr, key) {
-    if (!arr.includes(key)) arr.push(key);
-  }
-
-  function insertBefore(arr, beforeKey, keys) {
-    const out = Array.isArray(arr) ? arr.slice() : [];
-    const idx = out.indexOf(beforeKey);
-    const insertAt = idx >= 0 ? idx : out.length;
-    const toInsert = [];
-    (keys || []).forEach((k) => {
-      if (!out.includes(k) && !toInsert.includes(k)) toInsert.push(k);
-    });
-    out.splice(insertAt, 0, ...toInsert);
-    return out;
-  }
-
-  const NEW_KEYS = [
-    "api_key_token",
-    "bearer_token",
-    "security_answer",
-    "ip_label",
-    "ip_address",
-    "mac_label",
-    "mac_address",
-    "imei2",
-    "device_fingerprint",
-    "uuid2",
-    "bank_routing_ids",
-    "avs_data",
-    "three_ds_status",
-    "eci",
-    "legal_ref_tail",
-    "wallet_id",
-    "tx_hash",
-    "crypto_wallet",
-    "insurance_id2",
-    "access_token_bare",
-    "session_id_bare"
-  ];
-
-  DE.priority = insertBefore(DE.priority || [], "ref_generic_tail_de", ["insurance_id2"]);
-  DE.priority = insertBefore(DE.priority || [], "number", NEW_KEYS);
-
-  DE.alwaysOn = DE.alwaysOn || [];
-  NEW_KEYS.forEach((k) => uniqPush(DE.alwaysOn, k));
-
-  Object.assign(DE.rules, {
-    api_key_token: {
-      pattern:
-        /((?:api[ \t]*key|x-api-key|access[ \t]*token|refresh[ \t]*token|token|auth[ \t]*token|client[ \t]*secret|secret[ \t]*key|schlüssel|schluessel)[ \t]*[:：=]?[ \t]+)([A-Za-z0-9._\-]{8,300})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    access_token_bare: {
-      pattern: /(\bAccess[ \t]*Token[ \t]+)([A-Za-z0-9._\-]{8,300})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    bearer_token: {
-      pattern: /(\bauthorization[ \t]*[:：=][ \t]*bearer[ \t]+)([A-Za-z0-9._\-]{8,400})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    security_answer: {
-      pattern:
-        /((?:Sicherheitsantwort|Antwort|security[ \t]*answer|answer)[ \t]*[:：=][ \t]*)([^\n\r]{1,160})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    ip_label: {
-      pattern:
-        /((?:IP(?:[ \t]*Adresse|Address)?|IPv4|IPv6)[ \t]*[:：=][ \t]*)((?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)|(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{1,4})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    ip_address: {
-      pattern:
-        /\b((?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)|(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{1,4})\b/giu,
-      tag: "SECRET"
-    },
-
-    mac_label: {
-      pattern: /((?:MAC(?:[ \t]*Adresse|Address)?)[ \t]*[:：=][ \t]*)(\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b)/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    mac_address: {
-      pattern: /\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b/giu,
-      tag: "SECRET"
-    },
-
-    imei2: {
-      pattern: /((?:IMEI)[ \t]*[:：=][ \t]*)(\d{14,16})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    device_fingerprint: {
-      pattern:
-        /((?:Geräte-?ID|Geraete-?ID|Device[ \t]*ID|Session[ \t]*ID|Sitzungs-?ID|Fingerprint|Browser-?Fingerprint|User-?Agent)[ \t]*[:：=][ \t]*)([^\n\r]{1,220})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    session_id_bare: {
-      pattern: /(\bSession[ \t]*ID[ \t]+)([A-Za-z0-9._\-]{6,220})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    uuid2: {
-      pattern: /\b([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\b/giu,
-      tag: "SECRET"
-    },
-
-    bank_routing_ids: {
-      pattern:
-        /((?:Clearing[ \t]*(?:nummer|number|no\.?)|Clearing|Zentralbank-?Nr\.?|Filial-?Code|Filialnummer|Branch[ \t]*Code|Transit[ \t]*Number|BSB|ABA(?:[ \t]*(?:Number|Routing[ \t]*Number))?)[ \t]*[:：=][ \t]*)([0-9][0-9 \t-]{2,24}[0-9])/giu,
-      tag: "ACCOUNT",
-      mode: "prefix"
-    },
-
-    avs_data: {
-      pattern: /((?:AVS[ \t]*Data)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{1,40})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    three_ds_status: {
-      pattern: /((?:3-?D[ \t]*Secure|3DS)(?:[ \t]*Status)?[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{1,40})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    eci: {
-      pattern: /((?:ECI)[ \t]*[:：=][ \t]*)(\d{2})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    legal_ref_tail: {
-      pattern:
-        /((?:(?:Vertragsnummer|Vertrag[ \t]*Nr\.?|Schadensnummer|Schaden[ \t]*Nr\.?|Rechtsfall[ \t]*Ref|Legal[ \t]*Case[ \t]*Ref|Claim[ \t]*Reference|Contract[ \t]*Number)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
-      tag: "REF",
-      mode: "prefix"
-    },
-
-    insurance_id2: {
-      pattern:
-        /((?:Versicherungs(?:nummer|nr\.?)|Police(?:n)?nummer|Policen(?:nr\.?)|Policy[ \t]*(?:ID|No\.?|Number)|Member[ \t]*(?:ID|No\.?|Number))[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-_.]{3,60})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    wallet_id: {
-      pattern: /((?:Wallet[ \t]*ID)[ \t]*[:：=][ \t]*)([A-Za-z0-9._\-]{3,80})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    tx_hash: {
-      pattern: /((?:Transaction[ \t]*Hash|TX[ \t]*Hash|Txn[ \t]*Hash)[ \t]*[:：=][ \t]*)(0x[0-9a-f]{16,128})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    crypto_wallet: {
-      pattern:
-        /((?:BTC|ETH)[ \t]*[:：=][ \t]*)((?:bc1)[0-9a-z]{25,90}|[13][A-HJ-NP-Za-km-z1-9]{25,34}|0x[a-f0-9]{40})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    }
-  });
-})();
-
-// =========================
-// DE Fix Patch
-// =========================
-(function () {
-  "use strict";
-
-  const PACKS = (window.__ENGINE_LANG_PACKS__ = window.__ENGINE_LANG_PACKS__ || {});
-  const DE = PACKS.de;
-  if (!DE) return;
-
-  function uniqPush(arr, key) {
-    if (!arr.includes(key)) arr.push(key);
-  }
-
-  function insertBefore(arr, beforeKey, keys) {
-    const out = Array.isArray(arr) ? arr.slice() : [];
-    const idx = out.indexOf(beforeKey);
-    const insertAt = idx >= 0 ? idx : out.length;
-    const toInsert = [];
-    (keys || []).forEach((k) => {
-      if (!out.includes(k) && !toInsert.includes(k)) toInsert.push(k);
-    });
-    out.splice(insertAt, 0, ...toInsert);
-    return out;
-  }
-
-  const NEW_KEYS = [
-    "account_holder_name_keep_title",
-    "birthplace_optional_secret",
-    "blz_paren",
-    "card_expiry_de",
-    "card_security_de"
-  ];
-
-  DE.priority = insertBefore(DE.priority || [], "account", ["account_holder_name_keep_title"]);
-  DE.priority = insertBefore(DE.priority || [], "birthplace", ["birthplace_optional_secret"]);
-  DE.priority = insertBefore(DE.priority || [], "blz", ["blz_paren"]);
-  DE.priority = insertBefore(DE.priority || [], "number", ["card_expiry_de", "card_security_de"]);
-
-  DE.alwaysOn = Array.isArray(DE.alwaysOn) ? DE.alwaysOn : [];
-  uniqPush(DE.alwaysOn, "account_holder_name_keep_title");
-  uniqPush(DE.alwaysOn, "blz_paren");
-  uniqPush(DE.alwaysOn, "card_expiry_de");
-  uniqPush(DE.alwaysOn, "card_security_de");
-  uniqPush(DE.alwaysOn, "birthplace_optional_secret");
-
-  Object.assign(DE.rules, {
-    account_holder_name_keep_title: {
-      pattern:
-        /^((?:Kontoinhaber)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
-      tag: "NAME",
-      mode: "prefix"
-    },
-
-    birthplace_optional_secret: {
-      pattern: /((?:Geburtsort)[ \t]*[:：=][ \t]*)([^\n\r]{2,80})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    },
-
-    blz_paren: {
-      pattern: /((?:Bankleitzahl)[ \t]*(?:\([ \t]*BLZ[ \t]*\))?[ \t]*[:：=][ \t]*)(\d{5,12})/giu,
-      tag: "ACCOUNT",
-      mode: "prefix"
-    },
-
-    card_expiry_de: {
-      pattern:
-        /((?:Gültig[ \t]*bis|Gueltig[ \t]*bis|Ablaufdatum|Expiry|Expiration|Exp(?:iry|iration)?(?:[ \t]*Date)?|Valid[ \t]*Thru|Valid[ \t]*Through)[ \t]*[:：=][ \t]*)(\d{2}[ \t]*\/[ \t]*\d{2,4}|\d{2}[ \t]*-[ \t]*\d{2,4}|\d{4}[ \t]*-[ \t]*\d{2})/giu,
-        tag: "SECRET",
-        mode: "prefix"
-    },
-
-    card_security_de: {
-      pattern: /((?:CVC|CVV|CVC2|CAV2)[ \t]*[:：=][ \t]*)(\d{3,4})/giu,
-      tag: "SECRET",
-      mode: "prefix"
-    }
-  });
 })();
