@@ -25,6 +25,13 @@
 // - FIX 7: 补强 address_cn / address_cn_block 标签覆盖
 // - NO unrelated deletions
 // - NO structural shrink
+//
+// PATCH-3 (minimal confirmed fixes only):
+// - FIX 8: 新增 company_label_inline_zh，覆盖“单位名称 / 项目服务机构 / 账户名”等单行公司标签
+// - FIX 9: 新增 address_cn_block_multiline，覆盖“标签 + 姓名 + 地址”三段式多行地址块
+// - FIX 10: 新增 money_label_currency_zh，覆盖“人民币：12600.00”等货币标签格式
+// - FIX 11: 新增 account_cn_inline，覆盖长段落中的“收款账号6217... / 联行号1021...”
+// - FIX 12: 新增 secret_inline_zh，覆盖长段落中的“接口密钥sk_... / 会话IDsess_... / 钱包地址0x...”
 // =========================
 
 (function () {
@@ -77,6 +84,7 @@
       "secret",
       "security_answer",
       "api_key_token_zh",
+      "secret_inline_zh",
 
       // identity (CN-realistic)
       "dob",
@@ -98,6 +106,7 @@
 
       // financial
       "account",
+      "account_cn_inline",
       "bank",
       "bank_routing_ids",
       "card_expiry",
@@ -118,6 +127,7 @@
 
       // money
       "money_label",
+      "money_label_currency_zh",
       "money_cn_inline_label",
       "money",
 
@@ -126,12 +136,14 @@
 
       // person/org
       // ✅ company before person_name (开户名等公司字段不应被人名抢走)
+      "company_label_inline_zh",
       "company",
       "company_block",
       "person_name",
       "person_name_address_block",
 
       // address (CN partial)
+      "address_cn_block_multiline",
       "address_cn",
       "address_cn_block",
 
@@ -153,12 +165,14 @@
       "cust_id",
       "ref_label_tail",
 
+      "address_cn_block_multiline",
       "address_cn",
       "address_cn_block",
 
       "secret",
       "security_answer",
       "api_key_token_zh",
+      "secret_inline_zh",
 
       "dob",
       "place_of_birth",
@@ -177,16 +191,19 @@
       "uuid",
 
       "account",
+      "account_cn_inline",
       "bank",
       "bank_routing_ids",
       "card_expiry",
       "card_security",
 
       "money_label",
+      "money_label_currency_zh",
       "money_cn_inline_label",
       "money",
 
       // ✅ org before person
+      "company_label_inline_zh",
       "company",
       "company_block",
       "person_name",
@@ -335,6 +352,13 @@
         mode: "prefix"
       },
 
+      /* ===================== SECRET INLINE (ZH long-text) ===================== */
+      secret_inline_zh: {
+        pattern: /((?:接口密钥|API[ \t]*Key|Access[ \t]*Token|会话ID|Session[ \t]*ID|设备ID|Device[ \t]*ID|钱包地址|交易哈希|交易Hash)[ \t]*)(0x[0-9a-f]{16,128}|[A-Za-z0-9._\-]{6,300})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
       /* ===================== DOB / Birthdate (label-driven) ===================== */
       dob: {
         pattern: /((?:出生日期(?:（中文）)?|出生年月|生日|DOB|Date[ \t]*of[ \t]*Birth)[ \t]*[:：=][ \t]*)(\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日)/giu,
@@ -403,6 +427,13 @@
       /* ===================== ACCOUNT (label-driven) ===================== */
       account: {
         pattern: /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|信用卡|信用卡号|信用卡號|card[ \t]*number|credit[ \t]*card|对公账户|對公賬戶|IBAN|Account[ \t]*Number)[ \t]*[:：=]?[ \t]*)([A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
+        tag: "ACCOUNT",
+        mode: "prefix"
+      },
+
+      /* ===================== ACCOUNT INLINE (ZH long-text) ===================== */
+      account_cn_inline: {
+        pattern: /((?:对公账户|收款账号|银行账号|银行卡号|联行号|清算号|分行号|支行号|路由号)[ \t]*)(\d[\d \t-]{6,40}\d)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -480,10 +511,25 @@
         mode: "address_cn_partial"
       },
 
+      /* ===================== ADDRESS BLOCK MULTILINE (ZH) ===================== */
+      address_cn_block_multiline: {
+        pattern:
+          /((?:账单地址|帳單地址|收货地址|收貨地址|收件地址|办公地址|辦公地址|通信地址|聯系地址|联系地址|公司地址|注册地址|签署地址|履约地址|地址)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,3}(?:[\u4E00-\u9FFF]{2,6}[ \t]*(?:\r?\n[ \t]*){1,3})?)([^\n\r]{2,200}(?:(?:路|街|道|大道|巷|弄|里|坊|胡同)[^\n\r]{0,40}\d{1,6}(?:-\d{1,4})?[ \t]*号[^\n\r]{0,80}))/giu,
+        tag: "ADDRESS",
+        mode: "address_cn_partial"
+      },
+
       /* ===================== MONEY LABEL (ZH/EN strong labels; no currency sign required) ===================== */
       money_label: {
         pattern:
           /((?:金额|合计|总计|小计|应付|实付|已付|支付金额|付款金额|收款金额|退款金额|余额|费用|手续费|服务费|税额|税费|增值税|合同总金额|首付款|尾款|金额合计|基础服务包|高级功能模块|实施费用|售后支持|付款|VAT|Amount|Total|Subtotal|Balance|Paid|Payment|Refund|Due|Net|Gross)[ \t]*[:：=][ \t]*)((?:[-+−]?(?:\d{1,3}(?:[, \t]\d{3})+|\d+)(?:\.\d{1,2})?))/giu,
+        tag: "MONEY",
+        mode: "prefix"
+      },
+
+      /* ===================== MONEY LABEL CURRENCY (ZH) ===================== */
+      money_label_currency_zh: {
+        pattern: /((?:人民币|CNY|RMB|USD|EUR)[ \t]*[:：=][ \t]*)([-+−]?(?:\d{1,3}(?:[,\.\t ]\d{3})+|\d+)(?:[.,]\d{1,2})?)/giu,
         tag: "MONEY",
         mode: "prefix"
       },
@@ -500,6 +546,14 @@
         pattern:
           /(?:\b(?:人民币|CNY|RMB)\b[ \t]*[-+−]?(?:\d{1,3}(?:[, \t]\d{3})+|\d+)(?:\.\d{1,2})?[ \t]*(?:元)?|[¥￥][ \t]*[-+−]?(?:\d{1,3}(?:[, \t]\d{3})+|\d+)(?:\.\d{1,2})?|\b[-+−]?(?:\d{1,3}(?:[, \t]\d{3})+|\d+)(?:\.\d{1,2})?[ \t]*元|\bUSD\b[ \t]*\$?[ \t]*[-+−]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?|\$[ \t]*[-+−]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?|€[ \t]*[-+−]?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d{2})?|\b[-+−]?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d{2})?[ \t]*€)/giu,
         tag: "MONEY"
+      },
+
+      /* ===================== COMPANY LABEL INLINE (ZH) ===================== */
+      company_label_inline_zh: {
+        pattern:
+          /((?:公司名称|公司名稱|单位名称|單位名稱|供应商|供應商|开票方|開票方|收款方|付款方|法务顾问单位|项目服务机构|項目服務機構|开户名|账户名|帳戶名|開戶名|甲方|乙方|发货方)[ \t]*[:：=][ \t]*)([\u4E00-\u9FFF][\u4E00-\u9FFF0-9（）()·&\-\s]{1,80}?(?:集团有限公司|股份有限公司|有限责任公司|有限公司|分公司|事务所|中心|集团|公司))/gmu,
+        tag: "COMPANY",
+        mode: "prefix"
       },
 
       /* ===================== COMPANY (ZH) ===================== */
