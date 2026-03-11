@@ -16,6 +16,15 @@
 // - FIX 1: person_name 移除“开户名 / 账户名”，避免与公司/对公账户名冲突
 // - FIX 2: company 补充高价值中文组织后缀：分公司 / 事务所 / 中心
 // - Keep all other behaviors unchanged
+//
+// PATCH-2 (minimal confirmed fixes only):
+// - FIX 3: 新增 api_key_token_zh，覆盖“接口密钥 / API Key / Access Token / Token”
+// - FIX 4: handle_label 增补“用户ID / 用户 / 账号”，但不重新引入“账户名 / 開戶名”
+// - FIX 5: money_label 扩充中文财务标签；新增 money_cn_inline_label
+// - FIX 6: company 通用规则移除裸“中心”，避免误伤地址；保留 company_block 中的“中心”
+// - FIX 7: 补强 address_cn / address_cn_block 标签覆盖
+// - NO unrelated deletions
+// - NO structural shrink
 // =========================
 
 (function () {
@@ -67,6 +76,7 @@
       // secrets/auth first
       "secret",
       "security_answer",
+      "api_key_token_zh",
 
       // identity (CN-realistic)
       "dob",
@@ -108,6 +118,7 @@
 
       // money
       "money_label",
+      "money_cn_inline_label",
       "money",
 
       // phone AFTER ids
@@ -147,6 +158,7 @@
 
       "secret",
       "security_answer",
+      "api_key_token_zh",
 
       "dob",
       "place_of_birth",
@@ -171,6 +183,7 @@
       "card_security",
 
       "money_label",
+      "money_cn_inline_label",
       "money",
 
       // ✅ org before person
@@ -259,8 +272,7 @@
         "供应链",
         "电商",
         "互联网",
-        "事务所",
-        "中心"
+        "事务所"
       ];
 
       let keep = "";
@@ -312,6 +324,13 @@
       /* ===================== SECURITY ANSWER (label-driven) ===================== */
       security_answer: {
         pattern: /((?:安全答案|密保答案|回答|答案|security[ \t]*answer|answer)[ \t]*[:：=][ \t]*)([^\n\r]{1,160})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      /* ===================== API KEY / TOKEN (label-driven; zh) ===================== */
+      api_key_token_zh: {
+        pattern: /((?:接口密钥|API[ \t]*Key|Api[ \t]*Key|访问令牌|Access[ \t]*Token|刷新令牌|Refresh[ \t]*Token|令牌|Token)[ \t]*[:：=]?[ \t]*)([A-Za-z0-9._\-]{8,300})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -426,7 +445,7 @@
       /* ===================== PERSON NAME (label-driven; CN-realistic) ===================== */
       person_name: {
         pattern:
-          /((?:姓名|收件人|联系人|Name|Recipient)[ \t]*[:：=][ \t]*)(?![^\n\r]*(?:集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司|分公司|事务所|中心))((?:(?:Mr\.?|Mrs\.?|Ms\.?|Dr\.?|Prof\.?)[ \t]*)?[\u4E00-\u9FFF]{2,6}|(?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})/gmu,
+          /((?:姓名|收件人|联系人|Name|Recipient)[ \t]*[:：=][ \t]*)(?![^\n\r]*(?:集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司|分公司|事务所))((?:(?:Mr\.?|Mrs\.?|Ms\.?|Dr\.?|Prof\.?)[ \t]*)?[\u4E00-\u9FFF]{2,6}|(?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})/gmu,
         tag: "NAME",
         mode: "prefix"
       },
@@ -434,21 +453,21 @@
       /* ===================== PERSON NAME IN ADDRESS BLOCK (ZH multiline) ===================== */
       person_name_address_block: {
         pattern:
-          /((?:账单地址|帳單地址|收货地址|收貨地址|办公地址|辦公地址|通信地址|聯絡地址|联系地址|聯繫地址|地址)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,4})(?![^\n\r]*(?:集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司|分公司|事务所|中心))([\u4E00-\u9FFF]{2,6})(?=[ \t]*(?:\r?\n))/gmu,
+          /((?:账单地址|帳單地址|收货地址|收貨地址|办公地址|辦公地址|通信地址|聯絡地址|联系地址|聯繫地址|地址)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,4})(?![^\n\r]*(?:集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司|分公司|事务所))([\u4E00-\u9FFF]{2,6})(?=[ \t]*(?:\r?\n))/gmu,
         tag: "NAME",
         mode: "prefix"
       },
 
       /* ===================== HANDLE (label-driven) ===================== */
       handle_label: {
-        pattern: /((?:用户名|用[ \t]*户[ \t]*名|登录账号|登[ \t]*录[ \t]*账[ \t]*号|账号名|账[ \t]*号[ \t]*名|支付账号|支付账户|微信号|WeChat[ \t]*ID|wxid|User[ \t]*ID)[ \t]*[:：=][ \t]*)([A-Za-z0-9_@.\-]{3,80})/giu,
+        pattern: /((?:用户名|用[ \t]*户[ \t]*名|用户ID|用户[ \t]*ID|用户|登录账号|登[ \t]*录[ \t]*账[ \t]*号|账号名|账[ \t]*号[ \t]*名|账号|支付账号|支付账户|微信号|WeChat[ \t]*ID|wxid|User[ \t]*ID)[ \t]*[:：=][ \t]*)([A-Za-z0-9_@.\-]{3,80})/giu,
         tag: "HANDLE",
         mode: "prefix"
       },
 
       /* ===================== ADDRESS (CN partial) ===================== */
       address_cn: {
-        pattern: /((?:地址|住址|办公地址|通信地址|收货地址|居住地址|单位地址|联系地址)[ \t]*[:：=][ \t]*)([^\n\r]{2,120})/giu,
+        pattern: /((?:地址|住址|办公地址|通信地址|收货地址|收件地址|联系地址|联系住址|居住地址|单位地址|公司地址|注册地址|签署地址|履约地址)[ \t]*[:：=][ \t]*)([^\n\r]{2,160})/giu,
         tag: "ADDRESS",
         mode: "address_cn_partial"
       },
@@ -456,7 +475,7 @@
       /* ===================== ADDRESS BLOCK (CN multiline partial) ===================== */
       address_cn_block: {
         pattern:
-          /((?:账单地址|帳單地址|收货地址|收貨地址|办公地址|辦公地址|通信地址|聯系地址|联系地址|地址)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,4}(?:[\u4E00-\u9FFF]{2,6}[ \t]*(?:\r?\n[ \t]*){1,4})?)([^\n\r]{2,160}(?:(?:路|街|道|大道|巷|弄|里|坊|胡同|区|镇|村|桥|湾|园|城|厦|楼)[^\n\r]{0,40}\d{1,6}(?:-\d{1,4})?[ \t]*号))/giu,
+          /((?:账单地址|帳單地址|收货地址|收貨地址|收件地址|办公地址|辦公地址|通信地址|聯系地址|联系地址|公司地址|注册地址|签署地址|履约地址|地址)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,4}(?:[\u4E00-\u9FFF]{2,6}[ \t]*(?:\r?\n[ \t]*){1,4})?)(?=[^\n\r]{2,200})((?:.*?(?:路|街|道|大道|巷|弄|里|坊|胡同))\d{1,6}(?:-\d{1,4})?[ \t]*号[^\n\r]{0,80})/giu,
         tag: "ADDRESS",
         mode: "address_cn_partial"
       },
@@ -464,7 +483,14 @@
       /* ===================== MONEY LABEL (ZH/EN strong labels; no currency sign required) ===================== */
       money_label: {
         pattern:
-          /((?:金额|合计|总计|小计|应付|实付|已付|支付金额|付款金额|收款金额|退款金额|余额|费用|手续费|服务费|税额|税费|增值税|VAT|Amount|Total|Subtotal|Balance|Paid|Payment|Refund|Due|Net|Gross)[ \t]*[:：=][ \t]*)((?:[-+−]?(?:\d{1,3}(?:[, \t]\d{3})+|\d+)(?:\.\d{1,2})?))/giu,
+          /((?:金额|合计|总计|小计|应付|实付|已付|支付金额|付款金额|收款金额|退款金额|余额|费用|手续费|服务费|税额|税费|增值税|合同总金额|首付款|尾款|金额合计|基础服务包|高级功能模块|实施费用|售后支持|付款|VAT|Amount|Total|Subtotal|Balance|Paid|Payment|Refund|Due|Net|Gross)[ \t]*[:：=][ \t]*)((?:[-+−]?(?:\d{1,3}(?:[, \t]\d{3})+|\d+)(?:\.\d{1,2})?))/giu,
+        tag: "MONEY",
+        mode: "prefix"
+      },
+
+      /* ===================== MONEY INLINE LABEL (ZH) ===================== */
+      money_cn_inline_label: {
+        pattern: /((?:基础服务包|高级功能模块|实施费用|售后支持|首付款|尾款|合同总金额|服务费|手续费|增值税)[ \t]*)([-+−]?(?:\d{1,3}(?:[, \t]\d{3})+|\d+)(?:\.\d{1,2})?)/giu,
         tag: "MONEY",
         mode: "prefix"
       },
@@ -478,7 +504,7 @@
 
       /* ===================== COMPANY (ZH) ===================== */
       company: {
-        pattern: /(?<name>[\u4E00-\u9FFF][\u4E00-\u9FFF0-9（）()·&\-\s]{1,60}?)(?<legal>集团有限公司|股份有限公司|有限责任公司|有限公司|分公司|事务所|中心|集团|公司)(?=$|[^\u4E00-\u9FFF])/gu,
+        pattern: /(?<name>[\u4E00-\u9FFF][\u4E00-\u9FFF0-9（）()·&\-\s]{1,60}?)(?<legal>集团有限公司|股份有限公司|有限责任公司|有限公司|分公司|事务所|集团|公司)(?=$|[^\u4E00-\u9FFF])/gu,
         tag: "COMPANY",
         mode: "company"
       },
