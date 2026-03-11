@@ -38,6 +38,13 @@
 // - FIX 14: 强化 address_cn_block_multiline，兼容“【姓名】”占位后的三段式地址块
 // - FIX 15: 强化 account_cn_inline，兼容标签后直接接数字、空格或换行
 // - FIX 16: 强化 secret_inline_zh，兼容“接口密钥 sk_... / 会话ID sess_... / 设备ID device_... / 钱包地址 0x...”及轻微断裂
+//
+// PATCH-5 (minimal confirmed fixes only):
+// - FIX 17: 新增 ref_inline_zh，覆盖长段落中的“合同编号HT-... / 订单号ORD-... / 参考编号REF-...”
+// - FIX 18: 进一步补强 address_cn_block_multiline，兼容“标签 + 【姓名】 + 下一行地址正文”
+// - FIX 19: 进一步补强 account_cn_inline / secret_inline_zh 的跨行值形式
+// - NO unrelated deletions
+// - NO structural shrink
 // =========================
 
 (function () {
@@ -130,6 +137,7 @@
 
       // ✅ ID policy: keep prefix/body, mask ONLY the last numeric segment (tail digits)
       "ref_label_tail",
+      "ref_inline_zh",
 
       // money
       "money_label",
@@ -171,6 +179,7 @@
       // refs / ids
       "cust_id",
       "ref_label_tail",
+      "ref_inline_zh",
 
       "address_cn_block_multiline",
       "address_cn",
@@ -428,6 +437,14 @@
       ref_label_tail: {
         pattern:
           /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|Case[ \t]*ID|Ticket[ \t]*No\.?|Application[ \t]*ID|Order[ \t]*ID|Invoice[ \t]*No\.?|Reference)[ \t]*[:：=][ \t]*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,10}[-_.]))(\d{4,})/giu,
+        tag: "REF",
+        mode: "prefix"
+      },
+
+      /* ===================== REF INLINE (ZH long-text; keep prefix/body, mask tail only) ===================== */
+      ref_inline_zh: {
+        pattern:
+          /((?:合同编号|补充协议编号|参考编号|订单号|发票号|申请编号|工单号|票据号|法律案件号|索赔参考号|客户号|合同号|编号)[ \t]*)(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,10}[-_.]))(\d{4,}))/giu,
         tag: "REF",
         mode: "prefix"
       },
