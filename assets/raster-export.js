@@ -257,25 +257,70 @@
   }
 
   function drawRedactionsOnCanvas(canvas, rects) {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
 
-    ctx.save();
-    ctx.globalCompositeOperation = "source-over";
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
 
-    for (const r of rects || []) {
-      const x = clamp(Number(r && r.x) || 0, 0, canvas.width);
-      const y = clamp(Number(r && r.y) || 0, 0, canvas.height);
-      const w = clamp(Number(r && r.w) || 0, 0, canvas.width - x);
-      const h = clamp(Number(r && r.h) || 0, 0, canvas.height - y);
-      if (w <= 0 || h <= 0) continue;
+  const PAD = 2;
 
-      ctx.fillStyle = "#000";
-      ctx.fillRect(x, y, w, h);
-    }
+  for (const r of rects || []) {
+    let x = Number(r && r.x) || 0;
+    let y = Number(r && r.y) || 0;
+    let w = Number(r && r.w) || 0;
+    let h = Number(r && r.h) || 0;
 
-    ctx.restore();
+    x -= PAD;
+    y -= PAD;
+    w += PAD * 2;
+    h += PAD * 2;
+
+    x = clamp(x, 0, canvas.width);
+    y = clamp(y, 0, canvas.height);
+    w = clamp(w, 0, canvas.width - x);
+    h = clamp(h, 0, canvas.height - y);
+
+    if (w <= 0 || h <= 0) continue;
+
+    ctx.fillStyle = "#000";
+    ctx.fillRect(x, y, w, h);
   }
+
+  ctx.restore();
+}
+
+  function mergeRects(rects) {
+  if (!Array.isArray(rects) || rects.length < 2) return rects || [];
+
+  const sorted = rects.slice().sort((a, b) => {
+    if (Math.abs(a.y - b.y) < 3) return a.x - b.x;
+    return a.y - b.y;
+  });
+
+  const out = [];
+
+  for (const r of sorted) {
+    const last = out[out.length - 1];
+
+    if (
+      last &&
+      Math.abs(last.y - r.y) < 3 &&
+      Math.abs(last.h - r.h) < 3 &&
+      r.x <= last.x + last.w + 4
+    ) {
+      const nx = Math.min(last.x, r.x);
+      const nw = Math.max(last.x + last.w, r.x + r.w) - nx;
+
+      last.x = nx;
+      last.w = nw;
+    } else {
+      out.push({ ...r });
+    }
+  }
+
+  return out;
+}
 
   async function canvasToPngBytes(canvas) {
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png", 1.0));
@@ -797,6 +842,7 @@
       })());
 
       setRasterPhase("autoRedactReadablePdf:apply", `p${p.pageNumber}`);
+      rects = mergeRects(rects);
       drawRedactionsOnCanvas(p.canvas, rects);
 
       if (dbgCfg.enabled) {
