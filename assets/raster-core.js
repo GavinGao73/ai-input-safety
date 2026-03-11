@@ -341,7 +341,8 @@
         pageNumber,
         start,
         end,
-        textLength: pageText.length
+        textLength: pageText.length,
+        pageText
       };
 
       byPage.set(pageNumber, info);
@@ -610,6 +611,54 @@
       }
 
       return { items, pageText, itemRanges };
+    },
+
+        buildPageTextAndRangesAgainstAuthority(textContentOrItems, authoritativePageText) {
+      const built = SpanEngine.buildPageTextAndRangesFromItems(textContentOrItems);
+      const target = safeString(authoritativePageText)
+        .replace(/\u0000/g, "")
+        .replace(/\r\n?/g, "\n");
+
+      if (!target.trim()) return built;
+      if (built.pageText === target) return built;
+
+      const itemRanges = [];
+      let cursor = 0;
+
+      for (const r of built.itemRanges) {
+        const chunk = built.pageText.slice(r.start, r.end);
+        if (!chunk) continue;
+
+        let foundAt = target.indexOf(chunk, cursor);
+
+        if (foundAt < 0) {
+          const probeEnd = Math.min(
+            target.length,
+            cursor + Math.max(120, chunk.length * 16)
+          );
+          const sub = target.slice(cursor, probeEnd);
+          const pos = sub.indexOf(chunk);
+          if (pos >= 0) foundAt = cursor + pos;
+        }
+
+        if (foundAt < 0) {
+          return built;
+        }
+
+        itemRanges.push({
+          idx: r.idx,
+          start: foundAt,
+          end: foundAt + chunk.length
+        });
+
+        cursor = foundAt + chunk.length;
+      }
+
+      return {
+        items: built.items,
+        pageText: target,
+        itemRanges
+      };
     },
 
     normalizeCoreHit(hit) {
@@ -1016,7 +1065,7 @@
       return merged;
     },
 
-    buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
+        buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
       const tuning = getLangTuning(lang);
       const mergeCfg = getMergeCfg(tuning);
       const rects = [];
@@ -1058,13 +1107,22 @@
             if (le <= ls) continue;
           }
 
-          if (le - ls <= 0) continue;
-
           const bb = BBoxEngine.rectBox(pdfjsLib, viewport, it, key, lang);
           const len = Math.max(1, s.length);
 
-          const x1 = bb.x + bb.w * (ls / len);
-          const x2 = bb.x + bb.w * (le / len);
+          ls = clamp(ls, 0, len);
+          le = clamp(le, 0, len);
+          if (le <= ls) continue;
+
+          const coveredLen = le - ls;
+          const isCjkItem = /[\u4E00-\u9FFF]/.test(s);
+          const coverWholeItem =
+            len <= 2 ||
+            (isCjkItem && coveredLen > 0) ||
+            coveredLen >= len * 0.72;
+
+          const x1 = coverWholeItem ? bb.x : (bb.x + bb.w * (ls / len));
+          const x2 = coverWholeItem ? (bb.x + bb.w) : (bb.x + bb.w * (le / len));
 
           const pcfg = RectEngine.padForKey(key, tuning);
           const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
@@ -1072,17 +1130,25 @@
 
           const rx = clamp(x1 - padX, 0, viewport.width);
           const ry = clamp(bb.y - padY, 0, viewport.height);
-          const rw = clamp((x2 - x1) + padX * 2, 1, viewport.width - clamp(x1 - padX, 0, viewport.width));
-          const rh = clamp(bb.h + padY * 2, 6, viewport.height - clamp(bb.y - padY, 0, viewport.height));
+          const rw = clamp(
+            (x2 - x1) + padX * 2,
+            1,
+            viewport.width - clamp(x1 - padX, 0, viewport.width)
+          );
+          const rh = clamp(
+            bb.h + padY * 2,
+            6,
+            viewport.height - clamp(bb.y - padY, 0, viewport.height)
+          );
 
           if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
-            if (rw > Math.min(viewport.width * 0.22, bb.w * 0.55)) continue;
+            if (rw > Math.min(viewport.width * 0.22, bb.w * 1.10)) continue;
           }
           if (key === "company") {
-            if (rw > Math.min(viewport.width * 0.18, bb.w * 0.45)) continue;
+            if (rw > Math.min(viewport.width * 0.40, bb.w * 1.50)) continue;
           }
           if (key === "manual_term") {
-            if (rw > Math.min(viewport.width * 0.28, bb.w * 0.70)) continue;
+            if (rw > Math.min(viewport.width * 0.45, bb.w * 1.60)) continue;
           }
           if (rw > viewport.width * 0.92 || rh > viewport.height * 0.35 || (rw > viewport.width * 0.85 && rh > viewport.height * 0.20)) continue;
 
@@ -1109,7 +1175,7 @@
         const sameLine = (overlap / minH) > mergeCfg.sameLineOverlapRatio;
         const similarHeight = (Math.min(last.h, r.h) / Math.max(last.h, r.h)) > mergeCfg.similarHeightRatio;
         const gap = r.x - (last.x + last.w);
-        const near = gap >= 0 && gap <= nearGap;
+        const near = gap <= nearGap && gap >= -2;
 
         if (r.key === last.key && r.hitId === last.hitId && sameLine && similarHeight && near) {
           const nx = Math.min(last.x, r.x);
@@ -1127,15 +1193,18 @@
 
       return out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId }));
     }
-  };
-
+    
   function normalizeCoreHit(hit) { return SpanEngine.normalizeCoreHit(hit); }
   function buildPageTextAndRangesFromItems(textContentOrItems) { return SpanEngine.buildPageTextAndRangesFromItems(textContentOrItems); }
   function collectCoreHitsForPage(args) { return SpanEngine.collectCoreHitsForPage(args); }
 
-  function textItemsToRectsFromSpans(pdfjsLib, viewport, textContentOrItems, spans, lang) {
-    const built = SpanEngine.buildPageTextAndRangesFromItems(textContentOrItems);
+  function textItemsToRectsFromSpans(pdfjsLib, viewport, textContentOrItems, spans, lang, authoritativePageText) {
+    const built = authoritativePageText
+      ? SpanEngine.buildPageTextAndRangesAgainstAuthority(textContentOrItems, authoritativePageText)
+      : SpanEngine.buildPageTextAndRangesFromItems(textContentOrItems);
+
     if (!built.items.length || !Array.isArray(spans) || !spans.length) return [];
+
     return RectEngine.buildRects(
       pdfjsLib,
       viewport,
@@ -1170,7 +1239,20 @@
       hitId: h.id
     }));
 
-    let rects = textItemsToRectsFromSpans(pdfjsLib, viewport, itemsOrTextContent, spans, lang);
+    const pageInfo = pageLocator && pageLocator.byPage
+      ? pageLocator.byPage.get(Number(pageNumber))
+      : null;
+
+    const authoritativePageText = safeString(pageInfo && pageInfo.pageText);
+
+    let rects = textItemsToRectsFromSpans(
+      pdfjsLib,
+      viewport,
+      itemsOrTextContent,
+      spans,
+      lang,
+      authoritativePageText
+    );
 
     const mappedHitIds = new Set(
       asArray(rects).map((r) => safeString(r && r.hitId)).filter(Boolean)
@@ -1370,7 +1452,14 @@
 
     return {
       ok: true,
-      rects: textItemsToRectsFromSpans(pdfjsLib, viewport, itemsOrTextContent, coreRes.spans || [], lang),
+      rects: textItemsToRectsFromSpans(
+        pdfjsLib,
+        viewport,
+        itemsOrTextContent,
+        coreRes.spans || [],
+        lang,
+        pageText
+      ),
       spans: Array.isArray(coreRes.spans) ? coreRes.spans : [],
       source: "matcher-core",
       hitCount: Array.isArray(coreRes.spans) ? coreRes.spans.length : 0,
