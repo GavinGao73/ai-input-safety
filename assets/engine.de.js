@@ -4,7 +4,7 @@
 // - placeholders + detect + rules
 // - high-sensitivity German document model
 //
-// FINAL-2 RELEASE:
+// FINAL-3 RELEASE:
 // - Keep Herr/Frau/Dr./Prof. in output; mask only the person name
 // - Address: only mask street + house number; keep PLZ+City/Country
 // - Zusatz: mask Gebäude/OG/Zimmer-like fragment; keep Klingel tail structure
@@ -18,10 +18,16 @@
 // - company rule tightened to reduce swallowing leading transaction words
 //
 // FINAL-2 FIXES:
-// - FIX A: strengthen German name matching for umlauts/ß and OCR-broken text
-// - FIX B: add next-line recipient name rules for Rechnungsadresse/Lieferadresse/Empfänger blocks
-// - FIX C: preserve transfer/action words before company names in transaction lines
-// - FIX D: add bare long-text rules for Geburtsdatum/Geburtsort/Personalausweis/Reisepass/Führerschein/IBAN/Access Token/Session ID
+// - strengthen German name matching for umlauts/ß and OCR-broken text
+// - add next-line recipient name rules for Rechnungsadresse/Lieferadresse/Empfänger blocks
+// - preserve transfer/action words before company names in transaction lines
+// - add bare long-text rules for Geburtsdatum/Geburtsort/Personalausweis/Reisepass/Führerschein/IBAN/Access Token/Session ID
+//
+// FINAL-3 FIXES:
+// - FIX A: add explicit OCR-tolerant name rules for Schäfer/König-style broken extraction
+// - FIX B: expand Führerschein matching to D-771882-2025 style bare/id-label formats
+// - FIX C: preserve full transaction verbs (Überweisung / Lastschrift / Gutschrift / Zahlung / Abbuchung)
+// - FIX D: bare IBAN / bare Access Token now consume full token, not partial
 // =========================
 
 (function () {
@@ -78,6 +84,7 @@
       "id_card",
       "passport",
       "driver_license",
+      "driver_license_bare_short",
 
       "birthdate",
       "birthplace",
@@ -104,10 +111,12 @@
       "person_name_keep_title",
       "person_name_inline",
       "person_name",
+      "person_name_broken_ocr",
       "recipient_name_nextline",
+      "recipient_name_nextline_broken_ocr",
 
-      "company",
       "company_tx_line",
+      "company",
 
       "address_de_inline_street",
       "address_de_extra_partial",
@@ -132,6 +141,7 @@
       "id_card",
       "passport",
       "driver_license",
+      "driver_license_bare_short",
       "birthdate",
       "birthplace",
       "birthdate_bare",
@@ -155,10 +165,12 @@
       "person_name_keep_title",
       "person_name_inline",
       "person_name",
+      "person_name_broken_ocr",
       "recipient_name_nextline",
+      "recipient_name_nextline_broken_ocr",
 
-      "company",
       "company_tx_line",
+      "company",
       "address_de_inline_street",
       "address_de_extra_partial",
       "address_de_street_partial",
@@ -280,7 +292,14 @@
 
       driver_license: {
         pattern:
-          /((?:Führerschein(?:nummer|[- \t]?Nr\.?)|Führerscheinnummer)[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32})/giu,
+          /((?:Führerschein(?:nummer|[- \t]?Nr\.?)|Fuehrerschein(?:nummer|[- \t]?Nr\.?)|Führerscheinnummer)[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32})/giu,
+        tag: "SECRET",
+        mode: "prefix"
+      },
+
+      driver_license_bare_short: {
+        pattern:
+          /((?:Führerschein(?:-Nr\.?|nummer)?|Fuehrerschein(?:-Nr\.?|nummer)?)[ \t]*[:：=]?[ \t]*)([A-Z]-\d{4,}-\d{2,4})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -322,20 +341,20 @@
       },
 
       driver_license_bare: {
-        pattern: /(\bFührerschein(?:-Nr\.?|nummer)?[ \t]+)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32})/giu,
+        pattern: /(\b(?:Führerschein(?:-Nr\.?|nummer)?|Fuehrerschein(?:-Nr\.?|nummer)?)[ \t]+)([A-Za-z0-9][A-Za-z0-9\-\/]{4,32})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
 
       account: {
         pattern:
-          /((?:IBAN|Kontonummer|Account(?:[ \t]*Number)?)[ \t]*[:：=][ \t]*)([A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
+          /((?:IBAN|Kontonummer|Account(?:[ \t]*Number)?)[ \t]*[:：=][ \t]*)([A-Z]{2}\d{2}(?:[ \t]?[A-Z0-9]{2,5}){3,10}|[A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
 
       account_bare_iban: {
-        pattern: /(\bIBAN[ \t]+)(DE\d{2}(?:[ \t]?[A-Z0-9]{3,5}){2,9})/giu,
+        pattern: /(\bIBAN[ \t]+)(DE\d{2}(?:[ \t]?[A-Z0-9]{2,5}){3,10})/giu,
         tag: "ACCOUNT",
         mode: "prefix"
       },
@@ -390,30 +409,43 @@
 
       person_name_keep_title: {
         pattern:
-          /^((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner|Ansprechperson|Empfänger|Rechnungsempfänger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+          /^((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner|Ansprechperson|Empfänger|Rechnungsempfänger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
 
       person_name_inline: {
         pattern:
-          /((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner|Ansprechperson|Empfänger|Rechnungsempfänger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
+          /((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner|Ansprechperson|Empfänger|Rechnungsempfänger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
         tag: "NAME",
         mode: "prefix"
       },
 
       person_name: {
         pattern:
-          /((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner|Ansprechperson|Empfänger|Rechnungsempfänger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){1,3})/gu,
+          /((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner|Ansprechperson|Empfänger|Rechnungsempfänger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){1,3})/gu,
+        tag: "NAME",
+        mode: "prefix"
+      },
+
+      person_name_broken_ocr: {
+        pattern:
+          /((?:Ansprechpartner|Empfänger|Name|Kundename|Sachbearbeiter)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)([A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,20})[ \t]+([äöüÄÖÜß][A-Za-zÄÖÜäöüß'’\-]{1,20})/gmu,
         tag: "NAME",
         mode: "prefix"
       },
 
       recipient_name_nextline: {
         pattern:
-          /((?:Rechnungsadresse|Lieferadresse|Empfänger|Rechnungsempfänger)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,3})((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?=[ \t]*(?:\r?\n))/gmu,
+          /((?:Rechnungsadresse|Lieferadresse|Empfänger|Rechnungsempfänger)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,3})((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?=[ \t]*(?:\r?\n))/gmu,
         tag: "NAME",
         mode: "prefix"
+      },
+
+      recipient_name_nextline_broken_ocr: {
+        pattern:
+          /((?:Rechnungsadresse|Lieferadresse|Empfänger|Rechnungsempfänger)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,3}(?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,20})[ \t]+([äöüÄÖÜß][A-Za-zÄÖÜäöüß'’\-]{1,20})(?=[ \t]*(?:\r?\n))/gmu,
+        tag: "NAME"
       },
 
       company_tx_line: {
@@ -729,7 +761,7 @@
   Object.assign(DE.rules, {
     account_holder_name_keep_title: {
       pattern:
-        /^((?:Kontoinhaber)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+        /^((?:Kontoinhaber)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
       tag: "NAME",
       mode: "prefix"
     },
