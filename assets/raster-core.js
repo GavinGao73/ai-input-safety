@@ -1281,9 +1281,17 @@
         const wholeValueMode = RectEngine.isWholeValueRectKey(key);
 
         if (wholeValueMode) {
+          const raw = String(s || "");
+          const colonMatch = raw.match(/^[^:：]{0,24}[:：]\s*/);
+          if (colonMatch && colonMatch[0]) {
+          ls = colonMatch[0].length;
+          le = raw.length;
+          } else {
           ls = 0;
           le = s.length;
+          }
         } else if (preferSub) {
+        
           const subA = A + Number(preferSub.offsetStart || 0);
           const subB = A + Number(preferSub.offsetEnd || 0);
           const a1 = Math.max(subA, r.start);
