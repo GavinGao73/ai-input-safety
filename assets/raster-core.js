@@ -208,11 +208,6 @@
     return set;
   }
 
-  /* =========================
-     LEGACY MATCHER BUILDERS
-     - retained only for transition fallback
-     ========================= */
-
   function buildRuleMatchers(lang, enabledKeys, moneyMode, manualTerms) {
     const PRIORITY = getPriorityForLang(lang);
     const ALWAYS_ON = getAlwaysOnSetForLang(lang);
@@ -613,7 +608,7 @@
       return { items, pageText, itemRanges };
     },
 
-        buildPageTextAndRangesAgainstAuthority(textContentOrItems, authoritativePageText) {
+    buildPageTextAndRangesAgainstAuthority(textContentOrItems, authoritativePageText) {
       const built = SpanEngine.buildPageTextAndRangesFromItems(textContentOrItems);
       const target = safeString(authoritativePageText)
         .replace(/\u0000/g, "")
@@ -632,10 +627,7 @@
         let foundAt = target.indexOf(chunk, cursor);
 
         if (foundAt < 0) {
-          const probeEnd = Math.min(
-            target.length,
-            cursor + Math.max(120, chunk.length * 16)
-          );
+          const probeEnd = Math.min(target.length, cursor + Math.max(120, chunk.length * 16));
           const sub = target.slice(cursor, probeEnd);
           const pos = sub.indexOf(chunk);
           if (pos >= 0) foundAt = cursor + pos;
@@ -1065,7 +1057,7 @@
       return merged;
     },
 
-        buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
+    buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
       const tuning = getLangTuning(lang);
       const mergeCfg = getMergeCfg(tuning);
       const rects = [];
@@ -1130,16 +1122,8 @@
 
           const rx = clamp(x1 - padX, 0, viewport.width);
           const ry = clamp(bb.y - padY, 0, viewport.height);
-          const rw = clamp(
-            (x2 - x1) + padX * 2,
-            1,
-            viewport.width - clamp(x1 - padX, 0, viewport.width)
-          );
-          const rh = clamp(
-            bb.h + padY * 2,
-            6,
-            viewport.height - clamp(bb.y - padY, 0, viewport.height)
-          );
+          const rw = clamp((x2 - x1) + padX * 2, 1, viewport.width - clamp(x1 - padX, 0, viewport.width));
+          const rh = clamp(bb.h + padY * 2, 6, viewport.height - clamp(bb.y - padY, 0, viewport.height));
 
           if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
             if (rw > Math.min(viewport.width * 0.22, bb.w * 1.10)) continue;
@@ -1193,7 +1177,8 @@
 
       return out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId }));
     }
-    
+  };
+
   function normalizeCoreHit(hit) { return SpanEngine.normalizeCoreHit(hit); }
   function buildPageTextAndRangesFromItems(textContentOrItems) { return SpanEngine.buildPageTextAndRangesFromItems(textContentOrItems); }
   function collectCoreHitsForPage(args) { return SpanEngine.collectCoreHitsForPage(args); }
@@ -1417,12 +1402,6 @@
     return result;
   }
 
-  /* =========================
-     LEGACY / TRANSITION FALLBACKS
-     - retained only for transition safety
-     - not the primary rect pipeline anymore
-     ========================= */
-
   function tryMatcherCoreRectsForPage({ pdfjsLib, viewport, itemsOrTextContent, pageNumber, lang, enabledKeys, moneyMode, manualTerms }) {
     const built = SpanEngine.buildPageTextAndRangesFromItems(itemsOrTextContent);
     const pageText = String(built.pageText || "");
@@ -1490,28 +1469,18 @@
     normLang,
     getLangTuning,
     getRasterLangPacks,
-
-    /* legacy transition */
     buildRuleMatchers,
-
-    /* shared helpers */
     getItemsArray,
     buildItemBoxes,
     buildPageTextAndRangesFromItems,
     normalizeCoreHit,
     collectCoreHitsForPage,
     normalizePagesItems,
-
-    /* primary path */
     buildSpansFromMatchResultForPage,
     mapMatchResultPageToRects,
     mapMatchResultToRects,
     buildRasterRectResult,
-
-    /* low-level geometry */
     textItemsToRectsFromSpans,
-
-    /* transition fallback */
     tryMatcherCoreRectsForPage,
     textItemsToRects
   };
