@@ -1092,7 +1092,7 @@
       return merged;
     },
 
-        shouldCollapseHitId(key) {
+    shouldCollapseHitId(key) {
       return [
         "address_inline_zh",
         "phone",
