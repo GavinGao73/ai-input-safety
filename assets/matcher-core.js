@@ -1,3 +1,4 @@
+
 // =========================
 // assets/matcher-core.js
 // v20260308-matchresult-v2-slim-page-only
@@ -247,58 +248,6 @@
     return "other";
   }
 
-    function isWholeValueHitKey(key) {
-    return [
-      "ref_label_tail",
-      "ref_generic_tail",
-      "legal_ref_tail",
-
-      "ref_inline_zh",
-
-      "account",
-      "account_cn_inline",
-      "bank",
-      "bank_routing_ids",
-
-      "wallet_id",
-      "tx_hash",
-      "crypto_wallet",
-
-      "uuid",
-      "uuid2",
-      "imei",
-      "imei2",
-      "mac_address",
-      "ip_address",
-
-      "phone",
-      "email",
-
-      "dob",
-      "place_of_birth",
-      "passport",
-      "passport_inline_zh",
-      "driver_license",
-      "license_plate",
-      "license_plate_inline_zh",
-      "id_card",
-      "id_card_inline_zh",
-      "tax_id_zh",
-
-      "secret",
-      "secret_inline_zh",
-      "security_answer",
-      "api_key_token",
-      "api_key_token_zh",
-      "device_fingerprint",
-
-      "money",
-      "money_label",
-      "money_cn_inline_label",
-      "money_label_currency_zh"
-    ].includes(safeString(key));
-  }
-
   function standardizeHit(hit, lang, pack) {
     const h = hit && typeof hit === "object" ? hit : {};
     const key = safeString(h.key);
@@ -487,7 +436,7 @@
     return hits;
   }
 
-    function chooseValueSubrange(matcher, hit) {
+  function chooseValueSubrange(matcher, hit) {
     const full = safeString(hit && hit.full);
     const groups = hit && hit.groups ? hit.groups : [];
     const key = matcher && matcher.key ? matcher.key : "";
@@ -507,11 +456,7 @@
     if (mode === "prefix") {
       const label = groups[1] != null ? String(groups[1]) : "";
       const val = groups[2] != null ? String(groups[2]) : "";
-
       if (label || val) {
-        if (isWholeValueHitKey(key)) {
-          return { offsetStart: label.length, offsetEnd: full.length };
-        }
         return { offsetStart: label.length, offsetEnd: label.length + val.length };
       }
     }
@@ -519,11 +464,7 @@
     if (mode === "prefix_keep_tail") {
       const label = groups[1] != null ? String(groups[1]) : "";
       const toMask = groups[2] != null ? String(groups[2]) : "";
-
       if (label || toMask) {
-        if (isWholeValueHitKey(key)) {
-          return { offsetStart: label.length, offsetEnd: full.length };
-        }
         return { offsetStart: label.length, offsetEnd: label.length + toMask.length };
       }
     }
@@ -534,11 +475,6 @@
       const b = groups[3] != null ? String(groups[3]) : "";
       const c = groups[4] != null ? String(groups[4]) : "";
       const best = a || b || c || full;
-
-      if (isWholeValueHitKey(key) && label) {
-        return { offsetStart: label.length, offsetEnd: full.length };
-      }
-
       const pos = full.indexOf(best);
       if (pos >= 0) return { offsetStart: pos, offsetEnd: pos + best.length };
       if (label) return { offsetStart: label.length, offsetEnd: full.length };
@@ -551,10 +487,6 @@
         const pos = full.indexOf(name);
         if (pos >= 0) return { offsetStart: pos, offsetEnd: pos + name.length };
       }
-    }
-
-    if (isWholeValueHitKey(key)) {
-      return { offsetStart: 0, offsetEnd: full.length };
     }
 
     return { offsetStart: 0, offsetEnd: full.length };
