@@ -550,6 +550,14 @@
       if (!Number.isFinite(w) || w <= 0) w = est;
 
       const group = BBoxEngine.keyGroup(key);
+      let widthScale = 0.5;
+
+      if (key === "address_inline_zh") widthScale = 0.75;
+      else if (key === "company") widthScale = 0.65;
+      else if (key === "phone" || key === "email") widthScale = 0.6;
+      else if (key === "money") widthScale = 0.55;
+      else if (key === "ref_label_tail" || key === "ref_inline_zh") widthScale = 0.45;
+      
       const cfg = bboxCfg[group] || bboxCfg.default || {
         maxByPage: 0.30,
         maxByEst: 1.45,
@@ -565,14 +573,17 @@
         w,
         1,
         Math.min(
-          viewport.width * Number(cfg.maxByPage || 0.30) * 0.5,
+          viewport.width * Number(cfg.maxByPage || 0.30) * widthScale,
           est * Number(cfg.maxByEst || 1.45) * 0.5
         )
       );
 
       const isLong = group === "longValue";
       const isAddr = group === "address";
-      const minW = isLong ? (est * 0.41) : (isAddr ? (est * 0.39) : (est * 0.36));
+      const minW = isLong
+        ? (est * 0.82 * widthScale)
+        : (isAddr ? (est * 0.78 * widthScale) : (est * 0.72 * widthScale));
+      
       w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.15 : (isAddr ? 0.17 : 0.07))));
       
       return {
