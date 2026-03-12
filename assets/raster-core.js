@@ -1032,6 +1032,27 @@
       return pad[key] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
     },
 
+    isWholeValueRectKey(key) {
+      return [
+        "ref_label_tail",
+        "ref_generic_tail",
+        "legal_ref_tail",
+        "account",
+        "bank",
+        "wallet_id",
+        "tx_hash",
+        "crypto_wallet",
+        "uuid",
+        "uuid2",
+        "imei",
+        "imei2",
+        "mac_address",
+        "ip_address",
+        "ip_label",
+        "mac_label"
+      ].includes(String(key || ""));
+    },
+
     filterAndMergeSpans(spans, tuning) {
       const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
       const merged = [];
@@ -1081,7 +1102,12 @@
           let ls = a0 - r.start;
           let le = b0 - r.start;
 
-          if (preferSub) {
+          const wholeValueMode = RectEngine.isWholeValueRectKey(key);
+
+          if (wholeValueMode) {
+            ls = 0;
+            le = s.length;
+          } else if (preferSub) {
             const subA = A + Number(preferSub.offsetStart || 0);
             const subB = A + Number(preferSub.offsetEnd || 0);
             const a1 = Math.max(subA, r.start);
@@ -1109,6 +1135,7 @@
           const coveredLen = le - ls;
           const isCjkItem = /[\u4E00-\u9FFF]/.test(s);
           const coverWholeItem =
+            wholeValueMode ||
             len <= 2 ||
             (isCjkItem && coveredLen > 0) ||
             coveredLen >= len * 0.72;
