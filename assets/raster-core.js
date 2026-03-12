@@ -1173,54 +1173,6 @@
     ].includes(String(key || ""));
   },
 
-  preferValueSide(key) {
-    return [
-      "ref_label_tail",
-      "ref_inline_zh",
-      "money",
-      "money_label",
-      "money_cn_inline_label",
-      "money_label_currency_zh",
-      "phone",
-      "email",
-      "account",
-      "account_cn_inline",
-      "id_card",
-      "id_card_inline_zh",
-      "passport",
-      "passport_inline_zh",
-      "driver_license",
-      "license_plate",
-      "license_plate_inline_zh",
-      "tax_id_zh",
-      "uuid",
-      "wallet_id",
-      "ip_address",
-      "ip_label",
-      "secret",
-      "secret_inline_zh",
-      "security_answer",
-      "api_key_token_zh",
-      "device_fingerprint",
-      "dob",
-      "place_of_birth"
-    ].includes(String(key || ""));
-  },
-
-  findValueStartByDelimiter(s, ls, le) {
-    const text = String(s || "");
-    const stop = Math.min(text.length, Math.max(ls, le));
-    for (let i = Math.max(0, ls); i < stop; i++) {
-      const ch = text[i];
-      if (ch === ":" || ch === "：" ) {
-        let j = i + 1;
-        while (j < text.length && RectEngine.weakTrim(text[j])) j++;
-        return j;
-      }
-    }
-    return -1;
-  },
-
   filterAndMergeSpans(spans, tuning) {
     const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
     const merged = [];
@@ -1326,7 +1278,12 @@
         let ls = a0 - r.start;
         let le = b0 - r.start;
 
-        if (preferSub) {
+        const wholeValueMode = RectEngine.isWholeValueRectKey(key);
+
+        if (wholeValueMode) {
+          ls = 0;
+          le = s.length;
+        } else if (preferSub) {
           const subA = A + Number(preferSub.offsetStart || 0);
           const subB = A + Number(preferSub.offsetEnd || 0);
           const a1 = Math.max(subA, r.start);
@@ -1342,14 +1299,6 @@
           ls = shr.ls;
           le = shr.le;
           if (le <= ls) continue;
-        } else if (RectEngine.preferValueSide(key)) {
-          const valueStart = RectEngine.findValueStartByDelimiter(s, ls, le);
-          if (valueStart >= 0 && valueStart < le) {
-            ls = Math.max(ls, valueStart);
-          }
-          while (ls < le && RectEngine.weakTrim(s[ls])) ls++;
-          while (le > ls && RectEngine.weakTrim(s[le - 1])) le--;
-          if (le <= ls) continue;
         }
 
         const bb = BBoxEngine.rectBox(pdfjsLib, viewport, it, key, lang);
@@ -1361,28 +1310,23 @@
 
         const coveredLen = le - ls;
         const isCjkItem = /[\u4E00-\u9FFF]/.test(s);
-
+        const wholeByKey = RectEngine.isWholeValueRectKey(key);
         const coverWholeItem =
+          wholeByKey ||
           len <= 2 ||
-          (isCjkItem && coveredLen > 0 && coveredLen >= Math.max(1, len * 0.60)) ||
-          coveredLen >= len * 0.88;
+          (isCjkItem && coveredLen > 0) ||
+          coveredLen >= len * 0.72;
 
         const x1 = coverWholeItem ? bb.x : (bb.x + bb.w * (ls / len));
         const x2 = coverWholeItem ? (bb.x + bb.w) : (bb.x + bb.w * (le / len));
 
         const pcfg = RectEngine.padForKey(key, tuning);
-        const padXBase = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
+        const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
         const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
 
-        const leftPadMul = RectEngine.preferValueSide(key) ? 0.35 : 1.0;
-        const rightPadMul = 1.0;
-
-        const leftPad = padXBase * leftPadMul;
-        const rightPad = padXBase * rightPadMul;
-
-        const rx = clamp(x1 - leftPad, 0, viewport.width);
+        const rx = clamp(x1 - padX, 0, viewport.width);
         const ry = clamp(bb.y - padY, 0, viewport.height);
-        const rw = clamp((x2 - x1) + leftPad + rightPad, 1, viewport.width - rx);
+        const rw = clamp((x2 - x1) + padX * 2, 1, viewport.width - clamp(x1 - padX, 0, viewport.width));
         const rh = clamp(bb.h + padY * 2, 6, viewport.height - clamp(bb.y - padY, 0, viewport.height));
 
         if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
