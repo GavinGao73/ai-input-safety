@@ -1,3 +1,4 @@
+
 /* =========================================================
  * assets/raster-core.js
  * Raster geometry / matching core
@@ -411,7 +412,7 @@
   }
 
   const BBoxEngine = {
-    keyGroup(key) {
+        keyGroup(key) {
       const k = String(key || "");
 
       const isLong =
@@ -550,6 +551,14 @@
       if (!Number.isFinite(w) || w <= 0) w = est;
 
       const group = BBoxEngine.keyGroup(key);
+      let widthScale = 0.5;
+
+      if (key === "address_inline_zh") widthScale = 0.75;
+      else if (key === "company") widthScale = 0.65;
+      else if (key === "phone" || key === "email") widthScale = 0.6;
+      else if (key === "money") widthScale = 0.55;
+      else if (key === "ref_label_tail" || key === "ref_inline_zh") widthScale = 0.45;
+      
       const cfg = bboxCfg[group] || bboxCfg.default || {
         maxByPage: 0.30,
         maxByEst: 1.45,
@@ -561,29 +570,23 @@
       const softMul = Number(cfg.wSoftCapEstMul || 1.15);
       if (w > est * hardRatio) w = est * softMul;
 
-      let widthMul = 1.0;
-      const k = String(key || "");
-
-      if (k === "phone") widthMul = 0.62;
-      else if (k === "email") widthMul = 0.50;
-      else if (k === "money") widthMul = 0.72;
-      else if (k === "money_label" || k === "money_cn_inline_label" || k === "money_label_currency_zh") widthMul = 0.72;
-      else if (k === "company") widthMul = 0.82;
-      else if (k === "ref_label_tail" || k === "ref_inline_zh") widthMul = 1.55;
-
       w = clamp(
-        w * widthMul,
+        w,
         1,
         Math.min(
-          viewport.width * Number(cfg.maxByPage || 0.30),
-          est * Number(cfg.maxByEst || 1.45) * widthMul
+          viewport.width * Number(cfg.maxByPage || 0.30) * widthScale,
+          est * Number(cfg.maxByEst || 1.45) * 0.5
         )
       );
 
       const isLong = group === "longValue";
-      const minW = isLong ? (est * 0.88 * widthMul) : (est * 0.78 * widthMul);
-      w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.30 : 0.18)));
-
+      const isAddr = group === "address";
+      const minW = isLong
+        ? (est * 0.82 * widthScale)
+        : (isAddr ? (est * 0.78 * widthScale) : (est * 0.72 * widthScale));
+      
+      w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.15 : (isAddr ? 0.17 : 0.07))));
+      
       return {
         x: clamp(x, 0, viewport.width),
         y: clamp(y - fontH, 0, viewport.height),
@@ -1054,357 +1057,379 @@
   };
 
   const RectEngine = {
-    weakTrim(ch) {
-      if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return true;
-      return ":：,，;；()（）[]【】<>《》\"'“”‘’".includes(ch);
-    },
+  weakTrim(ch) {
+    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return true;
+    return ":：,，;；()（）[]【】<>《》\"'“”‘’".includes(ch);
+  },
 
-    makeLabelPrefixRe(words) {
-      if (!Array.isArray(words) || !words.length) return null;
-      const parts = words.map((w) => String(w || "").trim()).filter(Boolean).map(escapeRegExp);
-      if (!parts.length) return null;
-      try { return new RegExp(`^(?:${parts.join("|")})\\s*[:：]?\\s*`, "i"); } catch (_) { return null; }
-    },
+  makeLabelPrefixRe(words) {
+    if (!Array.isArray(words) || !words.length) return null;
+    const parts = words.map((w) => String(w || "").trim()).filter(Boolean).map(escapeRegExp);
+    if (!parts.length) return null;
+    try { return new RegExp(`^(?:${parts.join("|")})\\s*[:：]?\\s*`, "i"); } catch (_) { return null; }
+  },
 
-    shrinkByLabel(key, s, ls, le, tuning) {
-      if (key === "manual_term" || le <= ls) return { ls, le };
+  shrinkByLabel(key, s, ls, le, tuning) {
+    if (key === "manual_term" || le <= ls) return { ls, le };
 
-      const sub = s.slice(ls, le);
-      const labels = (tuning && tuning.shrinkLabels) || {};
-      const map = {
-        phone: labels.phone,
-        account: labels.account,
-        email: labels.email,
-        bank: labels.bank,
-        address_de_street: labels.address,
-        address_de_postal: labels.address,
-        address_de_street_partial: labels.address,
-        address_de_extra_partial: labels.address,
-        address_de_inline_street: labels.address,
-        address_en_inline_street: labels.address,
-        address_en_extra_block: labels.address,
-        address_en_extra: labels.address,
-        address_cn: labels.address
+    const sub = s.slice(ls, le);
+    const labels = (tuning && tuning.shrinkLabels) || {};
+    const map = {
+      phone: labels.phone,
+      account: labels.account,
+      email: labels.email,
+      bank: labels.bank,
+      address_de_street: labels.address,
+      address_de_postal: labels.address,
+      address_de_street_partial: labels.address,
+      address_de_extra_partial: labels.address,
+      address_de_inline_street: labels.address,
+      address_en_inline_street: labels.address,
+      address_en_extra_block: labels.address,
+      address_en_extra: labels.address,
+      address_cn: labels.address
+    };
+
+    const re = RectEngine.makeLabelPrefixRe(map[key]);
+    const mm = re ? sub.match(re) : null;
+    if (mm && mm[0]) ls += mm[0].length;
+
+    while (ls < le && RectEngine.weakTrim(s[ls])) ls++;
+    while (le > ls && RectEngine.weakTrim(s[le - 1])) le--;
+
+    return { ls, le };
+  },
+
+  padForKey(key, tuning) {
+    const pad = (tuning && tuning.pad) || {};
+    return pad[key] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
+  },
+
+  shouldSkipLabelShrink(key) {
+    return [
+      "ref_label_tail",
+      "ref_inline_zh",
+      "money",
+      "money_label",
+      "money_cn_inline_label",
+      "money_label_currency_zh",
+      "phone",
+      "email",
+      "account",
+      "account_cn_inline",
+      "id_card",
+      "id_card_inline_zh",
+      "passport",
+      "passport_inline_zh",
+      "driver_license",
+      "license_plate",
+      "license_plate_inline_zh",
+      "tax_id_zh",
+      "uuid",
+      "wallet_id",
+      "ip_address",
+      "ip_label",
+      "secret",
+      "secret_inline_zh",
+      "security_answer",
+      "api_key_token_zh",
+      "device_fingerprint",
+      "dob",
+      "place_of_birth"
+    ].includes(String(key || ""));
+  },
+
+  isWholeValueRectKey(key) {
+    return [
+      "account",
+      "account_cn_inline",
+      "api_key_token_zh",
+      "device_fingerprint",
+      "dob",
+      "driver_license",
+      "email",
+      "handle_label",
+      "id_card",
+      "id_card_inline_zh",
+      "ip_address",
+      "ip_label",
+      "license_plate",
+      "license_plate_inline_zh",
+      "money",
+      "money_cn_inline_label",
+      "money_label",
+      "money_label_currency_zh",
+      "passport",
+      "passport_inline_zh",
+      "phone",
+      "place_of_birth",
+      "ref_inline_zh",
+      "ref_label_tail",
+      "secret",
+      "secret_inline_zh",
+      "security_answer",
+      "tax_id_zh",
+      "uuid",
+      "wallet_id"
+    ].includes(String(key || ""));
+  },
+
+  filterAndMergeSpans(spans, tuning) {
+    const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
+    const merged = [];
+
+    for (const sp of spans || []) {
+      if (!sp || !sp.key) continue;
+      if ((sp.b - sp.a) > (MAX_MATCH_LEN[sp.key] || 120)) continue;
+
+      const last = merged[merged.length - 1];
+      if (last && last.key === sp.key && sp.a <= last.b) {
+        last.b = Math.max(last.b, sp.b);
+      } else {
+        merged.push({
+          a: sp.a,
+          b: sp.b,
+          key: sp.key,
+          preferSub: sp.preferSub || null,
+          hitId: sp.hitId || ""
+        });
+      }
+    }
+
+    return merged;
+  },
+
+  shouldCollapseHitId(key) {
+    return [
+      "address_inline_zh",
+      "phone",
+      "money",
+      "company"
+    ].includes(String(key || ""));
+  },
+
+  collapseRectsByHitId(rects) {
+    if (!Array.isArray(rects) || !rects.length) return rects || [];
+
+    const keep = [];
+    const groups = new Map();
+
+    for (const r of rects) {
+      const key = String((r && r.key) || "");
+      const hitId = String((r && r.hitId) || "");
+
+      if (!hitId || !RectEngine.shouldCollapseHitId(key)) {
+        keep.push(r);
+        continue;
+      }
+
+      const gid = key + "::" + hitId;
+      if (!groups.has(gid)) {
+        groups.set(gid, {
+          x1: Number(r.x),
+          y1: Number(r.y),
+          x2: Number(r.x) + Number(r.w),
+          y2: Number(r.y) + Number(r.h),
+          key,
+          hitId
+        });
+      } else {
+        const g = groups.get(gid);
+        g.x1 = Math.min(g.x1, Number(r.x));
+        g.y1 = Math.min(g.y1, Number(r.y));
+        g.x2 = Math.max(g.x2, Number(r.x) + Number(r.w));
+        g.y2 = Math.max(g.y2, Number(r.y) + Number(r.h));
+      }
+    }
+
+    const collapsed = Array.from(groups.values()).map((g) => ({
+      x: g.x1,
+      y: g.y1,
+      w: Math.max(1, g.x2 - g.x1),
+      h: Math.max(1, g.y2 - g.y1),
+      key: g.key,
+      hitId: g.hitId
+    }));
+
+    const all = keep.concat(collapsed);
+    all.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+    return all;
+  },
+
+  buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
+    const tuning = getLangTuning(lang);
+    const rects = [];
+
+    for (const sp of RectEngine.filterAndMergeSpans(spans, tuning)) {
+      const A = sp.a;
+      const B = sp.b;
+      const key = sp.key;
+      const preferSub = sp.preferSub;
+      const hitId = safeString(sp.hitId || "");
+
+      for (const r of itemRanges) {
+        const a0 = Math.max(A, r.start);
+        const b0 = Math.min(B, r.end);
+        if (b0 <= a0) continue;
+
+        const it = items[r.idx];
+        const s = String(it.str || "");
+        if (!s) continue;
+
+        let ls = a0 - r.start;
+        let le = b0 - r.start;
+
+        const wholeValueMode = RectEngine.isWholeValueRectKey(key);
+
+        if (wholeValueMode) {
+          ls = 0;
+          le = s.length;
+        } else if (preferSub) {
+          const subA = A + Number(preferSub.offsetStart || 0);
+          const subB = A + Number(preferSub.offsetEnd || 0);
+          const a1 = Math.max(subA, r.start);
+          const b1 = Math.min(subB, r.end);
+          if (b1 > a1) {
+            ls = a1 - r.start;
+            le = b1 - r.start;
+          } else {
+            continue;
+          }
+        } else if (!RectEngine.shouldSkipLabelShrink(key)) {
+          const shr = RectEngine.shrinkByLabel(key, s, ls, le, tuning);
+          ls = shr.ls;
+          le = shr.le;
+          if (le <= ls) continue;
+        }
+
+        const bb = BBoxEngine.rectBox(pdfjsLib, viewport, it, key, lang);
+        const len = Math.max(1, s.length);
+
+        ls = clamp(ls, 0, len);
+        le = clamp(le, 0, len);
+        if (le <= ls) continue;
+
+        const coveredLen = le - ls;
+        const isCjkItem = /[\u4E00-\u9FFF]/.test(s);
+        const wholeByKey = RectEngine.isWholeValueRectKey(key);
+        const coverWholeItem =
+          wholeByKey ||
+          len <= 2 ||
+          (isCjkItem && coveredLen > 0) ||
+          coveredLen >= len * 0.72;
+
+        const x1 = coverWholeItem ? bb.x : (bb.x + bb.w * (ls / len));
+        const x2 = coverWholeItem ? (bb.x + bb.w) : (bb.x + bb.w * (le / len));
+
+        const pcfg = RectEngine.padForKey(key, tuning);
+        const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
+        const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
+
+        const rx = clamp(x1 - padX, 0, viewport.width);
+        const ry = clamp(bb.y - padY, 0, viewport.height);
+        const rw = clamp((x2 - x1) + padX * 2, 1, viewport.width - clamp(x1 - padX, 0, viewport.width));
+        const rh = clamp(bb.h + padY * 2, 6, viewport.height - clamp(bb.y - padY, 0, viewport.height));
+
+        if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
+          if (rw > Math.min(viewport.width * 0.22, bb.w * 1.10)) continue;
+        }
+        if (key === "company") {
+          if (rw > Math.min(viewport.width * 0.40, bb.w * 1.50)) continue;
+        }
+        if (key === "manual_term") {
+          if (rw > Math.min(viewport.width * 0.45, bb.w * 1.60)) continue;
+        }
+        if (rw > viewport.width * 0.92 || rh > viewport.height * 0.35 || (rw > viewport.width * 0.85 && rh > viewport.height * 0.20)) continue;
+
+        rects.push({ x: rx, y: ry, w: rw, h: rh, key, hitId });
+      }
+    }
+
+    if (!rects.length) return [];
+
+    rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+
+    const out = [];
+
+    function canMergeRects(a, b) {
+      if (!a || !b) return false;
+      if (a.key !== b.key) return false;
+
+      const overlap = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+      const minH = Math.max(1, Math.min(a.h, b.h));
+      const sameLine = (overlap / minH) > 0.72;
+      const similarHeight = (Math.min(a.h, b.h) / Math.max(a.h, b.h)) > 0.65;
+      const gap = b.x - (a.x + a.w);
+      const near = gap <= Math.max(nearGap, Math.min(a.h, b.h) * 0.45) && gap >= -3;
+
+      return sameLine && similarHeight && near;
+    }
+
+    function mergeTwoRects(a, b) {
+      const nx = Math.min(a.x, b.x);
+      const ny = Math.min(a.y, b.y);
+      const nr = Math.max(a.x + a.w, b.x + b.w);
+      const nb = Math.max(a.y + a.h, b.y + b.h);
+
+      return {
+        x: nx,
+        y: ny,
+        w: nr - nx,
+        h: nb - ny,
+        key: a.key,
+        hitId: a.hitId || b.hitId || ""
+      };
+    }
+
+    for (const r of rects) {
+      if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
+
+      const candidate = {
+        x: r.x,
+        y: r.y,
+        w: r.w,
+        h: r.h,
+        key: r.key,
+        hitId: r.hitId
       };
 
-      const re = RectEngine.makeLabelPrefixRe(map[key]);
-      const mm = re ? sub.match(re) : null;
-      if (mm && mm[0]) ls += mm[0].length;
-
-      while (ls < le && RectEngine.weakTrim(s[ls])) ls++;
-      while (le > ls && RectEngine.weakTrim(s[le - 1])) le--;
-
-      return { ls, le };
-    },
-
-    padForKey(key, tuning) {
-      const k = String(key || "");
-      const pad = (tuning && tuning.pad) || {};
-
-      if (k === "ref_label_tail" || k === "ref_inline_zh") {
-        return { pxW: 0.62, pyH: 0.018, minX: 220, minY: 0.30 };
+      if (!out.length) {
+        out.push(candidate);
+        continue;
       }
 
-      if (k === "phone") {
-        return { pxW: 0.06, pyH: 0.018, minX: 18, minY: 0.30 };
+      const last = out[out.length - 1];
+      if (canMergeRects(last, candidate)) {
+        out[out.length - 1] = mergeTwoRects(last, candidate);
+      } else {
+        out.push(candidate);
       }
-
-      if (k === "email") {
-        return { pxW: 0.08, pyH: 0.018, minX: 22, minY: 0.30 };
-      }
-
-      if (
-        k === "money" ||
-        k === "money_label" ||
-        k === "money_cn_inline_label" ||
-        k === "money_label_currency_zh"
-      ) {
-        return { pxW: 0.03, pyH: 0.018, minX: 10, minY: 0.30 };
-      }
-
-      return pad[k] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
-    },
-
-    shouldSkipLabelShrink(key) {
-      return [
-        "uuid",
-        "wallet_id",
-        "secret",
-        "secret_inline_zh",
-        "security_answer",
-        "api_key_token_zh",
-        "device_fingerprint"
-      ].includes(String(key || ""));
-    },
-
-    isWholeValueRectKey(key) {
-      return [
-        "uuid",
-        "wallet_id",
-        "secret",
-        "secret_inline_zh",
-        "security_answer",
-        "api_key_token_zh",
-        "device_fingerprint"
-      ].includes(String(key || ""));
-    },
-
-    filterAndMergeSpans(spans, tuning) {
-      const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
-      const merged = [];
-
-      for (const sp of spans || []) {
-        if (!sp || !sp.key) continue;
-        if ((sp.b - sp.a) > (MAX_MATCH_LEN[sp.key] || 120)) continue;
-
-        const last = merged[merged.length - 1];
-        if (last && last.key === sp.key && sp.a <= last.b) {
-          last.b = Math.max(last.b, sp.b);
-        } else {
-          merged.push({
-            a: sp.a,
-            b: sp.b,
-            key: sp.key,
-            preferSub: sp.preferSub || null,
-            hitId: sp.hitId || ""
-          });
-        }
-      }
-
-      return merged;
-    },
-
-    shouldCollapseHitId(key) {
-      return [
-        "address_inline_zh",
-        "phone",
-        "money",
-        "company"
-      ].includes(String(key || ""));
-    },
-
-    collapseRectsByHitId(rects) {
-      if (!Array.isArray(rects) || !rects.length) return rects || [];
-
-      const keep = [];
-      const groups = new Map();
-
-      for (const r of rects) {
-        const key = String((r && r.key) || "");
-        const hitId = String((r && r.hitId) || "");
-
-        if (!hitId || !RectEngine.shouldCollapseHitId(key)) {
-          keep.push(r);
-          continue;
-        }
-
-        const gid = key + "::" + hitId;
-        if (!groups.has(gid)) {
-          groups.set(gid, {
-            x1: Number(r.x),
-            y1: Number(r.y),
-            x2: Number(r.x) + Number(r.w),
-            y2: Number(r.y) + Number(r.h),
-            key,
-            hitId
-          });
-        } else {
-          const g = groups.get(gid);
-          g.x1 = Math.min(g.x1, Number(r.x));
-          g.y1 = Math.min(g.y1, Number(r.y));
-          g.x2 = Math.max(g.x2, Number(r.x) + Number(r.w));
-          g.y2 = Math.max(g.y2, Number(r.y) + Number(r.h));
-        }
-      }
-
-      const collapsed = Array.from(groups.values()).map((g) => ({
-        x: g.x1,
-        y: g.y1,
-        w: Math.max(1, g.x2 - g.x1),
-        h: Math.max(1, g.y2 - g.y1),
-        key: g.key,
-        hitId: g.hitId
-      }));
-
-      const all = keep.concat(collapsed);
-      all.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-      return all;
-    },
-
-    buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
-      const tuning = getLangTuning(lang);
-      const rects = [];
-
-      for (const sp of RectEngine.filterAndMergeSpans(spans, tuning)) {
-        const A = sp.a;
-        const B = sp.b;
-        const key = sp.key;
-        const preferSub = sp.preferSub;
-        const hitId = safeString(sp.hitId || "");
-
-        for (const r of itemRanges) {
-          const a0 = Math.max(A, r.start);
-          const b0 = Math.min(B, r.end);
-          if (b0 <= a0) continue;
-
-          const it = items[r.idx];
-          const s = String(it.str || "");
-          if (!s) continue;
-
-          let ls = a0 - r.start;
-          let le = b0 - r.start;
-
-          const wholeValueMode = RectEngine.isWholeValueRectKey(key);
-
-          if (wholeValueMode) {
-            ls = 0;
-            le = s.length;
-          } else if (preferSub) {
-            const subA = A + Number(preferSub.offsetStart || 0);
-            const subB = A + Number(preferSub.offsetEnd || 0);
-            const a1 = Math.max(subA, r.start);
-            const b1 = Math.min(subB, r.end);
-            if (b1 > a1) {
-              ls = a1 - r.start;
-              le = b1 - r.start;
-            } else {
-              continue;
-            }
-          } else if (!RectEngine.shouldSkipLabelShrink(key)) {
-            const shr = RectEngine.shrinkByLabel(key, s, ls, le, tuning);
-            ls = shr.ls;
-            le = shr.le;
-            if (le <= ls) continue;
-          }
-
-          const bb = BBoxEngine.rectBox(pdfjsLib, viewport, it, key, lang);
-          const len = Math.max(1, s.length);
-
-          ls = clamp(ls, 0, len);
-          le = clamp(le, 0, len);
-          if (le <= ls) continue;
-
-          const coveredLen = le - ls;
-          const isCjkItem = /[\u4E00-\u9FFF]/.test(s);
-          const wholeByKey = RectEngine.isWholeValueRectKey(key);
-          const coverWholeItem =
-            wholeByKey ||
-            len <= 2 ||
-            (isCjkItem && coveredLen > 0) ||
-            coveredLen >= len * 0.72;
-
-          const x1 = coverWholeItem ? bb.x : (bb.x + bb.w * (ls / len));
-          const x2 = coverWholeItem ? (bb.x + bb.w) : (bb.x + bb.w * (le / len));
-
-          const pcfg = RectEngine.padForKey(key, tuning);
-          const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
-          const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
-
-          const rx = clamp(x1 - padX, 0, viewport.width);
-          const ry = clamp(bb.y - padY, 0, viewport.height);
-          const rw = clamp((x2 - x1) + padX * 2, 1, viewport.width - clamp(x1 - padX, 0, viewport.width));
-          const rh = clamp(bb.h + padY * 2, 6, viewport.height - clamp(bb.y - padY, 0, viewport.height));
-
-          if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
-            if (rw > Math.min(viewport.width * 0.22, bb.w * 1.10)) continue;
-          }
-          if (key === "company") {
-            if (rw > Math.min(viewport.width * 0.40, bb.w * 1.50)) continue;
-          }
-          if (key === "manual_term") {
-            if (rw > Math.min(viewport.width * 0.45, bb.w * 1.60)) continue;
-          }
-          if (rw > viewport.width * 0.92 || rh > viewport.height * 0.35 || (rw > viewport.width * 0.85 && rh > viewport.height * 0.20)) continue;
-
-          rects.push({ x: rx, y: ry, w: rw, h: rh, key, hitId });
-        }
-      }
-
-      if (!rects.length) return [];
-
-      rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-
-      const out = [];
-
-      function canMergeRects(a, b) {
-        if (!a || !b) return false;
-        if (a.key !== b.key) return false;
-
-        const overlap = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
-        const minH = Math.max(1, Math.min(a.h, b.h));
-        const sameLine = (overlap / minH) > 0.72;
-        const similarHeight = (Math.min(a.h, b.h) / Math.max(a.h, b.h)) > 0.65;
-        const gap = b.x - (a.x + a.w);
-        const near = gap <= Math.max(nearGap, Math.min(a.h, b.h) * 0.45) && gap >= -3;
-
-        return sameLine && similarHeight && near;
-      }
-
-      function mergeTwoRects(a, b) {
-        const nx = Math.min(a.x, b.x);
-        const ny = Math.min(a.y, b.y);
-        const nr = Math.max(a.x + a.w, b.x + b.w);
-        const nb = Math.max(a.y + a.h, b.y + b.h);
-
-        return {
-          x: nx,
-          y: ny,
-          w: nr - nx,
-          h: nb - ny,
-          key: a.key,
-          hitId: a.hitId || b.hitId || ""
-        };
-      }
-
-      for (const r of rects) {
-        if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
-
-        const candidate = {
-          x: r.x,
-          y: r.y,
-          w: r.w,
-          h: r.h,
-          key: r.key,
-          hitId: r.hitId
-        };
-
-        if (!out.length) {
-          out.push(candidate);
-          continue;
-        }
-
-        const last = out[out.length - 1];
-        if (canMergeRects(last, candidate)) {
-          out[out.length - 1] = mergeTwoRects(last, candidate);
-        } else {
-          out.push(candidate);
-        }
-      }
-
-      let changed = true;
-      while (changed && out.length > 1) {
-        changed = false;
-        const pass = [];
-
-        for (const r of out) {
-          const last = pass[pass.length - 1];
-          if (last && canMergeRects(last, r)) {
-            pass[pass.length - 1] = mergeTwoRects(last, r);
-            changed = true;
-          } else {
-            pass.push(r);
-          }
-        }
-
-        out.length = 0;
-        out.push(...pass);
-      }
-
-      return RectEngine.collapseRectsByHitId(
-        out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId }))
-      );
     }
-  };
+
+    let changed = true;
+    while (changed && out.length > 1) {
+      changed = false;
+      const pass = [];
+
+      for (const r of out) {
+        const last = pass[pass.length - 1];
+        if (last && canMergeRects(last, r)) {
+          pass[pass.length - 1] = mergeTwoRects(last, r);
+          changed = true;
+        } else {
+          pass.push(r);
+        }
+      }
+
+      out.length = 0;
+      out.push(...pass);
+    }
+
+    return RectEngine.collapseRectsByHitId(
+      out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId }))
+    );
+  }
+};
 
   function normalizeCoreHit(hit) { return SpanEngine.normalizeCoreHit(hit); }
   function buildPageTextAndRangesFromItems(textContentOrItems) { return SpanEngine.buildPageTextAndRangesFromItems(textContentOrItems); }
