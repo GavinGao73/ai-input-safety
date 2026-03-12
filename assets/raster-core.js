@@ -1092,6 +1092,63 @@
       return merged;
     },
 
+        shouldCollapseHitId(key) {
+      return [
+        "address_inline_zh",
+        "phone",
+        "money",
+        "company"
+      ].includes(String(key || ""));
+    },
+
+    collapseRectsByHitId(rects) {
+      if (!Array.isArray(rects) || !rects.length) return rects || [];
+
+      const keep = [];
+      const groups = new Map();
+
+      for (const r of rects) {
+        const key = String(r && r.key || "");
+        const hitId = String(r && r.hitId || "");
+
+        if (!hitId || !RectEngine.shouldCollapseHitId(key)) {
+          keep.push(r);
+          continue;
+        }
+
+        const gid = key + "::" + hitId;
+        if (!groups.has(gid)) {
+          groups.set(gid, {
+            x1: Number(r.x),
+            y1: Number(r.y),
+            x2: Number(r.x) + Number(r.w),
+            y2: Number(r.y) + Number(r.h),
+            key,
+            hitId
+          });
+        } else {
+          const g = groups.get(gid);
+          g.x1 = Math.min(g.x1, Number(r.x));
+          g.y1 = Math.min(g.y1, Number(r.y));
+          g.x2 = Math.max(g.x2, Number(r.x) + Number(r.w));
+          g.y2 = Math.max(g.y2, Number(r.y) + Number(r.h));
+        }
+      }
+
+      const collapsed = Array.from(groups.values()).map((g) => ({
+        x: g.x1,
+        y: g.y1,
+        w: Math.max(1, g.x2 - g.x1),
+        h: Math.max(1, g.y2 - g.y1),
+        key: g.key,
+        hitId: g.hitId
+      }));
+
+      const all = keep.concat(collapsed);
+      all.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+      return all;
+    },
+
     buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
       const tuning = getLangTuning(lang);
       const rects = [];
@@ -1261,7 +1318,9 @@
         out.push(...pass);
       }
 
-      return out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId }));
+      return RectEngine.collapseRectsByHitId(
+        out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId }))
+      );
     }
   };
 
