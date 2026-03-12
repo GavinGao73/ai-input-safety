@@ -1105,91 +1105,121 @@
   },
 
   shouldSkipLabelShrink(key) {
-  return [
-    // 编号 / 尾段类：不要再做 label shrink，避免把标题吃进去或起点错位
-    "ref_label_tail",
-    "ref_inline_zh",
+    return [
+      "ref_label_tail",
+      "ref_inline_zh",
+      "money",
+      "money_label",
+      "money_cn_inline_label",
+      "money_label_currency_zh",
+      "phone",
+      "email",
+      "account",
+      "account_cn_inline",
+      "id_card",
+      "id_card_inline_zh",
+      "passport",
+      "passport_inline_zh",
+      "driver_license",
+      "license_plate",
+      "license_plate_inline_zh",
+      "tax_id_zh",
+      "uuid",
+      "wallet_id",
+      "ip_address",
+      "ip_label",
+      "secret",
+      "secret_inline_zh",
+      "security_answer",
+      "api_key_token_zh",
+      "device_fingerprint",
+      "dob",
+      "place_of_birth"
+    ].includes(String(key || ""));
+  },
 
-    // 金额类：保持值整体处理
-    "money",
-    "money_label",
-    "money_cn_inline_label",
-    "money_label_currency_zh",
+  isWholeValueRectKey(key) {
+    return [
+      "account",
+      "account_cn_inline",
+      "api_key_token_zh",
+      "device_fingerprint",
+      "dob",
+      "driver_license",
+      "email",
+      "handle_label",
+      "id_card",
+      "id_card_inline_zh",
+      "ip_address",
+      "ip_label",
+      "license_plate",
+      "license_plate_inline_zh",
+      "money",
+      "money_cn_inline_label",
+      "money_label",
+      "money_label_currency_zh",
+      "passport",
+      "passport_inline_zh",
+      "phone",
+      "place_of_birth",
+      "ref_inline_zh",
+      "ref_label_tail",
+      "secret",
+      "secret_inline_zh",
+      "security_answer",
+      "tax_id_zh",
+      "uuid",
+      "wallet_id"
+    ].includes(String(key || ""));
+  },
 
-    // 联系方式 / 标识类
-    "phone",
-    "email",
+  preferValueSide(key) {
+    return [
+      "ref_label_tail",
+      "ref_inline_zh",
+      "money",
+      "money_label",
+      "money_cn_inline_label",
+      "money_label_currency_zh",
+      "phone",
+      "email",
+      "account",
+      "account_cn_inline",
+      "id_card",
+      "id_card_inline_zh",
+      "passport",
+      "passport_inline_zh",
+      "driver_license",
+      "license_plate",
+      "license_plate_inline_zh",
+      "tax_id_zh",
+      "uuid",
+      "wallet_id",
+      "ip_address",
+      "ip_label",
+      "secret",
+      "secret_inline_zh",
+      "security_answer",
+      "api_key_token_zh",
+      "device_fingerprint",
+      "dob",
+      "place_of_birth"
+    ].includes(String(key || ""));
+  },
 
-    // 账号 / 证件 / 标识类
-    "account",
-    "account_cn_inline",
-    "id_card",
-    "id_card_inline_zh",
-    "passport",
-    "passport_inline_zh",
-    "driver_license",
-    "license_plate",
-    "license_plate_inline_zh",
-    "tax_id_zh",
-    "uuid",
-    "wallet_id",
-    "ip_address",
-    "ip_label",
-    "secret",
-    "secret_inline_zh",
-    "security_answer",
-    "api_key_token_zh",
-    "device_fingerprint",
-    "dob",
-    "place_of_birth"
-  ].includes(String(key || ""));
-},
-
-isWholeValueRectKey(key) {
-  return [
-    // 账号 / 标识 / 敏感值：整值覆盖
-    "account",
-    "account_cn_inline",
-    "api_key_token_zh",
-    "device_fingerprint",
-    "dob",
-    "driver_license",
-    "email",
-    "handle_label",
-    "id_card",
-    "id_card_inline_zh",
-    "ip_address",
-    "ip_label",
-    "license_plate",
-    "license_plate_inline_zh",
-
-    // 金额类：整值覆盖金额本身，不做碎切
-    "money",
-    "money_cn_inline_label",
-    "money_label",
-    "money_label_currency_zh",
-
-    // 证件 / 出生 / 电话
-    "passport",
-    "passport_inline_zh",
-    "phone",
-    "place_of_birth",
-
-    // 编号尾段类
-    "ref_inline_zh",
-    "ref_label_tail",
-
-    // secret 类
-    "secret",
-    "secret_inline_zh",
-    "security_answer",
-
-    // 其他技术标识
-    "tax_id_zh",
-    "uuid",
-    "wallet_id"
-  ].includes(String(key || ""));
-},
+  findValueStartByDelimiter(s, ls, le) {
+    const text = String(s || "");
+    const stop = Math.min(text.length, Math.max(ls, le));
+    for (let i = Math.max(0, ls); i < stop; i++) {
+      const ch = text[i];
+      if (ch === ":" || ch === "：" ) {
+        let j = i + 1;
+        while (j < text.length && RectEngine.weakTrim(text[j])) j++;
+        return j;
+      }
+    }
+    return -1;
+  },
 
   filterAndMergeSpans(spans, tuning) {
     const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
@@ -1296,12 +1326,7 @@ isWholeValueRectKey(key) {
         let ls = a0 - r.start;
         let le = b0 - r.start;
 
-        const wholeValueMode = RectEngine.isWholeValueRectKey(key);
-
-        if (wholeValueMode) {
-          ls = 0;
-          le = s.length;
-        } else if (preferSub) {
+        if (preferSub) {
           const subA = A + Number(preferSub.offsetStart || 0);
           const subB = A + Number(preferSub.offsetEnd || 0);
           const a1 = Math.max(subA, r.start);
@@ -1317,6 +1342,14 @@ isWholeValueRectKey(key) {
           ls = shr.ls;
           le = shr.le;
           if (le <= ls) continue;
+        } else if (RectEngine.preferValueSide(key)) {
+          const valueStart = RectEngine.findValueStartByDelimiter(s, ls, le);
+          if (valueStart >= 0 && valueStart < le) {
+            ls = Math.max(ls, valueStart);
+          }
+          while (ls < le && RectEngine.weakTrim(s[ls])) ls++;
+          while (le > ls && RectEngine.weakTrim(s[le - 1])) le--;
+          if (le <= ls) continue;
         }
 
         const bb = BBoxEngine.rectBox(pdfjsLib, viewport, it, key, lang);
@@ -1328,23 +1361,28 @@ isWholeValueRectKey(key) {
 
         const coveredLen = le - ls;
         const isCjkItem = /[\u4E00-\u9FFF]/.test(s);
-        const wholeByKey = RectEngine.isWholeValueRectKey(key);
+
         const coverWholeItem =
-          wholeByKey ||
           len <= 2 ||
-          (isCjkItem && coveredLen > 0) ||
-          coveredLen >= len * 0.72;
+          (isCjkItem && coveredLen > 0 && coveredLen >= Math.max(1, len * 0.60)) ||
+          coveredLen >= len * 0.88;
 
         const x1 = coverWholeItem ? bb.x : (bb.x + bb.w * (ls / len));
         const x2 = coverWholeItem ? (bb.x + bb.w) : (bb.x + bb.w * (le / len));
 
         const pcfg = RectEngine.padForKey(key, tuning);
-        const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
+        const padXBase = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
         const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
 
-        const rx = clamp(x1 - padX, 0, viewport.width);
+        const leftPadMul = RectEngine.preferValueSide(key) ? 0.35 : 1.0;
+        const rightPadMul = 1.0;
+
+        const leftPad = padXBase * leftPadMul;
+        const rightPad = padXBase * rightPadMul;
+
+        const rx = clamp(x1 - leftPad, 0, viewport.width);
         const ry = clamp(bb.y - padY, 0, viewport.height);
-        const rw = clamp((x2 - x1) + padX * 2, 1, viewport.width - clamp(x1 - padX, 0, viewport.width));
+        const rw = clamp((x2 - x1) + leftPad + rightPad, 1, viewport.width - rx);
         const rh = clamp(bb.h + padY * 2, 6, viewport.height - clamp(bb.y - padY, 0, viewport.height));
 
         if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
