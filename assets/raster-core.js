@@ -1197,37 +1197,38 @@
 
       rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
 
-      const out = [];
-      for (const r of rects) {
-        if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
+  const out = [];
+  for (const r of rects) {
+  if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
 
-        const last = out[out.length - 1];
-        if (!last) {
-          out.push({ x: r.x, y: r.y, w: r.w, h: r.h, key: r.key, hitId: r.hitId });
-          continue;
-        }
+  const last = out[out.length - 1];
+  if (!last) {
+    out.push({ x: r.x, y: r.y, w: r.w, h: r.h, key: r.key, hitId: r.hitId });
+    continue;
+  }
 
-        const overlap = Math.max(0, Math.min(last.y + last.h, r.y + r.h) - Math.max(last.y, r.y));
-        const minH = Math.max(1, Math.min(last.h, r.h));
-        const sameLine = (overlap / minH) > mergeCfg.sameLineOverlapRatio;
-        const similarHeight = (Math.min(last.h, r.h) / Math.max(last.h, r.h)) > mergeCfg.similarHeightRatio;
-        const gap = r.x - (last.x + last.w);
-        const near = gap <= nearGap && gap >= -2;
+  const overlap = Math.max(0, Math.min(last.y + last.h, r.y + r.h) - Math.max(last.y, r.y));
+  const minH = Math.max(1, Math.min(last.h, r.h));
+  const sameLine = (overlap / minH) > 0.72;
+  const similarHeight = (Math.min(last.h, r.h) / Math.max(last.h, r.h)) > 0.65;
+  const gap = r.x - (last.x + last.w);
+  const near = gap <= Math.max(nearGap, Math.min(last.h, r.h) * 0.45) && gap >= -3;
 
-        if (r.key === last.key && r.hitId === last.hitId && sameLine && similarHeight && near) {
-          const nx = Math.min(last.x, r.x);
-          const ny = Math.min(last.y, r.y);
-          const nr = Math.max(last.x + last.w, r.x + r.w);
-          const nb = Math.max(last.y + last.h, r.y + r.h);
-          last.x = nx;
-          last.y = ny;
-          last.w = nr - nx;
-          last.h = nb - ny;
-        } else {
-          out.push({ x: r.x, y: r.y, w: r.w, h: r.h, key: r.key, hitId: r.hitId });
-        }
-      }
-
+  if (r.key === last.key && sameLine && similarHeight && near) {
+    const nx = Math.min(last.x, r.x);
+    const ny = Math.min(last.y, r.y);
+    const nr = Math.max(last.x + last.w, r.x + r.w);
+    const nb = Math.max(last.y + last.h, r.y + r.h);
+    last.x = nx;
+    last.y = ny;
+    last.w = nr - nx;
+    last.h = nb - ny;
+    if (!last.hitId && r.hitId) last.hitId = r.hitId;
+  } else {
+    out.push({ x: r.x, y: r.y, w: r.w, h: r.h, key: r.key, hitId: r.hitId });
+  }
+}
+      
       return out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId }));
     }
   };
