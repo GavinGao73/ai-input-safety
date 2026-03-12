@@ -561,12 +561,19 @@
       const softMul = Number(cfg.wSoftCapEstMul || 1.15);
       if (w > est * hardRatio) w = est * softMul;
 
-      w = clamp(w, 1, Math.min(viewport.width * Number(cfg.maxByPage || 0.30), est * Number(cfg.maxByEst || 1.45)));
+      w = clamp(
+        w,
+        1,
+        Math.min(
+          viewport.width * Number(cfg.maxByPage || 0.30) * 0.5,
+          est * Number(cfg.maxByEst || 1.45) * 0.5
+        )
+      );
 
       const isLong = group === "longValue";
       const isAddr = group === "address";
-      const minW = isLong ? (est * 0.82) : (isAddr ? (est * 0.78) : (est * 0.72));
-      w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.30 : (isAddr ? 0.34 : 0.14))));
+      const minW = isLong ? (est * 0.41) : (isAddr ? (est * 0.39) : (est * 0.36));
+      w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.15 : (isAddr ? 0.17 : 0.07))));
       
       return {
         x: clamp(x, 0, viewport.width),
