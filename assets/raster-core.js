@@ -1032,54 +1032,42 @@
       return pad[key] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
     },
 
-      isWholeValueRectKey(key) {
-        return [
-    "account",
-    "account_cn_inline",
-    "api_key_token_zh",
-    "device_fingerprint",
-    "dob",
-    "driver_license",
-    "email",
-    "handle_label",
-    "id_card",
-    "id_card_inline_zh",
-    "ip_address",
-    "ip_label",
-    "license_plate",
-    "license_plate_inline_zh",
+    isWholeValueRectKey(key) {
+      return [
+        "account",
+        "account_cn_inline",
+        "api_key_token_zh",
+        "device_fingerprint",
+        "dob",
+        "driver_license",
+        "email",
+        "handle_label",
+        "id_card",
+        "id_card_inline_zh",
+        "ip_address",
+        "ip_label",
+        "license_plate",
+        "license_plate_inline_zh",
+        "money",
+        "money_cn_inline_label",
+        "money_label",
+        "money_label_currency_zh",
+        "passport",
+        "passport_inline_zh",
+        "phone",
+        "place_of_birth",
+        "ref_inline_zh",
+        "ref_label_tail",
+        "secret",
+        "secret_inline_zh",
+        "security_answer",
+        "tax_id_zh",
+        "uuid",
+        "wallet_id"
+      ].includes(String(key || ""));
+    },
 
-    "money",
-    "money_cn_inline_label",
-    "money_label",
-    "money_label_currency_zh",
-
-    "passport",
-    "passport_inline_zh",
-    "phone",
-    "place_of_birth",
-
-    "ref_inline_zh",
-    "ref_label_tail",
-
-    "secret",
-    "secret_inline_zh",
-    "security_answer",
-
-    "tax_id_zh",
-    "uuid",
-    "wallet_id",
-
-    // 新增（降低几何切割难度）
-    "device_fingerprint",
-    "api_key_token_zh",
-    "secret",
-    "security_answer"
-  ].includes(String(key || ""));
-},
-    
     filterAndMergeSpans(spans, tuning) {
-    
       const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
       const merged = [];
 
@@ -1106,7 +1094,6 @@
 
     buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
       const tuning = getLangTuning(lang);
-      const mergeCfg = getMergeCfg(tuning);
       const rects = [];
 
       for (const sp of RectEngine.filterAndMergeSpans(spans, tuning)) {
@@ -1194,7 +1181,11 @@
         }
       }
 
-            const out = [];
+      if (!rects.length) return [];
+
+      rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+
+      const out = [];
 
       function canMergeRects(a, b) {
         if (!a || !b) return false;
@@ -1271,6 +1262,8 @@
       }
 
       return out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId }));
+    }
+  };
 
   function normalizeCoreHit(hit) { return SpanEngine.normalizeCoreHit(hit); }
   function buildPageTextAndRangesFromItems(textContentOrItems) { return SpanEngine.buildPageTextAndRangesFromItems(textContentOrItems); }
