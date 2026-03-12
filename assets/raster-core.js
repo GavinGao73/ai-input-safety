@@ -1105,73 +1105,91 @@
   },
 
   shouldSkipLabelShrink(key) {
-    return [
-      "ref_label_tail",
-      "ref_inline_zh",
-      "money",
-      "money_label",
-      "money_cn_inline_label",
-      "money_label_currency_zh",
-      "phone",
-      "email",
-      "account",
-      "account_cn_inline",
-      "id_card",
-      "id_card_inline_zh",
-      "passport",
-      "passport_inline_zh",
-      "driver_license",
-      "license_plate",
-      "license_plate_inline_zh",
-      "tax_id_zh",
-      "uuid",
-      "wallet_id",
-      "ip_address",
-      "ip_label",
-      "secret",
-      "secret_inline_zh",
-      "security_answer",
-      "api_key_token_zh",
-      "device_fingerprint",
-      "dob",
-      "place_of_birth"
-    ].includes(String(key || ""));
-  },
+  return [
+    // 编号 / 尾段类：不要再做 label shrink，避免把标题吃进去或起点错位
+    "ref_label_tail",
+    "ref_inline_zh",
 
-  isWholeValueRectKey(key) {
-    return [
-      "account",
-      "account_cn_inline",
-      "api_key_token_zh",
-      "device_fingerprint",
-      "dob",
-      "driver_license",
-      "email",
-      "handle_label",
-      "id_card",
-      "id_card_inline_zh",
-      "ip_address",
-      "ip_label",
-      "license_plate",
-      "license_plate_inline_zh",
-      "money",
-      "money_cn_inline_label",
-      "money_label",
-      "money_label_currency_zh",
-      "passport",
-      "passport_inline_zh",
-      "phone",
-      "place_of_birth",
-      "ref_inline_zh",
-      "ref_label_tail",
-      "secret",
-      "secret_inline_zh",
-      "security_answer",
-      "tax_id_zh",
-      "uuid",
-      "wallet_id"
-    ].includes(String(key || ""));
-  },
+    // 金额类：保持值整体处理
+    "money",
+    "money_label",
+    "money_cn_inline_label",
+    "money_label_currency_zh",
+
+    // 联系方式 / 标识类
+    "phone",
+    "email",
+
+    // 账号 / 证件 / 标识类
+    "account",
+    "account_cn_inline",
+    "id_card",
+    "id_card_inline_zh",
+    "passport",
+    "passport_inline_zh",
+    "driver_license",
+    "license_plate",
+    "license_plate_inline_zh",
+    "tax_id_zh",
+    "uuid",
+    "wallet_id",
+    "ip_address",
+    "ip_label",
+    "secret",
+    "secret_inline_zh",
+    "security_answer",
+    "api_key_token_zh",
+    "device_fingerprint",
+    "dob",
+    "place_of_birth"
+  ].includes(String(key || ""));
+},
+
+isWholeValueRectKey(key) {
+  return [
+    // 账号 / 标识 / 敏感值：整值覆盖
+    "account",
+    "account_cn_inline",
+    "api_key_token_zh",
+    "device_fingerprint",
+    "dob",
+    "driver_license",
+    "email",
+    "handle_label",
+    "id_card",
+    "id_card_inline_zh",
+    "ip_address",
+    "ip_label",
+    "license_plate",
+    "license_plate_inline_zh",
+
+    // 金额类：整值覆盖金额本身，不做碎切
+    "money",
+    "money_cn_inline_label",
+    "money_label",
+    "money_label_currency_zh",
+
+    // 证件 / 出生 / 电话
+    "passport",
+    "passport_inline_zh",
+    "phone",
+    "place_of_birth",
+
+    // 编号尾段类
+    "ref_inline_zh",
+    "ref_label_tail",
+
+    // secret 类
+    "secret",
+    "secret_inline_zh",
+    "security_answer",
+
+    // 其他技术标识
+    "tax_id_zh",
+    "uuid",
+    "wallet_id"
+  ].includes(String(key || ""));
+},
 
   filterAndMergeSpans(spans, tuning) {
     const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
