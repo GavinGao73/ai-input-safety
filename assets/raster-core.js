@@ -82,19 +82,38 @@
         }
       },
       bbox: {
-        default: { maxByPage: 0.30, maxByEst: 1.45, wHardCapEstRatio: 2.2, wSoftCapEstMul: 1.15 },
-        longValue: { maxByPage: 0.55, maxByEst: 2.20, wHardCapEstRatio: 2.8, wSoftCapEstMul: 1.60 },
-        address: { maxByPage: 0.60, maxByEst: 2.10, wHardCapEstRatio: 3.2, wSoftCapEstMul: 1.70 },
-        money: { maxByPage: 0.35, maxByEst: 1.80 },
-        manual_term: { maxByPage: 0.40, maxByEst: 1.80 }
+        default:   { maxByPage: 0.24, maxByEst: 1.28, wHardCapEstRatio: 1.90, wSoftCapEstMul: 1.08 },
+        longValue: { maxByPage: 0.42, maxByEst: 1.70, wHardCapEstRatio: 2.20, wSoftCapEstMul: 1.22 },
+        address:   { maxByPage: 0.50, maxByEst: 1.80, wHardCapEstRatio: 2.50, wSoftCapEstMul: 1.35 },
+        money:     { maxByPage: 0.26, maxByEst: 1.35, wHardCapEstRatio: 1.85, wSoftCapEstMul: 1.08 },
+        manual_term:{ maxByPage: 0.34, maxByEst: 1.55, wHardCapEstRatio: 2.10, wSoftCapEstMul: 1.20 }
       },
       pad: {
-        person_name: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
-        person_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
-        account_holder_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
-        company: { pxW: 0.0045, pyH: 0.032, minX: 0.55, minY: 0.60 },
-        manual_term: { pxW: 0.0040, pyH: 0.035, minX: 0.55, minY: 0.65 },
-        _default: { pxW: 0.0050, pyH: 0.045, minX: 0.55, minY: 0.75 }
+        person_name: { pxW: 0.0015, pyH: 0.018, minX: 0.18, minY: 0.32 },
+        person_name_keep_title: { pxW: 0.0015, pyH: 0.018, minX: 0.18, minY: 0.32 },
+        account_holder_name_keep_title: { pxW: 0.0015, pyH: 0.018, minX: 0.18, minY: 0.32 },
+
+        company: { pxW: 0.0025, pyH: 0.022, minX: 0.28, minY: 0.36 },
+        company_label_inline_zh: { pxW: 0.0023, pyH: 0.020, minX: 0.24, minY: 0.34 },
+        company_label_inline_zh_no_colon: { pxW: 0.0023, pyH: 0.020, minX: 0.24, minY: 0.34 },
+
+        phone: { pxW: 0.0022, pyH: 0.020, minX: 0.24, minY: 0.34 },
+        email: { pxW: 0.0022, pyH: 0.020, minX: 0.24, minY: 0.34 },
+        account: { pxW: 0.0024, pyH: 0.020, minX: 0.24, minY: 0.34 },
+        account_cn_inline: { pxW: 0.0024, pyH: 0.020, minX: 0.24, minY: 0.34 },
+
+        ref_label_tail: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
+        ref_inline_zh: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
+
+        money: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
+        money_label: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
+        money_cn_inline_label: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
+        money_label_currency_zh: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
+
+        address_inline_zh: { pxW: 0.0020, pyH: 0.018, minX: 0.20, minY: 0.30 },
+
+        manual_term: { pxW: 0.0030, pyH: 0.024, minX: 0.30, minY: 0.40 },
+        _default: { pxW: 0.0022, pyH: 0.020, minX: 0.22, minY: 0.34 }
       },
       shrinkLabels: { phone: [], account: [], email: [], address: [], bank: [] },
       merge: { nearGapLegacy: 1.2, nearGapCore: 1.2, sameLineOverlapRatio: 0.88, similarHeightRatio: 0.80 },
@@ -392,21 +411,55 @@
   }
 
   const BBoxEngine = {
-    keyGroup(key) {
-      const isLong = key === "account" || key === "phone" || key === "email" || key === "bank";
-      const isAddr =
-        key === "address_de_street" ||
-        key === "address_de_postal" ||
-        key === "address_de_street_partial" ||
-        key === "address_de_extra_partial" ||
-        key === "address_de_inline_street" ||
-        key === "address_en_inline_street" ||
-        key === "address_en_extra_block" ||
-        key === "address_en_extra" ||
-        key === "address_cn";
+        keyGroup(key) {
+      const k = String(key || "");
 
-      if (key === "money" || key === "money_label") return "money";
-      if (key === "manual_term") return "manual_term";
+      const isLong =
+        k === "account" ||
+        k === "account_cn_inline" ||
+        k === "phone" ||
+        k === "email" ||
+        k === "bank" ||
+        k === "ref_label_tail" ||
+        k === "ref_inline_zh" ||
+        k === "uuid" ||
+        k === "wallet_id" ||
+        k === "ip_address" ||
+        k === "ip_label" ||
+        k === "device_fingerprint" ||
+        k === "api_key_token_zh" ||
+        k === "secret" ||
+        k === "secret_inline_zh" ||
+        k === "security_answer" ||
+        k === "tax_id_zh" ||
+        k === "passport" ||
+        k === "passport_inline_zh" ||
+        k === "id_card" ||
+        k === "id_card_inline_zh" ||
+        k === "driver_license" ||
+        k === "license_plate" ||
+        k === "license_plate_inline_zh";
+
+      const isAddr =
+        k === "address_inline_zh" ||
+        k === "address_cn" ||
+        k === "address_de_street" ||
+        k === "address_de_postal" ||
+        k === "address_de_street_partial" ||
+        k === "address_de_extra_partial" ||
+        k === "address_de_inline_street" ||
+        k === "address_en_inline_street" ||
+        k === "address_en_extra_block" ||
+        k === "address_en_extra";
+
+      if (
+        k === "money" ||
+        k === "money_label" ||
+        k === "money_cn_inline_label" ||
+        k === "money_label_currency_zh"
+      ) return "money";
+
+      if (k === "manual_term") return "manual_term";
       if (isLong) return "longValue";
       if (isAddr) return "address";
       return "default";
@@ -511,9 +564,10 @@
       w = clamp(w, 1, Math.min(viewport.width * Number(cfg.maxByPage || 0.30), est * Number(cfg.maxByEst || 1.45)));
 
       const isLong = group === "longValue";
-      const minW = isLong ? (est * 0.92) : (est * 0.80);
-      w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.38 : 0.18)));
-
+      const isAddr = group === "address";
+      const minW = isLong ? (est * 0.82) : (isAddr ? (est * 0.78) : (est * 0.72));
+      w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.30 : (isAddr ? 0.34 : 0.14))));
+      
       return {
         x: clamp(x, 0, viewport.width),
         y: clamp(y - fontH, 0, viewport.height),
