@@ -1034,26 +1034,37 @@
 
     isWholeValueRectKey(key) {
       return [
-        "ref_label_tail",
-        "ref_generic_tail",
-        "legal_ref_tail",
         "account",
-        "bank",
-        "wallet_id",
-        "tx_hash",
-        "crypto_wallet",
-        "uuid",
-        "uuid2",
-        "imei",
-        "imei2",
-        "mac_address",
+        "account_cn_inline",
+        "api_key_token_zh",
+        "device_fingerprint",
+        "dob",
+        "driver_license",
+        "email",
+        "handle_label",
+        "id_card",
+        "id_card_inline_zh",
         "ip_address",
         "ip_label",
-        "mac_label"
+        "license_plate",
+        "license_plate_inline_zh",
+        "passport",
+        "passport_inline_zh",
+        "phone",
+        "place_of_birth",
+        "ref_inline_zh",
+        "ref_label_tail",
+        "secret",
+        "secret_inline_zh",
+        "security_answer",
+        "tax_id_zh",
+        "uuid",
+        "wallet_id"
       ].includes(String(key || ""));
     },
 
     filterAndMergeSpans(spans, tuning) {
+    
       const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
       const merged = [];
 
@@ -1134,8 +1145,9 @@
 
           const coveredLen = le - ls;
           const isCjkItem = /[\u4E00-\u9FFF]/.test(s);
+          const wholeByKey = RectEngine.isWholeValueRectKey(key);
           const coverWholeItem =
-            wholeValueMode ||
+            wholeByKey ||
             len <= 2 ||
             (isCjkItem && coveredLen > 0) ||
             coveredLen >= len * 0.72;
