@@ -1049,6 +1049,7 @@
     "license_plate",
     "license_plate_inline_zh",
 
+    "money",
     "money_cn_inline_label",
     "money_label",
     "money_label_currency_zh",
