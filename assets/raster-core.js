@@ -1163,11 +1163,21 @@ isWholeValueRectKey(key) {
     "license_plate",
     "license_plate_inline_zh",
 
+    // 金额类：整值覆盖金额本身，不做碎切
+    "money",
+    "money_cn_inline_label",
+    "money_label",
+    "money_label_currency_zh",
+
     // 证件 / 出生 / 电话
     "passport",
     "passport_inline_zh",
     "phone",
     "place_of_birth",
+
+    // 编号尾段类
+    "ref_inline_zh",
+    "ref_label_tail",
 
     // secret 类
     "secret",
