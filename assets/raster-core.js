@@ -1032,7 +1032,7 @@
       return pad[key] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
     },
 
-    isWholeValueRectKey(key) {
+        isWholeValueRectKey(key) {
       return [
         "account",
         "account_cn_inline",
@@ -1048,6 +1048,9 @@
         "ip_label",
         "license_plate",
         "license_plate_inline_zh",
+        "money_cn_inline_label",
+        "money_label",
+        "money_label_currency_zh",
         "passport",
         "passport_inline_zh",
         "phone",
@@ -1062,7 +1065,7 @@
         "wallet_id"
       ].includes(String(key || ""));
     },
-
+    
     filterAndMergeSpans(spans, tuning) {
     
       const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
