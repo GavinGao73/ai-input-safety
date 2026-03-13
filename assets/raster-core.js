@@ -563,17 +563,17 @@
 
   const k = String(key || "");
 
-   if (k === "ref_label_tail" || k === "ref_inline_zh") {
+  if (k === "ref_label_tail" || k === "ref_inline_zh") {
   w = clamp(
-    w * 0.51,
+    w * 0.53,
     1,
     Math.min(
       viewport.width * Number(cfg.maxByPage || 0.30),
-      est * Number(cfg.maxByEst || 1.45) * 0.51
+      est * Number(cfg.maxByEst || 1.45) * 0.53
     )
   );
 
-  w = Math.max(w, Math.min(est * 0.40, viewport.width * 0.102));
+  w = Math.max(w, Math.min(est * 0.42, viewport.width * 0.106));
 } else {
       
     w = clamp(
