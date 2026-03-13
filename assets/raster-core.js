@@ -563,18 +563,18 @@
 
   const k = String(key || "");
 
-  if (k === "ref_label_tail" || k === "ref_inline_zh") {
-    w = clamp(
-      w * 0.42,
-      1,
-      Math.min(
-        viewport.width * Number(cfg.maxByPage || 0.30),
-        est * Number(cfg.maxByEst || 1.45) * 0.42
-      )
-    );
+if (k === "ref_label_tail" || k === "ref_inline_zh") {
+  w = clamp(
+    w * 0.48,
+    1,
+    Math.min(
+      viewport.width * Number(cfg.maxByPage || 0.30),
+      est * Number(cfg.maxByEst || 1.45) * 0.48
+    )
+  );
 
-    w = Math.max(w, Math.min(est * 0.32, viewport.width * 0.085));
-  } else {
+  w = Math.max(w, Math.min(est * 0.37, viewport.width * 0.095));
+} else {
       
     w = clamp(
       w,
