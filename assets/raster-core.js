@@ -1101,78 +1101,42 @@
   },
 
   padForKey(key, tuning) {
-    const pad = (tuning && tuning.pad) || {};
-    return pad[key] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
-  },
+  const k = String(key || "");
+  const pad = (tuning && tuning.pad) || {};
+
+  if (k === "ref_label_tail" || k === "ref_inline_zh") {
+    return { pxW: 0.010, pyH: 0.018, minX: 8, minY: 0.30 };
+  }
+
+  return pad[k] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
+},
 
   shouldSkipLabelShrink(key) {
-    return [
-      "ref_label_tail",
-      "ref_inline_zh",
-      "money",
-      "money_label",
-      "money_cn_inline_label",
-      "money_label_currency_zh",
-      "phone",
-      "email",
-      "account",
-      "account_cn_inline",
-      "id_card",
-      "id_card_inline_zh",
-      "passport",
-      "passport_inline_zh",
-      "driver_license",
-      "license_plate",
-      "license_plate_inline_zh",
-      "tax_id_zh",
-      "uuid",
-      "wallet_id",
-      "ip_address",
-      "ip_label",
-      "secret",
-      "secret_inline_zh",
-      "security_answer",
-      "api_key_token_zh",
-      "device_fingerprint",
-      "dob",
-      "place_of_birth"
-    ].includes(String(key || ""));
-  },
+  return [
+    "uuid",
+    "wallet_id",
+    "secret",
+    "secret_inline_zh",
+    "security_answer",
+    "api_key_token_zh",
+    "device_fingerprint"
+  ].includes(String(key || ""));
+},
 
   isWholeValueRectKey(key) {
-    return [
-      "account",
-      "account_cn_inline",
-      "api_key_token_zh",
-      "device_fingerprint",
-      "dob",
-      "driver_license",
-      "email",
-      "handle_label",
-      "id_card",
-      "id_card_inline_zh",
-      "ip_address",
-      "ip_label",
-      "license_plate",
-      "license_plate_inline_zh",
-      "money",
-      "money_cn_inline_label",
-      "money_label",
-      "money_label_currency_zh",
-      "passport",
-      "passport_inline_zh",
-      "phone",
-      "place_of_birth",
-      "ref_inline_zh",
-      "ref_label_tail",
-      "secret",
-      "secret_inline_zh",
-      "security_answer",
-      "tax_id_zh",
-      "uuid",
-      "wallet_id"
-    ].includes(String(key || ""));
-  },
+  return [
+    "ref_label_tail",
+    "ref_inline_zh",
+
+    "uuid",
+    "wallet_id",
+    "secret",
+    "secret_inline_zh",
+    "security_answer",
+    "api_key_token_zh",
+    "device_fingerprint"
+  ].includes(String(key || ""));
+},
 
   filterAndMergeSpans(spans, tuning) {
     const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
