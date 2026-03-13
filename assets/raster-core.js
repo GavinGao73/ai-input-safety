@@ -516,86 +516,88 @@
     },
 
     rectBox(pdfjsLib, viewport, it, key, lang) {
-      const tuning = getLangTuning(lang);
-      const rectCfg = getRectBoxCfg(tuning);
-      const bboxCfg = (tuning && tuning.bbox) || {};
-      const Util = pdfjsLib.Util;
+  const tuning = getLangTuning(lang);
+  const rectCfg = getRectBoxCfg(tuning);
+  const bboxCfg = (tuning && tuning.bbox) || {};
+  const Util = pdfjsLib.Util;
 
-      const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0];
-      const tx = Util.transform(viewport.transform, tr);
+  const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0];
+  const tx = Util.transform(viewport.transform, tr);
 
-      const x = Number(tx[4] || 0);
-      const y = Number(tx[5] || 0);
-      const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
-      const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
+  const x = Number(tx[4] || 0);
+  const y = Number(tx[5] || 0);
+  const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
+  const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
 
-      let fontH = sy;
-      if (!Number.isFinite(fontH) || fontH <= 0) {
-        fontH =
-          Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
-          Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
-          10;
-      }
+  let fontH = sy;
+  if (!Number.isFinite(fontH) || fontH <= 0) {
+    fontH =
+      Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
+      Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
+      10;
+  }
 
-      fontH = clamp(fontH * rectCfg.fontHeightMul, rectCfg.fontHeightMin, rectCfg.fontHeightMax);
+  fontH = clamp(fontH * rectCfg.fontHeightMul, rectCfg.fontHeightMin, rectCfg.fontHeightMax);
 
-      const s = String(it.str || "");
-      const textLen = Math.max(1, s.length);
+  const s = String(it.str || "");
+  const textLen = Math.max(1, s.length);
 
-      let w = 0;
-      try {
-        const iw = Number(it.width || 0);
-        if (Number.isFinite(iw) && iw > 0) w = iw * sx;
-      } catch (_) {}
+  let w = 0;
+  try {
+    const iw = Number(it.width || 0);
+    if (Number.isFinite(iw) && iw > 0) w = iw * sx;
+  } catch (_) {}
 
-      const est = Math.max(10, textLen * fontH * rectCfg.widthEstMul);
-      if (!Number.isFinite(w) || w <= 0) w = est;
+  const est = Math.max(10, textLen * fontH * rectCfg.widthEstMul);
+  if (!Number.isFinite(w) || w <= 0) w = est;
 
-      const group = BBoxEngine.keyGroup(key);
-      let widthScale = 0.5;
-
-      if (key === "address_inline_zh") widthScale = 0.75;
-      else if (key === "company") widthScale = 0.65;
-      else if (key === "phone" || key === "email") widthScale = 0.6;
-      else if (key === "money") widthScale = 0.55;
-      else if (key === "ref_label_tail" || key === "ref_inline_zh") widthScale = 0.45;
-      
-      const cfg = bboxCfg[group] || bboxCfg.default || {
-        maxByPage: 0.30,
-        maxByEst: 1.45,
-        wHardCapEstRatio: 2.2,
-        wSoftCapEstMul: 1.15
-      };
-
-      const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
-      const softMul = Number(cfg.wSoftCapEstMul || 1.15);
-      if (w > est * hardRatio) w = est * softMul;
-
-      w = clamp(
-        w,
-        1,
-        Math.min(
-          viewport.width * Number(cfg.maxByPage || 0.30) * widthScale,
-          est * Number(cfg.maxByEst || 1.45) * 0.5
-        )
-      );
-
-      const isLong = group === "longValue";
-      const isAddr = group === "address";
-      const minW = isLong
-        ? (est * 0.82 * widthScale)
-        : (isAddr ? (est * 0.78 * widthScale) : (est * 0.72 * widthScale));
-      
-      w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.15 : (isAddr ? 0.17 : 0.07))));
-      
-      return {
-        x: clamp(x, 0, viewport.width),
-        y: clamp(y - fontH, 0, viewport.height),
-        w: clamp(w, 1, viewport.width - clamp(x, 0, viewport.width)),
-        h: clamp(fontH, 6, viewport.height - clamp(y - fontH, 0, viewport.height))
-      };
-    }
+  const group = BBoxEngine.keyGroup(key);
+  const cfg = bboxCfg[group] || bboxCfg.default || {
+    maxByPage: 0.30,
+    maxByEst: 1.45,
+    wHardCapEstRatio: 2.2,
+    wSoftCapEstMul: 1.15
   };
+
+  const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
+  const softMul = Number(cfg.wSoftCapEstMul || 1.15);
+  if (w > est * hardRatio) w = est * softMul;
+
+  const k = String(key || "");
+
+  if (k === "ref_label_tail" || k === "ref_inline_zh") {
+    w = clamp(
+      w * 0.72,
+      1,
+      Math.min(
+        viewport.width * Number(cfg.maxByPage || 0.30),
+        est * Number(cfg.maxByEst || 1.45) * 0.72
+      )
+    );
+
+    w = Math.max(w, Math.min(est * 0.58, viewport.width * 0.16));
+  } else {
+    w = clamp(
+      w,
+      1,
+      Math.min(
+        viewport.width * Number(cfg.maxByPage || 0.30),
+        est * Number(cfg.maxByEst || 1.45)
+      )
+    );
+
+    const isLong = group === "longValue";
+    const minW = isLong ? (est * 0.92) : (est * 0.80);
+    w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.38 : 0.18)));
+  }
+
+  return {
+    x: clamp(x, 0, viewport.width),
+    y: clamp(y - fontH, 0, viewport.height),
+    w: clamp(w, 1, viewport.width - clamp(x, 0, viewport.width)),
+    h: clamp(fontH, 6, viewport.height - clamp(y - fontH, 0, viewport.height))
+  };
+},
 
   function buildItemBoxes(pdfjsLib, viewport, textContentOrItems, lang) {
     const items = getItemsArray(textContentOrItems);
@@ -1102,9 +1104,15 @@
   },
 
   padForKey(key, tuning) {
-    const pad = (tuning && tuning.pad) || {};
-    return pad[key] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
-  },
+  const pad = (tuning && tuning.pad) || {};
+  const k = String(key || "");
+
+  if (k === "ref_label_tail" || k === "ref_inline_zh") {
+    return { pxW: 0.004, pyH: 0.018, minX: 3, minY: 0.30 };
+  }
+
+  return pad[k] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
+},
 
   shouldSkipLabelShrink(key) {
     return [
