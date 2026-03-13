@@ -565,15 +565,15 @@
 
   if (k === "ref_label_tail" || k === "ref_inline_zh") {
     w = clamp(
-      w * 0.54,
+      w * 0.42,
       1,
       Math.min(
         viewport.width * Number(cfg.maxByPage || 0.30),
-        est * Number(cfg.maxByEst || 1.45) * 0.54
+        est * Number(cfg.maxByEst || 1.45) * 0.42
       )
     );
 
-    w = Math.max(w, Math.min(est * 0.42, viewport.width * 0.11));
+    w = Math.max(w, Math.min(est * 0.32, viewport.width * 0.085));
   } else {
       
     w = clamp(
