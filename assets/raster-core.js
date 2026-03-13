@@ -1323,10 +1323,10 @@
         const coveredLen = le - ls;
         const isCjkItem = /[\u4E00-\u9FFF]/.test(s);
         const wholeByKey = RectEngine.isWholeValueRectKey(key);
+        
         const coverWholeItem =
           wholeByKey ||
           len <= 2 ||
-          (isCjkItem && coveredLen > 0) ||
           coveredLen >= len * 0.72;
 
         const x1 = coverWholeItem ? bb.x : (bb.x + bb.w * (ls / len));
