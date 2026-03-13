@@ -612,6 +612,7 @@
     h: clamp(fontH, 6, viewport.height - clamp(y - fontH, 0, viewport.height))
   };
 },
+};
 
   function buildItemBoxes(pdfjsLib, viewport, textContentOrItems, lang) {
     const items = getItemsArray(textContentOrItems);
