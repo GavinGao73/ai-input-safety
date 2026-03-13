@@ -417,30 +417,28 @@
       const k = String(key || "");
 
       const isLong =
-        k === "account" ||
-        k === "account_cn_inline" ||
-        k === "phone" ||
-        k === "email" ||
-        k === "bank" ||
-        k === "ref_label_tail" ||
-        k === "ref_inline_zh" ||
-        k === "uuid" ||
-        k === "wallet_id" ||
-        k === "ip_address" ||
-        k === "ip_label" ||
-        k === "device_fingerprint" ||
-        k === "api_key_token_zh" ||
-        k === "secret" ||
-        k === "secret_inline_zh" ||
-        k === "security_answer" ||
-        k === "tax_id_zh" ||
-        k === "passport" ||
-        k === "passport_inline_zh" ||
-        k === "id_card" ||
-        k === "id_card_inline_zh" ||
-        k === "driver_license" ||
-        k === "license_plate" ||
-        k === "license_plate_inline_zh";
+  k === "account" ||
+  k === "account_cn_inline" ||
+  k === "phone" ||
+  k === "email" ||
+  k === "bank" ||
+  k === "uuid" ||
+  k === "wallet_id" ||
+  k === "ip_address" ||
+  k === "ip_label" ||
+  k === "device_fingerprint" ||
+  k === "api_key_token_zh" ||
+  k === "secret" ||
+  k === "secret_inline_zh" ||
+  k === "security_answer" ||
+  k === "tax_id_zh" ||
+  k === "passport" ||
+  k === "passport_inline_zh" ||
+  k === "id_card" ||
+  k === "id_card_inline_zh" ||
+  k === "driver_license" ||
+  k === "license_plate" ||
+  k === "license_plate_inline_zh";
 
       const isAddr =
         k === "address_inline_zh" ||
