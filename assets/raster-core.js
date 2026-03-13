@@ -593,7 +593,7 @@
   return {
     x: clamp(x, 0, viewport.width),
     y: clamp(y - fontH, 0, viewport.height),
-    w: clamp(w, 1, viewport.width - clamp(x, 0, viewport.width)),
+    w: clamp(w + 6, 1, viewport.width - clamp(x, 0, viewport.width)),
     h: clamp(fontH, 6, viewport.height - clamp(y - fontH, 0, viewport.height))
   };
 },
