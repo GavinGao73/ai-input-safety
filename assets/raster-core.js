@@ -574,20 +574,32 @@
   );
 
   w = Math.max(w, Math.min(est * 0.425, viewport.width * 0.108));
-} else {
-      
-    w = clamp(
-      w,
-      1,
-      Math.min(
-        viewport.width * Number(cfg.maxByPage || 0.30),
-        est * Number(cfg.maxByEst || 1.45)
-      )
-    );
+  } else {
+    if (k === "company" || k === "company_label_inline_zh" || k === "company_label_inline_zh_no_colon") {
+      w = clamp(
+        w * 1.34,
+        1,
+        Math.min(
+          viewport.width * 0.42,
+          est * 2.05
+        )
+      );
 
-    const isLong = group === "longValue";
-    const minW = isLong ? (est * 0.92) : (est * 0.80);
-    w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.38 : 0.18)));
+      w = Math.max(w, Math.min(est * 1.18, viewport.width * 0.26));
+    } else {
+      w = clamp(
+        w,
+        1,
+        Math.min(
+          viewport.width * Number(cfg.maxByPage || 0.30),
+          est * Number(cfg.maxByEst || 1.45)
+        )
+      );
+
+      const isLong = group === "longValue";
+      const minW = isLong ? (est * 0.92) : (est * 0.80);
+      w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.38 : 0.18)));
+    }
   }
 
   return {
