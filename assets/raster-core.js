@@ -1208,13 +1208,15 @@
   },
 
   shouldCollapseHitId(key) {
-    return [
-      "address_inline_zh",
-      "phone",
-      "money",
-      "company"
-    ].includes(String(key || ""));
-  },
+  return [
+    "address_inline_zh",
+    "phone",
+    "money",
+    "company",
+    "license_plate",
+    "license_plate_inline_zh"
+  ].includes(String(key || ""));
+},
 
   collapseRectsByHitId(rects) {
     if (!Array.isArray(rects) || !rects.length) return rects || [];
