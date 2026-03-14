@@ -1332,13 +1332,12 @@
         if (le <= ls) continue;
 
         const coveredLen = le - ls;
-        const isCjkItem = /[\u4E00-\u9FFF]/.test(s);
-        const wholeByKey = RectEngine.isWholeValueRectKey(key);
-        
-        const coverWholeItem =
-          wholeByKey ||
-          len <= 2 ||
-          coveredLen >= len * 0.72;
+const wholeByKey = wholeValueMode;
+
+const coverWholeItem =
+  wholeByKey ||
+  len <= 2 ||
+  coveredLen >= len * (isEnglish ? 0.90 : 0.72);
 
         const x1 = coverWholeItem ? bb.x : (bb.x + bb.w * (ls / len));
         const x2 = coverWholeItem ? (bb.x + bb.w) : (bb.x + bb.w * (le / len));
