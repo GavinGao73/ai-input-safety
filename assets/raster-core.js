@@ -606,14 +606,15 @@
     }
   }
 
+  const baseY = clamp(y - fontH + Math.min(4, Math.max(2, fontH * 0.16)), 0, viewport.height);
+  const baseH = clamp(fontH - Math.min(4, Math.max(2, fontH * 0.14)), 4, viewport.height - baseY);
+
   return {
     x: clamp(x, 0, viewport.width),
-    y: clamp(y - fontH, 0, viewport.height),
+    y: baseY,
     w: clamp(w + 6, 1, viewport.width - clamp(x, 0, viewport.width)),
-    h: clamp(fontH, 6, viewport.height - clamp(y - fontH, 0, viewport.height))
+    h: baseH
   };
-},
-};
 
   function buildItemBoxes(pdfjsLib, viewport, textContentOrItems, lang) {
     const items = getItemsArray(textContentOrItems);
@@ -1352,8 +1353,8 @@
         const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
         const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
 
-        const visualDownShift = Math.min(8.0, Math.max(5.0, bb.h * 0.28));
-        const visualHeightTrim = Math.min(7.0, Math.max(4.0, bb.h * 0.24));
+        const visualDownShift = Math.min(2.0, Math.max(1.0, bb.h * 0.06));
+        const visualHeightTrim = Math.min(2.0, Math.max(1.0, bb.h * 0.06));
 
         const nameLeftShift =
           (key === "person_name" ||
