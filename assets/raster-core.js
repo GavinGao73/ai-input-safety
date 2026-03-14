@@ -89,9 +89,9 @@
         manual_term:{ maxByPage: 0.34, maxByEst: 1.55, wHardCapEstRatio: 2.10, wSoftCapEstMul: 1.20 }
       },
       pad: {
-        person_name: { pxW: 0.0018, pyH: 0.014, minX: 3, minY: 0.24 },
-        person_name_keep_title: { pxW: 0.0018, pyH: 0.014, minX: 3, minY: 0.24 },
-        account_holder_name_keep_title: { pxW: 0.0018, pyH: 0.014, minX: 3, minY: 0.24 },
+        person_name: { pxW: 0.0005, pyH: 0.014, minX: 0.5, minY: 0.24 },
+        person_name_keep_title: { pxW: 0.0005, pyH: 0.014, minX: 0.5, minY: 0.24 },
+        account_holder_name_keep_title: { pxW: 0.0005, pyH: 0.014, minX: 0.5, minY: 0.24 },
 
         company: { pxW: 0.0025, pyH: 0.022, minX: 0.28, minY: 0.36 },
         company_label_inline_zh: { pxW: 0.0023, pyH: 0.020, minX: 0.24, minY: 0.34 },
