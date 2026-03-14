@@ -89,9 +89,9 @@
         manual_term:{ maxByPage: 0.34, maxByEst: 1.55, wHardCapEstRatio: 2.10, wSoftCapEstMul: 1.20 }
       },
       pad: {
-        person_name: { pxW: 0.0026, pyH: 0.014, minX: 5, minY: 0.24 },
-        person_name_keep_title: { pxW: 0.0026, pyH: 0.014, minX: 5, minY: 0.24 },
-        account_holder_name_keep_title: { pxW: 0.0026, pyH: 0.014, minX: 5, minY: 0.24 },
+        person_name: { pxW: 0.0018, pyH: 0.014, minX: 3, minY: 0.24 },
+        person_name_keep_title: { pxW: 0.0018, pyH: 0.014, minX: 3, minY: 0.24 },
+        account_holder_name_keep_title: { pxW: 0.0018, pyH: 0.014, minX: 3, minY: 0.24 },
 
         company: { pxW: 0.0025, pyH: 0.022, minX: 0.28, minY: 0.36 },
         company_label_inline_zh: { pxW: 0.0023, pyH: 0.020, minX: 0.24, minY: 0.34 },
@@ -1352,13 +1352,23 @@
         const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
         const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
 
-        const rx = clamp(x1 - padX, 0, viewport.width);
+        const visualDownShift = Math.min(8.0, Math.max(5.0, bb.h * 0.28));
+        const visualHeightTrim = Math.min(7.0, Math.max(4.0, bb.h * 0.24));
 
-        const visualDownShift = Math.min(5.0, Math.max(3.0, bb.h * 0.20));
-        const visualHeightTrim = Math.min(6.0, Math.max(3.0, bb.h * 0.22));
+        const nameLeftShift =
+          (key === "person_name" ||
+          key === "person_name_keep_title" ||
+          key === "account_holder_name_keep_title")
+          ? Math.min(4.0, Math.max(2.0, bb.w * 0.04))
+           : 0;
 
+        const rx = clamp(x1 - padX - nameLeftShift, 0, viewport.width);
         const ry = clamp(bb.y - padY + visualDownShift, 0, viewport.height);
-        const rw = clamp((x2 - x1) + padX * 2, 1, viewport.width - clamp(x1 - padX, 0, viewport.width));
+        const rw = clamp(
+          (x2 - x1) + padX * 2 + nameLeftShift,
+          1,
+          viewport.width - clamp(x1 - padX - nameLeftShift, 0, viewport.width)
+        );
         const rh = clamp(
           bb.h + padY * 2 - visualHeightTrim,
           3,
