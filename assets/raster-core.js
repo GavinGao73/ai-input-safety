@@ -1392,18 +1392,56 @@
     const out = [];
 
     function canMergeRects(a, b) {
-      if (!a || !b) return false;
-      if (a.key !== b.key) return false;
+  if (!a || !b) return false;
+  if (a.key !== b.key) return false;
 
-      const overlap = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
-      const minH = Math.max(1, Math.min(a.h, b.h));
-      const sameLine = (overlap / minH) > 0.72;
-      const similarHeight = (Math.min(a.h, b.h) / Math.max(a.h, b.h)) > 0.65;
-      const gap = b.x - (a.x + a.w);
-      const near = gap <= Math.max(nearGap, Math.min(a.h, b.h) * 0.45) && gap >= -3;
+  const aHit = String(a.hitId || "");
+  const bHit = String(b.hitId || "");
 
-      return sameLine && similarHeight && near;
-    }
+  // ✅ 不同命中绝不合并
+  if (aHit && bHit && aHit !== bHit) return false;
+
+  const overlap = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+  const minH = Math.max(1, Math.min(a.h, b.h));
+  const sameLine = (overlap / minH) > 0.80;
+  const similarHeight = (Math.min(a.h, b.h) / Math.max(a.h, b.h)) > 0.72;
+  const gap = b.x - (a.x + a.w);
+
+  const k = String(a.key || "");
+  const isParagraphSensitive =
+    k === "ref_label_tail" ||
+    k === "ref_inline_zh" ||
+    k === "company" ||
+    k === "company_label_inline_zh" ||
+    k === "company_label_inline_zh_no_colon" ||
+    k === "account" ||
+    k === "account_cn_inline" ||
+    k === "id_card" ||
+    k === "id_card_inline_zh" ||
+    k === "passport" ||
+    k === "passport_inline_zh" ||
+    k === "driver_license" ||
+    k === "license_plate" ||
+    k === "license_plate_inline_zh" ||
+    k === "tax_id_zh" ||
+    k === "uuid" ||
+    k === "wallet_id" ||
+    k === "ip_address" ||
+    k === "ip_label" ||
+    k === "secret" ||
+    k === "secret_inline_zh" ||
+    k === "security_answer" ||
+    k === "api_key_token_zh" ||
+    k === "device_fingerprint" ||
+    k === "handle_label";
+
+  // ✅ 正文敏感项更严格，避免串成大黑条
+  const near = isParagraphSensitive
+    ? (gap <= Math.max(1.5, Math.min(a.h, b.h) * 0.12) && gap >= -1)
+    : (gap <= Math.max(nearGap, Math.min(a.h, b.h) * 0.45) && gap >= -3);
+
+  return sameLine && similarHeight && near;
+}
 
     function mergeTwoRects(a, b) {
       const nx = Math.min(a.x, b.x);
