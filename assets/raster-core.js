@@ -1150,8 +1150,6 @@
       "passport",
       "passport_inline_zh",
       "driver_license",
-      "license_plate",
-      "license_plate_inline_zh",
       "tax_id_zh",
       "uuid",
       "wallet_id",
@@ -1159,11 +1157,9 @@
       "ip_label",
       "secret",
       "secret_inline_zh",
-      "security_answer",
       "api_key_token_zh",
       "device_fingerprint",
-      "dob",
-      "place_of_birth"
+      "dob"
     ].includes(String(key || ""));
   },
 
@@ -1181,8 +1177,6 @@
       "id_card_inline_zh",
       "ip_address",
       "ip_label",
-      "license_plate",
-      "license_plate_inline_zh",
       "money",
       "money_cn_inline_label",
       "money_label",
@@ -1190,12 +1184,10 @@
       "passport",
       "passport_inline_zh",
       "phone",
-      "place_of_birth",
       "ref_inline_zh",
       "ref_label_tail",
       "secret",
       "secret_inline_zh",
-      "security_answer",
       "tax_id_zh",
       "uuid",
       "wallet_id"
