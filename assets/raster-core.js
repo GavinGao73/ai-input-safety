@@ -89,9 +89,9 @@
         manual_term:{ maxByPage: 0.34, maxByEst: 1.55, wHardCapEstRatio: 2.10, wSoftCapEstMul: 1.20 }
       },
       pad: {
-        person_name: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
-        person_name_keep_title: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
-        account_holder_name_keep_title: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
+        person_name: { pxW: 0.0026, pyH: 0.014, minX: 5, minY: 0.24 },
+        person_name_keep_title: { pxW: 0.0026, pyH: 0.014, minX: 5, minY: 0.24 },
+        account_holder_name_keep_title: { pxW: 0.0026, pyH: 0.014, minX: 5, minY: 0.24 },
 
         company: { pxW: 0.0025, pyH: 0.022, minX: 0.28, minY: 0.36 },
         company_label_inline_zh: { pxW: 0.0023, pyH: 0.020, minX: 0.24, minY: 0.34 },
@@ -1354,14 +1354,14 @@
 
         const rx = clamp(x1 - padX, 0, viewport.width);
 
-        const visualDownShift = Math.min(2.5, bb.h * 0.10);
-        const visualHeightTrim = Math.min(3.0, bb.h * 0.14);
+        const visualDownShift = Math.min(5.0, Math.max(3.0, bb.h * 0.20));
+        const visualHeightTrim = Math.min(6.0, Math.max(3.0, bb.h * 0.22));
 
         const ry = clamp(bb.y - padY + visualDownShift, 0, viewport.height);
         const rw = clamp((x2 - x1) + padX * 2, 1, viewport.width - clamp(x1 - padX, 0, viewport.width));
         const rh = clamp(
           bb.h + padY * 2 - visualHeightTrim,
-          4,
+          3,
           viewport.height - clamp(bb.y - padY + visualDownShift, 0, viewport.height)
         );
 
