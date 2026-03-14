@@ -1299,14 +1299,45 @@
         if (!s) continue;
 
         let ls = a0 - r.start;
-        let le = b0 - r.start;
+let le = b0 - r.start;
 
-        const wholeValueMode = RectEngine.isWholeValueRectKey(key);
+const isEnglish = normLang(lang) === "en";
+const englishInlineValueKeys = new Set([
+  "phone",
+  "email",
+  "money",
+  "money_label",
+  "money_cn_inline_label",
+  "money_label_currency_zh",
+  "account",
+  "account_cn_inline",
+  "dob",
+  "id_card",
+  "id_card_inline_zh",
+  "passport",
+  "passport_inline_zh",
+  "driver_license",
+  "tax_id_zh",
+  "uuid",
+  "wallet_id",
+  "ip_address",
+  "ip_label",
+  "secret",
+  "secret_inline_zh",
+  "api_key_token_zh",
+  "device_fingerprint"
+]);
 
-        if (wholeValueMode) {
-          ls = 0;
-          le = s.length;
-        } else if (preferSub) {
+const isEnglishInlineValue =
+  isEnglish && englishInlineValueKeys.has(String(key || ""));
+
+const wholeValueMode =
+  RectEngine.isWholeValueRectKey(key) && !isEnglishInlineValue;
+
+if (wholeValueMode) {
+  ls = 0;
+  le = s.length;
+} else if (preferSub) {
           const subA = A + Number(preferSub.offsetStart || 0);
           const subB = A + Number(preferSub.offsetEnd || 0);
           const a1 = Math.max(subA, r.start);
@@ -1317,13 +1348,18 @@
           } else {
             continue;
           }
-        } else if (!RectEngine.shouldSkipLabelShrink(key)) {
-          const shr = RectEngine.shrinkByLabel(key, s, ls, le, tuning);
-          ls = shr.ls;
-          le = shr.le;
-          if (le <= ls) continue;
-        }
+  
+        } else {
+  const skipLabelShrink =
+    RectEngine.shouldSkipLabelShrink(key) && !isEnglishInlineValue;
 
+  if (!skipLabelShrink) {
+    const shr = RectEngine.shrinkByLabel(key, s, ls, le, tuning);
+    ls = shr.ls;
+    le = shr.le;
+    if (le <= ls) continue;
+  }
+}
         const bb = BBoxEngine.rectBox(pdfjsLib, viewport, it, key, lang);
         const len = Math.max(1, s.length);
 
