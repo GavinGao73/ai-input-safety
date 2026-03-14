@@ -1379,7 +1379,7 @@
         );
 
         if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
-          if (rw > Math.min(viewport.width * 0.22, bb.w * 1.10)) continue;
+          if (rw > Math.min(viewport.width * 0.16, bb.w * 0.90)) continue;
         }
         if (key === "company") {
           if (rw > Math.min(viewport.width * 0.40, bb.w * 1.50)) continue;
