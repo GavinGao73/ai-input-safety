@@ -48,7 +48,7 @@
 
     bbox: {
       default: { maxByPage: 0.24, maxByEst: 1.28, wHardCapEstRatio: 1.90, wSoftCapEstMul: 1.08 },
-      longValue: { maxByPage: 0.45, maxByEst: 1.80, wHardCapEstRatio: 2.20, wSoftCapEstMul: 1.22 },
+      longValue: { maxByPage: 0.50, maxByEst: 2.00, wHardCapEstRatio: 2.20, wSoftCapEstMul: 1.22 },
       address: { maxByPage: 0.50, maxByEst: 1.80, wHardCapEstRatio: 2.50, wSoftCapEstMul: 1.35 },
       money: { maxByPage: 0.26, maxByEst: 1.35, wHardCapEstRatio: 1.85, wSoftCapEstMul: 1.08 },
       manual_term: { maxByPage: 0.34, maxByEst: 1.55, wHardCapEstRatio: 2.10, wSoftCapEstMul: 1.20 }
@@ -67,8 +67,8 @@
       account: { pxW: 0.0040, pyH: 0.005, minX: 0.40, minY: 0.05 },
       account_cn_inline: { pxW: 0.0040, pyH: 0.005, minX: 0.40, minY: 0.05 },
       // 参考编号类：进一步加宽、下移
-      ref_label_tail: { pxW: 0.0040, pyH: 0.005, minX: 0.40, minY: 0.05 },
-      ref_inline_zh: { pxW: 0.0040, pyH: 0.005, minX: 0.40, minY: 0.05 },
+      ref_label_tail: { pxW: 0.006, pyH: 0.005, minX: 0.6, minY: 0.05 },
+      ref_inline_zh: { pxW: 0.006, pyH: 0.005, minX: 0.6, minY: 0.05 },
       money: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
       money_label: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
       money_cn_inline_label: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
