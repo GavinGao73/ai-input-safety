@@ -45,7 +45,6 @@
     return Array.isArray(v) ? v : [];
   }
 
-  function getRasterLangPacks() { return window.__RASTER_LANG_PACKS__ || {}; }
   function getEnginePolicy() { return window.__ENGINE_POLICY__ || {}; }
   function getPacks() { return window.__ENGINE_LANG_PACKS__ || {}; }
 
@@ -82,11 +81,11 @@
         }
       },
       bbox: {
-        default:   { maxByPage: 0.24, maxByEst: 1.28, wHardCapEstRatio: 1.90, wSoftCapEstMul: 1.08 },
+        default: { maxByPage: 0.24, maxByEst: 1.28, wHardCapEstRatio: 1.90, wSoftCapEstMul: 1.08 },
         longValue: { maxByPage: 0.42, maxByEst: 1.70, wHardCapEstRatio: 2.20, wSoftCapEstMul: 1.22 },
-        address:   { maxByPage: 0.50, maxByEst: 1.80, wHardCapEstRatio: 2.50, wSoftCapEstMul: 1.35 },
-        money:     { maxByPage: 0.26, maxByEst: 1.35, wHardCapEstRatio: 1.85, wSoftCapEstMul: 1.08 },
-        manual_term:{ maxByPage: 0.34, maxByEst: 1.55, wHardCapEstRatio: 2.10, wSoftCapEstMul: 1.20 }
+        address: { maxByPage: 0.50, maxByEst: 1.80, wHardCapEstRatio: 2.50, wSoftCapEstMul: 1.35 },
+        money: { maxByPage: 0.26, maxByEst: 1.35, wHardCapEstRatio: 1.85, wSoftCapEstMul: 1.08 },
+        manual_term: { maxByPage: 0.34, maxByEst: 1.55, wHardCapEstRatio: 2.10, wSoftCapEstMul: 1.20 }
       },
       pad: {
         person_name: { pxW: 0.0005, pyH: 0.014, minX: 0.5, minY: 0.24 },
@@ -117,14 +116,166 @@
         license_plate_inline_zh: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
         security_answer: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
         secret_inline_zh: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
-        
+
         manual_term: { pxW: 0.0030, pyH: 0.024, minX: 0.30, minY: 0.40 },
         _default: { pxW: 0.0022, pyH: 0.020, minX: 0.22, minY: 0.34 }
       },
       shrinkLabels: { phone: [], account: [], email: [], address: [], bank: [] },
       merge: { nearGapLegacy: 1.2, nearGapCore: 1.2, sameLineOverlapRatio: 0.88, similarHeightRatio: 0.80 },
       itemBox: { fontHeightMul: 1.08, fontHeightMin: 6, fontHeightMax: 96, widthEstMul: 0.72, shortTokenCap: 1.10, hardCap: 1.18 },
-      rectBox: { fontHeightMul: 1.10, fontHeightMin: 6, fontHeightMax: 104, widthEstMul: 0.82 }
+      rectBox: { fontHeightMul: 1.10, fontHeightMin: 6, fontHeightMax: 104, widthEstMul: 0.82 },
+      rectPolicy: {
+        wholeValueKeys: [
+          "account",
+          "account_cn_inline",
+          "api_key_token_zh",
+          "device_fingerprint",
+          "dob",
+          "driver_license",
+          "email",
+          "handle_label",
+          "id_card",
+          "id_card_inline_zh",
+          "ip_address",
+          "ip_label",
+          "money",
+          "money_cn_inline_label",
+          "money_label",
+          "money_label_currency_zh",
+          "passport",
+          "passport_inline_zh",
+          "phone",
+          "ref_inline_zh",
+          "ref_label_tail",
+          "secret",
+          "secret_inline_zh",
+          "tax_id_zh",
+          "uuid",
+          "wallet_id"
+        ],
+        skipLabelShrinkKeys: [
+          "ref_label_tail",
+          "ref_inline_zh",
+          "money",
+          "money_label",
+          "money_cn_inline_label",
+          "money_label_currency_zh",
+          "phone",
+          "email",
+          "account",
+          "account_cn_inline",
+          "id_card",
+          "id_card_inline_zh",
+          "passport",
+          "passport_inline_zh",
+          "driver_license",
+          "tax_id_zh",
+          "uuid",
+          "wallet_id",
+          "ip_address",
+          "ip_label",
+          "secret",
+          "secret_inline_zh",
+          "api_key_token_zh",
+          "device_fingerprint",
+          "dob"
+        ],
+        collapseHitIdKeys: [
+          "address_inline_zh",
+          "phone",
+          "money",
+          "company",
+          "license_plate",
+          "license_plate_inline_zh"
+        ],
+        longValueKeys: [
+          "account",
+          "account_cn_inline",
+          "phone",
+          "email",
+          "bank",
+          "uuid",
+          "wallet_id",
+          "ip_address",
+          "ip_label",
+          "device_fingerprint",
+          "api_key_token_zh",
+          "secret",
+          "secret_inline_zh",
+          "security_answer",
+          "tax_id_zh",
+          "passport",
+          "passport_inline_zh",
+          "id_card",
+          "id_card_inline_zh",
+          "driver_license",
+          "license_plate",
+          "license_plate_inline_zh"
+        ],
+        addressKeys: [
+          "address_inline_zh",
+          "address_cn",
+          "address_de_street",
+          "address_de_postal",
+          "address_de_street_partial",
+          "address_de_extra_partial",
+          "address_de_inline_street",
+          "address_en_inline_street",
+          "address_en_extra_block",
+          "address_en_extra"
+        ],
+        moneyKeys: [
+          "money",
+          "money_label",
+          "money_cn_inline_label",
+          "money_label_currency_zh"
+        ],
+        coverWholeItemRatio: {
+          default: 0.72,
+          enDefault: 0.90
+        },
+        padOverrides: {
+          ref_label_tail: { pxW: 0.002, pyH: 0.018, minX: 2, minY: 0.30 },
+          ref_inline_zh: { pxW: 0.002, pyH: 0.018, minX: 2, minY: 0.30 }
+        },
+        rectBoxSpecial: {
+          refTailWidthRatio: 0.535,
+          refTailMinEstRatio: 0.425,
+          refTailMinPageRatio: 0.108,
+          companyInlineZhWidthRatio: 1.18,
+          companyInlineZhMaxPage: 0.34,
+          companyInlineZhMaxEst: 1.70,
+          companyInlineZhMinEst: 0.98,
+          companyInlineZhMinPage: 0.22
+        },
+        paragraphSensitiveKeys: [
+          "ref_label_tail",
+          "ref_inline_zh",
+          "company",
+          "company_label_inline_zh",
+          "company_label_inline_zh_no_colon",
+          "account",
+          "account_cn_inline",
+          "id_card",
+          "id_card_inline_zh",
+          "passport",
+          "passport_inline_zh",
+          "driver_license",
+          "license_plate",
+          "license_plate_inline_zh",
+          "tax_id_zh",
+          "uuid",
+          "wallet_id",
+          "ip_address",
+          "ip_label",
+          "secret",
+          "secret_inline_zh",
+          "security_answer",
+          "api_key_token_zh",
+          "device_fingerprint",
+          "handle_label"
+        ]
+      }
     };
   }
 
@@ -145,15 +296,37 @@
       shrinkLabels: { ...(base.shrinkLabels || {}), ...(picked.shrinkLabels || {}) },
       merge: { ...(base.merge || {}), ...(picked.merge || {}) },
       itemBox: { ...(base.itemBox || {}), ...(picked.itemBox || {}) },
-      rectBox: { ...(base.rectBox || {}), ...(picked.rectBox || {}) }
+      rectBox: { ...(base.rectBox || {}), ...(picked.rectBox || {}) },
+      rectPolicy: {
+        ...(base.rectPolicy || {}),
+        ...(picked.rectPolicy || {}),
+        coverWholeItemRatio: {
+          ...(((base.rectPolicy || {}).coverWholeItemRatio) || {}),
+          ...((((picked || {}).rectPolicy || {}).coverWholeItemRatio) || {})
+        },
+        padOverrides: {
+          ...(((base.rectPolicy || {}).padOverrides) || {}),
+          ...((((picked || {}).rectPolicy || {}).padOverrides) || {})
+        },
+        rectBoxSpecial: {
+          ...(((base.rectPolicy || {}).rectBoxSpecial) || {}),
+          ...((((picked || {}).rectPolicy || {}).rectBoxSpecial) || {})
+        }
+      }
     };
+  }
+
+  function getPackForLang(lang) {
+    const PACKS = getPacks();
+    const L = normLang(lang);
+    return PACKS[L] || PACKS.zh || null;
   }
 
   function getLangTuning(lang) {
     const L = normLang(lang);
-    const packs = getRasterLangPacks();
     const base = getDefaultRasterTuning();
-    const picked = packs[L] || packs.zh || null;
+    const pack = getPackForLang(L);
+    const picked = pack && pack.raster && typeof pack.raster === "object" ? pack.raster : null;
     return (!picked || typeof picked !== "object") ? base : mergeObjects(base, picked);
   }
 
@@ -187,12 +360,6 @@
       fontHeightMax: Number(c.fontHeightMax || 104),
       widthEstMul: Number(c.widthEstMul || 0.82)
     };
-  }
-
-  function getPackForLang(lang) {
-    const PACKS = getPacks();
-    const L = normLang(lang);
-    return PACKS[L] || PACKS.zh || null;
   }
 
   function getPriorityForLang(lang) {
@@ -417,32 +584,43 @@
   }
 
   const BBoxEngine = {
-        keyGroup(key) {
+    keyGroup(key, lang) {
+      const tuning = getLangTuning(lang);
+      const policy = (tuning && tuning.rectPolicy) || {};
       const k = String(key || "");
 
+      const moneyKeys = new Set(Array.isArray(policy.moneyKeys) ? policy.moneyKeys : []);
+      const longValueKeys = new Set(Array.isArray(policy.longValueKeys) ? policy.longValueKeys : []);
+      const addressKeys = new Set(Array.isArray(policy.addressKeys) ? policy.addressKeys : []);
+
+      if (k === "manual_term") return "manual_term";
+      if (moneyKeys.has(k)) return "money";
+      if (longValueKeys.has(k)) return "longValue";
+      if (addressKeys.has(k)) return "address";
+
       const isLong =
-  k === "account" ||
-  k === "account_cn_inline" ||
-  k === "phone" ||
-  k === "email" ||
-  k === "bank" ||
-  k === "uuid" ||
-  k === "wallet_id" ||
-  k === "ip_address" ||
-  k === "ip_label" ||
-  k === "device_fingerprint" ||
-  k === "api_key_token_zh" ||
-  k === "secret" ||
-  k === "secret_inline_zh" ||
-  k === "security_answer" ||
-  k === "tax_id_zh" ||
-  k === "passport" ||
-  k === "passport_inline_zh" ||
-  k === "id_card" ||
-  k === "id_card_inline_zh" ||
-  k === "driver_license" ||
-  k === "license_plate" ||
-  k === "license_plate_inline_zh";
+        k === "account" ||
+        k === "account_cn_inline" ||
+        k === "phone" ||
+        k === "email" ||
+        k === "bank" ||
+        k === "uuid" ||
+        k === "wallet_id" ||
+        k === "ip_address" ||
+        k === "ip_label" ||
+        k === "device_fingerprint" ||
+        k === "api_key_token_zh" ||
+        k === "secret" ||
+        k === "secret_inline_zh" ||
+        k === "security_answer" ||
+        k === "tax_id_zh" ||
+        k === "passport" ||
+        k === "passport_inline_zh" ||
+        k === "id_card" ||
+        k === "id_card_inline_zh" ||
+        k === "driver_license" ||
+        k === "license_plate" ||
+        k === "license_plate_inline_zh";
 
       const isAddr =
         k === "address_inline_zh" ||
@@ -463,7 +641,6 @@
         k === "money_label_currency_zh"
       ) return "money";
 
-      if (k === "manual_term") return "manual_term";
       if (isLong) return "longValue";
       if (isAddr) return "address";
       return "default";
@@ -518,105 +695,117 @@
     },
 
     rectBox(pdfjsLib, viewport, it, key, lang) {
-  const tuning = getLangTuning(lang);
-  const rectCfg = getRectBoxCfg(tuning);
-  const bboxCfg = (tuning && tuning.bbox) || {};
-  const Util = pdfjsLib.Util;
+      const tuning = getLangTuning(lang);
+      const rectCfg = getRectBoxCfg(tuning);
+      const bboxCfg = (tuning && tuning.bbox) || {};
+      const rectPolicy = (tuning && tuning.rectPolicy) || {};
+      const rectBoxSpecial = (rectPolicy && rectPolicy.rectBoxSpecial) || {};
+      const Util = pdfjsLib.Util;
 
-  const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0];
-  const tx = Util.transform(viewport.transform, tr);
+      const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0];
+      const tx = Util.transform(viewport.transform, tr);
 
-  const x = Number(tx[4] || 0);
-  const y = Number(tx[5] || 0);
-  const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
-  const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
+      const x = Number(tx[4] || 0);
+      const y = Number(tx[5] || 0);
+      const sx = Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) || 1;
+      const sy = Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) || sx;
 
-  let fontH = sy;
-  if (!Number.isFinite(fontH) || fontH <= 0) {
-    fontH =
-      Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
-      Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
-      10;
-  }
+      let fontH = sy;
+      if (!Number.isFinite(fontH) || fontH <= 0) {
+        fontH =
+          Math.hypot(Number(tx[2] || 0), Number(tx[3] || 0)) ||
+          Math.hypot(Number(tx[0] || 0), Number(tx[1] || 0)) ||
+          10;
+      }
 
-  fontH = clamp(fontH * rectCfg.fontHeightMul, rectCfg.fontHeightMin, rectCfg.fontHeightMax);
+      fontH = clamp(fontH * rectCfg.fontHeightMul, rectCfg.fontHeightMin, rectCfg.fontHeightMax);
 
-  const s = String(it.str || "");
-  const textLen = Math.max(1, s.length);
+      const s = String(it.str || "");
+      const textLen = Math.max(1, s.length);
 
-  let w = 0;
-  try {
-    const iw = Number(it.width || 0);
-    if (Number.isFinite(iw) && iw > 0) w = iw * sx;
-  } catch (_) {}
+      let w = 0;
+      try {
+        const iw = Number(it.width || 0);
+        if (Number.isFinite(iw) && iw > 0) w = iw * sx;
+      } catch (_) {}
 
-  const est = Math.max(10, textLen * fontH * rectCfg.widthEstMul);
-  if (!Number.isFinite(w) || w <= 0) w = est;
+      const est = Math.max(10, textLen * fontH * rectCfg.widthEstMul);
+      if (!Number.isFinite(w) || w <= 0) w = est;
 
-  const group = BBoxEngine.keyGroup(key);
-  const cfg = bboxCfg[group] || bboxCfg.default || {
-    maxByPage: 0.30,
-    maxByEst: 1.45,
-    wHardCapEstRatio: 2.2,
-    wSoftCapEstMul: 1.15
-  };
+      const group = BBoxEngine.keyGroup(key, lang);
+      const cfg = bboxCfg[group] || bboxCfg.default || {
+        maxByPage: 0.30,
+        maxByEst: 1.45,
+        wHardCapEstRatio: 2.2,
+        wSoftCapEstMul: 1.15
+      };
 
-  const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
-  const softMul = Number(cfg.wSoftCapEstMul || 1.15);
-  if (w > est * hardRatio) w = est * softMul;
+      const hardRatio = Number(cfg.wHardCapEstRatio || 2.2);
+      const softMul = Number(cfg.wSoftCapEstMul || 1.15);
+      if (w > est * hardRatio) w = est * softMul;
 
-  const k = String(key || "");
+      const k = String(key || "");
 
-  if (k === "ref_label_tail" || k === "ref_inline_zh") {
-  w = clamp(
-    w * 0.535,
-    1,
-    Math.min(
-      viewport.width * Number(cfg.maxByPage || 0.30),
-      est * Number(cfg.maxByEst || 1.45) * 0.535
-    )
-  );
+      if (k === "ref_label_tail" || k === "ref_inline_zh") {
+        const widthRatio = Number(rectBoxSpecial.refTailWidthRatio || 0.535);
+        const minEstRatio = Number(rectBoxSpecial.refTailMinEstRatio || 0.425);
+        const minPageRatio = Number(rectBoxSpecial.refTailMinPageRatio || 0.108);
 
-  w = Math.max(w, Math.min(est * 0.425, viewport.width * 0.108));
-  } else {
-    if (k === "company_label_inline_zh") {
-  w = clamp(
-    w * 1.18,
-    1,
-    Math.min(
-      viewport.width * 0.34,
-      est * 1.70
-    )
-  );
+        w = clamp(
+          w * widthRatio,
+          1,
+          Math.min(
+            viewport.width * Number(cfg.maxByPage || 0.30),
+            est * Number(cfg.maxByEst || 1.45) * widthRatio
+          )
+        );
 
-  w = Math.max(w, Math.min(est * 0.98, viewport.width * 0.22));
-} else {
-      w = clamp(
-        w,
-        1,
-        Math.min(
-          viewport.width * Number(cfg.maxByPage || 0.30),
-          est * Number(cfg.maxByEst || 1.45)
-        )
-      );
+        w = Math.max(w, Math.min(est * minEstRatio, viewport.width * minPageRatio));
+      } else {
+        if (k === "company_label_inline_zh") {
+          const widthRatio = Number(rectBoxSpecial.companyInlineZhWidthRatio || 1.18);
+          const maxPage = Number(rectBoxSpecial.companyInlineZhMaxPage || 0.34);
+          const maxEst = Number(rectBoxSpecial.companyInlineZhMaxEst || 1.70);
+          const minEst = Number(rectBoxSpecial.companyInlineZhMinEst || 0.98);
+          const minPage = Number(rectBoxSpecial.companyInlineZhMinPage || 0.22);
 
-      const isLong = group === "longValue";
-      const minW = isLong ? (est * 0.92) : (est * 0.80);
-      w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.38 : 0.18)));
+          w = clamp(
+            w * widthRatio,
+            1,
+            Math.min(
+              viewport.width * maxPage,
+              est * maxEst
+            )
+          );
+
+          w = Math.max(w, Math.min(est * minEst, viewport.width * minPage));
+        } else {
+          w = clamp(
+            w,
+            1,
+            Math.min(
+              viewport.width * Number(cfg.maxByPage || 0.30),
+              est * Number(cfg.maxByEst || 1.45)
+            )
+          );
+
+          const isLong = group === "longValue";
+          const minW = isLong ? (est * 0.92) : (est * 0.80);
+          w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.38 : 0.18)));
+        }
+      }
+
+      const baseY = clamp(y - fontH + Math.min(4, Math.max(2, fontH * 0.16)), 0, viewport.height);
+      const baseH = clamp(fontH - Math.min(4, Math.max(2, fontH * 0.14)), 4, viewport.height - baseY);
+
+      return {
+        x: clamp(x, 0, viewport.width),
+        y: baseY,
+        w: clamp(w + 6, 1, viewport.width - clamp(x, 0, viewport.width)),
+        h: baseH
+      };
     }
-  }
-
-  const baseY = clamp(y - fontH + Math.min(4, Math.max(2, fontH * 0.16)), 0, viewport.height);
-  const baseH = clamp(fontH - Math.min(4, Math.max(2, fontH * 0.14)), 4, viewport.height - baseY);
-
-  return {
-    x: clamp(x, 0, viewport.width),
-    y: baseY,
-    w: clamp(w + 6, 1, viewport.width - clamp(x, 0, viewport.width)),
-    h: baseH
   };
- }
-};
 
   function buildItemBoxes(pdfjsLib, viewport, textContentOrItems, lang) {
     const items = getItemsArray(textContentOrItems);
@@ -1079,470 +1268,492 @@
   };
 
   const RectEngine = {
-  weakTrim(ch) {
-    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return true;
-    return ":：,，;；()（）[]【】<>《》\"'“”‘’".includes(ch);
-  },
+    weakTrim(ch) {
+      if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return true;
+      return ":：,，;；()（）[]【】<>《》\"'“”‘’".includes(ch);
+    },
 
-  makeLabelPrefixRe(words) {
-    if (!Array.isArray(words) || !words.length) return null;
-    const parts = words.map((w) => String(w || "").trim()).filter(Boolean).map(escapeRegExp);
-    if (!parts.length) return null;
-    try { return new RegExp(`^(?:${parts.join("|")})\\s*[:：]?\\s*`, "i"); } catch (_) { return null; }
-  },
+    makeLabelPrefixRe(words) {
+      if (!Array.isArray(words) || !words.length) return null;
+      const parts = words.map((w) => String(w || "").trim()).filter(Boolean).map(escapeRegExp);
+      if (!parts.length) return null;
+      try { return new RegExp(`^(?:${parts.join("|")})\\s*[:：]?\\s*`, "i"); } catch (_) { return null; }
+    },
 
-  shrinkByLabel(key, s, ls, le, tuning) {
-    if (key === "manual_term" || le <= ls) return { ls, le };
+    shrinkByLabel(key, s, ls, le, tuning) {
+      if (key === "manual_term" || le <= ls) return { ls, le };
 
-    const sub = s.slice(ls, le);
-    const labels = (tuning && tuning.shrinkLabels) || {};
-    const map = {
-      phone: labels.phone,
-      account: labels.account,
-      email: labels.email,
-      bank: labels.bank,
-      address_de_street: labels.address,
-      address_de_postal: labels.address,
-      address_de_street_partial: labels.address,
-      address_de_extra_partial: labels.address,
-      address_de_inline_street: labels.address,
-      address_en_inline_street: labels.address,
-      address_en_extra_block: labels.address,
-      address_en_extra: labels.address,
-      address_cn: labels.address
-    };
+      const sub = s.slice(ls, le);
+      const labels = (tuning && tuning.shrinkLabels) || {};
+      const map = {
+        phone: labels.phone,
+        account: labels.account,
+        email: labels.email,
+        bank: labels.bank,
+        address_de_street: labels.address,
+        address_de_postal: labels.address,
+        address_de_street_partial: labels.address,
+        address_de_extra_partial: labels.address,
+        address_de_inline_street: labels.address,
+        address_en_inline_street: labels.address,
+        address_en_extra_block: labels.address,
+        address_en_extra: labels.address,
+        address_cn: labels.address
+      };
 
-    const re = RectEngine.makeLabelPrefixRe(map[key]);
-    const mm = re ? sub.match(re) : null;
-    if (mm && mm[0]) ls += mm[0].length;
+      const re = RectEngine.makeLabelPrefixRe(map[key]);
+      const mm = re ? sub.match(re) : null;
+      if (mm && mm[0]) ls += mm[0].length;
 
-    while (ls < le && RectEngine.weakTrim(s[ls])) ls++;
-    while (le > ls && RectEngine.weakTrim(s[le - 1])) le--;
+      while (ls < le && RectEngine.weakTrim(s[ls])) ls++;
+      while (le > ls && RectEngine.weakTrim(s[le - 1])) le--;
 
-    return { ls, le };
-  },
+      return { ls, le };
+    },
 
-  padForKey(key, tuning) {
-  const pad = (tuning && tuning.pad) || {};
-  const k = String(key || "");
+    padForKey(key, tuning) {
+      const pad = (tuning && tuning.pad) || {};
+      const policy = (tuning && tuning.rectPolicy) || {};
+      const overrides = (policy && policy.padOverrides) || {};
+      const k = String(key || "");
 
-  if (k === "ref_label_tail" || k === "ref_inline_zh") {
-    return { pxW: 0.002, pyH: 0.018, minX: 2, minY: 0.30 };
-  }
+      if (overrides[k]) return overrides[k];
 
-  return pad[k] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
-},
-
-  shouldSkipLabelShrink(key) {
-    return [
-      "ref_label_tail",
-      "ref_inline_zh",
-      "money",
-      "money_label",
-      "money_cn_inline_label",
-      "money_label_currency_zh",
-      "phone",
-      "email",
-      "account",
-      "account_cn_inline",
-      "id_card",
-      "id_card_inline_zh",
-      "passport",
-      "passport_inline_zh",
-      "driver_license",
-      "tax_id_zh",
-      "uuid",
-      "wallet_id",
-      "ip_address",
-      "ip_label",
-      "secret",
-      "secret_inline_zh",
-      "api_key_token_zh",
-      "device_fingerprint",
-      "dob"
-    ].includes(String(key || ""));
-  },
-
-  isWholeValueRectKey(key) {
-    return [
-      "account",
-      "account_cn_inline",
-      "api_key_token_zh",
-      "device_fingerprint",
-      "dob",
-      "driver_license",
-      "email",
-      "handle_label",
-      "id_card",
-      "id_card_inline_zh",
-      "ip_address",
-      "ip_label",
-      "money",
-      "money_cn_inline_label",
-      "money_label",
-      "money_label_currency_zh",
-      "passport",
-      "passport_inline_zh",
-      "phone",
-      "ref_inline_zh",
-      "ref_label_tail",
-      "secret",
-      "secret_inline_zh",
-      "tax_id_zh",
-      "uuid",
-      "wallet_id"
-    ].includes(String(key || ""));
-  },
-
-  filterAndMergeSpans(spans, tuning) {
-    const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
-    const merged = [];
-
-    for (const sp of spans || []) {
-      if (!sp || !sp.key) continue;
-      if ((sp.b - sp.a) > (MAX_MATCH_LEN[sp.key] || 120)) continue;
-
-      const last = merged[merged.length - 1];
-      if (last && last.key === sp.key && sp.a <= last.b) {
-        last.b = Math.max(last.b, sp.b);
-      } else {
-        merged.push({
-          a: sp.a,
-          b: sp.b,
-          key: sp.key,
-          preferSub: sp.preferSub || null,
-          hitId: sp.hitId || ""
-        });
-      }
-    }
-
-    return merged;
-  },
-
-  shouldCollapseHitId(key) {
-  return [
-    "address_inline_zh",
-    "phone",
-    "money",
-    "company",
-    "license_plate",
-    "license_plate_inline_zh"
-  ].includes(String(key || ""));
-},
-
-  collapseRectsByHitId(rects) {
-    if (!Array.isArray(rects) || !rects.length) return rects || [];
-
-    const keep = [];
-    const groups = new Map();
-
-    for (const r of rects) {
-      const key = String((r && r.key) || "");
-      const hitId = String((r && r.hitId) || "");
-
-      if (!hitId || !RectEngine.shouldCollapseHitId(key)) {
-        keep.push(r);
-        continue;
+      if (k === "ref_label_tail" || k === "ref_inline_zh") {
+        return { pxW: 0.002, pyH: 0.018, minX: 2, minY: 0.30 };
       }
 
-      const gid = key + "::" + hitId;
-      if (!groups.has(gid)) {
-        groups.set(gid, {
-          x1: Number(r.x),
-          y1: Number(r.y),
-          x2: Number(r.x) + Number(r.w),
-          y2: Number(r.y) + Number(r.h),
-          key,
-          hitId
-        });
-      } else {
-        const g = groups.get(gid);
-        g.x1 = Math.min(g.x1, Number(r.x));
-        g.y1 = Math.min(g.y1, Number(r.y));
-        g.x2 = Math.max(g.x2, Number(r.x) + Number(r.w));
-        g.y2 = Math.max(g.y2, Number(r.y) + Number(r.h));
+      return pad[k] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
+    },
+
+    shouldSkipLabelShrink(key, tuning) {
+      const policy = (tuning && tuning.rectPolicy) || {};
+      const list = Array.isArray(policy.skipLabelShrinkKeys) ? policy.skipLabelShrinkKeys : [];
+      if (list.includes(String(key || ""))) return true;
+
+      return [
+        "ref_label_tail",
+        "ref_inline_zh",
+        "money",
+        "money_label",
+        "money_cn_inline_label",
+        "money_label_currency_zh",
+        "phone",
+        "email",
+        "account",
+        "account_cn_inline",
+        "id_card",
+        "id_card_inline_zh",
+        "passport",
+        "passport_inline_zh",
+        "driver_license",
+        "tax_id_zh",
+        "uuid",
+        "wallet_id",
+        "ip_address",
+        "ip_label",
+        "secret",
+        "secret_inline_zh",
+        "api_key_token_zh",
+        "device_fingerprint",
+        "dob"
+      ].includes(String(key || ""));
+    },
+
+    isWholeValueRectKey(key, tuning) {
+      const policy = (tuning && tuning.rectPolicy) || {};
+      const list = Array.isArray(policy.wholeValueKeys) ? policy.wholeValueKeys : [];
+      if (list.includes(String(key || ""))) return true;
+
+      return [
+        "account",
+        "account_cn_inline",
+        "api_key_token_zh",
+        "device_fingerprint",
+        "dob",
+        "driver_license",
+        "email",
+        "handle_label",
+        "id_card",
+        "id_card_inline_zh",
+        "ip_address",
+        "ip_label",
+        "money",
+        "money_cn_inline_label",
+        "money_label",
+        "money_label_currency_zh",
+        "passport",
+        "passport_inline_zh",
+        "phone",
+        "ref_inline_zh",
+        "ref_label_tail",
+        "secret",
+        "secret_inline_zh",
+        "tax_id_zh",
+        "uuid",
+        "wallet_id"
+      ].includes(String(key || ""));
+    },
+
+    filterAndMergeSpans(spans, tuning) {
+      const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
+      const merged = [];
+
+      for (const sp of spans || []) {
+        if (!sp || !sp.key) continue;
+        if ((sp.b - sp.a) > (MAX_MATCH_LEN[sp.key] || 120)) continue;
+
+        const last = merged[merged.length - 1];
+        if (last && last.key === sp.key && sp.a <= last.b) {
+          last.b = Math.max(last.b, sp.b);
+        } else {
+          merged.push({
+            a: sp.a,
+            b: sp.b,
+            key: sp.key,
+            preferSub: sp.preferSub || null,
+            hitId: sp.hitId || ""
+          });
+        }
       }
-    }
 
-    const collapsed = Array.from(groups.values()).map((g) => ({
-      x: g.x1,
-      y: g.y1,
-      w: Math.max(1, g.x2 - g.x1),
-      h: Math.max(1, g.y2 - g.y1),
-      key: g.key,
-      hitId: g.hitId
-    }));
+      return merged;
+    },
 
-    const all = keep.concat(collapsed);
-    all.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-    return all;
-  },
+    shouldCollapseHitId(key, tuning) {
+      const policy = (tuning && tuning.rectPolicy) || {};
+      const list = Array.isArray(policy.collapseHitIdKeys) ? policy.collapseHitIdKeys : [];
+      if (list.includes(String(key || ""))) return true;
 
-  buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
-    const tuning = getLangTuning(lang);
-    const rects = [];
+      return [
+        "address_inline_zh",
+        "phone",
+        "money",
+        "company",
+        "license_plate",
+        "license_plate_inline_zh"
+      ].includes(String(key || ""));
+    },
 
-    for (const sp of RectEngine.filterAndMergeSpans(spans, tuning)) {
-      const A = sp.a;
-      const B = sp.b;
-      const key = sp.key;
-      const preferSub = sp.preferSub;
-      const hitId = safeString(sp.hitId || "");
+    collapseRectsByHitId(rects, lang) {
+      if (!Array.isArray(rects) || !rects.length) return rects || [];
+      const tuning = getLangTuning(lang);
 
-      for (const r of itemRanges) {
-        const a0 = Math.max(A, r.start);
-        const b0 = Math.min(B, r.end);
-        if (b0 <= a0) continue;
+      const keep = [];
+      const groups = new Map();
 
-        const it = items[r.idx];
-        const s = String(it.str || "");
-        if (!s) continue;
+      for (const r of rects) {
+        const key = String((r && r.key) || "");
+        const hitId = String((r && r.hitId) || "");
 
-        let ls = a0 - r.start;
-let le = b0 - r.start;
+        if (!hitId || !RectEngine.shouldCollapseHitId(key, tuning)) {
+          keep.push(r);
+          continue;
+        }
 
-const isEnglish = normLang(lang) === "en";
-const englishInlineValueKeys = new Set([
-  "phone",
-  "email",
-  "money",
-  "money_label",
-  "money_cn_inline_label",
-  "money_label_currency_zh",
-  "account",
-  "account_cn_inline",
-  "dob",
-  "id_card",
-  "id_card_inline_zh",
-  "passport",
-  "passport_inline_zh",
-  "driver_license",
-  "tax_id_zh",
-  "uuid",
-  "wallet_id",
-  "ip_address",
-  "ip_label",
-  "secret",
-  "secret_inline_zh",
-  "api_key_token_zh",
-  "device_fingerprint"
-]);
+        const gid = key + "::" + hitId;
+        if (!groups.has(gid)) {
+          groups.set(gid, {
+            x1: Number(r.x),
+            y1: Number(r.y),
+            x2: Number(r.x) + Number(r.w),
+            y2: Number(r.y) + Number(r.h),
+            key,
+            hitId
+          });
+        } else {
+          const g = groups.get(gid);
+          g.x1 = Math.min(g.x1, Number(r.x));
+          g.y1 = Math.min(g.y1, Number(r.y));
+          g.x2 = Math.max(g.x2, Number(r.x) + Number(r.w));
+          g.y2 = Math.max(g.y2, Number(r.y) + Number(r.h));
+        }
+      }
 
-const isEnglishInlineValue =
-  isEnglish && englishInlineValueKeys.has(String(key || ""));
+      const collapsed = Array.from(groups.values()).map((g) => ({
+        x: g.x1,
+        y: g.y1,
+        w: Math.max(1, g.x2 - g.x1),
+        h: Math.max(1, g.y2 - g.y1),
+        key: g.key,
+        hitId: g.hitId
+      }));
 
-const wholeValueMode =
-  RectEngine.isWholeValueRectKey(key) && !isEnglishInlineValue;
+      const all = keep.concat(collapsed);
+      all.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+      return all;
+    },
 
-if (wholeValueMode) {
-  ls = 0;
-  le = s.length;
-} else if (preferSub) {
-          const subA = A + Number(preferSub.offsetStart || 0);
-          const subB = A + Number(preferSub.offsetEnd || 0);
-          const a1 = Math.max(subA, r.start);
-          const b1 = Math.min(subB, r.end);
-          if (b1 > a1) {
-            ls = a1 - r.start;
-            le = b1 - r.start;
+    buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
+      const tuning = getLangTuning(lang);
+      const rects = [];
+
+      for (const sp of RectEngine.filterAndMergeSpans(spans, tuning)) {
+        const A = sp.a;
+        const B = sp.b;
+        const key = sp.key;
+        const preferSub = sp.preferSub;
+        const hitId = safeString(sp.hitId || "");
+
+        for (const r of itemRanges) {
+          const a0 = Math.max(A, r.start);
+          const b0 = Math.min(B, r.end);
+          if (b0 <= a0) continue;
+
+          const it = items[r.idx];
+          const s = String(it.str || "");
+          if (!s) continue;
+
+          let ls = a0 - r.start;
+          let le = b0 - r.start;
+
+          const isEnglish = normLang(lang) === "en";
+          const englishInlineValueKeys = new Set([
+            "phone",
+            "email",
+            "money",
+            "money_label",
+            "money_cn_inline_label",
+            "money_label_currency_zh",
+            "account",
+            "account_cn_inline",
+            "dob",
+            "id_card",
+            "id_card_inline_zh",
+            "passport",
+            "passport_inline_zh",
+            "driver_license",
+            "tax_id_zh",
+            "uuid",
+            "wallet_id",
+            "ip_address",
+            "ip_label",
+            "secret",
+            "secret_inline_zh",
+            "api_key_token_zh",
+            "device_fingerprint"
+          ]);
+
+          const isEnglishInlineValue =
+            isEnglish && englishInlineValueKeys.has(String(key || ""));
+
+          const wholeValueMode =
+            RectEngine.isWholeValueRectKey(key, tuning) && !isEnglishInlineValue;
+
+          if (wholeValueMode) {
+            ls = 0;
+            le = s.length;
+          } else if (preferSub) {
+            const subA = A + Number(preferSub.offsetStart || 0);
+            const subB = A + Number(preferSub.offsetEnd || 0);
+            const a1 = Math.max(subA, r.start);
+            const b1 = Math.min(subB, r.end);
+            if (b1 > a1) {
+              ls = a1 - r.start;
+              le = b1 - r.start;
+            } else {
+              continue;
+            }
           } else {
-            continue;
+            const skipLabelShrink =
+              RectEngine.shouldSkipLabelShrink(key, tuning) && !isEnglishInlineValue;
+
+            if (!skipLabelShrink) {
+              const shr = RectEngine.shrinkByLabel(key, s, ls, le, tuning);
+              ls = shr.ls;
+              le = shr.le;
+              if (le <= ls) continue;
+            }
           }
-  
+
+          const bb = BBoxEngine.rectBox(pdfjsLib, viewport, it, key, lang);
+          const len = Math.max(1, s.length);
+
+          ls = clamp(ls, 0, len);
+          le = clamp(le, 0, len);
+          if (le <= ls) continue;
+
+          const coveredLen = le - ls;
+          const wholeByKey = wholeValueMode;
+          const coverRatioCfg = (((tuning || {}).rectPolicy || {}).coverWholeItemRatio) || {};
+          const coverDefault = Number(coverRatioCfg.default || 0.72);
+          const coverEnglishDefault = Number(coverRatioCfg.enDefault || 0.90);
+
+          const coverWholeItem =
+            wholeByKey ||
+            len <= 2 ||
+            coveredLen >= len * (isEnglish ? coverEnglishDefault : coverDefault);
+
+          const x1 = coverWholeItem ? bb.x : (bb.x + bb.w * (ls / len));
+          const x2 = coverWholeItem ? (bb.x + bb.w) : (bb.x + bb.w * (le / len));
+
+          const pcfg = RectEngine.padForKey(key, tuning);
+          const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
+          const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
+
+          const visualDownShift = Math.min(2.0, Math.max(1.0, bb.h * 0.06));
+          const visualHeightTrim = Math.min(2.0, Math.max(1.0, bb.h * 0.06));
+
+          const nameLeftShift =
+            (key === "person_name" ||
+            key === "person_name_keep_title" ||
+            key === "account_holder_name_keep_title")
+            ? Math.min(4.0, Math.max(2.0, bb.w * 0.04))
+            : 0;
+
+          const rx = clamp(x1 - padX - nameLeftShift, 0, viewport.width);
+          const ry = clamp(bb.y - padY + visualDownShift, 0, viewport.height);
+          const rw = clamp(
+            (x2 - x1) + padX * 2 + nameLeftShift,
+            1,
+            viewport.width - clamp(x1 - padX - nameLeftShift, 0, viewport.width)
+          );
+          const rh = clamp(
+            bb.h + padY * 2 - visualHeightTrim,
+            3,
+            viewport.height - clamp(bb.y - padY + visualDownShift, 0, viewport.height)
+          );
+
+          if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
+            if (rw > Math.min(viewport.width * 0.16, bb.w * 0.90)) continue;
+          }
+          if (key === "company") {
+            if (rw > Math.min(viewport.width * 0.40, bb.w * 1.50)) continue;
+          }
+          if (key === "manual_term") {
+            if (rw > Math.min(viewport.width * 0.45, bb.w * 1.60)) continue;
+          }
+          if (rw > viewport.width * 0.92 || rh > viewport.height * 0.35 || (rw > viewport.width * 0.85 && rh > viewport.height * 0.20)) continue;
+
+          rects.push({ x: rx, y: ry, w: rw, h: rh, key, hitId });
+        }
+      }
+
+      if (!rects.length) return [];
+
+      rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+
+      const out = [];
+      const policy = ((tuning || {}).rectPolicy) || {};
+      const paragraphSensitiveKeys = new Set(Array.isArray(policy.paragraphSensitiveKeys) ? policy.paragraphSensitiveKeys : []);
+
+      function canMergeRects(a, b) {
+        if (!a || !b) return false;
+        if (a.key !== b.key) return false;
+
+        const aHit = String(a.hitId || "");
+        const bHit = String(b.hitId || "");
+
+        if (aHit && bHit && aHit !== bHit) return false;
+
+        const overlap = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+        const minH = Math.max(1, Math.min(a.h, b.h));
+        const sameLine = (overlap / minH) > 0.80;
+        const similarHeight = (Math.min(a.h, b.h) / Math.max(a.h, b.h)) > 0.72;
+        const gap = b.x - (a.x + a.w);
+
+        const k = String(a.key || "");
+        const isParagraphSensitive =
+          paragraphSensitiveKeys.has(k) ||
+          k === "ref_label_tail" ||
+          k === "ref_inline_zh" ||
+          k === "company" ||
+          k === "company_label_inline_zh" ||
+          k === "company_label_inline_zh_no_colon" ||
+          k === "account" ||
+          k === "account_cn_inline" ||
+          k === "id_card" ||
+          k === "id_card_inline_zh" ||
+          k === "passport" ||
+          k === "passport_inline_zh" ||
+          k === "driver_license" ||
+          k === "license_plate" ||
+          k === "license_plate_inline_zh" ||
+          k === "tax_id_zh" ||
+          k === "uuid" ||
+          k === "wallet_id" ||
+          k === "ip_address" ||
+          k === "ip_label" ||
+          k === "secret" ||
+          k === "secret_inline_zh" ||
+          k === "security_answer" ||
+          k === "api_key_token_zh" ||
+          k === "device_fingerprint" ||
+          k === "handle_label";
+
+        const near = isParagraphSensitive
+          ? (gap <= Math.max(1.5, Math.min(a.h, b.h) * 0.12) && gap >= -1)
+          : (gap <= Math.max(nearGap, Math.min(a.h, b.h) * 0.45) && gap >= -3);
+
+        return sameLine && similarHeight && near;
+      }
+
+      function mergeTwoRects(a, b) {
+        const nx = Math.min(a.x, b.x);
+        const ny = Math.min(a.y, b.y);
+        const nr = Math.max(a.x + a.w, b.x + b.w);
+        const nb = Math.max(a.y + a.h, b.y + b.h);
+
+        return {
+          x: nx,
+          y: ny,
+          w: nr - nx,
+          h: nb - ny,
+          key: a.key,
+          hitId: a.hitId || b.hitId || ""
+        };
+      }
+
+      for (const r of rects) {
+        if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
+
+        const candidate = {
+          x: r.x,
+          y: r.y,
+          w: r.w,
+          h: r.h,
+          key: r.key,
+          hitId: r.hitId
+        };
+
+        if (!out.length) {
+          out.push(candidate);
+          continue;
+        }
+
+        const last = out[out.length - 1];
+        if (canMergeRects(last, candidate)) {
+          out[out.length - 1] = mergeTwoRects(last, candidate);
         } else {
-  const skipLabelShrink =
-    RectEngine.shouldSkipLabelShrink(key) && !isEnglishInlineValue;
-
-  if (!skipLabelShrink) {
-    const shr = RectEngine.shrinkByLabel(key, s, ls, le, tuning);
-    ls = shr.ls;
-    le = shr.le;
-    if (le <= ls) continue;
-  }
-}
-        const bb = BBoxEngine.rectBox(pdfjsLib, viewport, it, key, lang);
-        const len = Math.max(1, s.length);
-
-        ls = clamp(ls, 0, len);
-        le = clamp(le, 0, len);
-        if (le <= ls) continue;
-
-        const coveredLen = le - ls;
-const wholeByKey = wholeValueMode;
-
-const coverWholeItem =
-  wholeByKey ||
-  len <= 2 ||
-  coveredLen >= len * (isEnglish ? 0.90 : 0.72);
-
-        const x1 = coverWholeItem ? bb.x : (bb.x + bb.w * (ls / len));
-        const x2 = coverWholeItem ? (bb.x + bb.w) : (bb.x + bb.w * (le / len));
-
-        const pcfg = RectEngine.padForKey(key, tuning);
-        const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
-        const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
-
-        const visualDownShift = Math.min(2.0, Math.max(1.0, bb.h * 0.06));
-        const visualHeightTrim = Math.min(2.0, Math.max(1.0, bb.h * 0.06));
-
-        const nameLeftShift =
-          (key === "person_name" ||
-          key === "person_name_keep_title" ||
-          key === "account_holder_name_keep_title")
-          ? Math.min(4.0, Math.max(2.0, bb.w * 0.04))
-           : 0;
-
-        const rx = clamp(x1 - padX - nameLeftShift, 0, viewport.width);
-        const ry = clamp(bb.y - padY + visualDownShift, 0, viewport.height);
-        const rw = clamp(
-          (x2 - x1) + padX * 2 + nameLeftShift,
-          1,
-          viewport.width - clamp(x1 - padX - nameLeftShift, 0, viewport.width)
-        );
-        const rh = clamp(
-          bb.h + padY * 2 - visualHeightTrim,
-          3,
-          viewport.height - clamp(bb.y - padY + visualDownShift, 0, viewport.height)
-        );
-
-        if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
-          if (rw > Math.min(viewport.width * 0.16, bb.w * 0.90)) continue;
-        }
-        if (key === "company") {
-          if (rw > Math.min(viewport.width * 0.40, bb.w * 1.50)) continue;
-        }
-        if (key === "manual_term") {
-          if (rw > Math.min(viewport.width * 0.45, bb.w * 1.60)) continue;
-        }
-        if (rw > viewport.width * 0.92 || rh > viewport.height * 0.35 || (rw > viewport.width * 0.85 && rh > viewport.height * 0.20)) continue;
-
-        rects.push({ x: rx, y: ry, w: rw, h: rh, key, hitId });
-      }
-    }
-
-    if (!rects.length) return [];
-
-    rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-
-    const out = [];
-
-    function canMergeRects(a, b) {
-  if (!a || !b) return false;
-  if (a.key !== b.key) return false;
-
-  const aHit = String(a.hitId || "");
-  const bHit = String(b.hitId || "");
-
-  // ✅ 不同命中绝不合并
-  if (aHit && bHit && aHit !== bHit) return false;
-
-  const overlap = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
-  const minH = Math.max(1, Math.min(a.h, b.h));
-  const sameLine = (overlap / minH) > 0.80;
-  const similarHeight = (Math.min(a.h, b.h) / Math.max(a.h, b.h)) > 0.72;
-  const gap = b.x - (a.x + a.w);
-
-  const k = String(a.key || "");
-  const isParagraphSensitive =
-    k === "ref_label_tail" ||
-    k === "ref_inline_zh" ||
-    k === "company" ||
-    k === "company_label_inline_zh" ||
-    k === "company_label_inline_zh_no_colon" ||
-    k === "account" ||
-    k === "account_cn_inline" ||
-    k === "id_card" ||
-    k === "id_card_inline_zh" ||
-    k === "passport" ||
-    k === "passport_inline_zh" ||
-    k === "driver_license" ||
-    k === "license_plate" ||
-    k === "license_plate_inline_zh" ||
-    k === "tax_id_zh" ||
-    k === "uuid" ||
-    k === "wallet_id" ||
-    k === "ip_address" ||
-    k === "ip_label" ||
-    k === "secret" ||
-    k === "secret_inline_zh" ||
-    k === "security_answer" ||
-    k === "api_key_token_zh" ||
-    k === "device_fingerprint" ||
-    k === "handle_label";
-
-  // ✅ 正文敏感项更严格，避免串成大黑条
-  const near = isParagraphSensitive
-    ? (gap <= Math.max(1.5, Math.min(a.h, b.h) * 0.12) && gap >= -1)
-    : (gap <= Math.max(nearGap, Math.min(a.h, b.h) * 0.45) && gap >= -3);
-
-  return sameLine && similarHeight && near;
-}
-
-    function mergeTwoRects(a, b) {
-      const nx = Math.min(a.x, b.x);
-      const ny = Math.min(a.y, b.y);
-      const nr = Math.max(a.x + a.w, b.x + b.w);
-      const nb = Math.max(a.y + a.h, b.y + b.h);
-
-      return {
-        x: nx,
-        y: ny,
-        w: nr - nx,
-        h: nb - ny,
-        key: a.key,
-        hitId: a.hitId || b.hitId || ""
-      };
-    }
-
-    for (const r of rects) {
-      if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
-
-      const candidate = {
-        x: r.x,
-        y: r.y,
-        w: r.w,
-        h: r.h,
-        key: r.key,
-        hitId: r.hitId
-      };
-
-      if (!out.length) {
-        out.push(candidate);
-        continue;
-      }
-
-      const last = out[out.length - 1];
-      if (canMergeRects(last, candidate)) {
-        out[out.length - 1] = mergeTwoRects(last, candidate);
-      } else {
-        out.push(candidate);
-      }
-    }
-
-    let changed = true;
-    while (changed && out.length > 1) {
-      changed = false;
-      const pass = [];
-
-      for (const r of out) {
-        const last = pass[pass.length - 1];
-        if (last && canMergeRects(last, r)) {
-          pass[pass.length - 1] = mergeTwoRects(last, r);
-          changed = true;
-        } else {
-          pass.push(r);
+          out.push(candidate);
         }
       }
 
-      out.length = 0;
-      out.push(...pass);
-    }
+      let changed = true;
+      while (changed && out.length > 1) {
+        changed = false;
+        const pass = [];
 
-    return RectEngine.collapseRectsByHitId(
-      out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId }))
-    );
-  }
-};
+        for (const r of out) {
+          const last = pass[pass.length - 1];
+          if (last && canMergeRects(last, r)) {
+            pass[pass.length - 1] = mergeTwoRects(last, r);
+            changed = true;
+          } else {
+            pass.push(r);
+          }
+        }
+
+        out.length = 0;
+        out.push(...pass);
+      }
+
+      return RectEngine.collapseRectsByHitId(
+        out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId })),
+        lang
+      );
+    }
+  };
 
   function normalizeCoreHit(hit) { return SpanEngine.normalizeCoreHit(hit); }
   function buildPageTextAndRangesFromItems(textContentOrItems) { return SpanEngine.buildPageTextAndRangesFromItems(textContentOrItems); }
@@ -1833,7 +2044,6 @@ const coverWholeItem =
     clamp,
     normLang,
     getLangTuning,
-    getRasterLangPacks,
     buildRuleMatchers,
     getItemsArray,
     buildItemBoxes,
