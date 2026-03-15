@@ -1,7 +1,7 @@
 // =========================
 // assets/raster.en.js
 // Raster render profile: en
-// 版本：整行覆盖版（禁用 englishInlineValueKeys，增大左侧填充）
+// 版本：保留标题，只覆盖内容
 // =========================
 
 (function () {
@@ -56,20 +56,30 @@
       account_holder_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
       company: { pxW: 0.0045, pyH: 0.032, minX: 0.55, minY: 0.60 },
       manual_term: { pxW: 0.0040, pyH: 0.035, minX: 0.55, minY: 0.65 },
-      // 为长值增加水平填充
-      uuid: { pxW: 0.008, pyH: 0.045, minX: 2.0, minY: 0.75 },
-      ip_address: { pxW: 0.007, pyH: 0.045, minX: 2.0, minY: 0.75 },
-      wallet_id: { pxW: 0.007, pyH: 0.045, minX: 2.0, minY: 0.75 },
-      // 增大默认左侧填充，使矩形能覆盖标签
-      _default: { pxW: 0.008, pyH: 0.045, minX: 3.0, minY: 0.75 }
+      // 为长值增加水平填充，但保留标题收缩
+      uuid: { pxW: 0.008, pyH: 0.045, minX: 0.8, minY: 0.75 },
+      ip_address: { pxW: 0.007, pyH: 0.045, minX: 0.7, minY: 0.75 },
+      wallet_id: { pxW: 0.007, pyH: 0.045, minX: 0.7, minY: 0.75 },
+      // 默认填充：适度左侧填充，确保内容覆盖完整
+      _default: { pxW: 0.006, pyH: 0.045, minX: 0.5, minY: 0.75 }
     },
 
     shrinkLabels: {
-      phone: ["Phone", "Mobile", "Tel", "Telephone", "Contact"],
-      account: ["Account", "Account No", "Account Number", "IBAN", "Card Number", "Routing Number"],
-      email: ["Email", "E-mail"],
-      address: ["Address", "Shipping Address", "Billing Address", "Mailing Address"],
-      bank: ["Bank", "Bank Name", "BIC", "SWIFT", "SWIFT/BIC"]
+      phone: ["Phone", "Mobile", "Tel", "Telephone", "Contact", "Cell"],
+      account: ["Account", "Account No", "Account Number", "IBAN", "Card Number", "Routing Number", "Bank Account"],
+      email: ["Email", "E-mail", "Email Address"],
+      address: ["Address", "Shipping Address", "Billing Address", "Mailing Address", "Office Address"],
+      bank: ["Bank", "Bank Name", "BIC", "SWIFT", "SWIFT/BIC"],
+      // 补充常见标签
+      passport: ["Passport", "Passport Number", "Passport No"],
+      driver_license: ["Driver License", "Driver's License", "License", "DL"],
+      license_plate: ["License Plate", "Plate", "Registration"],
+      dob: ["Date of Birth", "DOB", "Birth Date"],
+      id_card: ["ID", "ID Card", "Identification", "Identity Card"],
+      company: ["Company", "Company Name", "Organization", "Supplier", "Legal Entity", "Registered Company", "Billing Company"],
+      money: ["Amount", "Contract Amount", "Service Fee", "Tax Amount", "Total Amount", "USD"],
+      ref: ["Reference", "Ref", "Reference ID", "Order Number", "Case ID", "Application ID", "Invoice Number", "Customer ID"],
+      handle: ["Handle", "User", "Username"]
     },
 
     merge: {
@@ -118,7 +128,6 @@
       ]
     },
 
-    // 整项覆盖的 key 列表（包含所有需要覆盖整行的 key）
     wholeValueKeys: [
       "account", "account_cn_inline", "api_key_token_zh",
       "device_fingerprint", "dob", "driver_license", "email",
@@ -130,7 +139,6 @@
       "tax_id_zh", "uuid", "wallet_id"
     ],
 
-    // 跳过标签收缩的 key 列表
     skipLabelShrinkKeys: [
       "ref_label_tail", "ref_inline_zh", "money", "money_label",
       "money_cn_inline_label", "money_label_currency_zh",
@@ -158,8 +166,17 @@
       "api_key_token_zh", "device_fingerprint", "handle_label"
     ],
 
-    // ★ 关键修改：清空 englishInlineValueKeys，禁用内联值特殊处理
-    englishInlineValueKeys: [],
+    // 英文特有的内联值列表：这些 key 不会触发 whole item 覆盖，从而允许 shrinkLabels 生效
+    englishInlineValueKeys: [
+      "phone", "email", "money", "money_label",
+      "money_cn_inline_label", "money_label_currency_zh",
+      "account", "account_cn_inline", "dob", "id_card",
+      "id_card_inline_zh", "passport", "passport_inline_zh",
+      "driver_license", "tax_id_zh", "uuid", "wallet_id",
+      "ip_address", "ip_label", "secret", "secret_inline_zh",
+      "api_key_token_zh", "device_fingerprint", "company",
+      "ref_label_tail", "ref_inline_zh"
+    ],
 
     rectPolicy: {
       coverWholeItemRatio: {
