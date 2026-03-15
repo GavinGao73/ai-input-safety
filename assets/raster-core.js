@@ -433,7 +433,7 @@
 
     function normalizeToRegExp(pat) {
       if (!pat) return null;
-      if (pat instanceof RegExp)) return pat;
+      if (pat instanceof RegExp) return pat;
 
       if (typeof pat === "string") {
         try { return new RegExp(pat, "u"); } catch (_) {
