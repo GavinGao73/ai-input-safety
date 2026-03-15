@@ -2,10 +2,10 @@
 // assets/raster.zh.js
 // Raster render profile: zh
 // 修改记录：
-// 1. bbox.longValue 的 maxByPage 从 0.42 → 0.45, maxByEst 从 1.70 → 1.80（允许更宽）
-// 2. 调整 ref_label_tail / ref_inline_zh 的垂直填充（pyH 0.018→0.010, minY 0.30→0.15）下移，水平填充（pxW 0.0018→0.0025, minX 0.18→0.25）加宽
-// 3. 调整 account / account_cn_inline 的垂直填充（pyH 0.020→0.012, minY 0.34→0.18）下移，水平填充（pxW 0.0024→0.0030, minX 0.24→0.30）加宽
-// 4. 调整 id_card / passport 等（可选，已调整）
+// 1. 移除 padOverrides 中的 ref_label_tail / ref_inline_zh（避免覆盖 pad 中的新值）
+// 2. 增大 account / ref 等 key 的水平填充（pxW 0.0030→0.0040, minX 0.30→0.40）
+// 3. 减小垂直填充（pyH 0.012→0.005, minY 0.18→0.05）
+// 4. 调整 _default 以覆盖 handle/ref/number 等未单独配置的 key
 // =========================
 
 (function () {
@@ -48,7 +48,6 @@
 
     bbox: {
       default: { maxByPage: 0.24, maxByEst: 1.28, wHardCapEstRatio: 1.90, wSoftCapEstMul: 1.08 },
-      // 放宽长值的宽度限制
       longValue: { maxByPage: 0.45, maxByEst: 1.80, wHardCapEstRatio: 2.20, wSoftCapEstMul: 1.22 },
       address: { maxByPage: 0.50, maxByEst: 1.80, wHardCapEstRatio: 2.50, wSoftCapEstMul: 1.35 },
       money: { maxByPage: 0.26, maxByEst: 1.35, wHardCapEstRatio: 1.85, wSoftCapEstMul: 1.08 },
@@ -64,12 +63,12 @@
       company_label_inline_zh_no_colon: { pxW: 0.0023, pyH: 0.020, minX: 0.24, minY: 0.34 },
       phone: { pxW: 0.0022, pyH: 0.020, minX: 0.24, minY: 0.34 },
       email: { pxW: 0.0022, pyH: 0.020, minX: 0.24, minY: 0.34 },
-      // 账号类：下移并加宽
-      account: { pxW: 0.0030, pyH: 0.012, minX: 0.30, minY: 0.18 },
-      account_cn_inline: { pxW: 0.0030, pyH: 0.012, minX: 0.30, minY: 0.18 },
-      // 参考编号类：下移并加宽
-      ref_label_tail: { pxW: 0.0025, pyH: 0.010, minX: 0.25, minY: 0.15 },
-      ref_inline_zh: { pxW: 0.0025, pyH: 0.010, minX: 0.25, minY: 0.15 },
+      // 账号类：进一步加宽、下移
+      account: { pxW: 0.0040, pyH: 0.005, minX: 0.40, minY: 0.05 },
+      account_cn_inline: { pxW: 0.0040, pyH: 0.005, minX: 0.40, minY: 0.05 },
+      // 参考编号类：进一步加宽、下移
+      ref_label_tail: { pxW: 0.0040, pyH: 0.005, minX: 0.40, minY: 0.05 },
+      ref_inline_zh: { pxW: 0.0040, pyH: 0.005, minX: 0.40, minY: 0.05 },
       money: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
       money_label: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
       money_cn_inline_label: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
@@ -81,7 +80,8 @@
       security_answer: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
       secret_inline_zh: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
       manual_term: { pxW: 0.0030, pyH: 0.024, minX: 0.30, minY: 0.40 },
-      _default: { pxW: 0.0022, pyH: 0.020, minX: 0.22, minY: 0.34 }
+      // 默认值：适当加宽、下移，覆盖 handle/ref/number 等未单独配置的 key
+      _default: { pxW: 0.0030, pyH: 0.010, minX: 0.30, minY: 0.10 }
     },
 
     shrinkLabels: {
@@ -261,10 +261,8 @@
         default: 0.72,
         enDefault: 0.90
       },
-      padOverrides: {
-        ref_label_tail: { pxW: 0.002, pyH: 0.018, minX: 2, minY: 0.30 },
-        ref_inline_zh: { pxW: 0.002, pyH: 0.018, minX: 2, minY: 0.30 }
-      },
+      // 已移除冲突的 padOverrides 条目，让 pad 中的值生效
+      padOverrides: {},
       rectBoxSpecial: {
         refTailWidthRatio: 0.535,
         refTailMinEstRatio: 0.425,
