@@ -1,7 +1,11 @@
 // =========================
 // assets/raster.zh.js
 // Raster render profile: zh
-// 从 raster-core.js 中提取的中文红删配置，以固化内容为准
+// 修改记录：
+// 1. bbox.longValue 的 maxByPage 从 0.42 → 0.45, maxByEst 从 1.70 → 1.80（允许更宽）
+// 2. 调整 ref_label_tail / ref_inline_zh 的垂直填充（pyH 0.018→0.010, minY 0.30→0.15）下移，水平填充（pxW 0.0018→0.0025, minX 0.18→0.25）加宽
+// 3. 调整 account / account_cn_inline 的垂直填充（pyH 0.020→0.012, minY 0.34→0.18）下移，水平填充（pxW 0.0024→0.0030, minX 0.24→0.30）加宽
+// 4. 调整 id_card / passport 等（可选，已调整）
 // =========================
 
 (function () {
@@ -44,7 +48,8 @@
 
     bbox: {
       default: { maxByPage: 0.24, maxByEst: 1.28, wHardCapEstRatio: 1.90, wSoftCapEstMul: 1.08 },
-      longValue: { maxByPage: 0.42, maxByEst: 1.70, wHardCapEstRatio: 2.20, wSoftCapEstMul: 1.22 },
+      // 放宽长值的宽度限制
+      longValue: { maxByPage: 0.45, maxByEst: 1.80, wHardCapEstRatio: 2.20, wSoftCapEstMul: 1.22 },
       address: { maxByPage: 0.50, maxByEst: 1.80, wHardCapEstRatio: 2.50, wSoftCapEstMul: 1.35 },
       money: { maxByPage: 0.26, maxByEst: 1.35, wHardCapEstRatio: 1.85, wSoftCapEstMul: 1.08 },
       manual_term: { maxByPage: 0.34, maxByEst: 1.55, wHardCapEstRatio: 2.10, wSoftCapEstMul: 1.20 }
@@ -59,10 +64,12 @@
       company_label_inline_zh_no_colon: { pxW: 0.0023, pyH: 0.020, minX: 0.24, minY: 0.34 },
       phone: { pxW: 0.0022, pyH: 0.020, minX: 0.24, minY: 0.34 },
       email: { pxW: 0.0022, pyH: 0.020, minX: 0.24, minY: 0.34 },
-      account: { pxW: 0.0024, pyH: 0.020, minX: 0.24, minY: 0.34 },
-      account_cn_inline: { pxW: 0.0024, pyH: 0.020, minX: 0.24, minY: 0.34 },
-      ref_label_tail: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
-      ref_inline_zh: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
+      // 账号类：下移并加宽
+      account: { pxW: 0.0030, pyH: 0.012, minX: 0.30, minY: 0.18 },
+      account_cn_inline: { pxW: 0.0030, pyH: 0.012, minX: 0.30, minY: 0.18 },
+      // 参考编号类：下移并加宽
+      ref_label_tail: { pxW: 0.0025, pyH: 0.010, minX: 0.25, minY: 0.15 },
+      ref_inline_zh: { pxW: 0.0025, pyH: 0.010, minX: 0.25, minY: 0.15 },
       money: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
       money_label: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
       money_cn_inline_label: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
@@ -108,7 +115,6 @@
       widthEstMul: 0.82
     },
 
-    // 以下字段为新增，从核心的硬编码列表迁移而来
     keyGroups: {
       longValueKeys: [
         "account",
@@ -248,10 +254,8 @@
       "handle_label"
     ],
 
-    // 中文不需要 englishInlineValueKeys，留空
     englishInlineValueKeys: [],
 
-    // rectPolicy 中的非列表字段（覆盖默认）
     rectPolicy: {
       coverWholeItemRatio: {
         default: 0.72,
