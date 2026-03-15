@@ -1,21 +1,13 @@
 /* =========================================================
  * assets/raster-core.js
- * Raster geometry / matching core
- * - NO PDF loading
- * - NO file reading
- * - NO PDF exporting
- * - NO DOM side effects
- *
- * BOUNDARY
- * - PRIMARY: matchResult -> page-local spans -> rects
- * - LEGACY: regex/span fallback retained only for transition safety
+ * Raster geometry / matching core (language-agnostic)
  * ======================================================= */
 
 (function () {
   "use strict";
 
   const NS = "__RASTER_CORE__";
-  const VERSION = "raster-core-r7-page-local-main-debug-20260314-1";
+  const VERSION = "raster-core-r8-language-pack-20260315";
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
   function safeString(v) { return typeof v === "string" ? v : (v == null ? "" : String(v)); }
@@ -45,39 +37,39 @@
     return Array.isArray(v) ? v : [];
   }
 
-  function getEnginePolicy() { return window.__ENGINE_POLICY__ || {}; }
-  function getPacks() { return window.__ENGINE_LANG_PACKS__ || {}; }
+  function getRasterLangPacks() {
+    return window.__RASTER_LANG_PACKS__ || {};
+  }
 
+  // 通用默认配置（仅包含基础值，具体由语言包覆盖）
   function getDefaultRasterTuning() {
     return {
-      lang: "zh",
-      version: "fallback",
       limits: {
         maxMatchLen: {
-          manual_term: 90,
-          person_name: 40,
-          person_name_keep_title: 40,
-          account_holder_name_keep_title: 40,
-          company: 70,
-          email: 90,
-          phone: 60,
-          account: 90,
-          bank: 140,
-          address_de_street: 160,
-          address_de_postal: 160,
-          address_de_street_partial: 160,
-          address_de_extra_partial: 160,
-          address_de_inline_street: 160,
-          address_en_inline_street: 160,
-          address_en_extra_block: 160,
-          address_en_extra: 160,
-          address_cn: 160,
-          handle: 90,
-          ref: 90,
-          title: 90,
-          money: 70,
-          money_label: 70,
-          number: 70
+          manual_term: 80,
+          person_name: 30,
+          person_name_keep_title: 30,
+          account_holder_name_keep_title: 30,
+          company: 50,
+          email: 70,
+          phone: 40,
+          account: 70,
+          bank: 100,
+          address_de_street: 120,
+          address_de_postal: 120,
+          address_de_street_partial: 120,
+          address_de_extra_partial: 120,
+          address_de_inline_street: 120,
+          address_en_inline_street: 120,
+          address_en_extra_block: 120,
+          address_en_extra: 120,
+          address_cn: 120,
+          handle: 70,
+          ref: 70,
+          title: 70,
+          money: 50,
+          money_label: 50,
+          number: 50
         }
       },
       bbox: {
@@ -88,193 +80,46 @@
         manual_term: { maxByPage: 0.34, maxByEst: 1.55, wHardCapEstRatio: 2.10, wSoftCapEstMul: 1.20 }
       },
       pad: {
-        person_name: { pxW: 0.0005, pyH: 0.014, minX: 0.5, minY: 0.24 },
-        person_name_keep_title: { pxW: 0.0005, pyH: 0.014, minX: 0.5, minY: 0.24 },
-        account_holder_name_keep_title: { pxW: 0.0005, pyH: 0.014, minX: 0.5, minY: 0.24 },
-
-        company: { pxW: 0.0025, pyH: 0.022, minX: 0.28, minY: 0.36 },
-        company_label_inline_zh: { pxW: 0.0023, pyH: 0.020, minX: 0.24, minY: 0.34 },
-        company_label_inline_zh_no_colon: { pxW: 0.0023, pyH: 0.020, minX: 0.24, minY: 0.34 },
-
-        phone: { pxW: 0.0022, pyH: 0.020, minX: 0.24, minY: 0.34 },
-        email: { pxW: 0.0022, pyH: 0.020, minX: 0.24, minY: 0.34 },
-        account: { pxW: 0.0024, pyH: 0.020, minX: 0.24, minY: 0.34 },
-        account_cn_inline: { pxW: 0.0024, pyH: 0.020, minX: 0.24, minY: 0.34 },
-
-        ref_label_tail: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
-        ref_inline_zh: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
-
-        money: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
-        money_label: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
-        money_cn_inline_label: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
-        money_label_currency_zh: { pxW: 0.0018, pyH: 0.018, minX: 0.18, minY: 0.30 },
-
-        address_inline_zh: { pxW: 0.0035, pyH: 0.014, minX: 10, minY: 0.24 },
-
-        place_of_birth: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
-        license_plate: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
-        license_plate_inline_zh: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
-        security_answer: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
-        secret_inline_zh: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
-
-        manual_term: { pxW: 0.0030, pyH: 0.024, minX: 0.30, minY: 0.40 },
         _default: { pxW: 0.0022, pyH: 0.020, minX: 0.22, minY: 0.34 }
       },
-      shrinkLabels: { phone: [], account: [], email: [], address: [], bank: [] },
-      merge: { nearGapLegacy: 1.2, nearGapCore: 1.2, sameLineOverlapRatio: 0.88, similarHeightRatio: 0.80 },
-      itemBox: { fontHeightMul: 1.08, fontHeightMin: 6, fontHeightMax: 96, widthEstMul: 0.72, shortTokenCap: 1.10, hardCap: 1.18 },
-      rectBox: { fontHeightMul: 1.10, fontHeightMin: 6, fontHeightMax: 104, widthEstMul: 0.82 },
+      shrinkLabels: {},
+      merge: {
+        nearGapLegacy: 1.2,
+        nearGapCore: 1.2,
+        sameLineOverlapRatio: 0.88,
+        similarHeightRatio: 0.80
+      },
+      itemBox: {
+        fontHeightMul: 1.08,
+        fontHeightMin: 6,
+        fontHeightMax: 96,
+        widthEstMul: 0.72,
+        shortTokenCap: 1.10,
+        hardCap: 1.18
+      },
+      rectBox: {
+        fontHeightMul: 1.10,
+        fontHeightMin: 6,
+        fontHeightMax: 104,
+        widthEstMul: 0.82
+      },
+      keyGroups: {
+        longValueKeys: [],
+        addressKeys: [],
+        moneyKeys: []
+      },
+      wholeValueKeys: [],
+      skipLabelShrinkKeys: [],
+      collapseHitIdKeys: [],
+      paragraphSensitiveKeys: [],
+      englishInlineValueKeys: [],
       rectPolicy: {
-        wholeValueKeys: [
-          "account",
-          "account_cn_inline",
-          "api_key_token_zh",
-          "device_fingerprint",
-          "dob",
-          "driver_license",
-          "email",
-          "handle_label",
-          "id_card",
-          "id_card_inline_zh",
-          "ip_address",
-          "ip_label",
-          "money",
-          "money_cn_inline_label",
-          "money_label",
-          "money_label_currency_zh",
-          "passport",
-          "passport_inline_zh",
-          "phone",
-          "ref_inline_zh",
-          "ref_label_tail",
-          "secret",
-          "secret_inline_zh",
-          "tax_id_zh",
-          "uuid",
-          "wallet_id"
-        ],
-        skipLabelShrinkKeys: [
-          "ref_label_tail",
-          "ref_inline_zh",
-          "money",
-          "money_label",
-          "money_cn_inline_label",
-          "money_label_currency_zh",
-          "phone",
-          "email",
-          "account",
-          "account_cn_inline",
-          "id_card",
-          "id_card_inline_zh",
-          "passport",
-          "passport_inline_zh",
-          "driver_license",
-          "tax_id_zh",
-          "uuid",
-          "wallet_id",
-          "ip_address",
-          "ip_label",
-          "secret",
-          "secret_inline_zh",
-          "api_key_token_zh",
-          "device_fingerprint",
-          "dob"
-        ],
-        collapseHitIdKeys: [
-          "address_inline_zh",
-          "phone",
-          "money",
-          "company",
-          "license_plate",
-          "license_plate_inline_zh"
-        ],
-        longValueKeys: [
-          "account",
-          "account_cn_inline",
-          "phone",
-          "email",
-          "bank",
-          "uuid",
-          "wallet_id",
-          "ip_address",
-          "ip_label",
-          "device_fingerprint",
-          "api_key_token_zh",
-          "secret",
-          "secret_inline_zh",
-          "security_answer",
-          "tax_id_zh",
-          "passport",
-          "passport_inline_zh",
-          "id_card",
-          "id_card_inline_zh",
-          "driver_license",
-          "license_plate",
-          "license_plate_inline_zh"
-        ],
-        addressKeys: [
-          "address_inline_zh",
-          "address_cn",
-          "address_de_street",
-          "address_de_postal",
-          "address_de_street_partial",
-          "address_de_extra_partial",
-          "address_de_inline_street",
-          "address_en_inline_street",
-          "address_en_extra_block",
-          "address_en_extra"
-        ],
-        moneyKeys: [
-          "money",
-          "money_label",
-          "money_cn_inline_label",
-          "money_label_currency_zh"
-        ],
         coverWholeItemRatio: {
           default: 0.72,
           enDefault: 0.90
         },
-        padOverrides: {
-          ref_label_tail: { pxW: 0.002, pyH: 0.018, minX: 2, minY: 0.30 },
-          ref_inline_zh: { pxW: 0.002, pyH: 0.018, minX: 2, minY: 0.30 }
-        },
-        rectBoxSpecial: {
-          refTailWidthRatio: 0.535,
-          refTailMinEstRatio: 0.425,
-          refTailMinPageRatio: 0.108,
-          companyInlineZhWidthRatio: 1.18,
-          companyInlineZhMaxPage: 0.34,
-          companyInlineZhMaxEst: 1.70,
-          companyInlineZhMinEst: 0.98,
-          companyInlineZhMinPage: 0.22
-        },
-        paragraphSensitiveKeys: [
-          "ref_label_tail",
-          "ref_inline_zh",
-          "company",
-          "company_label_inline_zh",
-          "company_label_inline_zh_no_colon",
-          "account",
-          "account_cn_inline",
-          "id_card",
-          "id_card_inline_zh",
-          "passport",
-          "passport_inline_zh",
-          "driver_license",
-          "license_plate",
-          "license_plate_inline_zh",
-          "tax_id_zh",
-          "uuid",
-          "wallet_id",
-          "ip_address",
-          "ip_label",
-          "secret",
-          "secret_inline_zh",
-          "security_answer",
-          "api_key_token_zh",
-          "device_fingerprint",
-          "handle_label"
-        ]
+        padOverrides: {},
+        rectBoxSpecial: {}
       }
     };
   }
@@ -297,6 +142,12 @@
       merge: { ...(base.merge || {}), ...(picked.merge || {}) },
       itemBox: { ...(base.itemBox || {}), ...(picked.itemBox || {}) },
       rectBox: { ...(base.rectBox || {}), ...(picked.rectBox || {}) },
+      keyGroups: { ...(base.keyGroups || {}), ...(picked.keyGroups || {}) },
+      wholeValueKeys: picked.wholeValueKeys !== undefined ? picked.wholeValueKeys : base.wholeValueKeys,
+      skipLabelShrinkKeys: picked.skipLabelShrinkKeys !== undefined ? picked.skipLabelShrinkKeys : base.skipLabelShrinkKeys,
+      collapseHitIdKeys: picked.collapseHitIdKeys !== undefined ? picked.collapseHitIdKeys : base.collapseHitIdKeys,
+      paragraphSensitiveKeys: picked.paragraphSensitiveKeys !== undefined ? picked.paragraphSensitiveKeys : base.paragraphSensitiveKeys,
+      englishInlineValueKeys: picked.englishInlineValueKeys !== undefined ? picked.englishInlineValueKeys : base.englishInlineValueKeys,
       rectPolicy: {
         ...(base.rectPolicy || {}),
         ...(picked.rectPolicy || {}),
@@ -316,18 +167,12 @@
     };
   }
 
-  function getPackForLang(lang) {
-    const PACKS = getPacks();
-    const L = normLang(lang);
-    return PACKS[L] || PACKS.zh || null;
-  }
-
   function getLangTuning(lang) {
     const L = normLang(lang);
+    const packs = getRasterLangPacks();
+    const pack = packs[L] || packs.zh || {};
     const base = getDefaultRasterTuning();
-    const pack = getPackForLang(L);
-    const picked = pack && pack.raster && typeof pack.raster === "object" ? pack.raster : null;
-    return (!picked || typeof picked !== "object") ? base : mergeObjects(base, picked);
+    return mergeObjects(base, pack);
   }
 
   function getMergeCfg(tuning) {
@@ -363,9 +208,9 @@
   }
 
   function getPriorityForLang(lang) {
-    const pack = getPackForLang(lang);
+    const pack = getRasterLangPacks()[normLang(lang)];
     if (pack && Array.isArray(pack.priority) && pack.priority.length) return pack.priority.slice(0);
-    const pol = getEnginePolicy();
+    const pol = window.__ENGINE_POLICY__ || {};
     if (Array.isArray(pol.defaultPriority) && pol.defaultPriority.length) return pol.defaultPriority.slice(0);
     return [
       "person_name",
@@ -385,10 +230,10 @@
   }
 
   function getAlwaysOnSetForLang(lang) {
-    const pol = getEnginePolicy();
+    const pol = window.__ENGINE_POLICY__ || {};
     const baseArr = Array.isArray(pol.baseAlwaysOn) ? pol.baseAlwaysOn : [];
     const set = new Set(baseArr);
-    const pack = getPackForLang(lang);
+    const pack = getRasterLangPacks()[normLang(lang)];
     const extra = pack && pack.alwaysOn ? pack.alwaysOn : null;
 
     if (Array.isArray(extra)) {
@@ -403,7 +248,7 @@
   function buildRuleMatchers(lang, enabledKeys, moneyMode, manualTerms) {
     const PRIORITY = getPriorityForLang(lang);
     const ALWAYS_ON = getAlwaysOnSetForLang(lang);
-    const pack = getPackForLang(lang);
+    const pack = getRasterLangPacks()[normLang(lang)];
     const rules = (pack && pack.rules && typeof pack.rules === "object") ? pack.rules : {};
     const matchers = [];
     const enabledSet = new Set(Array.isArray(enabledKeys) ? enabledKeys : []);
@@ -586,63 +431,15 @@
   const BBoxEngine = {
     keyGroup(key, lang) {
       const tuning = getLangTuning(lang);
-      const policy = (tuning && tuning.rectPolicy) || {};
-      const k = String(key || "");
+      const groups = tuning.keyGroups || {};
+      const moneyKeys = new Set(groups.moneyKeys || []);
+      const longValueKeys = new Set(groups.longValueKeys || []);
+      const addressKeys = new Set(groups.addressKeys || []);
 
-      const moneyKeys = new Set(Array.isArray(policy.moneyKeys) ? policy.moneyKeys : []);
-      const longValueKeys = new Set(Array.isArray(policy.longValueKeys) ? policy.longValueKeys : []);
-      const addressKeys = new Set(Array.isArray(policy.addressKeys) ? policy.addressKeys : []);
-
-      if (k === "manual_term") return "manual_term";
-      if (moneyKeys.has(k)) return "money";
-      if (longValueKeys.has(k)) return "longValue";
-      if (addressKeys.has(k)) return "address";
-
-      const isLong =
-        k === "account" ||
-        k === "account_cn_inline" ||
-        k === "phone" ||
-        k === "email" ||
-        k === "bank" ||
-        k === "uuid" ||
-        k === "wallet_id" ||
-        k === "ip_address" ||
-        k === "ip_label" ||
-        k === "device_fingerprint" ||
-        k === "api_key_token_zh" ||
-        k === "secret" ||
-        k === "secret_inline_zh" ||
-        k === "security_answer" ||
-        k === "tax_id_zh" ||
-        k === "passport" ||
-        k === "passport_inline_zh" ||
-        k === "id_card" ||
-        k === "id_card_inline_zh" ||
-        k === "driver_license" ||
-        k === "license_plate" ||
-        k === "license_plate_inline_zh";
-
-      const isAddr =
-        k === "address_inline_zh" ||
-        k === "address_cn" ||
-        k === "address_de_street" ||
-        k === "address_de_postal" ||
-        k === "address_de_street_partial" ||
-        k === "address_de_extra_partial" ||
-        k === "address_de_inline_street" ||
-        k === "address_en_inline_street" ||
-        k === "address_en_extra_block" ||
-        k === "address_en_extra";
-
-      if (
-        k === "money" ||
-        k === "money_label" ||
-        k === "money_cn_inline_label" ||
-        k === "money_label_currency_zh"
-      ) return "money";
-
-      if (isLong) return "longValue";
-      if (isAddr) return "address";
+      if (key === "manual_term") return "manual_term";
+      if (moneyKeys.has(key)) return "money";
+      if (longValueKeys.has(key)) return "longValue";
+      if (addressKeys.has(key)) return "address";
       return "default";
     },
 
@@ -746,7 +543,8 @@
 
       const k = String(key || "");
 
-      if (k === "ref_label_tail" || k === "ref_inline_zh") {
+      // 特殊处理（语言包中的 rectBoxSpecial 可覆盖）
+      if (rectBoxSpecial.refTailWidthRatio !== undefined && (k === "ref_label_tail" || k === "ref_inline_zh")) {
         const widthRatio = Number(rectBoxSpecial.refTailWidthRatio || 0.535);
         const minEstRatio = Number(rectBoxSpecial.refTailMinEstRatio || 0.425);
         const minPageRatio = Number(rectBoxSpecial.refTailMinPageRatio || 0.108);
@@ -761,38 +559,36 @@
         );
 
         w = Math.max(w, Math.min(est * minEstRatio, viewport.width * minPageRatio));
+      } else if (rectBoxSpecial.companyInlineZhWidthRatio !== undefined && k === "company_label_inline_zh") {
+        const widthRatio = Number(rectBoxSpecial.companyInlineZhWidthRatio || 1.18);
+        const maxPage = Number(rectBoxSpecial.companyInlineZhMaxPage || 0.34);
+        const maxEst = Number(rectBoxSpecial.companyInlineZhMaxEst || 1.70);
+        const minEst = Number(rectBoxSpecial.companyInlineZhMinEst || 0.98);
+        const minPage = Number(rectBoxSpecial.companyInlineZhMinPage || 0.22);
+
+        w = clamp(
+          w * widthRatio,
+          1,
+          Math.min(
+            viewport.width * maxPage,
+            est * maxEst
+          )
+        );
+
+        w = Math.max(w, Math.min(est * minEst, viewport.width * minPage));
       } else {
-        if (k === "company_label_inline_zh") {
-          const widthRatio = Number(rectBoxSpecial.companyInlineZhWidthRatio || 1.18);
-          const maxPage = Number(rectBoxSpecial.companyInlineZhMaxPage || 0.34);
-          const maxEst = Number(rectBoxSpecial.companyInlineZhMaxEst || 1.70);
-          const minEst = Number(rectBoxSpecial.companyInlineZhMinEst || 0.98);
-          const minPage = Number(rectBoxSpecial.companyInlineZhMinPage || 0.22);
+        w = clamp(
+          w,
+          1,
+          Math.min(
+            viewport.width * Number(cfg.maxByPage || 0.30),
+            est * Number(cfg.maxByEst || 1.45)
+          )
+        );
 
-          w = clamp(
-            w * widthRatio,
-            1,
-            Math.min(
-              viewport.width * maxPage,
-              est * maxEst
-            )
-          );
-
-          w = Math.max(w, Math.min(est * minEst, viewport.width * minPage));
-        } else {
-          w = clamp(
-            w,
-            1,
-            Math.min(
-              viewport.width * Number(cfg.maxByPage || 0.30),
-              est * Number(cfg.maxByEst || 1.45)
-            )
-          );
-
-          const isLong = group === "longValue";
-          const minW = isLong ? (est * 0.92) : (est * 0.80);
-          w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.38 : 0.18)));
-        }
+        const isLong = group === "longValue";
+        const minW = isLong ? (est * 0.92) : (est * 0.80);
+        w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.38 : 0.18)));
       }
 
       const baseY = clamp(y - fontH + Math.min(4, Math.max(2, fontH * 0.16)), 0, viewport.height);
@@ -1104,7 +900,7 @@
       return {
         ok: true,
         spans,
-        debug: Object.assign({}, res && res.debug ? res.debug : {}, {
+        debug: Object.assign({}, (res && res.debug) ? res.debug : {}, {
           attempt: usedAttempt,
           pageNumber: Number(pageNumber) || 1,
           pageTextLength: prettyText.length
@@ -1285,23 +1081,7 @@
 
       const sub = s.slice(ls, le);
       const labels = (tuning && tuning.shrinkLabels) || {};
-      const map = {
-        phone: labels.phone,
-        account: labels.account,
-        email: labels.email,
-        bank: labels.bank,
-        address_de_street: labels.address,
-        address_de_postal: labels.address,
-        address_de_street_partial: labels.address,
-        address_de_extra_partial: labels.address,
-        address_de_inline_street: labels.address,
-        address_en_inline_street: labels.address,
-        address_en_extra_block: labels.address,
-        address_en_extra: labels.address,
-        address_cn: labels.address
-      };
-
-      const re = RectEngine.makeLabelPrefixRe(map[key]);
+      const re = RectEngine.makeLabelPrefixRe(labels[key]); // 直接使用 labels[key]
       const mm = re ? sub.match(re) : null;
       if (mm && mm[0]) ls += mm[0].length;
 
@@ -1317,82 +1097,17 @@
       const overrides = (policy && policy.padOverrides) || {};
       const k = String(key || "");
 
-      if (overrides[k]) return overrides[k];
-
-      if (k === "ref_label_tail" || k === "ref_inline_zh") {
-        return { pxW: 0.002, pyH: 0.018, minX: 2, minY: 0.30 };
-      }
-
-      return pad[k] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
+      return overrides[k] || pad[k] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
     },
 
     shouldSkipLabelShrink(key, tuning) {
-      const policy = (tuning && tuning.rectPolicy) || {};
-      const list = Array.isArray(policy.skipLabelShrinkKeys) ? policy.skipLabelShrinkKeys : [];
-      if (list.includes(String(key || ""))) return true;
-
-      return [
-        "ref_label_tail",
-        "ref_inline_zh",
-        "money",
-        "money_label",
-        "money_cn_inline_label",
-        "money_label_currency_zh",
-        "phone",
-        "email",
-        "account",
-        "account_cn_inline",
-        "id_card",
-        "id_card_inline_zh",
-        "passport",
-        "passport_inline_zh",
-        "driver_license",
-        "tax_id_zh",
-        "uuid",
-        "wallet_id",
-        "ip_address",
-        "ip_label",
-        "secret",
-        "secret_inline_zh",
-        "api_key_token_zh",
-        "device_fingerprint",
-        "dob"
-      ].includes(String(key || ""));
+      const list = tuning.skipLabelShrinkKeys || [];
+      return list.includes(String(key || ""));
     },
 
     isWholeValueRectKey(key, tuning) {
-      const policy = (tuning && tuning.rectPolicy) || {};
-      const list = Array.isArray(policy.wholeValueKeys) ? policy.wholeValueKeys : [];
-      if (list.includes(String(key || ""))) return true;
-
-      return [
-        "account",
-        "account_cn_inline",
-        "api_key_token_zh",
-        "device_fingerprint",
-        "dob",
-        "driver_license",
-        "email",
-        "handle_label",
-        "id_card",
-        "id_card_inline_zh",
-        "ip_address",
-        "ip_label",
-        "money",
-        "money_cn_inline_label",
-        "money_label",
-        "money_label_currency_zh",
-        "passport",
-        "passport_inline_zh",
-        "phone",
-        "ref_inline_zh",
-        "ref_label_tail",
-        "secret",
-        "secret_inline_zh",
-        "tax_id_zh",
-        "uuid",
-        "wallet_id"
-      ].includes(String(key || ""));
+      const list = tuning.wholeValueKeys || [];
+      return list.includes(String(key || ""));
     },
 
     filterAndMergeSpans(spans, tuning) {
@@ -1421,18 +1136,8 @@
     },
 
     shouldCollapseHitId(key, tuning) {
-      const policy = (tuning && tuning.rectPolicy) || {};
-      const list = Array.isArray(policy.collapseHitIdKeys) ? policy.collapseHitIdKeys : [];
-      if (list.includes(String(key || ""))) return true;
-
-      return [
-        "address_inline_zh",
-        "phone",
-        "money",
-        "company",
-        "license_plate",
-        "license_plate_inline_zh"
-      ].includes(String(key || ""));
+      const list = tuning.collapseHitIdKeys || [];
+      return list.includes(String(key || ""));
     },
 
     collapseRectsByHitId(rects, lang) {
@@ -1508,34 +1213,9 @@
           let le = b0 - r.start;
 
           const isEnglish = normLang(lang) === "en";
-          const englishInlineValueKeys = new Set([
-            "phone",
-            "email",
-            "money",
-            "money_label",
-            "money_cn_inline_label",
-            "money_label_currency_zh",
-            "account",
-            "account_cn_inline",
-            "dob",
-            "id_card",
-            "id_card_inline_zh",
-            "passport",
-            "passport_inline_zh",
-            "driver_license",
-            "tax_id_zh",
-            "uuid",
-            "wallet_id",
-            "ip_address",
-            "ip_label",
-            "secret",
-            "secret_inline_zh",
-            "api_key_token_zh",
-            "device_fingerprint"
-          ]);
-
+          const englishInlineValueSet = new Set(tuning.englishInlineValueKeys || []);
           const isEnglishInlineValue =
-            isEnglish && englishInlineValueKeys.has(String(key || ""));
+            isEnglish && englishInlineValueSet.has(String(key || ""));
 
           const wholeValueMode =
             RectEngine.isWholeValueRectKey(key, tuning) && !isEnglishInlineValue;
@@ -1614,6 +1294,7 @@
             viewport.height - clamp(bb.y - padY + visualDownShift, 0, viewport.height)
           );
 
+          // 可选的 key 特殊限制（可迁移到语言包）
           if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
             if (rw > Math.min(viewport.width * 0.16, bb.w * 0.90)) continue;
           }
@@ -1634,8 +1315,7 @@
       rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
 
       const out = [];
-      const policy = ((tuning || {}).rectPolicy) || {};
-      const paragraphSensitiveKeys = new Set(Array.isArray(policy.paragraphSensitiveKeys) ? policy.paragraphSensitiveKeys : []);
+      const paragraphSensitiveSet = new Set(tuning.paragraphSensitiveKeys || []);
 
       function canMergeRects(a, b) {
         if (!a || !b) return false;
@@ -1653,33 +1333,7 @@
         const gap = b.x - (a.x + a.w);
 
         const k = String(a.key || "");
-        const isParagraphSensitive =
-          paragraphSensitiveKeys.has(k) ||
-          k === "ref_label_tail" ||
-          k === "ref_inline_zh" ||
-          k === "company" ||
-          k === "company_label_inline_zh" ||
-          k === "company_label_inline_zh_no_colon" ||
-          k === "account" ||
-          k === "account_cn_inline" ||
-          k === "id_card" ||
-          k === "id_card_inline_zh" ||
-          k === "passport" ||
-          k === "passport_inline_zh" ||
-          k === "driver_license" ||
-          k === "license_plate" ||
-          k === "license_plate_inline_zh" ||
-          k === "tax_id_zh" ||
-          k === "uuid" ||
-          k === "wallet_id" ||
-          k === "ip_address" ||
-          k === "ip_label" ||
-          k === "secret" ||
-          k === "secret_inline_zh" ||
-          k === "security_answer" ||
-          k === "api_key_token_zh" ||
-          k === "device_fingerprint" ||
-          k === "handle_label";
+        const isParagraphSensitive = paragraphSensitiveSet.has(k);
 
         const near = isParagraphSensitive
           ? (gap <= Math.max(1.5, Math.min(a.h, b.h) * 0.12) && gap >= -1)
