@@ -1,6 +1,7 @@
 // =========================
 // assets/raster.en.js
 // Raster render profile: en
+// 优化版本：放宽长值宽度限制，增加长值填充
 // =========================
 
 (function () {
@@ -12,7 +13,6 @@
     lang: "en",
     version: "r1",
 
-    // 最大匹配长度（英文可沿用原有默认，也可按需调整）
     limits: {
       maxMatchLen: {
         manual_term: 90,
@@ -42,26 +42,29 @@
       }
     },
 
-    // bbox 缩放控制
     bbox: {
       default: { maxByPage: 0.30, maxByEst: 1.45, wHardCapEstRatio: 2.2, wSoftCapEstMul: 1.15 },
-      longValue: { maxByPage: 0.55, maxByEst: 2.20, wHardCapEstRatio: 2.8, wSoftCapEstMul: 1.60 },
-      address: { maxByPage: 0.60, maxByEst: 2.10, wHardCapEstRatio: 3.2, wSoftCapEstMul: 1.70 },
+      // 放宽长值宽度限制
+      longValue: { maxByPage: 0.70, maxByEst: 2.50, wHardCapEstRatio: 2.8, wSoftCapEstMul: 1.60 },
+      // 放宽地址宽度限制
+      address: { maxByPage: 0.75, maxByEst: 2.40, wHardCapEstRatio: 3.2, wSoftCapEstMul: 1.70 },
       money: { maxByPage: 0.35, maxByEst: 1.80 },
       manual_term: { maxByPage: 0.40, maxByEst: 1.80 }
     },
 
-    // 填充系数
     pad: {
       person_name: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
       person_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
       account_holder_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
       company: { pxW: 0.0045, pyH: 0.032, minX: 0.55, minY: 0.60 },
       manual_term: { pxW: 0.0040, pyH: 0.035, minX: 0.55, minY: 0.65 },
+      // 为极长值增加水平填充（可根据实际效果调整或删除）
+      uuid: { pxW: 0.008, pyH: 0.045, minX: 0.8, minY: 0.75 },
+      ip_address: { pxW: 0.007, pyH: 0.045, minX: 0.7, minY: 0.75 },
+      wallet_id: { pxW: 0.007, pyH: 0.045, minX: 0.7, minY: 0.75 },
       _default: { pxW: 0.0050, pyH: 0.045, minX: 0.55, minY: 0.75 }
     },
 
-    // 标签收缩（用于移除 label 前缀）
     shrinkLabels: {
       phone: ["Phone", "Mobile", "Tel", "Telephone", "Contact"],
       account: ["Account", "Account No", "Account Number", "IBAN", "Card Number", "Routing Number"],
@@ -70,15 +73,13 @@
       bank: ["Bank", "Bank Name", "BIC", "SWIFT", "SWIFT/BIC"]
     },
 
-    // 合并参数
     merge: {
       nearGapLegacy: 1.2,
-      nearGapCore: 1.2,
+      nearGapCore: 1.2,  // 若需要更积极的合并，可尝试增大至 1.8
       sameLineOverlapRatio: 0.88,
       similarHeightRatio: 0.80
     },
 
-    // 项框计算
     itemBox: {
       fontHeightMul: 1.08,
       fontHeightMin: 6,
@@ -88,7 +89,6 @@
       hardCap: 1.18
     },
 
-    // 矩形框计算
     rectBox: {
       fontHeightMul: 1.10,
       fontHeightMin: 6,
@@ -96,9 +96,6 @@
       widthEstMul: 0.82
     },
 
-    // ===== 新增字段（从核心迁移的英文特有配置）=====
-
-    // key 分组，用于 bbox 分类
     keyGroups: {
       longValueKeys: [
         "account", "account_cn_inline", "phone", "email", "bank",
@@ -122,7 +119,6 @@
       ]
     },
 
-    // 整项覆盖的 key 列表
     wholeValueKeys: [
       "account", "account_cn_inline", "api_key_token_zh",
       "device_fingerprint", "dob", "driver_license", "email",
@@ -134,7 +130,6 @@
       "tax_id_zh", "uuid", "wallet_id"
     ],
 
-    // 跳过标签收缩的 key 列表（通常与 wholeValueKeys 一致或稍少）
     skipLabelShrinkKeys: [
       "ref_label_tail", "ref_inline_zh", "money", "money_label",
       "money_cn_inline_label", "money_label_currency_zh",
@@ -146,13 +141,11 @@
       "dob"
     ],
 
-    // 需要按 hitId 合并的 key 列表
     collapseHitIdKeys: [
       "address_inline_zh", "phone", "money", "company",
       "license_plate", "license_plate_inline_zh"
     ],
 
-    // 段落敏感的 key 列表（合并时 gap 控制更严格）
     paragraphSensitiveKeys: [
       "ref_label_tail", "ref_inline_zh", "company",
       "company_label_inline_zh", "company_label_inline_zh_no_colon",
@@ -164,7 +157,6 @@
       "api_key_token_zh", "device_fingerprint", "handle_label"
     ],
 
-    // 英文特有的内联值列表，用于避免 whole item 覆盖
     englishInlineValueKeys: [
       "phone", "email", "money", "money_label",
       "money_cn_inline_label", "money_label_currency_zh",
@@ -175,13 +167,11 @@
       "api_key_token_zh", "device_fingerprint"
     ],
 
-    // rectPolicy 中的非列表配置（可覆盖核心默认）
     rectPolicy: {
       coverWholeItemRatio: {
         default: 0.72,
         enDefault: 0.90
       },
-      // 英文如需特殊 pad 或 rectBoxSpecial 可在此添加
       padOverrides: {},
       rectBoxSpecial: {}
     }
