@@ -120,33 +120,10 @@
         manual_term: { pxW: 0.0030, pyH: 0.024, minX: 0.30, minY: 0.40 },
         _default: { pxW: 0.0022, pyH: 0.020, minX: 0.22, minY: 0.34 }
       },
-      shrinkLabels: {
-        phone: [],
-        account: [],
-        email: [],
-        address: [],
-        bank: []
-      },
-      merge: {
-        nearGapLegacy: 1.2,
-        nearGapCore: 1.2,
-        sameLineOverlapRatio: 0.88,
-        similarHeightRatio: 0.80
-      },
-      itemBox: {
-        fontHeightMul: 1.08,
-        fontHeightMin: 6,
-        fontHeightMax: 96,
-        widthEstMul: 0.72,
-        shortTokenCap: 1.10,
-        hardCap: 1.18
-      },
-      rectBox: {
-        fontHeightMul: 1.10,
-        fontHeightMin: 6,
-        fontHeightMax: 104,
-        widthEstMul: 0.82
-      },
+      shrinkLabels: { phone: [], account: [], email: [], address: [], bank: [] },
+      merge: { nearGapLegacy: 1.2, nearGapCore: 1.2, sameLineOverlapRatio: 0.88, similarHeightRatio: 0.80 },
+      itemBox: { fontHeightMul: 1.08, fontHeightMin: 6, fontHeightMax: 96, widthEstMul: 0.72, shortTokenCap: 1.10, hardCap: 1.18 },
+      rectBox: { fontHeightMul: 1.10, fontHeightMin: 6, fontHeightMax: 104, widthEstMul: 0.82 },
       rectPolicy: {
         wholeValueKeys: [
           "account",
@@ -612,14 +589,60 @@
       const policy = (tuning && tuning.rectPolicy) || {};
       const k = String(key || "");
 
+      const moneyKeys = new Set(Array.isArray(policy.moneyKeys) ? policy.moneyKeys : []);
       const longValueKeys = new Set(Array.isArray(policy.longValueKeys) ? policy.longValueKeys : []);
       const addressKeys = new Set(Array.isArray(policy.addressKeys) ? policy.addressKeys : []);
-      const moneyKeys = new Set(Array.isArray(policy.moneyKeys) ? policy.moneyKeys : []);
 
       if (k === "manual_term") return "manual_term";
       if (moneyKeys.has(k)) return "money";
       if (longValueKeys.has(k)) return "longValue";
       if (addressKeys.has(k)) return "address";
+
+      const isLong =
+        k === "account" ||
+        k === "account_cn_inline" ||
+        k === "phone" ||
+        k === "email" ||
+        k === "bank" ||
+        k === "uuid" ||
+        k === "wallet_id" ||
+        k === "ip_address" ||
+        k === "ip_label" ||
+        k === "device_fingerprint" ||
+        k === "api_key_token_zh" ||
+        k === "secret" ||
+        k === "secret_inline_zh" ||
+        k === "security_answer" ||
+        k === "tax_id_zh" ||
+        k === "passport" ||
+        k === "passport_inline_zh" ||
+        k === "id_card" ||
+        k === "id_card_inline_zh" ||
+        k === "driver_license" ||
+        k === "license_plate" ||
+        k === "license_plate_inline_zh";
+
+      const isAddr =
+        k === "address_inline_zh" ||
+        k === "address_cn" ||
+        k === "address_de_street" ||
+        k === "address_de_postal" ||
+        k === "address_de_street_partial" ||
+        k === "address_de_extra_partial" ||
+        k === "address_de_inline_street" ||
+        k === "address_en_inline_street" ||
+        k === "address_en_extra_block" ||
+        k === "address_en_extra";
+
+      if (
+        k === "money" ||
+        k === "money_label" ||
+        k === "money_cn_inline_label" ||
+        k === "money_label_currency_zh"
+      ) return "money";
+
+      if (isLong) return "longValue";
+      if (isAddr) return "address";
       return "default";
     },
 
@@ -675,8 +698,8 @@
       const tuning = getLangTuning(lang);
       const rectCfg = getRectBoxCfg(tuning);
       const bboxCfg = (tuning && tuning.bbox) || {};
-      const policy = (tuning && tuning.rectPolicy) || {};
-      const special = (policy && policy.rectBoxSpecial) || {};
+      const rectPolicy = (tuning && tuning.rectPolicy) || {};
+      const rectBoxSpecial = (rectPolicy && rectPolicy.rectBoxSpecial) || {};
       const Util = pdfjsLib.Util;
 
       const tr = Array.isArray(it.transform) ? it.transform : [1, 0, 0, 1, 0, 0];
@@ -724,9 +747,9 @@
       const k = String(key || "");
 
       if (k === "ref_label_tail" || k === "ref_inline_zh") {
-        const widthRatio = Number(special.refTailWidthRatio || 0.535);
-        const minEstRatio = Number(special.refTailMinEstRatio || 0.425);
-        const minPageRatio = Number(special.refTailMinPageRatio || 0.108);
+        const widthRatio = Number(rectBoxSpecial.refTailWidthRatio || 0.535);
+        const minEstRatio = Number(rectBoxSpecial.refTailMinEstRatio || 0.425);
+        const minPageRatio = Number(rectBoxSpecial.refTailMinPageRatio || 0.108);
 
         w = clamp(
           w * widthRatio,
@@ -738,36 +761,38 @@
         );
 
         w = Math.max(w, Math.min(est * minEstRatio, viewport.width * minPageRatio));
-      } else if (k === "company_label_inline_zh") {
-        const widthRatio = Number(special.companyInlineZhWidthRatio || 1.18);
-        const maxPage = Number(special.companyInlineZhMaxPage || 0.34);
-        const maxEst = Number(special.companyInlineZhMaxEst || 1.70);
-        const minEst = Number(special.companyInlineZhMinEst || 0.98);
-        const minPage = Number(special.companyInlineZhMinPage || 0.22);
-
-        w = clamp(
-          w * widthRatio,
-          1,
-          Math.min(
-            viewport.width * maxPage,
-            est * maxEst
-          )
-        );
-
-        w = Math.max(w, Math.min(est * minEst, viewport.width * minPage));
       } else {
-        w = clamp(
-          w,
-          1,
-          Math.min(
-            viewport.width * Number(cfg.maxByPage || 0.30),
-            est * Number(cfg.maxByEst || 1.45)
-          )
-        );
+        if (k === "company_label_inline_zh") {
+          const widthRatio = Number(rectBoxSpecial.companyInlineZhWidthRatio || 1.18);
+          const maxPage = Number(rectBoxSpecial.companyInlineZhMaxPage || 0.34);
+          const maxEst = Number(rectBoxSpecial.companyInlineZhMaxEst || 1.70);
+          const minEst = Number(rectBoxSpecial.companyInlineZhMinEst || 0.98);
+          const minPage = Number(rectBoxSpecial.companyInlineZhMinPage || 0.22);
 
-        const isLong = group === "longValue";
-        const minW = isLong ? (est * 0.92) : (est * 0.80);
-        w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.38 : 0.18)));
+          w = clamp(
+            w * widthRatio,
+            1,
+            Math.min(
+              viewport.width * maxPage,
+              est * maxEst
+            )
+          );
+
+          w = Math.max(w, Math.min(est * minEst, viewport.width * minPage));
+        } else {
+          w = clamp(
+            w,
+            1,
+            Math.min(
+              viewport.width * Number(cfg.maxByPage || 0.30),
+              est * Number(cfg.maxByEst || 1.45)
+            )
+          );
+
+          const isLong = group === "longValue";
+          const minW = isLong ? (est * 0.92) : (est * 0.80);
+          w = Math.max(w, Math.min(minW, viewport.width * (isLong ? 0.38 : 0.18)));
+        }
       }
 
       const baseY = clamp(y - fontH + Math.min(4, Math.max(2, fontH * 0.16)), 0, viewport.height);
@@ -1292,19 +1317,82 @@
       const overrides = (policy && policy.padOverrides) || {};
       const k = String(key || "");
 
-      return overrides[k] || pad[k] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
+      if (overrides[k]) return overrides[k];
+
+      if (k === "ref_label_tail" || k === "ref_inline_zh") {
+        return { pxW: 0.002, pyH: 0.018, minX: 2, minY: 0.30 };
+      }
+
+      return pad[k] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
     },
 
     shouldSkipLabelShrink(key, tuning) {
       const policy = (tuning && tuning.rectPolicy) || {};
-      const arr = Array.isArray(policy.skipLabelShrinkKeys) ? policy.skipLabelShrinkKeys : [];
-      return arr.includes(String(key || ""));
+      const list = Array.isArray(policy.skipLabelShrinkKeys) ? policy.skipLabelShrinkKeys : [];
+      if (list.includes(String(key || ""))) return true;
+
+      return [
+        "ref_label_tail",
+        "ref_inline_zh",
+        "money",
+        "money_label",
+        "money_cn_inline_label",
+        "money_label_currency_zh",
+        "phone",
+        "email",
+        "account",
+        "account_cn_inline",
+        "id_card",
+        "id_card_inline_zh",
+        "passport",
+        "passport_inline_zh",
+        "driver_license",
+        "tax_id_zh",
+        "uuid",
+        "wallet_id",
+        "ip_address",
+        "ip_label",
+        "secret",
+        "secret_inline_zh",
+        "api_key_token_zh",
+        "device_fingerprint",
+        "dob"
+      ].includes(String(key || ""));
     },
 
     isWholeValueRectKey(key, tuning) {
       const policy = (tuning && tuning.rectPolicy) || {};
-      const arr = Array.isArray(policy.wholeValueKeys) ? policy.wholeValueKeys : [];
-      return arr.includes(String(key || ""));
+      const list = Array.isArray(policy.wholeValueKeys) ? policy.wholeValueKeys : [];
+      if (list.includes(String(key || ""))) return true;
+
+      return [
+        "account",
+        "account_cn_inline",
+        "api_key_token_zh",
+        "device_fingerprint",
+        "dob",
+        "driver_license",
+        "email",
+        "handle_label",
+        "id_card",
+        "id_card_inline_zh",
+        "ip_address",
+        "ip_label",
+        "money",
+        "money_cn_inline_label",
+        "money_label",
+        "money_label_currency_zh",
+        "passport",
+        "passport_inline_zh",
+        "phone",
+        "ref_inline_zh",
+        "ref_label_tail",
+        "secret",
+        "secret_inline_zh",
+        "tax_id_zh",
+        "uuid",
+        "wallet_id"
+      ].includes(String(key || ""));
     },
 
     filterAndMergeSpans(spans, tuning) {
@@ -1334,12 +1422,22 @@
 
     shouldCollapseHitId(key, tuning) {
       const policy = (tuning && tuning.rectPolicy) || {};
-      const arr = Array.isArray(policy.collapseHitIdKeys) ? policy.collapseHitIdKeys : [];
-      return arr.includes(String(key || ""));
+      const list = Array.isArray(policy.collapseHitIdKeys) ? policy.collapseHitIdKeys : [];
+      if (list.includes(String(key || ""))) return true;
+
+      return [
+        "address_inline_zh",
+        "phone",
+        "money",
+        "company",
+        "license_plate",
+        "license_plate_inline_zh"
+      ].includes(String(key || ""));
     },
 
-    collapseRectsByHitId(rects, lang, tuning) {
+    collapseRectsByHitId(rects, lang) {
       if (!Array.isArray(rects) || !rects.length) return rects || [];
+      const tuning = getLangTuning(lang);
 
       const keep = [];
       const groups = new Map();
@@ -1348,7 +1446,7 @@
         const key = String((r && r.key) || "");
         const hitId = String((r && r.hitId) || "");
 
-        if (!hitId || !RectEngine.shouldCollapseHitId(key, tuning || getLangTuning(lang))) {
+        if (!hitId || !RectEngine.shouldCollapseHitId(key, tuning)) {
           keep.push(r);
           continue;
         }
@@ -1456,7 +1554,6 @@
             } else {
               continue;
             }
-
           } else {
             const skipLabelShrink =
               RectEngine.shouldSkipLabelShrink(key, tuning) && !isEnglishInlineValue;
@@ -1478,11 +1575,14 @@
 
           const coveredLen = le - ls;
           const wholeByKey = wholeValueMode;
-          const coverCfg = (((tuning || {}).rectPolicy || {}).coverWholeItemRatio) || {};
+          const coverRatioCfg = (((tuning || {}).rectPolicy || {}).coverWholeItemRatio) || {};
+          const coverDefault = Number(coverRatioCfg.default || 0.72);
+          const coverEnglishDefault = Number(coverRatioCfg.enDefault || 0.90);
+
           const coverWholeItem =
             wholeByKey ||
             len <= 2 ||
-            coveredLen >= len * (isEnglish ? Number(coverCfg.enDefault || 0.90) : Number(coverCfg.default || 0.72));
+            coveredLen >= len * (isEnglish ? coverEnglishDefault : coverDefault);
 
           const x1 = coverWholeItem ? bb.x : (bb.x + bb.w * (ls / len));
           const x2 = coverWholeItem ? (bb.x + bb.w) : (bb.x + bb.w * (le / len));
@@ -1553,7 +1653,33 @@
         const gap = b.x - (a.x + a.w);
 
         const k = String(a.key || "");
-        const isParagraphSensitive = paragraphSensitiveKeys.has(k);
+        const isParagraphSensitive =
+          paragraphSensitiveKeys.has(k) ||
+          k === "ref_label_tail" ||
+          k === "ref_inline_zh" ||
+          k === "company" ||
+          k === "company_label_inline_zh" ||
+          k === "company_label_inline_zh_no_colon" ||
+          k === "account" ||
+          k === "account_cn_inline" ||
+          k === "id_card" ||
+          k === "id_card_inline_zh" ||
+          k === "passport" ||
+          k === "passport_inline_zh" ||
+          k === "driver_license" ||
+          k === "license_plate" ||
+          k === "license_plate_inline_zh" ||
+          k === "tax_id_zh" ||
+          k === "uuid" ||
+          k === "wallet_id" ||
+          k === "ip_address" ||
+          k === "ip_label" ||
+          k === "secret" ||
+          k === "secret_inline_zh" ||
+          k === "security_answer" ||
+          k === "api_key_token_zh" ||
+          k === "device_fingerprint" ||
+          k === "handle_label";
 
         const near = isParagraphSensitive
           ? (gap <= Math.max(1.5, Math.min(a.h, b.h) * 0.12) && gap >= -1)
@@ -1624,8 +1750,7 @@
 
       return RectEngine.collapseRectsByHitId(
         out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId })),
-        lang,
-        tuning
+        lang
       );
     }
   };
