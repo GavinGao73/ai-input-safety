@@ -1,6 +1,9 @@
 /* =========================================================
  * assets/raster-core.js
  * Raster geometry / matching core (language-agnostic)
+ * 修改记录：
+ * - 增加全局垂直偏移常数 GLOBAL_VERTICAL_OFFSET = 3（像素），所有矩形整体下移
+ * - 同时调整高度计算，确保高度不变
  * ======================================================= */
 
 (function () {
@@ -1193,6 +1196,9 @@
       const tuning = getLangTuning(lang);
       const rects = [];
 
+      // ========== 全局垂直偏移常数（像素） ==========
+      const GLOBAL_VERTICAL_OFFSET = 3; // 正值向下移动，负值向上。请根据需要调整
+
       for (const sp of RectEngine.filterAndMergeSpans(spans, tuning)) {
         const A = sp.a;
         const B = sp.b;
@@ -1271,8 +1277,9 @@
           const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
           const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
 
-          const visualDownShift = Math.min(2.0, Math.max(1.0, bb.h * 0.06));
-          const visualHeightTrim = Math.min(2.0, Math.max(1.0, bb.h * 0.06));
+          // 视觉微调（现在使用固定值加偏移）
+          const visualDownShift = 2;  // 原为 Math.min(2.0, Math.max(1.0, bb.h * 0.06))
+          const visualHeightTrim = 2; // 原为 Math.min(2.0, Math.max(1.0, bb.h * 0.06))
 
           const nameLeftShift =
             (key === "person_name" ||
@@ -1281,8 +1288,9 @@
             ? Math.min(4.0, Math.max(2.0, bb.w * 0.04))
             : 0;
 
+          // 应用全局垂直偏移
           const rx = clamp(x1 - padX - nameLeftShift, 0, viewport.width);
-          const ry = clamp(bb.y - padY + visualDownShift, 0, viewport.height);
+          const ry = clamp(bb.y - padY + visualDownShift + GLOBAL_VERTICAL_OFFSET, 0, viewport.height);
           const rw = clamp(
             (x2 - x1) + padX * 2 + nameLeftShift,
             1,
@@ -1291,7 +1299,7 @@
           const rh = clamp(
             bb.h + padY * 2 - visualHeightTrim,
             3,
-            viewport.height - clamp(bb.y - padY + visualDownShift, 0, viewport.height)
+            viewport.height - clamp(bb.y - padY + visualDownShift + GLOBAL_VERTICAL_OFFSET, 0, viewport.height)
           );
 
           // 可选的 key 特殊限制（可迁移到语言包）
