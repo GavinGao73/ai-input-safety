@@ -1,7 +1,7 @@
 // =========================
 // assets/raster.en.js
 // Raster render profile: en
-// 优化版本：放宽长值宽度限制，增加长值填充
+// 版本：整行覆盖版（禁用 englishInlineValueKeys，增大左侧填充）
 // =========================
 
 (function () {
@@ -44,9 +44,7 @@
 
     bbox: {
       default: { maxByPage: 0.30, maxByEst: 1.45, wHardCapEstRatio: 2.2, wSoftCapEstMul: 1.15 },
-      // 放宽长值宽度限制
       longValue: { maxByPage: 0.70, maxByEst: 2.50, wHardCapEstRatio: 2.8, wSoftCapEstMul: 1.60 },
-      // 放宽地址宽度限制
       address: { maxByPage: 0.75, maxByEst: 2.40, wHardCapEstRatio: 3.2, wSoftCapEstMul: 1.70 },
       money: { maxByPage: 0.35, maxByEst: 1.80 },
       manual_term: { maxByPage: 0.40, maxByEst: 1.80 }
@@ -58,11 +56,12 @@
       account_holder_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
       company: { pxW: 0.0045, pyH: 0.032, minX: 0.55, minY: 0.60 },
       manual_term: { pxW: 0.0040, pyH: 0.035, minX: 0.55, minY: 0.65 },
-      // 为极长值增加水平填充（可根据实际效果调整或删除）
-      uuid: { pxW: 0.008, pyH: 0.045, minX: 0.8, minY: 0.75 },
-      ip_address: { pxW: 0.007, pyH: 0.045, minX: 0.7, minY: 0.75 },
-      wallet_id: { pxW: 0.007, pyH: 0.045, minX: 0.7, minY: 0.75 },
-      _default: { pxW: 0.0050, pyH: 0.045, minX: 0.55, minY: 0.75 }
+      // 为长值增加水平填充
+      uuid: { pxW: 0.008, pyH: 0.045, minX: 2.0, minY: 0.75 },
+      ip_address: { pxW: 0.007, pyH: 0.045, minX: 2.0, minY: 0.75 },
+      wallet_id: { pxW: 0.007, pyH: 0.045, minX: 2.0, minY: 0.75 },
+      // 增大默认左侧填充，使矩形能覆盖标签
+      _default: { pxW: 0.008, pyH: 0.045, minX: 3.0, minY: 0.75 }
     },
 
     shrinkLabels: {
@@ -75,7 +74,7 @@
 
     merge: {
       nearGapLegacy: 1.2,
-      nearGapCore: 1.2,  // 若需要更积极的合并，可尝试增大至 1.8
+      nearGapCore: 1.2,
       sameLineOverlapRatio: 0.88,
       similarHeightRatio: 0.80
     },
@@ -119,6 +118,7 @@
       ]
     },
 
+    // 整项覆盖的 key 列表（包含所有需要覆盖整行的 key）
     wholeValueKeys: [
       "account", "account_cn_inline", "api_key_token_zh",
       "device_fingerprint", "dob", "driver_license", "email",
@@ -130,6 +130,7 @@
       "tax_id_zh", "uuid", "wallet_id"
     ],
 
+    // 跳过标签收缩的 key 列表
     skipLabelShrinkKeys: [
       "ref_label_tail", "ref_inline_zh", "money", "money_label",
       "money_cn_inline_label", "money_label_currency_zh",
@@ -157,15 +158,8 @@
       "api_key_token_zh", "device_fingerprint", "handle_label"
     ],
 
-    englishInlineValueKeys: [
-      "phone", "email", "money", "money_label",
-      "money_cn_inline_label", "money_label_currency_zh",
-      "account", "account_cn_inline", "dob", "id_card",
-      "id_card_inline_zh", "passport", "passport_inline_zh",
-      "driver_license", "tax_id_zh", "uuid", "wallet_id",
-      "ip_address", "ip_label", "secret", "secret_inline_zh",
-      "api_key_token_zh", "device_fingerprint"
-    ],
+    // ★ 关键修改：清空 englishInlineValueKeys，禁用内联值特殊处理
+    englishInlineValueKeys: [],
 
     rectPolicy: {
       coverWholeItemRatio: {
