@@ -11,7 +11,7 @@
 
   PACKS.en = {
     lang: "en",
-    version: "r1",
+    version: "r2",
 
     limits: {
       maxMatchLen: {
@@ -54,14 +54,15 @@
       person_name: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
       person_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
       account_holder_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
+
       company: { pxW: 0.0045, pyH: 0.032, minX: 0.55, minY: 0.60 },
       manual_term: { pxW: 0.0040, pyH: 0.035, minX: 0.55, minY: 0.65 },
-      // 为长值增加水平填充，但保留标题收缩
+
       uuid: { pxW: 0.008, pyH: 0.045, minX: 0.8, minY: 0.75 },
       ip_address: { pxW: 0.007, pyH: 0.045, minX: 0.7, minY: 0.75 },
       wallet_id: { pxW: 0.007, pyH: 0.045, minX: 0.7, minY: 0.75 },
-      // 默认填充：适度左侧填充，确保内容覆盖完整
-      _default: { pxW: 0.006, pyH: 0.045, minX: 0.5, minY: 0.75 }
+
+      _default: { pxW: 0.004, pyH: 0.035, minX: 0.5, minY: 0.70 }
     },
 
     shrinkLabels: {
@@ -70,7 +71,6 @@
       email: ["Email", "E-mail", "Email Address"],
       address: ["Address", "Shipping Address", "Billing Address", "Mailing Address", "Office Address"],
       bank: ["Bank", "Bank Name", "BIC", "SWIFT", "SWIFT/BIC"],
-      // 补充常见标签
       passport: ["Passport", "Passport Number", "Passport No"],
       driver_license: ["Driver License", "Driver's License", "License", "DL"],
       license_plate: ["License Plate", "Plate", "Registration"],
@@ -107,75 +107,76 @@
 
     keyGroups: {
       longValueKeys: [
-        "account", "account_cn_inline", "phone", "email", "bank",
-        "uuid", "wallet_id", "ip_address", "ip_label",
-        "device_fingerprint", "api_key_token_zh", "secret",
-        "secret_inline_zh", "security_answer", "tax_id_zh",
-        "passport", "passport_inline_zh", "id_card",
-        "id_card_inline_zh", "driver_license", "license_plate",
+        "account","account_cn_inline","phone","email","bank",
+        "uuid","wallet_id","ip_address","ip_label",
+        "device_fingerprint","api_key_token_zh","secret",
+        "secret_inline_zh","security_answer","tax_id_zh",
+        "passport","passport_inline_zh","id_card",
+        "id_card_inline_zh","driver_license","license_plate",
         "license_plate_inline_zh"
       ],
+
       addressKeys: [
-        "address_inline_zh", "address_cn", "address_de_street",
-        "address_de_postal", "address_de_street_partial",
-        "address_de_extra_partial", "address_de_inline_street",
-        "address_en_inline_street", "address_en_extra_block",
+        "address_inline_zh","address_cn","address_de_street",
+        "address_de_postal","address_de_street_partial",
+        "address_de_extra_partial","address_de_inline_street",
+        "address_en_inline_street","address_en_extra_block",
         "address_en_extra"
       ],
+
       moneyKeys: [
-        "money", "money_label", "money_cn_inline_label",
+        "money","money_label","money_cn_inline_label",
         "money_label_currency_zh"
       ]
     },
 
     wholeValueKeys: [
-      "account", "account_cn_inline", "api_key_token_zh",
-      "device_fingerprint", "dob", "driver_license", "email",
-      "handle_label", "id_card", "id_card_inline_zh",
-      "ip_address", "ip_label", "money", "money_cn_inline_label",
-      "money_label", "money_label_currency_zh", "passport",
-      "passport_inline_zh", "phone", "ref_inline_zh",
-      "ref_label_tail", "secret", "secret_inline_zh",
-      "tax_id_zh", "uuid", "wallet_id"
+      "account","account_cn_inline","api_key_token_zh",
+      "device_fingerprint","dob","driver_license","email",
+      "handle_label","id_card","id_card_inline_zh",
+      "ip_address","ip_label","money","money_cn_inline_label",
+      "money_label","money_label_currency_zh","passport",
+      "passport_inline_zh","phone","ref_inline_zh",
+      "ref_label_tail","secret","secret_inline_zh",
+      "tax_id_zh","uuid","wallet_id"
     ],
 
     skipLabelShrinkKeys: [
-      "ref_label_tail", "ref_inline_zh", "money", "money_label",
-      "money_cn_inline_label", "money_label_currency_zh",
-      "phone", "email", "account", "account_cn_inline",
-      "id_card", "id_card_inline_zh", "passport",
-      "passport_inline_zh", "driver_license", "tax_id_zh",
-      "uuid", "wallet_id", "ip_address", "ip_label", "secret",
-      "secret_inline_zh", "api_key_token_zh", "device_fingerprint",
+      "ref_label_tail","ref_inline_zh","money","money_label",
+      "money_cn_inline_label","money_label_currency_zh",
+      "phone","email","account","account_cn_inline",
+      "id_card","id_card_inline_zh","passport",
+      "passport_inline_zh","driver_license","tax_id_zh",
+      "uuid","wallet_id","ip_address","ip_label","secret",
+      "secret_inline_zh","api_key_token_zh","device_fingerprint",
       "dob"
     ],
 
     collapseHitIdKeys: [
-      "address_inline_zh", "phone", "money", "company",
-      "license_plate", "license_plate_inline_zh"
+      "address_inline_zh","phone","money","company",
+      "license_plate","license_plate_inline_zh"
     ],
 
     paragraphSensitiveKeys: [
-      "ref_label_tail", "ref_inline_zh", "company",
-      "company_label_inline_zh", "company_label_inline_zh_no_colon",
-      "account", "account_cn_inline", "id_card",
-      "id_card_inline_zh", "passport", "passport_inline_zh",
-      "driver_license", "license_plate", "license_plate_inline_zh",
-      "tax_id_zh", "uuid", "wallet_id", "ip_address", "ip_label",
-      "secret", "secret_inline_zh", "security_answer",
-      "api_key_token_zh", "device_fingerprint", "handle_label"
+      "ref_label_tail","ref_inline_zh","company",
+      "company_label_inline_zh","company_label_inline_zh_no_colon",
+      "account","account_cn_inline","id_card",
+      "id_card_inline_zh","passport","passport_inline_zh",
+      "driver_license","license_plate","license_plate_inline_zh",
+      "tax_id_zh","uuid","wallet_id","ip_address","ip_label",
+      "secret","secret_inline_zh","security_answer",
+      "api_key_token_zh","device_fingerprint","handle_label"
     ],
 
-    // 英文特有的内联值列表：这些 key 不会触发 whole item 覆盖，从而允许 shrinkLabels 生效
     englishInlineValueKeys: [
-      "phone", "email", "money", "money_label",
-      "money_cn_inline_label", "money_label_currency_zh",
-      "account", "account_cn_inline", "dob", "id_card",
-      "id_card_inline_zh", "passport", "passport_inline_zh",
-      "driver_license", "tax_id_zh", "uuid", "wallet_id",
-      "ip_address", "ip_label", "secret", "secret_inline_zh",
-      "api_key_token_zh", "device_fingerprint", "company",
-      "ref_label_tail", "ref_inline_zh"
+      "phone","email","money","money_label",
+      "money_cn_inline_label","money_label_currency_zh",
+      "account","account_cn_inline","dob","id_card",
+      "id_card_inline_zh","passport","passport_inline_zh",
+      "driver_license","tax_id_zh","uuid","wallet_id",
+      "ip_address","ip_label","secret","secret_inline_zh",
+      "api_key_token_zh","device_fingerprint","company",
+      "ref_label_tail","ref_inline_zh"
     ],
 
     rectPolicy: {
@@ -183,8 +184,21 @@
         default: 0.72,
         enDefault: 0.90
       },
-      padOverrides: {},
-      rectBoxSpecial: {}
+
+      padOverrides: {
+        email: { pxW: 0.004, pyH: 0.030 },
+        phone: { pxW: 0.004, pyH: 0.030 },
+        account: { pxW: 0.004, pyH: 0.030 },
+        money: { pxW: 0.004, pyH: 0.030 }
+      },
+
+      rectBoxSpecial: {
+        email: { widthMul: 1.05 },
+        phone: { widthMul: 1.05 },
+        account: { widthMul: 1.05 },
+        money: { widthMul: 1.05 },
+        ref_label_tail: { widthMul: 1.05 }
+      }
     }
   };
 })();
