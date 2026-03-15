@@ -265,7 +265,7 @@
       padOverrides: {},
       rectBoxSpecial: {
         refTailWidthRatio: 0.55,
-        refTailMinEstRatio: 045,
+        refTailMinEstRatio: 0.45,
         refTailMinPageRatio: 0.11,
         companyInlineZhWidthRatio: 1.18,
         companyInlineZhMaxPage: 0.34,
