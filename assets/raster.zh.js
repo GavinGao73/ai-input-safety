@@ -264,9 +264,9 @@
       // 已移除冲突的 padOverrides 条目，让 pad 中的值生效
       padOverrides: {},
       rectBoxSpecial: {
-        refTailWidthRatio: 0.55,
-        refTailMinEstRatio: 0.45,
-        refTailMinPageRatio: 0.11,
+        refTailWidthRatio: 0.6,
+        refTailMinEstRatio: 0.5,
+        refTailMinPageRatio: 0.15,
         companyInlineZhWidthRatio: 1.18,
         companyInlineZhMaxPage: 0.34,
         companyInlineZhMaxEst: 1.70,
