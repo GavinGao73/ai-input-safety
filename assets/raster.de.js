@@ -1,6 +1,7 @@
 // =========================
 // assets/raster.de.js
 // Raster render profile: de
+// 已按中文结构补齐字段（新增列表为空）
 // =========================
 
 (function () {
@@ -89,6 +90,32 @@
       fontHeightMin: 6,
       fontHeightMax: 104,
       widthEstMul: 0.82
+    },
+
+    // ----- 以下为按中文结构补齐的字段（暂为空）-----
+    keyGroups: {
+      longValueKeys: [],
+      addressKeys: [],
+      moneyKeys: []
+    },
+
+    wholeValueKeys: [],
+
+    skipLabelShrinkKeys: [],
+
+    collapseHitIdKeys: [],
+
+    paragraphSensitiveKeys: [],
+
+    englishInlineValueKeys: [],
+
+    rectPolicy: {
+      coverWholeItemRatio: {
+        default: 0.72,
+        enDefault: 0.90
+      },
+      padOverrides: {},
+      rectBoxSpecial: {}
     }
   };
 })();
