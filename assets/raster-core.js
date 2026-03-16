@@ -1286,12 +1286,10 @@
           const rhRaw = bb.h + padY * 2 - visualHeightTrim;
           console.log(`rhRaw=${rhRaw.toFixed(2)}`);
 
-          const nameLeftShift = ... // 后面保持不变
-
           const nameLeftShift =
             (key === "person_name" ||
-            key === "person_name_keep_title" ||
-            key === "account_holder_name_keep_title")
+             key === "person_name_keep_title" ||
+             key === "account_holder_name_keep_title")
             ? Math.min(4.0, Math.max(2.0, bb.w * 0.04))
             : 0;
 
