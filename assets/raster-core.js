@@ -1277,9 +1277,9 @@
           const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
           const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
 
-          // 视觉微调（现在使用固定值加偏移）
+          // 视觉微调：下移量固定为 2，高度削减从语言包读取
           const visualDownShift = 2;  // 原为 Math.min(2.0, Math.max(1.0, bb.h * 0.06))
-          const visualHeightTrim = 2; // 原为 Math.min(2.0, Math.max(1.0, bb.h * 0.06))
+          const visualHeightTrim = tuning.globalHeightTrim !== undefined ? tuning.globalHeightTrim : 2; // 关键修改
 
           const nameLeftShift =
             (key === "person_name" ||
