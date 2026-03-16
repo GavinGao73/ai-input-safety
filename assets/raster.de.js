@@ -14,7 +14,7 @@
     version: "r1",
 
     // 全局高度削减（像素），值越大黑条越矮。德语建议 5
-    globalHeightTrim: 5,
+    globalHeightTrim: 20,
 
     limits: {
       maxMatchLen: {
