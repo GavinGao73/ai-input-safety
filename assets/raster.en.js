@@ -2,6 +2,7 @@
 // assets/raster.en.js
 // Raster render profile: en
 // 统一规则：Label 保留，只覆盖 Value
+// 已按中文结构补齐字段（新增列表为空）
 // =========================
 
 (function () {
@@ -219,8 +220,24 @@
       widthEstMul: 0.82
     },
 
-    rectPolicy: {
+    // ----- 以下为按中文结构补齐的字段（暂为空）-----
+    keyGroups: {
+      longValueKeys: [],
+      addressKeys: [],
+      moneyKeys: []
+    },
 
+    wholeValueKeys: [],
+
+    skipLabelShrinkKeys: [],
+
+    collapseHitIdKeys: [],
+
+    paragraphSensitiveKeys: [],
+
+    englishInlineValueKeys: [],
+
+    rectPolicy: {
       coverWholeItemRatio: {
         default: 0.72,
         enDefault: 0.90
