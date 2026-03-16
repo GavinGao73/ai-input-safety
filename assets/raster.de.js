@@ -13,18 +13,8 @@
     lang: "de",
     version: "r1",
 
-    globalHeightTrim: 5,   // ← 正确位置：在对象内部，与 lang 等同级
-
-    limits: { ... },
-    bbox: { ... },
-    pad: { ... },
-    // ... 其余原有字段
-  };
-})();
-
-  PACKS.de = {
-    lang: "de",
-    version: "r1",
+    // 全局高度削减（像素），值越大黑条越矮。德语建议 5
+    globalHeightTrim: 5,
 
     limits: {
       maxMatchLen: {
