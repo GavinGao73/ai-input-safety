@@ -13,6 +13,19 @@
     lang: "de",
     version: "r1",
 
+    globalHeightTrim: 5,   // ← 正确位置：在对象内部，与 lang 等同级
+
+    limits: { ... },
+    bbox: { ... },
+    pad: { ... },
+    // ... 其余原有字段
+  };
+})();
+
+  PACKS.de = {
+    lang: "de",
+    version: "r1",
+
     limits: {
       maxMatchLen: {
         manual_term: 90,
