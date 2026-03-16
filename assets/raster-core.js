@@ -1278,8 +1278,15 @@
           const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
 
           // 视觉微调：下移量固定为 2，高度削减从语言包读取
-          const visualDownShift = 2;  // 原为 Math.min(2.0, Math.max(1.0, bb.h * 0.06))
-          const visualHeightTrim = tuning.globalHeightTrim !== undefined ? tuning.globalHeightTrim : 2; // 关键修改
+          const visualDownShift = 2;
+          const visualHeightTrim = tuning.globalHeightTrim !== undefined ? tuning.globalHeightTrim : 2;
+
+          // ====== 调试日志 ======
+          console.log(`[${key}] bb.h=${bb.h.toFixed(2)}, padY=${padY.toFixed(2)}, visualHeightTrim=${visualHeightTrim}`);
+          const rhRaw = bb.h + padY * 2 - visualHeightTrim;
+          console.log(`rhRaw=${rhRaw.toFixed(2)}`);
+
+          const nameLeftShift = ... // 后面保持不变
 
           const nameLeftShift =
             (key === "person_name" ||
