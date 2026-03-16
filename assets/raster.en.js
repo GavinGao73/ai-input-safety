@@ -15,6 +15,9 @@
     lang: "en",
     version: "r3-inline-value-redaction",
 
+    // 全局高度削减（像素），值越大黑条越矮。英文建议 5
+    globalHeightTrim: 5,
+
     limits: {
       maxMatchLen: {
         manual_term: 90,
