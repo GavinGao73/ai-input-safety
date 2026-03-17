@@ -224,7 +224,7 @@
       widthEstMul: 0.82
     },
 
-    // ----- 以下为按中文结构补齐的字段（暂为空）-----
+    // ----- 以下为按中文结构补齐的字段 -----
     keyGroups: {
       longValueKeys: [],
       addressKeys: [],
@@ -240,6 +240,28 @@
     paragraphSensitiveKeys: [],
 
     englishInlineValueKeys: [],
+
+    // 新增：忽略 preferSub 的 key 列表，强制使用标签收缩，覆盖整个值
+    ignorePreferSubKeys: [
+      "ref_generic_tail_de",
+      "id_label_tail",
+      "aktenzeichen_tail",
+      "legal_ref_tail",
+      "cust_id",
+      "person_name_keep_title",
+      "account_holder_name_keep_title",
+      "person_name",
+      "company",
+      "account",
+      "phone",
+      "money",
+      "money_label",
+      "address_de_inline_street",
+      "address_de_street_partial",
+      "address_de_extra_partial",
+      "klingel_name",
+      "handle_label"
+    ],
 
     rectPolicy: {
       coverWholeItemRatio: {
