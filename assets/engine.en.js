@@ -567,44 +567,40 @@
         tag: "ADDRESS"
       },
 
+      // 修改 ref_label_multi_tail 为匹配整个值，移除 mode
       ref_label_multi_tail: {
-        pattern:
-          /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*(?:[:：=]|-)[ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}?[-_.]))(\d{4,}(?:[-_.]\d{4,})+)/giu,
-        tag: "REF",
-        mode: "prefix"
+        pattern: /\b((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*(?:[:：=]|-)[ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}?[-_.]\d{4,}(?:[-_.]\d{4,})+))\b/giu,
+        tag: "REF"
       },
 
+      // 修改 ref_generic_multi_tail 为匹配整个值，移除 mode
       ref_generic_multi_tail: {
         pattern: /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{4,}(?:-\d{4,})+))\b/gu,
         tag: "REF"
-        // mode removed
       },
 
+      // 修改 ref_label_nextline 为匹配整个值，移除 mode
       ref_label_nextline: {
-        pattern:
-          /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*[:：=][ \t]*[\r]?\n[ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
-        tag: "REF",
-        mode: "prefix"
+        pattern: /\b((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*[:：=][ \t]*[\r]?\n[ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))\b/giu,
+        tag: "REF"
       },
 
+      // 修改 ref_label_tail 为匹配整个值，移除 mode
       ref_label_tail: {
-        pattern:
-          /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*(?:[:：=]|-)[ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
-        tag: "REF",
-        mode: "prefix"
+        pattern: /\b((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*(?:[:：=]|-)[ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))\b/giu,
+        tag: "REF"
       },
 
+      // 修改 ref_generic_tail 为匹配整个值，移除 mode
       ref_generic_tail: {
         pattern: /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{5,}))\b/gu,
         tag: "REF"
-        // mode removed
       },
 
+      // 修改 legal_ref_tail 为匹配整个值，移除 mode
       legal_ref_tail: {
-        pattern:
-          /((?:(?:contract[ \t]*number|claim[ \t]*reference|legal[ \t]*case[ \t]*ref)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})\b/giu,
-        tag: "REF",
-        mode: "prefix"
+        pattern: /\b((?:(?:contract[ \t]*number|claim[ \t]*reference|legal[ \t]*case[ \t]*ref)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))\b/giu,
+        tag: "REF"
       },
 
       handle: {
