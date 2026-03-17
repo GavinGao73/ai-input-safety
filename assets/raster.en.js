@@ -401,14 +401,9 @@
 
     englishInlineValueKeys: [],
 
-    // 新增：忽略 preferSub 的 key 列表，强制使用标签收缩，覆盖整个值
+    // 修改：移除了 ref 类 key，避免忽略 preferSub，让引擎的 preferSub 生效
     ignorePreferSubKeys: [
-      "ref_label_tail",
-      "ref_generic_tail",
-      "ref_label_multi_tail",
-      "ref_generic_multi_tail",
-      "legal_ref_tail",
-      "cust_id",
+      // 保留一些可能需要标签收缩的字段（可根据需要调整）
       "person_name",
       "person_name_keep_title",
       "account_holder_name_keep_title",
