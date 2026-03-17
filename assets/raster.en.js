@@ -2,7 +2,7 @@
 // assets/raster.en.js
 // Raster render profile: en
 // 统一规则：Label 保留，只覆盖 Value
-// 已按中文结构补齐字段（新增列表为空）
+// 已按中文结构补齐字段（新增列表为空），并扩展 shrinkLabels 以匹配 engine.en.js 中的标签
 // =========================
 
 (function () {
@@ -96,7 +96,11 @@
         "Tel",
         "Telephone",
         "Contact",
-        "Cell"
+        "Cell",
+        "Fax",
+        "WhatsApp",
+        "Telegram",
+        "Signal"
       ],
 
       account: [
@@ -106,7 +110,11 @@
         "IBAN",
         "Card Number",
         "Routing Number",
-        "Bank Account"
+        "Bank Account",
+        "Sort Code",
+        "Credit Card",
+        "Debit Card",
+        "Name on Card"
       ],
 
       email: [
@@ -120,7 +128,11 @@
         "Shipping Address",
         "Billing Address",
         "Mailing Address",
-        "Office Address"
+        "Office Address",
+        "Street Address",
+        "Zip Code",
+        "Postal Code",
+        "Postcode"
       ],
 
       bank: [
@@ -128,7 +140,9 @@
         "Bank Name",
         "BIC",
         "SWIFT",
-        "SWIFT/BIC"
+        "SWIFT/BIC",
+        "Swift Code",
+        "BIC Code"
       ],
 
       passport: [
@@ -160,7 +174,9 @@
         "ID",
         "ID Card",
         "Identification",
-        "Identity Card"
+        "Identity Card",
+        "National ID",
+        "National Identification Number"
       ],
 
       company: [
@@ -179,7 +195,22 @@
         "Service Fee",
         "Tax Amount",
         "Total Amount",
-        "USD"
+        "USD",
+        "Price",
+        "Fee",
+        "Charge",
+        "Balance",
+        "Paid",
+        "Payment",
+        "Refund",
+        "Due",
+        "Total Due",
+        "Net",
+        "Gross",
+        "Tax",
+        "VAT",
+        "Subtotal",
+        "Grand Total"
       ],
 
       ref: [
@@ -191,21 +222,49 @@
         "Application ID",
         "Invoice Number",
         "Customer ID",
-        "Reference Number"
+        "Reference Number",
+        "Request ID",
+        "Ticket ID",
+        "Account ID",
+        "Contract Number",
+        "Claim Reference",
+        "Legal Case Ref",
+        "Application Number",
+        "Order ID",
+        "Invoice ID",
+        "Case Number",
+        "Ticket Number",
+        "Customer Number"
       ],
 
       handle: [
         "Handle",
         "User",
-        "Username"
+        "Username",
+        "User ID",
+        "Login ID",
+        "Login"
       ],
 
-      // 新增类别，覆盖文档中出现的其他字段
       person_name: [
         "Name",
         "Full Name",
         "Customer Name",
-        "Contact Name"
+        "Contact Name",
+        "Account Holder",
+        "Account Manager",
+        "Manager",
+        "Agent",
+        "Contact Person",
+        "Support Agent",
+        "Sales Manager",
+        "Recipient",
+        "Name on Card",
+        "To",
+        "Attn",
+        "Attention",
+        "Contact",
+        "Customer"
       ],
 
       place_of_birth: [
@@ -220,7 +279,85 @@
         "Device ID",
         "IP Address",
         "MAC Address",
-        "Secret"
+        "Secret",
+        "Password",
+        "Passcode",
+        "PIN",
+        "OTP",
+        "2FA",
+        "Verification Code",
+        "Security Code",
+        "One-Time Code",
+        "Recovery Code",
+        "Backup Code",
+        "x-api-key",
+        "Refresh Token",
+        "Token",
+        "Auth Token",
+        "Client Secret",
+        "Secret Key",
+        "Authorization",
+        "SSN",
+        "Social Security Number",
+        "EIN",
+        "Employer Identification Number",
+        "National ID",
+        "ID Number",
+        "Tax ID",
+        "Tax Identification Number",
+        "TIN",
+        "Insurance ID",
+        "Policy ID",
+        "Claim ID",
+        "Member ID",
+        "Membership ID",
+        "ITIN",
+        "NINO",
+        "NHS Number",
+        "SIN",
+        "TFN",
+        "ABN",
+        "IPv4",
+        "IPv6",
+        "MAC Address",
+        "IMEI",
+        "Device ID",
+        "Fingerprint",
+        "User Agent",
+        "Account Number",
+        "Routing Number",
+        "Sort Code",
+        "IBAN",
+        "Credit Card",
+        "Debit Card",
+        "Card Number",
+        "Name on Card",
+        "SWIFT",
+        "SWIFT Code",
+        "BIC",
+        "Bank Name",
+        "Branch Code",
+        "Clearing Number",
+        "Transit Number",
+        "BSB",
+        "ABA",
+        "Expiry Date",
+        "Expiration Date",
+        "Valid Thru",
+        "Valid Through",
+        "CVV",
+        "CVC",
+        "AVS Data",
+        "3-D Secure",
+        "3DS",
+        "ECI",
+        "Security Answer",
+        "Wallet ID",
+        "Transaction Hash",
+        "TX Hash",
+        "TXN Hash",
+        "BTC",
+        "ETH"
       ]
     },
 
