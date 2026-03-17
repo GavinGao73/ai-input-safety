@@ -66,11 +66,26 @@
     },
 
     shrinkLabels: {
+      // 基础类别（原有）
       phone: ["Telefon", "Tel", "Handy", "Mobil", "Mobile", "Phone", "Kontakt"],
       account: ["Konto", "Kontonummer", "Account", "IBAN", "Kontoinhaber"],
       email: ["E-mail", "Email", "E-Mail"],
       address: ["Anschrift", "Adresse", "Address", "Rechnungsadresse", "Lieferadresse"],
-      bank: ["Bank", "Bankname", "BIC", "SWIFT", "Bankleitzahl", "BLZ"]
+      bank: ["Bank", "Bankname", "BIC", "SWIFT", "Bankleitzahl", "BLZ"],
+
+      // 新增类别，覆盖文档中出现的字段
+      person_name: ["Name", "Kundename", "Kontaktperson", "Ansprechpartner", "Sachbearbeiter"],
+      company: ["Firma", "Unternehmen", "GmbH", "AG", "GmbH & Co. KG"],
+      ref: ["Referenznummer", "Referenz", "Ref", "REF", "Bestellnummer", "Vertragsnummer", "Ticketnummer", "Kundennummer"],
+      money: ["Betrag", "Preis", "Gesamtbetrag", "Zwischensumme", "Umsatzsteuer", "Gutschrift"],
+      handle: ["User", "Benutzername", "Login"],
+      id_card: ["ID", "Identifikation", "Personalausweis"],
+      passport: ["Pass", "Reisepass"],
+      driver_license: ["Führerschein"],
+      license_plate: ["Kennzeichen", "Nummernschild"],
+      dob: ["Geburtsdatum", "Geburtstag"],
+      place_of_birth: ["Geburtsort"],
+      secret: ["Geheim", "API Key", "Access Token", "Session ID", "Device ID", "IP Adresse", "MAC Adresse"]
     },
 
     merge: {
