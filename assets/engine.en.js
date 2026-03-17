@@ -575,10 +575,9 @@
       },
 
       ref_generic_multi_tail: {
-        pattern:
-          /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-))(\d{4,}(?:-\d{4,})+)\b/gu,
-        tag: "REF",
-        mode: "prefix"
+        pattern: /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{4,}(?:-\d{4,})+))\b/gu,
+        tag: "REF"
+        // mode removed
       },
 
       ref_label_nextline: {
@@ -596,9 +595,9 @@
       },
 
       ref_generic_tail: {
-        pattern: /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-))(\d{5,})\b/gu,
-        tag: "REF",
-        mode: "prefix"
+        pattern: /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{5,}))\b/gu,
+        tag: "REF"
+        // mode removed
       },
 
       legal_ref_tail: {
