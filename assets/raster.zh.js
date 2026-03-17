@@ -18,8 +18,9 @@
     version: "r1",
 
     // 全局高度削减（像素），值越大黑条越矮。中文建议 4（比英文稍高）
-    globalHeightTrim: 4,
-
+    globalHeightTrim: 50,        // 高度削减
+    globalVerticalOffset: 10,     // 向下偏移更多，补偿上移
+    
     limits: {
       maxMatchLen: {
         manual_term: 90,
