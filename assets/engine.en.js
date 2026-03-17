@@ -567,39 +567,38 @@
         tag: "ADDRESS"
       },
 
-      // 修改后的 ref 规则：第二个捕获组为整个值（包括前缀和数字），保留 mode: "prefix"
+      // 修正后的 ref 规则：两个捕获组，第一个为标签，第二个为整个值（包括前缀和数字），保留 mode: "prefix"
       ref_label_multi_tail: {
-        pattern: /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*(?:[:：=]|-)[ \t]*)(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}?[-_.]\d{4,}(?:[-_.]\d{4,})+))/giu,
+        pattern: /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*(?:[:：=]|-)[ \t]*))(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}?[-_.]\d{4,}(?:[-_.]\d{4,})+))/giu,
         tag: "REF",
         mode: "prefix"
       },
 
-      // 通用规则：只有一个捕获组（整个值），无 mode，红删层直接覆盖整个匹配
+      // 通用规则：单个捕获组匹配整个值，无 mode
       ref_generic_multi_tail: {
         pattern: /\b(?!ERR-)(?!SKU:)([A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{4,}(?:-\d{4,})+)\b/gu,
         tag: "REF"
       },
 
       ref_label_nextline: {
-        pattern: /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*[:：=][ \t]*[\r]?\n[ \t]*)(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))/giu,
+        pattern: /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*[:：=][ \t]*[\r]?\n[ \t]*))(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))/giu,
         tag: "REF",
         mode: "prefix"
       },
 
       ref_label_tail: {
-        pattern: /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*(?:[:：=]|-)[ \t]*)(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))/giu,
+        pattern: /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*(?:[:：=]|-)[ \t]*))(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))/giu,
         tag: "REF",
         mode: "prefix"
       },
 
-      // 通用规则：只有一个捕获组
       ref_generic_tail: {
         pattern: /\b(?!ERR-)(?!SKU:)([A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{5,})\b/gu,
         tag: "REF"
       },
 
       legal_ref_tail: {
-        pattern: /((?:(?:contract[ \t]*number|claim[ \t]*reference|legal[ \t]*case[ \t]*ref)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))/giu,
+        pattern: /((?:(?:contract[ \t]*number|claim[ \t]*reference|legal[ \t]*case[ \t]*ref)[ \t]*[:：=][ \t]*))(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))/giu,
         tag: "REF",
         mode: "prefix"
       },
