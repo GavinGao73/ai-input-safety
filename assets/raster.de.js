@@ -1,7 +1,7 @@
 // =========================
 // assets/raster.de.js
 // Raster render profile: de
-// 已按中文结构补齐字段（新增列表为空）
+// 已按中文结构补齐字段（新增列表为空），并扩展 shrinkLabels 以匹配 engine.de.js 中的标签
 // =========================
 
 (function () {
@@ -66,47 +66,139 @@
     },
 
     shrinkLabels: {
-      // 基础类别（原有）
-      phone: ["Telefon", "Tel", "Handy", "Mobil", "Mobile", "Phone", "Kontakt"],
-      account: ["Konto", "Kontonummer", "Account", "IBAN", "Kontoinhaber"],
-      email: ["E-mail", "Email", "E-Mail"],
-      address: ["Anschrift", "Adresse", "Address", "Rechnungsadresse", "Lieferadresse"],
-      bank: ["Bank", "Bankname", "BIC", "SWIFT", "Bankleitzahl", "BLZ"],
+      // 电话类
+      phone: [
+        "Telefon", "Tel", "Handy", "Mobil", "Mobile", "Phone", "Kontakt",
+        "Mobiltelefon", "Festnetz", "Fax", "Telefonnummer", "Rufnummer"
+      ],
 
-      // 补充类别，覆盖文档中出现的字段
+      // 账户类（包括银行账号、信用卡等）
+      account: [
+        "Konto", "Kontonummer", "Account", "IBAN", "Kontoinhaber",
+        "Bankverbindung", "Kreditkarte", "Kartennummer", "Kreditkartennummer",
+        "Kreditkarten-Nr.", "Kreditkartentyp", "Karteninhaber", "CVC", "CVV",
+        "CVC2", "CAV2"
+      ],
+
+      // 电子邮件
+      email: [
+        "E-mail", "Email", "E-Mail", "Mail", "E-Mail-Adresse", "Mailadresse",
+        "Kontakt-E-Mail", "Kunden-E-Mail"
+      ],
+
+      // 地址类
+      address: [
+        "Anschrift", "Adresse", "Address", "Rechnungsadresse", "Lieferadresse",
+        "Straße", "Strasse", "Postadresse", "Versandadresse", "Hausadresse",
+        "Geschäftsadresse", "Privatadresse", "Wohnadresse", "Hauptadresse",
+        "Zusatz", "Adresszusatz", "Adressergänzung"
+      ],
+
+      // 银行类
+      bank: [
+        "Bank", "Bankname", "BIC", "SWIFT", "Bankleitzahl", "BLZ",
+        "Kreditinstitut", "Bankverbindung", "Bankleitzahl (BLZ)", "SWIFT-Code",
+        "SWIFT/BIC", "BIC/SWIFT"
+      ],
+
+      // 人名类（不包括尊称）
       person_name: [
-        "Name",
-        "Kundename",
-        "Kontaktperson",
-        "Ansprechpartner",
-        "Sachbearbeiter",
-        "Empfänger"
+        "Name", "Kundename", "Kunde", "Kontaktperson", "Kontakt",
+        "Ansprechpartner", "Ansprechperson", "Sachbearbeiter", "Bearbeiter",
+        "Empfänger", "Rechnungsempfänger", "Versicherte Person", "Patient",
+        "Kontoinhaber"
       ],
-      company: ["Firma", "Unternehmen", "GmbH", "AG", "GmbH & Co. KG"],
+
+      // 公司类
+      company: [
+        "Firma", "Unternehmen", "GmbH", "AG", "GmbH & Co. KG", "UG",
+        "KGaA", "OHG", "PartG", "eG", "GbR", "e.K.", "Company", "Organization",
+        "Supplier", "Legal Entity", "Registered Company", "Billing Company",
+        "Firmenname", "Firmenbezeichnung", "Handelsname"
+      ],
+
+      // 参考编号类
       ref: [
-        "Referenznummer",
-        "Referenz",
-        "Ref",
-        "REF",
-        "Bestellnummer",
-        "Vertragsnummer",
-        "Ticketnummer",
-        "Kundennummer",
-        "Vorgangs-ID",
-        "Interne Sicherheitsreferenz",
-        "Rechtsfall-Referenz",
-        "Claim Reference"
+        "Referenznummer", "Referenz", "Ref", "REF", "Bestellnummer", "Vertragsnummer",
+        "Ticketnummer", "Kundennummer", "Vorgangs-ID", "Vorgangsnummer",
+        "Interne Sicherheitsreferenz", "Rechtsfall-Referenz", "Claim Reference",
+        "Aktenzeichen", "Geschäftszeichen", "Antragsnummer", "Rechnungsnummer",
+        "Rechnungsnr", "Rechnungs-Nr.", "Liefernummer", "Lieferscheinnummer",
+        "Schadensnummer", "Schadennummer", "Schaden-Nr.", "Legal Case Ref",
+        "Contract Number", "Police(n)nummer", "Policen-Nr.", "Policy Number",
+        "Member ID", "Mitgliedsnummer", "Versicherungsnummer", "Versichertennummer",
+        "Krankenversichertennummer", "Sozialversicherungsnummer", "SV-Nummer",
+        "Rentenversicherungsnummer", "Steuer-ID", "Steueridentifikationsnummer",
+        "USt-IdNr", "Umsatzsteuer-ID", "VAT ID"
       ],
-      money: ["Betrag", "Preis", "Gesamtbetrag", "Zwischensumme", "Umsatzsteuer", "Gutschrift"],
-      handle: ["User", "Benutzername", "Login"],
-      id_card: ["ID", "Identifikation", "Personalausweis"],
-      passport: ["Pass", "Reisepass"],
-      driver_license: ["Führerschein"],
-      license_plate: ["Kennzeichen", "Nummernschild"],
-      dob: ["Geburtsdatum", "Geburtstag"],
-      place_of_birth: ["Geburtsort"],
-      secret: ["Geheim", "API Key", "Access Token", "Session ID", "Device ID", "IP Adresse", "MAC Adresse"],
-      datetime: ["Login Zeit", "Datum", "Zeit"]
+
+      // 金额类
+      money: [
+        "Betrag", "Preis", "Gesamtbetrag", "Zwischensumme", "Umsatzsteuer",
+        "Gutschrift", "Summe", "Total", "Netto", "Brutto", "Rechnungsbetrag",
+        "Zahlungsbetrag", "Kosten", "Gebühr", "Rabatt", "Nachlass", "Einrichtungsgebühr",
+        "Monatliche Rate", "Vertragswert", "Kulanznachlass", "Service Fee",
+        "Tax Amount", "Total Amount", "Contract Amount", "Amount"
+      ],
+
+      // 用户名/句柄类
+      handle: [
+        "User", "Benutzername", "Login", "Username", "Account", "Login-ID",
+        "User-ID", "Benutzerkennung", "Loginname", "Kontoname", "Handle"
+      ],
+
+      // 身份证件类
+      id_card: [
+        "ID", "Identifikation", "Personalausweis", "Personalausweisnummer",
+        "Ausweisnummer", "Ausweis", "ID-Nummer", "Identifikationsnummer"
+      ],
+
+      // 护照类
+      passport: [
+        "Pass", "Reisepass", "Reisepassnummer", "Passnummer", "Pass-Nr."
+      ],
+
+      // 驾照类
+      driver_license: [
+        "Führerschein", "Führerscheinnummer", "Führerschein-Nr.", "Fuehrerschein",
+        "Führerscheinklasse", "Fahrerlaubnis", "Fahrerlaubnisnummer"
+      ],
+
+      // 车牌类
+      license_plate: [
+        "Kennzeichen", "Nummernschild", "Kfz-Kennzeichen", "Auto-Kennzeichen",
+        "Fahrzeugkennzeichen"
+      ],
+
+      // 出生日期类
+      dob: [
+        "Geburtsdatum", "Geb. Datum", "Geburtstag", "Geburtsjahr",
+        "Date of Birth", "DOB", "Birth Date"
+      ],
+
+      // 出生地类
+      place_of_birth: [
+        "Geburtsort", "Geburtsstadt", "Birthplace"
+      ],
+
+      // 秘密/敏感信息类
+      secret: [
+        "Geheim", "API Key", "Access Token", "Session ID", "Device ID",
+        "IP Adresse", "MAC Adresse", "Passwort", "Kennwort", "PIN", "TAN",
+        "OTP", "2FA", "Sicherheitscode", "Client Secret", "Auth Token",
+        "Authorization", "Bearer", "Security Answer", "Answer", "Sicherheitsantwort",
+        "Antwort", "Zugangsdaten", "Login-Daten", "Authentifizierungscode",
+        "Bestätigungscode", "Transaktionsnummer", "Transaction Number",
+        "Geheimcode", "Geheimzahl", "Persönliche Identifikationsnummer"
+      ],
+
+      // 日期时间类
+      datetime: [
+        "Login Zeit", "Datum", "Zeit", "Gültig bis", "Ablaufdatum", "Expiry",
+        "Expiration", "Valid Thru", "Valid Through", "Gueltig bis", "Gültigkeitsdatum",
+        "Ausstellungsdatum", "Erstellungsdatum", "Zugriffszeit", "Letzte Änderung",
+        "Letzter Login", "Zeitpunkt", "Timestamp"
+      ]
     },
 
     merge: {
