@@ -1192,7 +1192,7 @@
       return all;
     },
 
-    buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
+      buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
   const tuning = getLangTuning(lang);
   const rects = [];
 
