@@ -283,7 +283,7 @@
 
     if (w <= 0 || h <= 0) continue;
 
-    ctx.fillStyle = "#000";
+    ctx.fillStyle = "#8B0000";
     ctx.fillRect(x, y, w, h);
   }
 
