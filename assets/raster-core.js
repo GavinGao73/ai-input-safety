@@ -2,8 +2,8 @@
  * assets/raster-core.js
  * Raster geometry / matching core (language-agnostic)
  * 修改记录：
- * - 增加从语言包读取的全局垂直偏移 globalVerticalOffset（默认3）
- * - 增加从语言包读取的全局高度削减 globalHeightTrim（默认2）
+ * - 增加全局垂直偏移常数 GLOBAL_VERTICAL_OFFSET = 3（像素），所有矩形整体下移
+ * - 同时调整高度计算，确保高度不变
  * ======================================================= */
 
 (function () {
@@ -116,9 +116,8 @@
       collapseHitIdKeys: [],
       paragraphSensitiveKeys: [],
       englishInlineValueKeys: [],
-      // 新增全局参数
       globalHeightTrim: 2,
-      globalVerticalOffset: 3,
+      globalVerticalOffset: 3,  // 新增默认垂直偏移
       rectPolicy: {
         coverWholeItemRatio: {
           default: 0.72,
@@ -154,7 +153,6 @@
       collapseHitIdKeys: picked.collapseHitIdKeys !== undefined ? picked.collapseHitIdKeys : base.collapseHitIdKeys,
       paragraphSensitiveKeys: picked.paragraphSensitiveKeys !== undefined ? picked.paragraphSensitiveKeys : base.paragraphSensitiveKeys,
       englishInlineValueKeys: picked.englishInlineValueKeys !== undefined ? picked.englishInlineValueKeys : base.englishInlineValueKeys,
-      // 合并新增参数
       globalHeightTrim: picked.globalHeightTrim !== undefined ? picked.globalHeightTrim : base.globalHeightTrim,
       globalVerticalOffset: picked.globalVerticalOffset !== undefined ? picked.globalVerticalOffset : base.globalVerticalOffset,
       rectPolicy: {
@@ -1090,7 +1088,7 @@
 
       const sub = s.slice(ls, le);
       const labels = (tuning && tuning.shrinkLabels) || {};
-      const re = RectEngine.makeLabelPrefixRe(labels[key]);
+      const re = RectEngine.makeLabelPrefixRe(labels[key]); // 直接使用 labels[key]
       const mm = re ? sub.match(re) : null;
       if (mm && mm[0]) ls += mm[0].length;
 
