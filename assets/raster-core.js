@@ -4,6 +4,7 @@
  * 修改记录：
  * - 增加全局垂直偏移常数 GLOBAL_VERTICAL_OFFSET = 3（像素），所有矩形整体下移
  * - 同时调整高度计算，确保高度不变
+ * - 增加 ignorePreferSubKeys 支持，允许语言包指定忽略 preferSub 的 key
  * ======================================================= */
 
 (function () {
@@ -118,6 +119,8 @@
       englishInlineValueKeys: [],
       globalHeightTrim: 2,
       globalVerticalOffset: 3,  // 新增默认垂直偏移
+      // 新增：忽略 preferSub 的 key 列表，默认空
+      ignorePreferSubKeys: [],
       rectPolicy: {
         coverWholeItemRatio: {
           default: 0.72,
@@ -155,6 +158,8 @@
       englishInlineValueKeys: picked.englishInlineValueKeys !== undefined ? picked.englishInlineValueKeys : base.englishInlineValueKeys,
       globalHeightTrim: picked.globalHeightTrim !== undefined ? picked.globalHeightTrim : base.globalHeightTrim,
       globalVerticalOffset: picked.globalVerticalOffset !== undefined ? picked.globalVerticalOffset : base.globalVerticalOffset,
+      // 新增合并 ignorePreferSubKeys
+      ignorePreferSubKeys: picked.ignorePreferSubKeys !== undefined ? picked.ignorePreferSubKeys : base.ignorePreferSubKeys,
       rectPolicy: {
         ...(base.rectPolicy || {}),
         ...(picked.rectPolicy || {}),
@@ -1230,10 +1235,13 @@
           const wholeValueMode =
             RectEngine.isWholeValueRectKey(key, tuning) && !isEnglishInlineValue;
 
+          // 新增：检查是否应忽略 preferSub
+          const ignorePreferSub = tuning.ignorePreferSubKeys && tuning.ignorePreferSubKeys.includes(key);
+
           if (wholeValueMode) {
             ls = 0;
             le = s.length;
-          } else if (preferSub) {
+          } else if (preferSub && !ignorePreferSub) {
             const subA = A + Number(preferSub.offsetStart || 0);
             const subB = A + Number(preferSub.offsetEnd || 0);
             const a1 = Math.max(subA, r.start);
