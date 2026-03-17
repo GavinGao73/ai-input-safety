@@ -16,7 +16,7 @@
     version: "r1",
 
     // 全局高度削减（像素），值越大黑条越矮。英文建议 5
-    globalHeightTrim: 35,        // 高度削减
+    globalHeightTrim: 30,        // 高度削减
     globalVerticalOffset: 30,     // 向下偏移更多，补偿上移
 
     limits: {
