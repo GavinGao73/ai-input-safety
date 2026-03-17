@@ -569,8 +569,9 @@
 
       // 修改 ref_label_multi_tail 为匹配整个值，移除 mode
       ref_label_multi_tail: {
-        pattern: /\b((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*(?:[:：=]|-)[ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}?[-_.]\d{4,}(?:[-_.]\d{4,})+))\b/giu,
-        tag: "REF"
+        pattern: /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*(?:[:：=]|-)[ \t]*)(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}?[-_.]\d{4,}(?:[-_.]\d{4,})+)))/giu,
+        tag: "REF",
+        mode: "prefix"
       },
 
       // 修改 ref_generic_multi_tail 为匹配整个值，移除 mode
