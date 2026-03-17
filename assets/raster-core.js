@@ -1196,8 +1196,8 @@
       const tuning = getLangTuning(lang);
       const rects = [];
 
-      // ========== 全局垂直偏移常数（像素） ==========
-      const GLOBAL_VERTICAL_OFFSET = 3; // 正值向下移动，负值向上。请根据需要调整
+      // ========== 从语言包读取全局垂直偏移（像素） ==========
+      const globalVerticalOffset = tuning.globalVerticalOffset !== undefined ? tuning.globalVerticalOffset : 3; // 默认 3
 
       for (const sp of RectEngine.filterAndMergeSpans(spans, tuning)) {
         const A = sp.a;
@@ -1293,9 +1293,9 @@
             ? Math.min(4.0, Math.max(2.0, bb.w * 0.04))
             : 0;
 
-          // 应用全局垂直偏移
+          // 应用全局垂直偏移（从语言包读取）
           const rx = clamp(x1 - padX - nameLeftShift, 0, viewport.width);
-          const ry = clamp(bb.y - padY + visualDownShift + GLOBAL_VERTICAL_OFFSET, 0, viewport.height);
+          const ry = clamp(bb.y - padY + visualDownShift + globalVerticalOffset, 0, viewport.height);
           const rw = clamp(
             (x2 - x1) + padX * 2 + nameLeftShift,
             1,
@@ -1304,7 +1304,7 @@
           const rh = clamp(
             bb.h + padY * 2 - visualHeightTrim,
             3,
-            viewport.height - clamp(bb.y - padY + visualDownShift + GLOBAL_VERTICAL_OFFSET, 0, viewport.height)
+            viewport.height - clamp(bb.y - padY + visualDownShift + globalVerticalOffset, 0, viewport.height)
           );
 
           // 可选的 key 特殊限制（可迁移到语言包）
@@ -1329,6 +1329,97 @@
 
       const out = [];
       const paragraphSensitiveSet = new Set(tuning.paragraphSensitiveKeys || []);
+
+      function canMergeRects(a, b) {
+        if (!a || !b) return false;
+        if (a.key !== b.key) return false;
+
+        const aHit = String(a.hitId || "");
+        const bHit = String(b.hitId || "");
+
+        if (aHit && bHit && aHit !== bHit) return false;
+
+        const overlap = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+        const minH = Math.max(1, Math.min(a.h, b.h));
+        const sameLine = (overlap / minH) > 0.80;
+        const similarHeight = (Math.min(a.h, b.h) / Math.max(a.h, b.h)) > 0.72;
+        const gap = b.x - (a.x + a.w);
+
+        const k = String(a.key || "");
+        const isParagraphSensitive = paragraphSensitiveSet.has(k);
+
+        const near = isParagraphSensitive
+          ? (gap <= Math.max(1.5, Math.min(a.h, b.h) * 0.12) && gap >= -1)
+          : (gap <= Math.max(nearGap, Math.min(a.h, b.h) * 0.45) && gap >= -3);
+
+        return sameLine && similarHeight && near;
+      }
+
+      function mergeTwoRects(a, b) {
+        const nx = Math.min(a.x, b.x);
+        const ny = Math.min(a.y, b.y);
+        const nr = Math.max(a.x + a.w, b.x + b.w);
+        const nb = Math.max(a.y + a.h, b.y + b.h);
+
+        return {
+          x: nx,
+          y: ny,
+          w: nr - nx,
+          h: nb - ny,
+          key: a.key,
+          hitId: a.hitId || b.hitId || ""
+        };
+      }
+
+      for (const r of rects) {
+        if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
+
+        const candidate = {
+          x: r.x,
+          y: r.y,
+          w: r.w,
+          h: r.h,
+          key: r.key,
+          hitId: r.hitId
+        };
+
+        if (!out.length) {
+          out.push(candidate);
+          continue;
+        }
+
+        const last = out[out.length - 1];
+        if (canMergeRects(last, candidate)) {
+          out[out.length - 1] = mergeTwoRects(last, candidate);
+        } else {
+          out.push(candidate);
+        }
+      }
+
+      let changed = true;
+      while (changed && out.length > 1) {
+        changed = false;
+        const pass = [];
+
+        for (const r of out) {
+          const last = pass[pass.length - 1];
+          if (last && canMergeRects(last, r)) {
+            pass[pass.length - 1] = mergeTwoRects(last, r);
+            changed = true;
+          } else {
+            pass.push(r);
+          }
+        }
+
+        out.length = 0;
+        out.push(...pass);
+      }
+
+      return RectEngine.collapseRectsByHitId(
+        out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId })),
+        lang
+      );
+    }
 
       function canMergeRects(a, b) {
         if (!a || !b) return false;
