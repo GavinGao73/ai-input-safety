@@ -1342,9 +1342,6 @@
 
       const out = [];
       const paragraphSensitiveSet = new Set(tuning.paragraphSensitiveKeys || []);
-
-      // ... 后续合并代码保持不变
-    }
     
       function canMergeRects(a, b) {
         if (!a || !b) return false;
