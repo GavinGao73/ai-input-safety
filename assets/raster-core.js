@@ -1238,6 +1238,12 @@
           // 新增：检查是否应忽略 preferSub
           const ignorePreferSub = tuning.ignorePreferSubKeys && tuning.ignorePreferSubKeys.includes(key);
 
+          // ====== 调试日志 ======
+          console.log(`处理 key: ${key}, preferSub: ${!!preferSub}, ignorePreferSub: ${ignorePreferSub}, wholeValueMode: ${wholeValueMode}`);
+          if (preferSub) {
+            console.log(`  preferSub offsets: start=${preferSub.offsetStart}, end=${preferSub.offsetEnd}`);
+          }
+
           if (wholeValueMode) {
             ls = 0;
             le = s.length;
@@ -1337,6 +1343,9 @@
       const out = [];
       const paragraphSensitiveSet = new Set(tuning.paragraphSensitiveKeys || []);
 
+      // ... 后续合并代码保持不变
+    }
+    
       function canMergeRects(a, b) {
         if (!a || !b) return false;
         if (a.key !== b.key) return false;
