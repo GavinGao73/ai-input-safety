@@ -73,10 +73,30 @@
       address: ["Anschrift", "Adresse", "Address", "Rechnungsadresse", "Lieferadresse"],
       bank: ["Bank", "Bankname", "BIC", "SWIFT", "Bankleitzahl", "BLZ"],
 
-      // 新增类别，覆盖文档中出现的字段
-      person_name: ["Name", "Kundename", "Kontaktperson", "Ansprechpartner", "Sachbearbeiter"],
+      // 补充类别，覆盖文档中出现的字段
+      person_name: [
+        "Name",
+        "Kundename",
+        "Kontaktperson",
+        "Ansprechpartner",
+        "Sachbearbeiter",
+        "Empfänger"
+      ],
       company: ["Firma", "Unternehmen", "GmbH", "AG", "GmbH & Co. KG"],
-      ref: ["Referenznummer", "Referenz", "Ref", "REF", "Bestellnummer", "Vertragsnummer", "Ticketnummer", "Kundennummer"],
+      ref: [
+        "Referenznummer",
+        "Referenz",
+        "Ref",
+        "REF",
+        "Bestellnummer",
+        "Vertragsnummer",
+        "Ticketnummer",
+        "Kundennummer",
+        "Vorgangs-ID",
+        "Interne Sicherheitsreferenz",
+        "Rechtsfall-Referenz",
+        "Claim Reference"
+      ],
       money: ["Betrag", "Preis", "Gesamtbetrag", "Zwischensumme", "Umsatzsteuer", "Gutschrift"],
       handle: ["User", "Benutzername", "Login"],
       id_card: ["ID", "Identifikation", "Personalausweis"],
@@ -85,7 +105,8 @@
       license_plate: ["Kennzeichen", "Nummernschild"],
       dob: ["Geburtsdatum", "Geburtstag"],
       place_of_birth: ["Geburtsort"],
-      secret: ["Geheim", "API Key", "Access Token", "Session ID", "Device ID", "IP Adresse", "MAC Adresse"]
+      secret: ["Geheim", "API Key", "Access Token", "Session ID", "Device ID", "IP Adresse", "MAC Adresse"],
+      datetime: ["Login Zeit", "Datum", "Zeit"]
     },
 
     merge: {
