@@ -2,8 +2,8 @@
  * assets/raster-core.js
  * Raster geometry / matching core (language-agnostic)
  * 修改记录：
- * - 增加全局垂直偏移常数 GLOBAL_VERTICAL_OFFSET = 3（像素），所有矩形整体下移
- * - 同时调整高度计算，确保高度不变
+ * - 增加从语言包读取的全局垂直偏移 globalVerticalOffset（默认3）
+ * - 增加从语言包读取的全局高度削减 globalHeightTrim（默认2）
  * ======================================================= */
 
 (function () {
@@ -116,6 +116,9 @@
       collapseHitIdKeys: [],
       paragraphSensitiveKeys: [],
       englishInlineValueKeys: [],
+      // 新增全局参数
+      globalHeightTrim: 2,
+      globalVerticalOffset: 3,
       rectPolicy: {
         coverWholeItemRatio: {
           default: 0.72,
@@ -151,6 +154,9 @@
       collapseHitIdKeys: picked.collapseHitIdKeys !== undefined ? picked.collapseHitIdKeys : base.collapseHitIdKeys,
       paragraphSensitiveKeys: picked.paragraphSensitiveKeys !== undefined ? picked.paragraphSensitiveKeys : base.paragraphSensitiveKeys,
       englishInlineValueKeys: picked.englishInlineValueKeys !== undefined ? picked.englishInlineValueKeys : base.englishInlineValueKeys,
+      // 合并新增参数
+      globalHeightTrim: picked.globalHeightTrim !== undefined ? picked.globalHeightTrim : base.globalHeightTrim,
+      globalVerticalOffset: picked.globalVerticalOffset !== undefined ? picked.globalVerticalOffset : base.globalVerticalOffset,
       rectPolicy: {
         ...(base.rectPolicy || {}),
         ...(picked.rectPolicy || {}),
@@ -1084,132 +1090,6 @@
 
       const sub = s.slice(ls, le);
       const labels = (tuning && tuning.shrinkLabels) || {};
-      const re = RectEngine.makeLabelPrefixRe(labels[key]); // 直接使用 labels[key]
-      const mm = re ? sub.match(re) : null;
-      if (mm && mm[0]) ls += mm[0].length;
-
-      while (ls < le && RectEngine.weakTrim(s[ls])) ls++;
-      while (le > ls && RectEngine.weakTrim(s[le - 1])) le--;
-
-      return { ls, le };
-    },
-
-    padForKey(key, tuning) {
-      const pad = (tuning && tuning.pad) || {};
-      const policy = (tuning && tuning.rectPolicy) || {};
-      const overrides = (policy && policy.padOverrides) || {};
-      const k = String(key || "");
-
-      return overrides[k] || pad[k] || pad._default || { pxW: 0.005, pyH: 0.045, minX: 0.55, minY: 0.75 };
-    },
-
-    shouldSkipLabelShrink(key, tuning) {
-      const list = tuning.skipLabelShrinkKeys || [];
-      return list.includes(String(key || ""));
-    },
-
-    isWholeValueRectKey(key, tuning) {
-      const list = tuning.wholeValueKeys || [];
-      return list.includes(String(key || ""));
-    },
-
-    filterAndMergeSpans(spans, tuning) {
-      const MAX_MATCH_LEN = Object.assign({}, (((tuning && tuning.limits) || {}).maxMatchLen) || {});
-      const merged = [];
-
-      for (const sp of spans || []) {
-        if (!sp || !sp.key) continue;
-        if ((sp.b - sp.a) > (MAX_MATCH_LEN[sp.key] || 120)) continue;
-
-        const last = merged[merged.length - 1];
-        if (last && last.key === sp.key && sp.a <= last.b) {
-          last.b = Math.max(last.b, sp.b);
-        } else {
-          merged.push({
-            a: sp.a,
-            b: sp.b,
-            key: sp.key,
-            preferSub: sp.preferSub || null,
-            hitId: sp.hitId || ""
-          });
-        }
-      }
-
-      return merged;
-    },
-
-    shouldCollapseHitId(key, tuning) {
-      const list = tuning.collapseHitIdKeys || [];
-      return list.includes(String(key || ""));
-    },
-
-    collapseRectsByHitId(rects, lang) {
-      if (!Array.isArray(rects) || !rects.length) return rects || [];
-      const tuning = getLangTuning(lang);
-
-      const keep = [];
-      const groups = new Map();
-
-      for (const r of rects) {
-        const key = String((r && r.key) || "");
-        const hitId = String((r && r.hitId) || "");
-
-        if (!hitId || !RectEngine.shouldCollapseHitId(key, tuning)) {
-          keep.push(r);
-          continue;
-        }
-
-        const gid = key + "::" + hitId;
-        if (!groups.has(gid)) {
-          groups.set(gid, {
-            x1: Number(r.x),
-            y1: Number(r.y),
-            x2: Number(r.x) + Number(r.w),
-            y2: Number(r.y) + Number(r.h),
-            key,
-            hitId
-          });
-        } else {
-          const g = groups.get(gid);
-          g.x1 = Math.min(g.x1, Number(r.x));
-          g.y1 = Math.min(g.y1, Number(r.y));
-          g.x2 = Math.max(g.x2, Number(r.x) + Number(r.w));
-          g.y2 = Math.max(g.y2, Number(r.y) + Number(r.h));
-        }
-      }
-
-      const collapsed = Array.from(groups.values()).map((g) => ({
-        x: g.x1,
-        y: g.y1,
-        w: Math.max(1, g.x2 - g.x1),
-        h: Math.max(1, g.y2 - g.y1),
-        key: g.key,
-        hitId: g.hitId
-      }));
-
-      const all = keep.concat(collapsed);
-      all.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-      return all;
-    },
-
-    const RectEngine = {
-    weakTrim(ch) {
-      if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return true;
-      return ":：,，;；()（）[]【】<>《》\"'“”‘’".includes(ch);
-    },
-
-    makeLabelPrefixRe(words) {
-      if (!Array.isArray(words) || !words.length) return null;
-      const parts = words.map((w) => String(w || "").trim()).filter(Boolean).map(escapeRegExp);
-      if (!parts.length) return null;
-      try { return new RegExp(`^(?:${parts.join("|")})\\s*[:：]?\\s*`, "i"); } catch (_) { return null; }
-    },
-
-    shrinkByLabel(key, s, ls, le, tuning) {
-      if (key === "manual_term" || le <= ls) return { ls, le };
-
-      const sub = s.slice(ls, le);
-      const labels = (tuning && tuning.shrinkLabels) || {};
       const re = RectEngine.makeLabelPrefixRe(labels[key]);
       const mm = re ? sub.match(re) : null;
       if (mm && mm[0]) ls += mm[0].length;
@@ -1546,8 +1426,7 @@
         lang
       );
     }
-  };   
-
+  };
 
   function normalizeCoreHit(hit) { return SpanEngine.normalizeCoreHit(hit); }
   function buildPageTextAndRangesFromItems(textContentOrItems) { return SpanEngine.buildPageTextAndRangesFromItems(textContentOrItems); }
