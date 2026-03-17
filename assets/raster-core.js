@@ -1193,258 +1193,233 @@
     },
 
     buildRects(pdfjsLib, viewport, items, itemRanges, spans, lang, nearGap) {
-      const tuning = getLangTuning(lang);
-      const rects = [];
+  const tuning = getLangTuning(lang);
+  const rects = [];
 
-      // ========== 从语言包读取全局垂直偏移（像素） ==========
-      const globalVerticalOffset = tuning.globalVerticalOffset !== undefined ? tuning.globalVerticalOffset : 3; // 默认 3
+  // ========== 从语言包读取全局垂直偏移（像素） ==========
+  const globalVerticalOffset = tuning.globalVerticalOffset !== undefined ? tuning.globalVerticalOffset : 3; // 默认 3
 
-      for (const sp of RectEngine.filterAndMergeSpans(spans, tuning)) {
-        const A = sp.a;
-        const B = sp.b;
-        const key = sp.key;
-        const preferSub = sp.preferSub;
-        const hitId = safeString(sp.hitId || "");
+  for (const sp of RectEngine.filterAndMergeSpans(spans, tuning)) {
+    const A = sp.a;
+    const B = sp.b;
+    const key = sp.key;
+    const preferSub = sp.preferSub;
+    const hitId = safeString(sp.hitId || "");
 
-        for (const r of itemRanges) {
-          const a0 = Math.max(A, r.start);
-          const b0 = Math.min(B, r.end);
-          if (b0 <= a0) continue;
+    for (const r of itemRanges) {
+      const a0 = Math.max(A, r.start);
+      const b0 = Math.min(B, r.end);
+      if (b0 <= a0) continue;
 
-          const it = items[r.idx];
-          const s = String(it.str || "");
-          if (!s) continue;
+      const it = items[r.idx];
+      const s = String(it.str || "");
+      if (!s) continue;
 
-          let ls = a0 - r.start;
-          let le = b0 - r.start;
+      let ls = a0 - r.start;
+      let le = b0 - r.start;
 
-          const isEnglish = normLang(lang) === "en";
-          const englishInlineValueSet = new Set(tuning.englishInlineValueKeys || []);
-          const isEnglishInlineValue =
-            isEnglish && englishInlineValueSet.has(String(key || ""));
+      const isEnglish = normLang(lang) === "en";
+      const englishInlineValueSet = new Set(tuning.englishInlineValueKeys || []);
+      const isEnglishInlineValue =
+        isEnglish && englishInlineValueSet.has(String(key || ""));
 
-          const wholeValueMode =
-            RectEngine.isWholeValueRectKey(key, tuning) && !isEnglishInlineValue;
+      const wholeValueMode =
+        RectEngine.isWholeValueRectKey(key, tuning) && !isEnglishInlineValue;
 
-          if (wholeValueMode) {
-            ls = 0;
-            le = s.length;
-          } else if (preferSub) {
-            const subA = A + Number(preferSub.offsetStart || 0);
-            const subB = A + Number(preferSub.offsetEnd || 0);
-            const a1 = Math.max(subA, r.start);
-            const b1 = Math.min(subB, r.end);
-            if (b1 > a1) {
-              ls = a1 - r.start;
-              le = b1 - r.start;
-            } else {
-              continue;
-            }
-          } else {
-            const skipLabelShrink =
-              RectEngine.shouldSkipLabelShrink(key, tuning) && !isEnglishInlineValue;
-
-            if (!skipLabelShrink) {
-              const shr = RectEngine.shrinkByLabel(key, s, ls, le, tuning);
-              ls = shr.ls;
-              le = shr.le;
-              if (le <= ls) continue;
-            }
-          }
-
-          const bb = BBoxEngine.rectBox(pdfjsLib, viewport, it, key, lang);
-          const len = Math.max(1, s.length);
-
-          ls = clamp(ls, 0, len);
-          le = clamp(le, 0, len);
-          if (le <= ls) continue;
-
-          const coveredLen = le - ls;
-          const wholeByKey = wholeValueMode;
-          const coverRatioCfg = (((tuning || {}).rectPolicy || {}).coverWholeItemRatio) || {};
-          const coverDefault = Number(coverRatioCfg.default || 0.72);
-          const coverEnglishDefault = Number(coverRatioCfg.enDefault || 0.90);
-
-          const coverWholeItem =
-            wholeByKey ||
-            len <= 2 ||
-            coveredLen >= len * (isEnglish ? coverEnglishDefault : coverDefault);
-
-          const x1 = coverWholeItem ? bb.x : (bb.x + bb.w * (ls / len));
-          const x2 = coverWholeItem ? (bb.x + bb.w) : (bb.x + bb.w * (le / len));
-
-          const pcfg = RectEngine.padForKey(key, tuning);
-          const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
-          const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
-
-          // 视觉微调：下移量固定为 2，高度削减从语言包读取
-          const visualDownShift = 2;
-          const visualHeightTrim = tuning.globalHeightTrim !== undefined ? tuning.globalHeightTrim : 2;
-
-          // ====== 调试日志 ======
-          console.log(`[${key}] bb.h=${bb.h.toFixed(2)}, padY=${padY.toFixed(2)}, visualHeightTrim=${visualHeightTrim}`);
-          const rhRaw = bb.h + padY * 2 - visualHeightTrim;
-          console.log(`rhRaw=${rhRaw.toFixed(2)}`);
-
-          const nameLeftShift =
-            (key === "person_name" ||
-             key === "person_name_keep_title" ||
-             key === "account_holder_name_keep_title")
-            ? Math.min(4.0, Math.max(2.0, bb.w * 0.04))
-            : 0;
-
-          // 应用全局垂直偏移（从语言包读取）
-          const rx = clamp(x1 - padX - nameLeftShift, 0, viewport.width);
-          const ry = clamp(bb.y - padY + visualDownShift + globalVerticalOffset, 0, viewport.height);
-          const rw = clamp(
-            (x2 - x1) + padX * 2 + nameLeftShift,
-            1,
-            viewport.width - clamp(x1 - padX - nameLeftShift, 0, viewport.width)
-          );
-          const rh = clamp(
-            bb.h + padY * 2 - visualHeightTrim,
-            3,
-            viewport.height - clamp(bb.y - padY + visualDownShift + globalVerticalOffset, 0, viewport.height)
-          );
-
-          // 可选的 key 特殊限制（可迁移到语言包）
-          if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
-            if (rw > Math.min(viewport.width * 0.16, bb.w * 0.90)) continue;
-          }
-          if (key === "company") {
-            if (rw > Math.min(viewport.width * 0.40, bb.w * 1.50)) continue;
-          }
-          if (key === "manual_term") {
-            if (rw > Math.min(viewport.width * 0.45, bb.w * 1.60)) continue;
-          }
-          if (rw > viewport.width * 0.92 || rh > viewport.height * 0.35 || (rw > viewport.width * 0.85 && rh > viewport.height * 0.20)) continue;
-
-          rects.push({ x: rx, y: ry, w: rw, h: rh, key, hitId });
-        }
-      }
-
-      if (!rects.length) return [];
-
-      rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-
-      const out = [];
-      const paragraphSensitiveSet = new Set(tuning.paragraphSensitiveKeys || []);
-
-      function canMergeRects(a, b) {
-        if (!a || !b) return false;
-        if (a.key !== b.key) return false;
-
-        const aHit = String(a.hitId || "");
-        const bHit = String(b.hitId || "");
-
-        if (aHit && bHit && aHit !== bHit) return false;
-
-        const overlap = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
-        const minH = Math.max(1, Math.min(a.h, b.h));
-        const sameLine = (overlap / minH) > 0.80;
-        const similarHeight = (Math.min(a.h, b.h) / Math.max(a.h, b.h)) > 0.72;
-        const gap = b.x - (a.x + a.w);
-
-        const k = String(a.key || "");
-        const isParagraphSensitive = paragraphSensitiveSet.has(k);
-
-        const near = isParagraphSensitive
-          ? (gap <= Math.max(1.5, Math.min(a.h, b.h) * 0.12) && gap >= -1)
-          : (gap <= Math.max(nearGap, Math.min(a.h, b.h) * 0.45) && gap >= -3);
-
-        return sameLine && similarHeight && near;
-      }
-
-      function mergeTwoRects(a, b) {
-        const nx = Math.min(a.x, b.x);
-        const ny = Math.min(a.y, b.y);
-        const nr = Math.max(a.x + a.w, b.x + b.w);
-        const nb = Math.max(a.y + a.h, b.y + b.h);
-
-        return {
-          x: nx,
-          y: ny,
-          w: nr - nx,
-          h: nb - ny,
-          key: a.key,
-          hitId: a.hitId || b.hitId || ""
-        };
-      }
-
-      for (const r of rects) {
-        if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
-
-        const candidate = {
-          x: r.x,
-          y: r.y,
-          w: r.w,
-          h: r.h,
-          key: r.key,
-          hitId: r.hitId
-        };
-
-        if (!out.length) {
-          out.push(candidate);
+      if (wholeValueMode) {
+        ls = 0;
+        le = s.length;
+      } else if (preferSub) {
+        const subA = A + Number(preferSub.offsetStart || 0);
+        const subB = A + Number(preferSub.offsetEnd || 0);
+        const a1 = Math.max(subA, r.start);
+        const b1 = Math.min(subB, r.end);
+        if (b1 > a1) {
+          ls = a1 - r.start;
+          le = b1 - r.start;
+        } else {
           continue;
         }
+      } else {
+        const skipLabelShrink =
+          RectEngine.shouldSkipLabelShrink(key, tuning) && !isEnglishInlineValue;
 
-        const last = out[out.length - 1];
-        if (canMergeRects(last, candidate)) {
-          out[out.length - 1] = mergeTwoRects(last, candidate);
-        } else {
-          out.push(candidate);
+        if (!skipLabelShrink) {
+          const shr = RectEngine.shrinkByLabel(key, s, ls, le, tuning);
+          ls = shr.ls;
+          le = shr.le;
+          if (le <= ls) continue;
         }
       }
 
-      let changed = true;
-      while (changed && out.length > 1) {
-        changed = false;
-        const pass = [];
+      const bb = BBoxEngine.rectBox(pdfjsLib, viewport, it, key, lang);
+      const len = Math.max(1, s.length);
 
-        for (const r of out) {
-          const last = pass[pass.length - 1];
-          if (last && canMergeRects(last, r)) {
-            pass[pass.length - 1] = mergeTwoRects(last, r);
-            changed = true;
-          } else {
-            pass.push(r);
-          }
-        }
+      ls = clamp(ls, 0, len);
+      le = clamp(le, 0, len);
+      if (le <= ls) continue;
 
-        out.length = 0;
-        out.push(...pass);
-      }
+      const coveredLen = le - ls;
+      const wholeByKey = wholeValueMode;
+      const coverRatioCfg = (((tuning || {}).rectPolicy || {}).coverWholeItemRatio) || {};
+      const coverDefault = Number(coverRatioCfg.default || 0.72);
+      const coverEnglishDefault = Number(coverRatioCfg.enDefault || 0.90);
 
-      return RectEngine.collapseRectsByHitId(
-        out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId })),
-        lang
+      const coverWholeItem =
+        wholeByKey ||
+        len <= 2 ||
+        coveredLen >= len * (isEnglish ? coverEnglishDefault : coverDefault);
+
+      const x1 = coverWholeItem ? bb.x : (bb.x + bb.w * (ls / len));
+      const x2 = coverWholeItem ? (bb.x + bb.w) : (bb.x + bb.w * (le / len));
+
+      const pcfg = RectEngine.padForKey(key, tuning);
+      const padX = Math.max(Number(pcfg.minX || 0), bb.w * Number(pcfg.pxW || 0));
+      const padY = Math.max(Number(pcfg.minY || 0), bb.h * Number(pcfg.pyH || 0));
+
+      // 视觉微调：下移量固定为 2，高度削减从语言包读取
+      const visualDownShift = 2;
+      const visualHeightTrim = tuning.globalHeightTrim !== undefined ? tuning.globalHeightTrim : 2;
+
+      // ====== 调试日志 ======
+      console.log(`[${key}] bb.h=${bb.h.toFixed(2)}, padY=${padY.toFixed(2)}, visualHeightTrim=${visualHeightTrim}`);
+      const rhRaw = bb.h + padY * 2 - visualHeightTrim;
+      console.log(`rhRaw=${rhRaw.toFixed(2)}`);
+
+      const nameLeftShift =
+        (key === "person_name" ||
+         key === "person_name_keep_title" ||
+         key === "account_holder_name_keep_title")
+        ? Math.min(4.0, Math.max(2.0, bb.w * 0.04))
+        : 0;
+
+      // 应用全局垂直偏移（从语言包读取）
+      const rx = clamp(x1 - padX - nameLeftShift, 0, viewport.width);
+      const ry = clamp(bb.y - padY + visualDownShift + globalVerticalOffset, 0, viewport.height);
+      const rw = clamp(
+        (x2 - x1) + padX * 2 + nameLeftShift,
+        1,
+        viewport.width - clamp(x1 - padX - nameLeftShift, 0, viewport.width)
       );
+      const rh = clamp(
+        bb.h + padY * 2 - visualHeightTrim,
+        3,
+        viewport.height - clamp(bb.y - padY + visualDownShift + globalVerticalOffset, 0, viewport.height)
+      );
+
+      // 可选的 key 特殊限制（可迁移到语言包）
+      if (key === "person_name" || key === "person_name_keep_title" || key === "account_holder_name_keep_title") {
+        if (rw > Math.min(viewport.width * 0.16, bb.w * 0.90)) continue;
+      }
+      if (key === "company") {
+        if (rw > Math.min(viewport.width * 0.40, bb.w * 1.50)) continue;
+      }
+      if (key === "manual_term") {
+        if (rw > Math.min(viewport.width * 0.45, bb.w * 1.60)) continue;
+      }
+      if (rw > viewport.width * 0.92 || rh > viewport.height * 0.35 || (rw > viewport.width * 0.85 && rh > viewport.height * 0.20)) continue;
+
+      rects.push({ x: rx, y: ry, w: rw, h: rh, key, hitId });
+    }
+  }
+
+  if (!rects.length) return [];
+
+  rects.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+
+  const out = [];
+  const paragraphSensitiveSet = new Set(tuning.paragraphSensitiveKeys || []);
+
+  function canMergeRects(a, b) {
+    if (!a || !b) return false;
+    if (a.key !== b.key) return false;
+
+    const aHit = String(a.hitId || "");
+    const bHit = String(b.hitId || "");
+
+    if (aHit && bHit && aHit !== bHit) return false;
+
+    const overlap = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+    const minH = Math.max(1, Math.min(a.h, b.h));
+    const sameLine = (overlap / minH) > 0.80;
+    const similarHeight = (Math.min(a.h, b.h) / Math.max(a.h, b.h)) > 0.72;
+    const gap = b.x - (a.x + a.w);
+
+    const k = String(a.key || "");
+    const isParagraphSensitive = paragraphSensitiveSet.has(k);
+
+    const near = isParagraphSensitive
+      ? (gap <= Math.max(1.5, Math.min(a.h, b.h) * 0.12) && gap >= -1)
+      : (gap <= Math.max(nearGap, Math.min(a.h, b.h) * 0.45) && gap >= -3);
+
+    return sameLine && similarHeight && near;
+  }
+
+  function mergeTwoRects(a, b) {
+    const nx = Math.min(a.x, b.x);
+    const ny = Math.min(a.y, b.y);
+    const nr = Math.max(a.x + a.w, b.x + b.w);
+    const nb = Math.max(a.y + a.h, b.y + b.h);
+
+    return {
+      x: nx,
+      y: ny,
+      w: nr - nx,
+      h: nb - ny,
+      key: a.key,
+      hitId: a.hitId || b.hitId || ""
+    };
+  }
+
+  for (const r of rects) {
+    if (!Number.isFinite(r.x + r.y + r.w + r.h)) continue;
+
+    const candidate = {
+      x: r.x,
+      y: r.y,
+      w: r.w,
+      h: r.h,
+      key: r.key,
+      hitId: r.hitId
+    };
+
+    if (!out.length) {
+      out.push(candidate);
+      continue;
     }
 
-      function canMergeRects(a, b) {
-        if (!a || !b) return false;
-        if (a.key !== b.key) return false;
+    const last = out[out.length - 1];
+    if (canMergeRects(last, candidate)) {
+      out[out.length - 1] = mergeTwoRects(last, candidate);
+    } else {
+      out.push(candidate);
+    }
+  }
 
-        const aHit = String(a.hitId || "");
-        const bHit = String(b.hitId || "");
+  let changed = true;
+  while (changed && out.length > 1) {
+    changed = false;
+    const pass = [];
 
-        if (aHit && bHit && aHit !== bHit) return false;
-
-        const overlap = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
-        const minH = Math.max(1, Math.min(a.h, b.h));
-        const sameLine = (overlap / minH) > 0.80;
-        const similarHeight = (Math.min(a.h, b.h) / Math.max(a.h, b.h)) > 0.72;
-        const gap = b.x - (a.x + a.w);
-
-        const k = String(a.key || "");
-        const isParagraphSensitive = paragraphSensitiveSet.has(k);
-
-        const near = isParagraphSensitive
-          ? (gap <= Math.max(1.5, Math.min(a.h, b.h) * 0.12) && gap >= -1)
-          : (gap <= Math.max(nearGap, Math.min(a.h, b.h) * 0.45) && gap >= -3);
-
-        return sameLine && similarHeight && near;
+    for (const r of out) {
+      const last = pass[pass.length - 1];
+      if (last && canMergeRects(last, r)) {
+        pass[pass.length - 1] = mergeTwoRects(last, r);
+        changed = true;
+      } else {
+        pass.push(r);
       }
+    }
+
+    out.length = 0;
+    out.push(...pass);
+  }
+
+  return RectEngine.collapseRectsByHitId(
+    out.map(({ x, y, w, h, key, hitId }) => ({ x, y, w, h, key, hitId })),
+    lang
+  );
+}
 
       function mergeTwoRects(a, b) {
         const nx = Math.min(a.x, b.x);
