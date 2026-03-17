@@ -90,7 +90,6 @@
     },
 
     shrinkLabels: {
-
       phone: [
         "Phone",
         "Mobile",
@@ -191,13 +190,37 @@
         "Case ID",
         "Application ID",
         "Invoice Number",
-        "Customer ID"
+        "Customer ID",
+        "Reference Number"
       ],
 
       handle: [
         "Handle",
         "User",
         "Username"
+      ],
+
+      // 新增类别，覆盖文档中出现的其他字段
+      person_name: [
+        "Name",
+        "Full Name",
+        "Customer Name",
+        "Contact Name"
+      ],
+
+      place_of_birth: [
+        "Place of Birth",
+        "Birthplace"
+      ],
+
+      secret: [
+        "API Key",
+        "Access Token",
+        "Session ID",
+        "Device ID",
+        "IP Address",
+        "MAC Address",
+        "Secret"
       ]
     },
 
