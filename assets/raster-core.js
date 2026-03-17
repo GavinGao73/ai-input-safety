@@ -1285,11 +1285,6 @@
           const visualDownShift = 2;
           const visualHeightTrim = tuning.globalHeightTrim !== undefined ? tuning.globalHeightTrim : 2;
 
-          // ====== 调试日志 ======
-          console.log(`[${key}] bb.h=${bb.h.toFixed(2)}, padY=${padY.toFixed(2)}, visualHeightTrim=${visualHeightTrim}`);
-          const rhRaw = bb.h + padY * 2 - visualHeightTrim;
-          console.log(`rhRaw=${rhRaw.toFixed(2)}`);
-
           const nameLeftShift =
             (key === "person_name" ||
              key === "person_name_keep_title" ||
