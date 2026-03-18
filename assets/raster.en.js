@@ -51,8 +51,8 @@
       },
 
       longValue: {
-        maxByPage: 0.70,
-        maxByEst: 2.50,
+        maxByPage: 1.00,
+        maxByEst: 3.00,
         wHardCapEstRatio: 2.8,
         wSoftCapEstMul: 1.60
       },
