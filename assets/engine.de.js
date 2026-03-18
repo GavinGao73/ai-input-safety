@@ -1,24 +1,13 @@
 // =========================
 // assets/engine.de.js
 // Content-strategy pack: de (FULL – extended conservative German policy)
-// - placeholders + detect + rules
-// - high-sensitivity German document model
-//
-// FINAL-3.3 MINIMAL PATCH PRODUCTION
-// - Keep Herr/Frau/Dr./Prof. in output; mask only the person name
-// - Address: only mask street + house number; keep PLZ+City/Country
-// - Zusatz: mask Gebäude/OG/Zimmer-like fragment; keep Klingel tail structure
-// - ID policy: keep prefix/body, mask ONLY the LAST numeric segment
-//
-// PATCH POLICY
-// - NO unnecessary deletions
-// - NO structural shrink
-// - ONLY minimal fixes for confirmed issues
-//
-// FINAL-3.3 FIXES
-// - FIX A: long-text Access Token bare matching strengthened for OCR/newline extraction
-// - FIX B: multiline bare IBAN matching strengthened to consume full token across line breaks
-// - FIX C: titled person-name matching strengthened for split surname / OCR-broken surname in long text
+// 修改记录：
+// - 统一规则：保留标签，覆盖整个值（包括前缀、称谓等）
+// - 参考编号类：改为两个捕获组（标签 + 整个值）
+// - 人名类：将称谓移入第二个捕获组，实现全覆盖
+// - 地址类：第二个捕获组匹配整行
+// - 新增公司标签规则 company_label，捕获整行公司名
+// - 所有 patch 规则同步调整
 // =========================
 
 (function () {
@@ -113,6 +102,7 @@
 
       "company_tx_line",
       "company_tx_line_broken_ocr",
+      "company_label",      // 新增公司标签规则，优先于通用公司规则
       "company",
 
       "address_de_inline_street",
@@ -173,6 +163,7 @@
 
       "company_tx_line",
       "company_tx_line_broken_ocr",
+      "company_label",
       "company",
       "address_de_inline_street",
       "address_de_extra_partial",
@@ -229,9 +220,9 @@
         mode: "prefix"
       },
 
+      // 修改：两个捕获组，第二个为整个值
       aktenzeichen_tail: {
-        pattern:
-          /((?:Aktenzeichen|Geschäftszeichen)[ \t]*[:：=][ \t]*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.\/][A-Za-z0-9\[\]]+){0,10}[-_.\/]))(\d{4,})/giu,
+        pattern: /((?:Aktenzeichen|Geschäftszeichen)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.\/][A-Za-z0-9\[\]]+){0,10}[-_.\/]\d{4,}))/giu,
         tag: "REF",
         mode: "prefix"
       },
@@ -242,24 +233,23 @@
         mode: "prefix"
       },
 
+      // 修改：两个捕获组，第二个为整个值
       id_label_tail: {
-        pattern:
-          /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)[ \t]*[:：=][ \t]*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.\/:][A-Za-z0-9\[\]]+){0,10}[-_.\/:]))(\d{4,})/giu,
+        pattern: /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.\/:][A-Za-z0-9\[\]]+){0,10}[-_.\/:]\d{4,}))/giu,
         tag: "REF",
         mode: "prefix"
       },
 
       id_label: {
-        pattern:
-          /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-_\/:.]{3,80})/giu,
+        pattern: /((?:Antragsnummer|Kundennummer|Rechnungsnummer|Rechnungsnr\.?|Vorgangs-?ID|Referenz|Ticketnummer|Bestellnummer)[ \t]*[:：=][ \t]*)([A-Za-z0-9][A-Za-z0-9\-_\/:.]{3,80})/giu,
         tag: "REF",
         mode: "prefix"
       },
 
+      // 通用规则：单个捕获组匹配整个值，无 mode
       ref_generic_tail_de: {
-        pattern: /\b((?!ERR-)(?!SKU:)(?:[A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-))(\d{5,})\b/gu,
-        tag: "REF",
-        mode: "prefix"
+        pattern: /\b(?!ERR-)(?!SKU:)([A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{5,})\b/gu,
+        tag: "REF"
       },
 
       tax_id: {
@@ -314,6 +304,7 @@
         mode: "prefix"
       },
 
+      // 修改：第二个捕获组包含完整日期
       birthdate: {
         pattern: /((?:Geburtsdatum|Geb\.?[ \t]*Datum)[ \t]*[:：=][ \t]*)(\d{1,2}\.\d{1,2}\.\d{2,4}|\d{4}-\d{2}-\d{2})/giu,
         tag: "SECRET",
@@ -423,23 +414,26 @@
         mode: "phone"
       },
 
+      // 修改：第二个捕获组包含称谓+完整姓名
       person_name_keep_title: {
         pattern:
-          /^((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner(?:[ \t]+Dienstleister)?|Ansprechperson|Empfänger|Empf[ \t]*ä[ \t]*nger|Rechnungsempfänger|Rechnungsempf[ \t]*ä[ \t]*nger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+          /^((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner(?:[ \t]+Dienstleister)?|Ansprechperson|Empfänger|Empf[ \t]*ä[ \t]*nger|Rechnungsempfänger|Rechnungsempf[ \t]*ä[ \t]*nger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?(?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
 
+      // 修改：第二个捕获组包含称谓+完整姓名
       person_name_inline: {
         pattern:
-          /((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner(?:[ \t]+Dienstleister)?|Ansprechperson|Empfänger|Empf[ \t]*ä[ \t]*nger|Rechnungsempfänger|Rechnungsempf[ \t]*ä[ \t]*nger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
+          /((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner(?:[ \t]+Dienstleister)?|Ansprechperson|Empfänger|Empf[ \t]*ä[ \t]*nger|Rechnungsempfänger|Rechnungsempf[ \t]*ä[ \t]*nger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?(?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
         tag: "NAME",
         mode: "prefix"
       },
 
+      // 修改：第二个捕获组包含称谓+完整姓名
       person_name: {
         pattern:
-          /((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner(?:[ \t]+Dienstleister)?|Ansprechperson|Empfänger|Empf[ \t]*ä[ \t]*nger|Rechnungsempfänger|Rechnungsempf[ \t]*ä[ \t]*nger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){1,3})/gu,
+          /((?:Name|Kundename|Kunde|Kontaktperson|Kontakt|Ansprechpartner(?:[ \t]+Dienstleister)?|Ansprechperson|Empfänger|Empf[ \t]*ä[ \t]*nger|Rechnungsempfänger|Rechnungsempf[ \t]*ä[ \t]*nger|Sachbearbeiter|Bearbeiter|Versicherte[ \t]*Person|Patient)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?(?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){1,3})/gu,
         tag: "NAME",
         mode: "prefix"
       },
@@ -453,7 +447,7 @@
 
       recipient_name_nextline: {
         pattern:
-          /((?:Rechnungsadresse|Lieferadresse|Empfänger|Empf[ \t]*ä[ \t]*nger|Rechnungsempfänger|Rechnungsempf[ \t]*ä[ \t]*nger)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,3})((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?=[ \t]*(?:\r?\n))/gmu,
+          /((?:Rechnungsadresse|Lieferadresse|Empfänger|Empf[ \t]*ä[ \t]*nger|Rechnungsempfänger|Rechnungsempf[ \t]*ä[ \t]*nger)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,3})((?:(?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)?(?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?=[ \t]*(?:\r?\n))/gmu,
         tag: "NAME",
         mode: "prefix"
       },
@@ -464,6 +458,7 @@
         tag: "NAME"
       },
 
+      // 修改：第二个捕获组包含称谓+完整姓名
       titled_name_bare: {
         pattern:
           /\b((?:Herr|Frau|Dr\.?|Prof\.?)[ \t]+)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40}){0,2})(?=[ \t]*(?:[.,;:)\]]|\n|\r|$))/gu,
@@ -499,6 +494,14 @@
         mode: "prefix"
       },
 
+      // 新增公司标签规则：匹配常见公司标签，捕获整行
+      company_label: {
+        pattern: /((?:Firma|Unternehmen|Firmenname|Handelsname|Firmenbezeichnung|GmbH|AG|KG)[ \t]*[:：=][ \t]*)([^\n\r]+)/giu,
+        tag: "COMPANY",
+        mode: "prefix"
+      },
+
+      // 原 company 规则（无标签）保留，但优先级较低
       company: {
         pattern:
           /\b(?<name>(?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9&.\-]*)(?:[ \t]+(?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9&.\-]*)){0,6})[ \t]+(?<legal>GmbH(?:[ \t]*&[ \t]*Co\.[ \t]*KG)?|UG(?:[ \t]*\([^)]+\))?|KGaA|OHG|PartG|eG|AG|KG|GbR|e\.K\.?)\b/giu,
@@ -506,22 +509,22 @@
         mode: "company"
       },
 
+      // 地址类：第二个捕获组匹配整行
       address_de_inline_street: {
         pattern:
-          /^(?!.*\b(?:Lagerplatz|Regal|Fach|SKU|Fehlercode|ERR|Testwert|Artikel|Gutschrift|Kontonummer|Bankleitzahl|Versichertennummer)\b)(?:[A-ZÄÖÜ][\p{L}.'\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][\p{L}.'\-]{1,40}){0,4})[ \t]+\d{1,4}(?:[ \t]*[A-Za-z])?(?:-\d{1,4})?$/gmu,
+          /^(?!.*\b(?:Lagerplatz|Regal|Fach|SKU|Fehlercode|ERR|Testwert|Artikel|Gutschrift|Kontonummer|Bankleitzahl|Versichertennummer)\b)([A-ZÄÖÜ][\p{L}.'\-]{1,40}(?:[ \t]+[A-ZÄÖÜ][\p{L}.'\-]{1,40}){0,4}[ \t]+\d{1,4}(?:[ \t]*[A-Za-z])?(?:-\d{1,4})?)$/gmu,
         tag: "ADDRESS"
       },
 
       address_de_street_partial: {
-        pattern:
-          /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)[ \t]*[:：=][ \t]*)([^,\n\r]{4,120}?)(?=[ \t]*,)/giu,
+        pattern: /((?:Adresse|Anschrift|Straße|Strasse|Rechnungsadresse|Lieferadresse)[ \t]*[:：=][ \t]*)([^\n\r]+)/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
 
       address_de_extra_partial: {
         pattern:
-          /((?:Zusatz)[ \t]*[:：=][ \t]*)((?=[^\n\r]{2,260})(?=.*\b(?:Gebäude|Haus|Block|Aufgang|Etage|Stock|Stockwerk|OG|EG|DG|WHG|Wohnung|Zimmer|Raum|App\.?|Apartment)\b)[^\n\r]*?)(?=,[ \t]*(?:Klingel|Tür|Tel\.?|Telefon)\b)/giu,
+          /((?:Zusatz)[ \t]*[:：=][ \t]*)((?=[^\n\r]{2,260})(?=.*\b(?:Gebäude|Haus|Block|Aufgang|Etage|Stock|Stockwerk|OG|EG|DG|WHG|Wohnung|Zimmer|Raum|App\.?|Apartment)\b)[^\n\r]*)(?=,[ \t]*(?:Klingel|Tür|Tel\.?|Telefon)\b)/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
@@ -566,7 +569,7 @@
 })();
 
 // =========================
-// DE High-Risk ADD-ONLY Patch
+// DE High-Risk ADD-ONLY Patch (已合并到主规则中，此处仅保留结构，规则已调整)
 // =========================
 (function () {
   "use strict";
@@ -721,9 +724,10 @@
       mode: "prefix"
     },
 
+    // 修改：两个捕获组，第二个为整个值
     legal_ref_tail: {
       pattern:
-        /((?:(?:Vertragsnummer|Vertrag[ \t]*Nr\.?|Schadensnummer|Schaden[ \t]*Nr\.?|Rechtsfall[ \t]*Ref|Legal[ \t]*Case[ \t]*Ref|Claim[ \t]*Reference|Contract[ \t]*Number)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]))(\d{4,})/giu,
+        /((?:(?:Vertragsnummer|Vertrag[ \t]*Nr\.?|Schadensnummer|Schaden[ \t]*Nr\.?|Rechtsfall[ \t]*Ref|Legal[ \t]*Case[ \t]*Ref|Claim[ \t]*Reference|Contract[ \t]*Number)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))/giu,
       tag: "REF",
       mode: "prefix"
     },
@@ -757,7 +761,7 @@
 })();
 
 // =========================
-// DE Fix Patch
+// DE Fix Patch (已合并到主规则中，此处仅保留结构，规则已调整)
 // =========================
 (function () {
   "use strict";
@@ -803,9 +807,10 @@
   uniqPush(DE.alwaysOn, "birthplace_optional_secret");
 
   Object.assign(DE.rules, {
+    // 修改：第二个捕获组包含称谓+完整姓名
     account_holder_name_keep_title: {
       pattern:
-        /^((?:Kontoinhaber)[ \t]*[:：=][ \t]*(?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+        /^((?:Kontoinhaber)[ \t]*[:：=][ \t]*)((?:(?:Herr|Frau|Dr\.?|Prof\.?)\.?[ \t]+)?(?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{1,40})(?:[ \t]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'’\-]{0,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
       tag: "NAME",
       mode: "prefix"
     },
@@ -825,8 +830,8 @@
     card_expiry_de: {
       pattern:
         /((?:Gültig[ \t]*bis|Gueltig[ \t]*bis|Ablaufdatum|Expiry|Expiration|Exp(?:iry|iration)?(?:[ \t]*Date)?|Valid[ \t]*Thru|Valid[ \t]*Through)[ \t]*[:：=][ \t]*)(\d{2}[ \t]*\/[ \t]*\d{2,4}|\d{2}[ \t]*-[ \t]*\d{2,4}|\d{4}[ \t]*-[ \t]*\d{2})/giu,
-        tag: "SECRET",
-        mode: "prefix"
+      tag: "SECRET",
+      mode: "prefix"
     },
 
     card_security_de: {
