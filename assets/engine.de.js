@@ -8,6 +8,7 @@
 // - 地址类：第二个捕获组匹配整行
 // - 新增公司标签规则 company_label，捕获整行公司名
 // - 所有 patch 规则同步调整
+// - 修复 legal_ref_tail 正则表达式括号不匹配问题
 // =========================
 
 (function () {
@@ -726,8 +727,7 @@
 
     // 修改：两个捕获组，第二个为整个值
     legal_ref_tail: {
-      pattern:
-        /((?:(?:Vertragsnummer|Vertrag[ \t]*Nr\.?|Schadensnummer|Schaden[ \t]*Nr\.?|Rechtsfall[ \t]*Ref|Legal[ \t]*Case[ \t]*Ref|Claim[ \t]*Reference|Contract[ \t]*Number)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))/giu,
+      pattern: /((?:(?:Vertragsnummer|Vertrag[ \t]*Nr\.?|Schadensnummer|Schaden[ \t]*Nr\.?|Rechtsfall[ \t]*Ref|Legal[ \t]*Case[ \t]*Ref|Claim[ \t]*Reference|Contract[ \t]*Number)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:)((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))/giu,
       tag: "REF",
       mode: "prefix"
     },
