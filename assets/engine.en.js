@@ -1,12 +1,12 @@
 // =========================
 // assets/engine.en.js
 // CONSOLIDATED CLEAN VERSION
-//
-// Goals:
-// - Keep original structure and behavior style
-// - Merge add-on patches into one clean pack
-// - Reduce false positives without expanding complexity
-// - Preserve labels / line structure / replacement stability
+// 修改记录：
+// - ref 类规则修正（已生效）
+// - 地址规则 address_de_street 改为捕获整个地址行
+// - 人名规则将可选称谓移入第二个捕获组，实现完整覆盖
+// - 出生日期规则捕获完整日期
+// - 新增 company_label 规则，匹配带标签的公司名并全覆盖
 // =========================
 
 (function () {
@@ -115,6 +115,7 @@
       "person_name_inline",
       "person_name_plain_label",
       "person_name_title_line",
+      "company_label",   // 新增公司标签规则，优先于通用公司规则
       "company",
 
       "address_de_street",
@@ -184,6 +185,7 @@
       "person_name_inline",
       "person_name_plain_label",
       "person_name_title_line",
+      "company_label",
 
       "address_en_inline_street",
       "address_en_street_line",
@@ -297,7 +299,7 @@
       },
 
       dob: {
-        pattern: /((?:date[ \t]*of[ \t]*birth|dob)[ \t]*[:：=][ \t]*\d{4}[-\/\.])(\d{2}[-\/\.]\d{2})/giu,
+        pattern: /((?:date[ \t]*of[ \t]*birth|dob)[ \t]*[:：=][ \t]*)(\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}|\d{1,2}\/\d{1,2}\/\d{4})/giu,
         tag: "SECRET",
         mode: "prefix"
       },
@@ -496,33 +498,45 @@
         mode: "phone"
       },
 
+      // 修改：第二个捕获组包含可选称谓和完整姓名
       person_name: {
         pattern:
-          /^(?:contact[ \t]*details[ \t]+)?((?:customer[ \t]*name|account[ \t]*holder|account[ \t]*manager|manager|agent|contact(?:[ \t]*person)?|support[ \t]*agent|sales[ \t]*manager|recipient|name[ \t]*on[ \t]*card|to|attn\.?|attention)(?:[ \t]*[:：=][ \t]*|[ \t]+)(?:(?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+          /^(?:contact[ \t]*details[ \t]+)?((?:customer[ \t]*name|account[ \t]*holder|account[ \t]*manager|manager|agent|contact(?:[ \t]*person)?|support[ \t]*agent|sales[ \t]*manager|recipient|name[ \t]*on[ \t]*card|to|attn\.?|attention)(?:[ \t]*[:：=][ \t]*|[ \t]+))(((?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?(?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
 
+      // 修改：第二个捕获组包含可选称谓和完整姓名
       person_name_inline: {
         pattern:
-          /((?:customer[ \t]*name|account[ \t]*holder|account[ \t]*manager|manager|agent|contact(?:[ \t]*person)?|support[ \t]*agent|sales[ \t]*manager|recipient|name[ \t]*on[ \t]*card|to|attn\.?|attention)(?:[ \t]*[:：=][ \t]*)(?:(?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
+          /((?:customer[ \t]*name|account[ \t]*holder|account[ \t]*manager|manager|agent|contact(?:[ \t]*person)?|support[ \t]*agent|sales[ \t]*manager|recipient|name[ \t]*on[ \t]*card|to|attn\.?|attention)(?:[ \t]*[:：=][ \t]*))(((?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?(?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
         tag: "NAME",
         mode: "prefix"
       },
 
+      // 修改：第二个捕获组包含可选称谓和完整姓名
       person_name_plain_label: {
         pattern:
-          /((?<!bank[ \t])(?<!company[ \t])(?<!product[ \t])(?<!system[ \t])(?<!service[ \t])(?:name)(?:[ \t]*[:：=][ \t]*)(?:(?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
+          /((?<!bank[ \t])(?<!company[ \t])(?<!product[ \t])(?<!system[ \t])(?<!service[ \t])(?:name)(?:[ \t]*[:：=][ \t]*))(((?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?(?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
         tag: "NAME",
         mode: "prefix"
       },
 
+      // 此规则无标签，整个匹配即为值，无需修改
       person_name_title_line: {
         pattern: /^((?:mr|mrs|ms|miss|dr|prof)\.?\s+)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
 
+      // 新增公司标签规则：匹配常见公司标签，捕获整行作为值，实现全覆盖
+      company_label: {
+        pattern: /((?:Company[ \t]*Name|Supplier|Legal[ \t]*Entity|Registered[ \t]*Company|Billing[ \t]*Company)[ \t]*[:：=][ \t]*)([^\n\r]+)/giu,
+        tag: "COMPANY",
+        mode: "prefix"
+      },
+
+      // 原有公司规则（匹配无标签的公司名），保留但优先级降低
       company: {
         pattern:
           /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)[ \t]+(?<legal>LLC|L\.?L\.?C\.?|Ltd\.?|Limited|Inc\.?|Incorporated|Corp\.?|Corporation|PLC|LLP)\b/giu,
@@ -530,9 +544,9 @@
         mode: "company"
       },
 
+      // 修改：第二个捕获组匹配整个地址行（直到行末）
       address_de_street: {
-        pattern:
-          /((?:address|shipping[ \t]*address|billing[ \t]*address|street[ \t]*address|mailing[ \t]*address)[ \t]*[:：=][ \t]*)([^,\n\r]{4,160}?)(?=[ \t]*,)/giu,
+        pattern: /((?:address|shipping[ \t]*address|billing[ \t]*address|street[ \t]*address|mailing[ \t]*address)[ \t]*[:：=][ \t]*)([^\n\r]+)/giu,
         tag: "ADDRESS",
         mode: "prefix"
       },
