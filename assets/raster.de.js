@@ -57,11 +57,26 @@
     },
 
     pad: {
-      person_name: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
-      person_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
-      account_holder_name_keep_title: { pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55 },
-      company: { pxW: 0.0045, pyH: 0.032, minX: 0.55, minY: 0.60 },
-      manual_term: { pxW: 0.0040, pyH: 0.035, minX: 0.55, minY: 0.65 },
+      person_name: { 
+        pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55,
+        maxWidthPageRatio: 0.16, maxWidthItemRatio: 0.90
+      },
+      person_name_keep_title: { 
+        pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55,
+        maxWidthPageRatio: 0.16, maxWidthItemRatio: 0.90
+      },
+      account_holder_name_keep_title: { 
+        pxW: 0.0020, pyH: 0.030, minX: 0.25, minY: 0.55,
+        maxWidthPageRatio: 0.16, maxWidthItemRatio: 0.90
+      },
+      company: { 
+        pxW: 0.0045, pyH: 0.032, minX: 0.55, minY: 0.60,
+        maxWidthPageRatio: 0.40, maxWidthItemRatio: 1.50
+      },
+      manual_term: { 
+        pxW: 0.0040, pyH: 0.035, minX: 0.55, minY: 0.65,
+        maxWidthPageRatio: 0.45, maxWidthItemRatio: 1.60
+      },
       _default: { pxW: 0.0050, pyH: 0.045, minX: 0.55, minY: 0.75 }
     },
 
