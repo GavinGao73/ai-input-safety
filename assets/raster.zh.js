@@ -60,10 +60,22 @@
     },
 
     pad: {
-      person_name: { pxW: 0.0005, pyH: 0.014, minX: 0.5, minY: 0.24 },
-      person_name_keep_title: { pxW: 0.0005, pyH: 0.014, minX: 0.5, minY: 0.24 },
-      account_holder_name_keep_title: { pxW: 0.0005, pyH: 0.014, minX: 0.5, minY: 0.24 },
-      company: { pxW: 0.0025, pyH: 0.022, minX: 0.28, minY: 0.36 },
+      person_name: {
+        pxW: 0.0005, pyH: 0.014, minX: 0.5, minY: 0.24,
+        maxWidthPageRatio: 0.16, maxWidthItemRatio: 0.90
+      },
+      person_name_keep_title: {
+        pxW: 0.0005, pyH: 0.014, minX: 0.5, minY: 0.24,
+        maxWidthPageRatio: 0.16, maxWidthItemRatio: 0.90
+      },
+      account_holder_name_keep_title: {
+        pxW: 0.0005, pyH: 0.014, minX: 0.5, minY: 0.24,
+        maxWidthPageRatio: 0.16, maxWidthItemRatio: 0.90
+      },
+      company: {
+        pxW: 0.0025, pyH: 0.022, minX: 0.28, minY: 0.36,
+        maxWidthPageRatio: 0.40, maxWidthItemRatio: 1.50
+      },
       company_label_inline_zh: { pxW: 0.0023, pyH: 0.020, minX: 0.24, minY: 0.34 },
       company_label_inline_zh_no_colon: { pxW: 0.0023, pyH: 0.020, minX: 0.24, minY: 0.34 },
       phone: { pxW: 0.0022, pyH: 0.020, minX: 0.24, minY: 0.34 },
@@ -84,7 +96,10 @@
       license_plate_inline_zh: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
       security_answer: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
       secret_inline_zh: { pxW: 0.0040, pyH: 0.014, minX: 8, minY: 0.24 },
-      manual_term: { pxW: 0.0030, pyH: 0.024, minX: 0.30, minY: 0.40 },
+      manual_term: {
+        pxW: 0.0030, pyH: 0.024, minX: 0.30, minY: 0.40,
+        maxWidthPageRatio: 0.45, maxWidthItemRatio: 1.60
+      },
       // 默认值：适当加宽、下移，覆盖 handle/ref/number 等未单独配置的 key
       _default: { pxW: 0.0030, pyH: 0.010, minX: 0.30, minY: 0.10 }
     },
