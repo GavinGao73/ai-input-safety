@@ -76,11 +76,20 @@
     },
 
     pad: {
-      person_name: { pxW: 0.002, pyH: 0.030, minX: 0.25, minY: 0.55 },
+      person_name: {
+        pxW: 0.002, pyH: 0.030, minX: 0.25, minY: 0.55,
+        maxWidthPageRatio: 0.16, maxWidthItemRatio: 0.90
+      },
 
-      company: { pxW: 0.004, pyH: 0.032, minX: 0.50, minY: 0.60 },
+      company: {
+        pxW: 0.004, pyH: 0.032, minX: 0.50, minY: 0.60,
+        maxWidthPageRatio: 0.40, maxWidthItemRatio: 1.50
+      },
 
-      manual_term: { pxW: 0.004, pyH: 0.035, minX: 0.55, minY: 0.65 },
+      manual_term: {
+        pxW: 0.004, pyH: 0.035, minX: 0.55, minY: 0.65,
+        maxWidthPageRatio: 0.45, maxWidthItemRatio: 1.60
+      },
 
       uuid: { pxW: 0.006, pyH: 0.045, minX: 0.8, minY: 0.75 },
       ip_address: { pxW: 0.006, pyH: 0.045, minX: 0.7, minY: 0.75 },
