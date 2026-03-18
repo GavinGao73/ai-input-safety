@@ -1,62 +1,7 @@
-
 // =========================
 // assets/engine.zh.js
 // Content-strategy pack: zh (NOT UI language)
-// - placeholders + detect + rules (FULL, no common)
-// - pack policy hooks: priority / alwaysOn / phoneGuard / company formatting / address partial formatting
-//
-// LOCKED (whitelist-aligned for zh):
-// - ID policy: keep prefix/body, mask ONLY the last numeric segment via ref_label_tail / cust_id.
-// - Disable legacy generic ref masking ("ref") to avoid breaking tail-only policy.
-// - Disable title masking ("title") to keep 先生/女士/教授 等称谓原样保留（不输出【称谓】）。
-//
-// NOTE (allowed cleanup):
-// - ref_label_full is legacy and NOT executed; removed to reduce confusion/attack surface.
-//
-// FINAL-CANDIDATE PATCH:
-// - FIX 1: person_name 移除“开户名 / 账户名”，避免与公司/对公账户名冲突
-// - FIX 2: company 补充高价值中文组织后缀：分公司 / 事务所 / 中心
-// - Keep all other behaviors unchanged
-//
-// PATCH-2 (minimal confirmed fixes only):
-// - FIX 3: 新增 api_key_token_zh，覆盖“接口密钥 / API Key / Access Token / Token”
-// - FIX 4: handle_label 增补“用户ID / 用户 / 账号”，但不重新引入“账户名 / 開戶名”
-// - FIX 5: money_label 扩充中文财务标签；新增 money_cn_inline_label
-// - FIX 6: company 通用规则移除裸“中心”，避免误伤地址；保留 company_block 中的“中心”
-// - FIX 7: 补强 address_cn / address_cn_block 标签覆盖
-// - NO unrelated deletions
-// - NO structural shrink
-//
-// PATCH-3 (minimal confirmed fixes only):
-// - FIX 8: 新增 company_label_inline_zh，覆盖“单位名称 / 项目服务机构 / 账户名”等单行公司标签
-// - FIX 9: 新增 address_cn_block_multiline，覆盖“标签 + 姓名 + 地址”三段式多行地址块
-// - FIX 10: 新增 money_label_currency_zh，覆盖“人民币：12600.00”等货币标签格式
-// - FIX 11: 新增 account_cn_inline，覆盖长段落中的“收款账号6217... / 联行号1021...”
-// - FIX 12: 新增 secret_inline_zh，覆盖长段落中的“接口密钥sk_... / 会话IDsess_... / 钱包地址0x...”
-//
-// PATCH-4 (minimal confirmed fixes only):
-// - FIX 13: 新增 company_label_inline_zh_no_colon，覆盖长段落中的“账户名北京星舟科技中心 / 開戶名广州...分公司”
-// - FIX 14: 强化 address_cn_block_multiline，兼容“【姓名】”占位后的三段式地址块
-// - FIX 15: 强化 account_cn_inline，兼容标签后直接接数字、空格或换行
-// - FIX 16: 强化 secret_inline_zh，兼容“接口密钥 sk_... / 会话ID sess_... / 设备ID device_... / 钱包地址 0x...”及轻微断裂
-//
-// PATCH-5 (minimal confirmed fixes only):
-// - FIX 17: 新增 ref_inline_zh，覆盖长段落中的“合同编号HT-... / 订单号ORD-... / 参考编号REF-...”
-// - FIX 18: 进一步补强 address_cn_block_multiline，兼容“标签 + 【姓名】 + 下一行地址正文”
-// - FIX 19: 进一步补强 account_cn_inline / secret_inline_zh 的跨行值形式
-// - NO unrelated deletions
-// - NO structural shrink
-//
-// PATCH-6 (minimal confirmed fixes only):
-// - FIX 20: ref_inline_zh 改为“仅遮尾段数字”，不再吞掉前缀主体
-// - FIX 21: 新增长段落裸值规则：id_card_inline_zh / passport_inline_zh / driver_license_inline_zh / license_plate_inline_zh
-// - NO unrelated deletions
-// - NO structural shrink
-//
-// PATCH-7 (final minimal confirmed fix):
-// - FIX 22: 新增 address_inline_zh，覆盖长段落中的裸中文地址
-// - NO unrelated deletions
-// - NO structural shrink
+// 统一规则：保留标签，覆盖整个值
 // =========================
 
 (function () {
@@ -246,6 +191,7 @@
     },
 
     formatAddressCnPartial: function ({ label, val, placeholder }) {
+      // 保留原有格式化函数，但 val 现在是整行地址
       const reRoadNo = /([\u4E00-\u9FFF]{1,40}(?:路|街|道|大道|巷|弄|里|坊|胡同|区|镇|村|桥|湾|园|城|厦|楼))[ \t]*(\d{1,6}(?:-\d{1,4})?[ \t]*号)/g;
       if (reRoadNo.test(val)) {
         const v2 = String(val || "").replace(reRoadNo, (m2, a, b) => `${a}${placeholder("ADDRESS")}`);
@@ -361,6 +307,7 @@
         mode: "prefix"
       },
 
+      // 修改：第二个捕获组包含完整日期
       dob: {
         pattern: /((?:出生日期(?:（中文）)?|出生年月|生日|DOB|Date[ \t]*of[ \t]*Birth)[ \t]*[:：=][ \t]*)(\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日)/giu,
         tag: "SECRET",
@@ -427,24 +374,28 @@
         mode: "prefix"
       },
 
+      // 修改：第二个捕获组为整个值（包括前缀和数字）
       cust_id: {
-        pattern: /((?:Customer[ \t]*ID|客户号|客户ID)[ \t]*[:：=][ \t]*CUST-)(?![^\n\r]*【编号】)(\d{6,})/giu,
+        pattern: /((?:Customer[ \t]*ID|客户号|客户ID)[ \t]*[:：=][ \t]*CUST-)(\d{6,})/giu,
         tag: "REF",
         mode: "prefix"
       },
 
+      // 修改：第二个捕获组为整个值（包括前缀和数字）
       ref_label_tail: {
-        pattern: /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|Case[ \t]*ID|Ticket[ \t]*No\.?|Application[ \t]*ID|Order[ \t]*ID|Invoice[ \t]*No\.?|Reference)[ \t]*[:：=][ \t]*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,10}[-_.]))(\d{4,})/giu,
+        pattern: /((?:申请编号|参考编号|订单号|单号|合同号|发票号|编号|工单号|票据号|客户号|索赔参考号|法律案件号|Case[ \t]*ID|Ticket[ \t]*No\.?|Application[ \t]*ID|Order[ \t]*ID|Invoice[ \t]*No\.?|Reference)[ \t]*[:：=][ \t]*)((?!ERR-)(?!SKU:)[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,10}[-_.]\d{4,})/giu,
         tag: "REF",
         mode: "prefix"
       },
 
+      // 修改：第二个捕获组为整个值（包括前缀和数字）
       ref_inline_zh: {
-        pattern: /((?:合同编号|补充协议编号|参考编号|订单号|发票号|申请编号|工单号|票据号|法律案件号|索赔参考号|客户号|合同号)[ \t]*(?!ERR-)(?!SKU:)(?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,10}[-_.]))(\d{4,})/giu,
+        pattern: /((?:合同编号|补充协议编号|参考编号|订单号|发票号|申请编号|工单号|票据号|法律案件号|索赔参考号|客户号|合同号)[ \t]*)((?!ERR-)(?!SKU:)[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,10}[-_.]\d{4,})/giu,
         tag: "REF",
         mode: "prefix"
       },
 
+      // 修改：第二个捕获组为完整账号（允许空格、连字符）
       account: {
         pattern: /((?:银行账号|銀行賬號|账号|賬號|收款账号|收款帳號|账户|帳戶|开户账号|開戶賬號|银行卡号|卡号|信用卡|信用卡号|信用卡號|card[ \t]*number|credit[ \t]*card|对公账户|對公賬戶|IBAN|Account[ \t]*Number)[ \t]*[:：=]?[ \t]*)([A-Z]{2}\d{2}[\d \t-]{10,40}|\d[\d \t-]{6,40}\d)/giu,
         tag: "ACCOUNT",
@@ -487,12 +438,14 @@
         mode: "phone"
       },
 
+      // 修改：第二个捕获组包含称谓和完整姓名
       person_name: {
         pattern: /((?:姓名|收件人|联系人|Name|Recipient)[ \t]*[:：=][ \t]*)(?![^\n\r]*(?:集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司|分公司|事务所))((?:(?:Mr\.?|Mrs\.?|Ms\.?|Dr\.?|Prof\.?)[ \t]*)?[\u4E00-\u9FFF]{2,6}|(?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{0,3}){0,3})/gmu,
         tag: "NAME",
         mode: "prefix"
       },
 
+      // 修改：第二个捕获组包含姓名
       person_name_address_block: {
         pattern: /((?:账单地址|帳單地址|收货地址|收貨地址|办公地址|辦公地址|通信地址|聯絡地址|联系地址|聯繫地址|地址)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,4})(?![^\n\r]*(?:集团有限公司|股份有限公司|有限责任公司|有限公司|集团|公司|分公司|事务所))((?:【姓名】|[\u4E00-\u9FFF]{2,6}))(?=[ \t]*(?:\r?\n))/gmu,
         tag: "NAME",
@@ -505,12 +458,14 @@
         mode: "prefix"
       },
 
+      // 修改：第二个捕获组匹配整行地址
       address_cn: {
-        pattern: /((?:地址|住址|办公地址|通信地址|收货地址|收件地址|联系地址|联系住址|居住地址|单位地址|公司地址|注册地址|签署地址|履约地址)[ \t]*[:：=][ \t]*)([^\n\r]{2,160})/giu,
+        pattern: /((?:地址|住址|办公地址|通信地址|收货地址|收件地址|联系地址|联系住址|居住地址|单位地址|公司地址|注册地址|签署地址|履约地址)[ \t]*[:：=][ \t]*)([^\n\r]+)/giu,
         tag: "ADDRESS",
         mode: "address_cn_partial"
       },
 
+      // 块地址规则暂保留原样，因其依赖格式化函数和复杂匹配，暂不改为全覆盖
       address_cn_block: {
         pattern: /((?:账单地址|帳單地址|收货地址|收貨地址|收件地址|办公地址|辦公地址|通信地址|聯系地址|联系地址|公司地址|注册地址|签署地址|履约地址|地址)[ \t]*[:：=]?[ \t]*(?:\r?\n[ \t]*){1,4}(?:(?:【姓名】|[\u4E00-\u9FFF]{2,6})[ \t]*(?:\r?\n[ \t]*){1,4})?)(?=[^\n\r]{2,200})((?:.*?(?:路|街|道|大道|巷|弄|里|坊|胡同))\d{1,6}(?:-\d{1,4})?[ \t]*号[^\n\r]{0,80})/giu,
         tag: "ADDRESS",
@@ -552,6 +507,7 @@
         tag: "MONEY"
       },
 
+      // 公司标签规则：第二个捕获组为完整公司名
       company_label_inline_zh: {
         pattern: /((?:公司名称|公司名稱|单位名称|單位名稱|供应商|供應商|开票方|開票方|收款方|付款方|法务顾问单位|项目服务机构|項目服務機構|开户名|账户名|帳戶名|開戶名|甲方|乙方|发货方)[ \t]*[:：=][ \t]*)([\u4E00-\u9FFF][\u4E00-\u9FFF0-9（）()·&\-\s]{1,80}?(?:集团有限公司|股份有限公司|有限责任公司|有限公司|分公司|事务所|中心|集团|公司))/gmu,
         tag: "COMPANY",
