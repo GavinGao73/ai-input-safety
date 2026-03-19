@@ -492,10 +492,9 @@
       },
 
       phone: {
-        pattern:
-          /((?:phone|mobile|tel|whatsapp|telegram|signal|fax)[ \t]*[:：=]?[ \t]*)([+＋]?[ \t]*\d[\d \t().-]{5,}\d)\b|(?<![A-Za-z0-9_-])((?:[+＋][ \t]*\d{1,3}|00[ \t]*\d{1,3})[\d \t().-]{6,}\d\b)/giu,
+        pattern: /((?:phone|mobile|tel|whatsapp|telegram|signal|fax|contact)[ \t]*[:：=]?[ \t]*)([+＋]?[ \t]*[\d][\d \t().-]{5,}\d)\b/giu,
         tag: "PHONE",
-        mode: "phone"
+        mode: "prefix"
       },
 
       // 简化的人名规则，确保捕获整个姓名（包括可选的称谓）
