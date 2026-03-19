@@ -531,10 +531,10 @@
 
       // 新增公司标签规则：匹配常见公司标签，捕获整行作为值，实现全覆盖
       company_label: {
-        pattern: /((?:Company[ \t]*Name|Supplier|Legal[ \t]*Entity|Registered[ \t]*Company|Billing[ \t]*Company)[ \t]*[:：=][ \t]*)([^\n\r]+)/giu,
+        pattern: /((?:Company(?:[ \t]*Name)?|Supplier|Legal[ \t]*Entity|Registered[ \t]*Company|Billing[ \t]*Company)[ \t]*[:：=][ \t]*)([^\n\r]+)/giu,
         tag: "COMPANY",
         mode: "prefix"
-      },
+      }
 
       // 原有公司规则（匹配无标签的公司名），保留但优先级降低
       company: {
