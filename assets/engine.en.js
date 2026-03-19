@@ -7,6 +7,7 @@
 // - 人名规则将可选称谓移入第二个捕获组，实现完整覆盖
 // - 出生日期规则捕获完整日期
 // - 新增 company_label 规则，匹配带标签的公司名并全覆盖
+// - 修复 company_label 后缺少逗号的语法错误
 // =========================
 
 (function () {
@@ -534,7 +535,7 @@
         pattern: /((?:Company(?:[ \t]*Name)?|Supplier|Legal[ \t]*Entity|Registered[ \t]*Company|Billing[ \t]*Company)[ \t]*[:：=][ \t]*)([^\n\r]+)/giu,
         tag: "COMPANY",
         mode: "prefix"
-      }
+      },
 
       // 原有公司规则（匹配无标签的公司名），保留但优先级降低
       company: {
@@ -581,7 +582,7 @@
         tag: "ADDRESS"
       },
 
-            // 通用规则：单个捕获组匹配整个值，无 mode
+      // 通用规则：单个捕获组匹配整个值，无 mode
       ref_generic_multi_tail: {
         pattern: /\b(?!ERR-)(?!SKU:)([A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{4,}(?:-\d{4,})+)\b/gu,
         tag: "REF"
@@ -620,7 +621,7 @@
         tag: "REF",
         mode: "prefix"
       },
-      
+
       handle: {
         pattern: /@[A-Za-z0-9_]{2,32}\b/g,
         tag: "HANDLE"
