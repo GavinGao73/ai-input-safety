@@ -95,6 +95,10 @@
       ip_address: { pxW: 0.006, pyH: 0.045, minX: 0.7, minY: 0.75 },
       wallet_id: { pxW: 0.006, pyH: 0.045, minX: 0.7, minY: 0.75 },
 
+      // 为 email 和 phone 添加单独配置，减小左侧填充以修正起点偏右
+      email: { pxW: 0.002, pyH: 0.035, minX: 0.2, minY: 0.70 },
+      phone: { pxW: 0.002, pyH: 0.035, minX: 0.2, minY: 0.70 },
+
       _default: { pxW: 0.004, pyH: 0.035, minX: 0.5, minY: 0.70 }
     },
 
