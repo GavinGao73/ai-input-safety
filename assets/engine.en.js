@@ -4,10 +4,9 @@
 // 修改记录：
 // - ref 类规则修正（已生效）
 // - 地址规则 address_de_street 改为捕获整个地址行
-// - 人名规则将可选称谓移入第二个捕获组，实现完整覆盖
+// - 人名规则简化，确保覆盖完整姓名
 // - 出生日期规则捕获完整日期
-// - 新增 company_label 规则，匹配带标签的公司名并全覆盖
-// - 修复 company_label 后缺少逗号的语法错误
+// - 新增公司标签规则 company_label，匹配带标签的公司名并全覆盖
 // =========================
 
 (function () {
@@ -499,15 +498,15 @@
         mode: "phone"
       },
 
-      // 修改：第二个捕获组包含可选称谓和完整姓名
+      // 简化的人名规则，确保捕获整个姓名（包括可选的称谓）
       person_name: {
         pattern:
-          /^(?:contact[ \t]*details[ \t]+)?((?:customer[ \t]*name|account[ \t]*holder|account[ \t]*manager|manager|agent|contact(?:[ \t]*person)?|support[ \t]*agent|sales[ \t]*manager|recipient|name[ \t]*on[ \t]*card|to|attn\.?|attention)(?:[ \t]*[:：=][ \t]*|[ \t]+))(((?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?(?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?:[ \t]+(?:\([^\n\r]{0,120}\)))?[ \t]*$/gmiu,
+          /((?:customer[ \t]*name|account[ \t]*holder|account[ \t]*manager|manager|agent|contact[ \t]*person|support[ \t]*agent|sales[ \t]*manager|recipient|name[ \t]*on[ \t]*card|to|attn\.?|attention)[ \t]*[:：=][ \t]*)((?:(?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]+(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]+)*)/giu,
         tag: "NAME",
         mode: "prefix"
       },
 
-      // 修改：第二个捕获组包含可选称谓和完整姓名
+      // 保留其他姓名规则（原样）
       person_name_inline: {
         pattern:
           /((?:customer[ \t]*name|account[ \t]*holder|account[ \t]*manager|manager|agent|contact(?:[ \t]*person)?|support[ \t]*agent|sales[ \t]*manager|recipient|name[ \t]*on[ \t]*card|to|attn\.?|attention)(?:[ \t]*[:：=][ \t]*))(((?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?(?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
@@ -515,7 +514,6 @@
         mode: "prefix"
       },
 
-      // 修改：第二个捕获组包含可选称谓和完整姓名
       person_name_plain_label: {
         pattern:
           /((?<!bank[ \t])(?<!company[ \t])(?<!product[ \t])(?<!system[ \t])(?<!service[ \t])(?:name)(?:[ \t]*[:：=][ \t]*))(((?:mr|mrs|ms|miss|dr|prof)\.?[ \t]+)?(?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})(?=[ \t]*(?:[|·]|\n|\r|$))/giu,
@@ -523,21 +521,20 @@
         mode: "prefix"
       },
 
-      // 此规则无标签，整个匹配即为值，无需修改
       person_name_title_line: {
         pattern: /^((?:mr|mrs|ms|miss|dr|prof)\.?\s+)((?:[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40})(?:[ \t]+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ'’\-]{1,40}){0,3})[ \t]*$/gmiu,
         tag: "NAME",
         mode: "prefix"
       },
 
-      // 新增公司标签规则：匹配常见公司标签，捕获整行作为值，实现全覆盖
+      // 公司标签规则（已包含 "Company"）
       company_label: {
         pattern: /((?:Company(?:[ \t]*Name)?|Supplier|Legal[ \t]*Entity|Registered[ \t]*Company|Billing[ \t]*Company)[ \t]*[:：=][ \t]*)([^\n\r]+)/giu,
         tag: "COMPANY",
         mode: "prefix"
       },
 
-      // 原有公司规则（匹配无标签的公司名），保留但优先级降低
+      // 原有公司规则
       company: {
         pattern:
           /\b(?<name>[A-Za-z][A-Za-z0-9&.\- ]{1,60}?)[ \t]+(?<legal>LLC|L\.?L\.?C\.?|Ltd\.?|Limited|Inc\.?|Incorporated|Corp\.?|Corporation|PLC|LLP)\b/giu,
@@ -545,7 +542,6 @@
         mode: "company"
       },
 
-      // 修改：第二个捕获组匹配整个地址行（直到行末）
       address_de_street: {
         pattern: /((?:address|shipping[ \t]*address|billing[ \t]*address|street[ \t]*address|mailing[ \t]*address)[ \t]*[:：=][ \t]*)([^\n\r]+)/giu,
         tag: "ADDRESS",
@@ -582,40 +578,34 @@
         tag: "ADDRESS"
       },
 
-      // 通用规则：单个捕获组匹配整个值，无 mode
       ref_generic_multi_tail: {
         pattern: /\b(?!ERR-)(?!SKU:)([A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{4,}(?:-\d{4,})+)\b/gu,
         tag: "REF"
       },
 
-      // 修正：将前瞻断言移入第一个捕获组
       ref_label_multi_tail: {
         pattern: /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*(?:[:：=]|-)[ \t]*)(?!ERR-)(?!SKU:))((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}?[-_.]\d{4,}(?:[-_.]\d{4,})+))/giu,
         tag: "REF",
         mode: "prefix"
       },
 
-      // 修正：将前瞻断言移入第一个捕获组
       ref_label_nextline: {
         pattern: /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*[:：=][ \t]*[\r]?\n[ \t]*)(?!ERR-)(?!SKU:))((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))/giu,
         tag: "REF",
         mode: "prefix"
       },
 
-      // 修正：将前瞻断言移入第一个捕获组
       ref_label_tail: {
         pattern: /((?:(?:application|order|invoice|reference|ref\.?|case|ticket|request|customer|account)[ \t]*(?:id|no\.?|number)?[ \t]*(?:[:：=]|-)[ \t]*)(?!ERR-)(?!SKU:))((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))/giu,
         tag: "REF",
         mode: "prefix"
       },
 
-      // 通用规则：单个捕获组匹配整个值，无 mode
       ref_generic_tail: {
         pattern: /\b(?!ERR-)(?!SKU:)([A-Z]{2,6}(?:-[A-Z0-9]{1,12}){1,6}-\d{5,})\b/gu,
         tag: "REF"
       },
 
-      // 修正：将前瞻断言移入第一个捕获组
       legal_ref_tail: {
         pattern: /((?:(?:contract[ \t]*number|claim[ \t]*reference|legal[ \t]*case[ \t]*ref)[ \t]*[:：=][ \t]*)(?!ERR-)(?!SKU:))((?:[A-Za-z0-9\[\]]+(?:[-_.][A-Za-z0-9\[\]]+){0,8}[-_.]\d{4,}))/giu,
         tag: "REF",
