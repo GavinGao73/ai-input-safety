@@ -195,6 +195,29 @@
     </div>
   </div>
 
+  <script>
+  (function () {
+    try {
+      const params = new URLSearchParams(location.search);
+      const text = params.get("text");
+
+      if (text) {
+        const ta = document.getElementById("inputText");
+        if (ta) {
+          ta.value = decodeURIComponent(text);
+
+          // 触发你的现有逻辑
+          if (typeof window.applyRules === "function") {
+            setTimeout(() => {
+              window.applyRules(ta.value);
+            }, 200);
+          }
+        }
+      }
+    } catch (e) {}
+  })();
+  </script>
+
   <!-- UI copy / lang -->
   <script src="./assets/i18n.js?v=20260309a1" defer></script>
 
