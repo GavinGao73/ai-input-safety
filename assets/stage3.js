@@ -244,6 +244,16 @@ function isSemanticReadingUsable(text, pagesText) {
 function setInputEditable(isEditable) {
   const ta = $("inputText");
   if (!ta) return;
+
+  // ✅ 如果没有上传文件 → 强制允许输入
+  const hasFile = !!window.lastUploadedFile;
+
+  if (!hasFile) {
+    ta.readOnly = false;
+    return;
+  }
+
+  // 原有逻辑（保持不变）
   ta.readOnly = !isEditable;
 }
 
