@@ -312,7 +312,9 @@ textarea{
 
 #inputWrap.pdf-overlay-on textarea{
   color: rgba(255,255,255,.92);
-  caret-color: transparent;
+  #inputText:not([readonly]) {
+  caret-color: auto;
+}
   -webkit-text-fill-color: rgba(255,255,255,.92);
 }
 #inputWrap.pdf-overlay-on textarea::selection{
